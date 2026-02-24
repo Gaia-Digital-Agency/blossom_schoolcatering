@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blossom School Catering — App Overview</title>
+
+    <!-- marked.js — renders markdown to HTML -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+
+    <style>
+        /* ── Reset ─────────────────────────────────────────── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        /* ── Tokens ────────────────────────────────────────── */
+        :root {
+            --black:        #000000;
+            --white:        #ffffff;
+            --grey-100:     #f4f4f4;
+            --grey-200:     #e8e8e8;
+            --grey-400:     #aaaaaa;
+            --grey-600:     #555555;
+            --text:         #111111;
+            --radius:       8px;
+            --font:         -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                            Helvetica, Arial, sans-serif;
+            --mono:         "SFMono-Regular", Consolas, "Liberation Mono",
+                            Menlo, monospace;
+        }
+
+        /* ── Base ──────────────────────────────────────────── */
+        html {
+            font-size: 16px;
+            -webkit-text-size-adjust: 100%;
+            scroll-behavior: smooth;
+        }
+        body {
+            font-family: var(--font);
+            line-height: 1.7;
+            background: var(--grey-100);
+            color: var(--text);
+            overflow-x: hidden;
+        }
+
+        /* ── Page header ───────────────────────────────────── */
+        .page-header {
+            background: var(--black);
+            color: var(--white);
+            padding: 2rem 1.5rem 1.75rem;
+            text-align: center;
+        }
+        .page-header .emoji {
+            font-size: 2rem;
+            display: block;
+            margin-bottom: 0.4rem;
+        }
+        .page-header h1 {
+            font-size: clamp(1.4rem, 5vw, 2rem);
+            font-weight: 800;
+            color: var(--white);
+            letter-spacing: -0.02em;
+            margin-bottom: 0.25rem;
+        }
+        .page-header p {
+            font-size: 0.85rem;
+            color: var(--white);
+            opacity: 0.6;
+        }
+
+        /* ── Page container ────────────────────────────────── */
+        .wrap {
+            max-width: 820px;
+            margin: 0 auto;
+            padding: 1.25rem 1rem 3rem;
+        }
+
+        /* ── Cards ─────────────────────────────────────────── */
+        .card {
+            background: var(--white);
+            border: 2px solid var(--black);
+            border-radius: var(--radius);
+            margin-bottom: 1.25rem;
+            overflow: hidden;
+        }
+        .card-head {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.65rem 1.2rem;
+            background: var(--black);
+        }
+        .card-head span {
+            font-size: 0.68rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--white);
+        }
+        .card-body {
+            padding: 1.5rem 1.4rem 1.75rem;
+        }
+
+        /* ── Markdown output typography ────────────────────── */
+        #readme h1 {
+            font-size: clamp(1.25rem, 4vw, 1.6rem);
+            font-weight: 800;
+            color: var(--black);
+            border-bottom: 2px solid var(--black);
+            padding-bottom: 0.35rem;
+            margin: 1.6rem 0 0.5rem;
+        }
+        #readme h1:first-child { margin-top: 0; }
+
+        #readme h2 {
+            font-size: clamp(1rem, 3.5vw, 1.2rem);
+            font-weight: 700;
+            color: var(--black);
+            border-bottom: 1px solid var(--grey-200);
+            padding-bottom: 0.25rem;
+            margin: 1.4rem 0 0.4rem;
+        }
+        #readme h3 {
+            font-size: clamp(0.95rem, 3vw, 1.05rem);
+            font-weight: 700;
+            color: var(--black);
+            margin: 1.1rem 0 0.3rem;
+        }
+        #readme h4 {
+            font-size: 0.88rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--grey-600);
+            margin: 0.9rem 0 0.25rem;
+        }
+        #readme p {
+            font-size: 0.95rem;
+            margin: 0.5rem 0;
+        }
+        #readme ul,
+        #readme ol {
+            margin: 0.4rem 0 0.4rem 1.4rem;
+        }
+        #readme li {
+            font-size: 0.93rem;
+            margin: 0.2rem 0;
+        }
+        #readme strong { font-weight: 700; }
+        #readme em     { font-style: italic; }
+        #readme a      { color: var(--black); text-decoration: underline; }
+        #readme hr {
+            border: none;
+            border-top: 1px solid var(--grey-200);
+            margin: 1.25rem 0;
+        }
+        #readme code {
+            font-family: var(--mono);
+            font-size: 0.8em;
+            background: var(--grey-200);
+            border: 1px solid var(--grey-400);
+            border-radius: 3px;
+            padding: 0.1em 0.35em;
+            color: var(--black);
+            word-break: break-all;
+        }
+        #readme pre {
+            background: var(--grey-200);
+            border: 1px solid var(--grey-400);
+            border-radius: var(--radius);
+            padding: 1rem;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin: 0.75rem 0;
+        }
+        #readme pre code {
+            font-size: 0.82rem;
+            background: none;
+            border: none;
+            padding: 0;
+            word-break: normal;
+            white-space: pre;
+        }
+        #readme table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.88rem;
+            margin: 0.75rem 0;
+            display: block;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        #readme th {
+            background: var(--black);
+            color: var(--white);
+            text-align: left;
+            font-weight: 700;
+            padding: 0.45rem 0.8rem;
+            border: 1px solid var(--black);
+            white-space: nowrap;
+        }
+        #readme td {
+            padding: 0.4rem 0.8rem;
+            border: 1px solid var(--grey-200);
+        }
+        #readme tr:nth-child(even) td { background: var(--grey-100); }
+        #readme blockquote {
+            border-left: 3px solid var(--black);
+            padding: 0.5rem 1rem;
+            background: var(--grey-100);
+            border-radius: 0 4px 4px 0;
+            color: var(--grey-600);
+            font-style: italic;
+            margin: 0.75rem 0;
+        }
+
+        /* ── Mermaid ERD ───────────────────────────────────── */
+        .mermaid-wrap {
+            width: 100%;
+        }
+        .mermaid-wrap .mermaid > svg {
+            width:   100% !important;
+            height:  auto !important;
+            display: block;
+        }
+
+        /* B&W overrides for mermaid SVG — all text black, boxes light */
+        .mermaid svg text                     { fill: var(--black) !important; }
+        .mermaid svg .er.entityBox            { fill: var(--grey-200) !important; stroke: var(--black) !important; }
+        .mermaid svg .er.attributeBoxOdd      { fill: var(--white)    !important; stroke: var(--grey-200) !important; }
+        .mermaid svg .er.attributeBoxEven     { fill: var(--grey-100) !important; stroke: var(--grey-200) !important; }
+        .mermaid svg .er.relationshipLine     { stroke: var(--black)  !important; }
+        .mermaid svg .er.relationshipLabelBox { fill: var(--white)    !important; stroke: var(--black) !important; }
+
+        .diagram-note {
+            font-size: 0.78rem;
+            color: var(--grey-600);
+            text-align: center;
+            margin-top: 0.75rem;
+        }
+
+        /* ── Footer ────────────────────────────────────────── */
+        .footer {
+            text-align: center;
+            font-size: 0.78rem;
+            color: var(--grey-600);
+            padding: 1rem 1rem 2.5rem;
+            border-top: 1px solid var(--grey-200);
+        }
+
+        /* ── Mobile tweaks ─────────────────────────────────── */
+        @media (max-width: 480px) {
+            .card-body        { padding: 1.1rem 1rem 1.3rem; }
+            #readme p,
+            #readme li        { font-size: 0.92rem; }
+        }
+    </style>
+</head>
+<body>
+
+<header class="page-header">
+    <span class="emoji">🌸</span>
+    <h1>Blossom School Catering</h1>
+    <p>App Overview &nbsp;·&nbsp; v1.0 &nbsp;·&nbsp; Feb 2026</p>
+</header>
+
+<div class="wrap">
+
+    <!-- README -->
+    <div class="card">
+        <div class="card-head">
+            <span>📋 &nbsp;README</span>
+        </div>
+        <div class="card-body">
+            <div id="readme"></div>
+        </div>
+    </div>
+
+    <!-- ERD -->
+    <div class="card">
+        <div class="card-head">
+            <span>🗄️ &nbsp;Database Schema — ERD</span>
+        </div>
+        <div class="card-body">
+            <div class="mermaid-wrap">
+                <div class="mermaid">
+erDiagram
+  USERS {
+    uuid id PK
+    role_type role
+    varchar username
+    text password_hash
+    varchar first_name
+    varchar last_name
+    varchar phone_number
+    varchar email
+    boolean is_active
+    timestamptz last_login_at
+    timestamptz created_at
+    timestamptz updated_at
+    timestamptz deleted_at
+  }
+  USER_PREFERENCES {
+    uuid id PK
+    uuid user_id FK
+    boolean dark_mode_enabled
+    boolean onboarding_completed
+    boolean tooltips_enabled
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  PARENTS {
+    uuid id PK
+    uuid user_id FK
+    text address
+    timestamptz created_at
+    timestamptz updated_at
+    timestamptz deleted_at
+  }
+  SCHOOLS {
+    uuid id PK
+    varchar name
+    text address
+    varchar city
+    varchar contact_email
+    varchar contact_phone
+    boolean is_active
+    timestamptz created_at
+    timestamptz updated_at
+    timestamptz deleted_at
+  }
+  ACADEMIC_YEARS {
+    uuid id PK
+    uuid school_id FK
+    varchar label
+    date start_date
+    date end_date
+    boolean is_active
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  ACADEMIC_TERMS {
+    uuid id PK
+    uuid academic_year_id FK
+    varchar label
+    integer term_number
+    date start_date
+    date end_date
+    boolean is_active
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  CHILDREN {
+    uuid id PK
+    uuid user_id FK
+    uuid school_id FK
+    date date_of_birth
+    gender_type gender
+    varchar school_grade
+    text photo_url
+    boolean is_active
+    timestamptz created_at
+    timestamptz updated_at
+    timestamptz deleted_at
+  }
+  PARENT_CHILDREN {
+    uuid id PK
+    uuid parent_id FK
+    uuid child_id FK
+    timestamptz created_at
+  }
+  CHILD_DIETARY_RESTRICTIONS {
+    uuid id PK
+    uuid child_id FK
+    varchar restriction_label
+    text restriction_details
+    boolean is_active
+    timestamptz created_at
+    timestamptz updated_at
+    timestamptz deleted_at
+  }
+  MENUS {
+    uuid id PK
+    session_type session
+    date service_date
+    boolean is_published
+    timestamptz created_at
+    timestamptz updated_at
+    timestamptz deleted_at
+  }
+  INGREDIENTS {
+    uuid id PK
+    varchar name
+    boolean is_active
+    boolean allergen_flag
+    text notes
+    timestamptz created_at
+    timestamptz updated_at
+    timestamptz deleted_at
+  }
+  MENU_ITEMS {
+    uuid id PK
+    uuid menu_id FK
+    varchar name
+    text description
+    text nutrition_facts_text
+    numeric price
+    text image_url
+    boolean is_available
+    integer display_order
+    timestamptz created_at
+    timestamptz updated_at
+    timestamptz deleted_at
+  }
+  MENU_ITEM_INGREDIENTS {
+    uuid id PK
+    uuid menu_item_id FK
+    uuid ingredient_id FK
+    timestamptz created_at
+  }
+  BLACKOUT_DAYS {
+    uuid id PK
+    date blackout_date
+    blackout_type type
+    text reason
+    uuid created_by FK
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  ORDER_CARTS {
+    uuid id PK
+    uuid child_id FK
+    uuid created_by_user_id FK
+    session_type session
+    date service_date
+    cart_status status
+    timestamptz expires_at
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  CART_ITEMS {
+    uuid id PK
+    uuid cart_id FK
+    uuid menu_item_id FK
+    integer quantity
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  ORDERS {
+    uuid id PK
+    uuid order_number
+    uuid cart_id FK
+    uuid child_id FK
+    uuid placed_by_user_id FK
+    session_type session
+    date service_date
+    order_status status
+    numeric total_price
+    text dietary_snapshot
+    timestamptz placed_at
+    timestamptz locked_at
+    delivery_status delivery_status
+    timestamptz delivered_at
+    uuid delivered_by_user_id FK
+    timestamptz created_at
+    timestamptz updated_at
+    timestamptz deleted_at
+  }
+  ORDER_ITEMS {
+    uuid id PK
+    uuid order_id FK
+    uuid menu_item_id FK
+    varchar item_name_snapshot
+    numeric price_snapshot
+    integer quantity
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  ORDER_MUTATIONS {
+    uuid id PK
+    uuid order_id FK
+    varchar action
+    uuid actor_user_id FK
+    timestamptz mutation_at
+    jsonb before_json
+    jsonb after_json
+  }
+  DELIVERY_ASSIGNMENTS {
+    uuid id PK
+    uuid order_id FK
+    uuid delivery_user_id FK
+    timestamptz assigned_at
+    timestamptz confirmed_at
+    text confirmation_note
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  BILLING_RECORDS {
+    uuid id PK
+    uuid order_id FK
+    uuid parent_id FK
+    payment_status status
+    text proof_image_url
+    timestamptz proof_uploaded_at
+    uuid verified_by FK
+    timestamptz verified_at
+    delivery_status delivery_status
+    timestamptz delivered_at
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  DIGITAL_RECEIPTS {
+    uuid id PK
+    uuid billing_record_id FK
+    varchar receipt_number
+    text pdf_url
+    timestamptz generated_at
+    uuid generated_by_user_id FK
+    timestamptz created_at
+  }
+  FAVOURITE_MEALS {
+    uuid id PK
+    uuid created_by_user_id FK
+    uuid child_id FK
+    varchar label
+    session_type session
+    boolean is_active
+    timestamptz created_at
+    timestamptz updated_at
+    timestamptz deleted_at
+  }
+  FAVOURITE_MEAL_ITEMS {
+    uuid id PK
+    uuid favourite_meal_id FK
+    uuid menu_item_id FK
+    integer quantity
+    timestamptz created_at
+  }
+  CHILD_BADGES {
+    uuid id PK
+    uuid child_id FK
+    badge_type badge_type
+    timestamptz earned_at
+    integer streak_count
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  ANALYTICS_DAILY_AGG {
+    date service_date PK
+    session_type session PK
+    uuid menu_item_id PK
+    bigint total_qty
+  }
+
+  USERS ||--o| USER_PREFERENCES : "preferences"
+  USERS ||--o| PARENTS : "profile"
+  USERS ||--o| CHILDREN : "profile"
+  SCHOOLS ||--o{ ACADEMIC_YEARS : "has"
+  SCHOOLS ||--o{ CHILDREN : "enrolled_in"
+  ACADEMIC_YEARS ||--o{ ACADEMIC_TERMS : "divided_into"
+  PARENTS ||--o{ PARENT_CHILDREN : "has"
+  CHILDREN ||--o{ PARENT_CHILDREN : "linked"
+  CHILDREN ||--o{ CHILD_DIETARY_RESTRICTIONS : "has"
+  CHILDREN ||--o{ CHILD_BADGES : "earns"
+  MENUS ||--o{ MENU_ITEMS : "contains"
+  MENU_ITEMS ||--o{ MENU_ITEM_INGREDIENTS : "uses"
+  INGREDIENTS ||--o{ MENU_ITEM_INGREDIENTS : "selected_in"
+  USERS ||--o{ BLACKOUT_DAYS : "created_by_admin"
+  CHILDREN ||--o{ ORDER_CARTS : "has_cart"
+  USERS ||--o{ ORDER_CARTS : "cart_creator"
+  ORDER_CARTS ||--o{ CART_ITEMS : "contains"
+  MENU_ITEMS ||--o{ CART_ITEMS : "in_cart"
+  ORDER_CARTS ||--o| ORDERS : "submitted_as"
+  CHILDREN ||--o{ ORDERS : "receives"
+  USERS ||--o{ ORDERS : "placed_by"
+  USERS ||--o{ ORDERS : "delivered_by"
+  ORDERS ||--o{ ORDER_ITEMS : "contains"
+  MENU_ITEMS ||--o{ ORDER_ITEMS : "ordered_as"
+  ORDERS ||--o{ ORDER_MUTATIONS : "audited_by"
+  USERS ||--o{ ORDER_MUTATIONS : "actor"
+  ORDERS ||--o| DELIVERY_ASSIGNMENTS : "assignment"
+  USERS ||--o{ DELIVERY_ASSIGNMENTS : "delivery_user"
+  ORDERS ||--o| BILLING_RECORDS : "billing"
+  PARENTS ||--o{ BILLING_RECORDS : "payer"
+  USERS ||--o{ BILLING_RECORDS : "verified_by_admin"
+  BILLING_RECORDS ||--o| DIGITAL_RECEIPTS : "has_receipt"
+  USERS ||--o{ DIGITAL_RECEIPTS : "generated_by"
+  USERS ||--o{ FAVOURITE_MEALS : "saved_by"
+  CHILDREN ||--o{ FAVOURITE_MEALS : "for_child"
+  FAVOURITE_MEALS ||--o{ FAVOURITE_MEAL_ITEMS : "contains"
+  MENU_ITEMS ||--o{ FAVOURITE_MEAL_ITEMS : "in_favourite"
+  MENU_ITEMS ||--o{ ANALYTICS_DAILY_AGG : "aggregated_item"
+                </div>
+            </div>
+            <p class="diagram-note">↕ Scrolls vertically with the page</p>
+        </div>
+    </div>
+
+</div>
+
+<footer class="footer">
+    Blossom School Catering &copy; 2026 Gaiada.com &nbsp;·&nbsp; All rights reserved
+</footer>
+
+<!-- Markdown source (hidden) -->
+<script id="md" type="text/plain">
+# Blossom School Catering
+
+Creation date: 2026-02-24
+GitHub: `git@github.com-net1io:Gaia-Digital-Agency/blossom_schoolcatering.git`
+Developed by Gaiada.com — Copyright (C) 2026
+
+## App Introduction
+
+Blossom School Catering is a mobile-first food ordering web application for
+international school catering in Bali, powered by Blossom Steakhouse kitchen.
+Parents and children place school meal orders (Lunch, Snack, Breakfast) via a
+cart/basket flow, while kitchen and admin users manage operations, reporting,
+and menu updates.
+
+## Business Goals
+
+- Enable simple, fast, cart-based meal ordering for families.
+- Support multi-school / multi-campus management with per-school academic year configuration.
+- Support parent-to-multiple-child management (up to 10 children per parent); each child registered separately.
+- Provide quick reorder, meal plan wizard, and favourite meals for returning users.
+- Ensure kitchen gets reliable order summaries, allergen alerts, and printable tags with QR codes.
+- Provide billing visibility with proof-of-payment upload and digital PDF receipts.
+- Engage children with a Clean Plate Club gamification system (streak and completion badges).
+- Go live by 1 April 2026 with required test completion.
+
+## Functional Scope
+
+- **Roles:** Parent, Child, Admin, Kitchen, Delivery.
+- **Sessions:** Lunch, Snack, Breakfast (display order: Lunch → Snack → Breakfast).
+- **Cart flow:** users build a cart before confirming an order; cart expires at 08:00 AM on service date.
+- **Order rule:** one meal set per child per session per day (max 3 sessions/day, max 5 items/order or cart).
+- **Child permissions:** create own order only; cannot edit/delete after placement.
+- **Parent permissions:** order per child, edit/delete before 08:00 same day; quick reorder; meal plan wizard.
+- **Weekday service:** meals are Monday–Friday only; blackout dates enforced.
+- **Schools:** multi-school/campus via schools master table; children linked by FK.
+- **Academic years/terms:** configurable per school; service dates outside active terms show a soft warning.
+- **Menu:** admin manages ingredient list; menu items link to it; search and filter available.
+- **Menu scale:** 20–50 items per session category.
+- **Allergens:** ingredient restrictions per child, snapshotted on each order for kitchen.
+- **Delivery:** role confirms delivered orders; billing delivery status updated automatically.
+- **Gamification:** streak and completion badges awarded server-side on each order placement.
+- **Preferences:** dark mode, onboarding flow, and tooltip preferences stored per user.
+- **Receipts:** digital PDF receipts generated by admin on payment verification.
+
+## App Architecture
+
+### 1) Client Layer (Mobile-first Web)
+
+- Next.js (TypeScript) frontend, Tailwind CSS with dark mode (`dark` class strategy).
+- Responsive dashboards for: Parent, Child, Admin, Kitchen, Delivery.
+- Session colour-coding: Lunch = amber, Snack = lime, Breakfast = sky blue.
+- Micro-animations: fade/slide transitions, confetti on order confirm, skeleton screens.
+- Progress stepper for billing: UNPAID → PENDING VERIFICATION → VERIFIED.
+- Kitchen dashboard: polling-based updates every 30–60 s with manual Refresh button.
+
+### 2) API / Application Layer
+
+- NestJS (TypeScript) with JWT auth and refresh token rotation.
+- Event-driven domain events (NestJS EventEmitter) for order lifecycle, billing, and badge calculation.
+- REST JSON APIs; OpenAPI/Swagger auto-generated from NestJS decorators.
+- Correlation ID middleware, rate limiting via ThrottlerModule.
+
+### 3) Data Layer
+
+- PostgreSQL (primary write + analytics read replica).
+- Redis for JWT refresh token store, cart expiry keys, visitor counter.
+- GCS + Cloud CDN for all assets: menu images, payment proof images, PDF receipts.
+
+### 4) Ops / Infra
+
+- GCP VM staging (`gda-s01`), Nginx reverse proxy, firewall-controlled ingress.
+- pg_cron for scheduled materialized view refresh (every 5 minutes).
+- Structured JSON logging (Winston) with correlation ID per request.
+
+## Technology Stack
+
+| Layer      | Technology                               |
+|------------|------------------------------------------|
+| Frontend   | Next.js 14 (TypeScript), Tailwind CSS    |
+| Backend    | NestJS (TypeScript), TypeORM             |
+| Database   | PostgreSQL 15 (primary + read replica)   |
+| Cache      | Redis 7                                  |
+| Storage    | Google Cloud Storage + Cloud CDN         |
+| Auth       | JWT + refresh token rotation             |
+| Events     | NestJS EventEmitter (synchronous)        |
+| Scheduling | pg_cron                                  |
+| Logging    | Winston (structured JSON)                |
+| Docs       | OpenAPI / Swagger                        |
+| Hosting    | GCP VM (Nginx reverse proxy)             |
+
+## New Features (v1.0)
+
+- **Cart / basket flow** — build and submit orders; expires 08:00 AM on service date
+- **Quick reorder** — one-tap repeat of a previous order into a new cart
+- **Meal plan wizard** — step-through interface to plan a full week of orders
+- **Smart cutoff countdown** — live timer showing time remaining to edit/submit
+- **Menu search & filter** — by name, allergen exclusion, price, session, favourites
+- **Guided onboarding** — first-run walkthrough for new parents
+- **Tooltips** — contextual help icons throughout UI (per-user opt-out stored)
+- **Favourite meals** — save up to 5 named meal presets per child per session
+- **Calendar view** — monthly/weekly calendar showing ordered and available days
+- **Nutritional summary** — weekly per-child meal variety report
+- **Allergen alert dashboard** — kitchen view of dietary restriction conflicts per order
+- **QR code order tags** — printable kitchen labels with QR codes
+- **Spending dashboard** — parent view of monthly spend with outstanding amounts
+- **Revenue dashboard** — admin view of revenue by school and session
+- **Multi-school / campus** — schools master table; children linked by FK
+- **Academic year / term** — configurable per school; soft warning for out-of-term dates
+- **Digital PDF receipts** — auto-generated on payment verification (`BLC-YYYY-NNNNN`)
+- **Birthday meal highlight** — visual badge on order cards matching child's birthday
+- **Clean Plate Club gamification** — streak and completion badges for children
+- **Dark mode** — Tailwind `dark` class strategy; preference stored per user
+- **Bulk CSV import** — admin uploads CSV to batch-create parent and child accounts
+- **Registration page** — dedicated page; each child registered separately
+
+## App Language
+
+English only — no i18n / multi-language support in v1.
+</script>
+
+<!-- Render markdown -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var src = document.getElementById('md').textContent.trim();
+        document.getElementById('readme').innerHTML = marked.parse(src);
+    });
+</script>
+
+<!-- Mermaid ERD -->
+<script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+        startOnLoad: true,
+        theme: 'neutral',
+        er: {
+            layoutDirection: 'TB',
+            useMaxWidth:     true,
+            diagramPadding:  20,
+            minEntityWidth:  120,
+            minEntityHeight: 60,
+            entityPadding:   15,
+        }
+    });
+</script>
+
+</body>
+</html>
