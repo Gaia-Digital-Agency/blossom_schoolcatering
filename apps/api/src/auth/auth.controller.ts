@@ -6,9 +6,10 @@ import { Roles } from './roles.decorator';
 import { RolesGuard } from './roles.guard';
 
 type LoginBody = {
-  username: string;
-  password: string;
-  role: string;
+  username?: string;
+  identifier?: string;
+  password?: string;
+  role?: string;
 };
 
 type RefreshBody = {
@@ -38,7 +39,13 @@ export class AuthController {
 
   @Post('login')
   login(@Body() body: LoginBody) {
-    return this.authService.login(body.username, body.password, body.role);
+    const username = body.username ?? body.identifier;
+    const password = body.password;
+    const role = body.role;
+    if (!username || !password || !role) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+    return this.authService.login(username, password, role);
   }
 
   @Post('google/dev')
