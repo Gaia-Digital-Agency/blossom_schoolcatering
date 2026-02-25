@@ -1,0 +1,2194 @@
+{
+  "meta": {
+    "dataset_version": "v1",
+    "generated_on": "2026-02-25",
+    "notes": "Sample dataset for Section 5 and role simulation"
+  },
+  "counts": {
+    "schools": 3,
+    "service_days": 10,
+    "sessions_per_day": 3,
+    "dishes_per_session": 5,
+    "parents": 10,
+    "youngsters": 30,
+    "delivery_persons": 3
+  },
+  "schools": [
+    {
+      "id": "sch-001",
+      "shortname": "BPC",
+      "full_name": "Blossom Primary Campus",
+      "city": "Denpasar",
+      "status": "active"
+    },
+    {
+      "id": "sch-002",
+      "shortname": "BWC",
+      "full_name": "Blossom West Campus",
+      "city": "Badung",
+      "status": "active"
+    },
+    {
+      "id": "sch-003",
+      "shortname": "BEC",
+      "full_name": "Blossom East Campus",
+      "city": "Gianyar",
+      "status": "active"
+    }
+  ],
+  "blackout_days": [
+    {
+      "id": "blk-001",
+      "year": 2026,
+      "long_name": "Nyepi Preparation",
+      "short_name": "NyepiPrep",
+      "from_date": "2026-03-11",
+      "to_date": "2026-03-11",
+      "days": 1,
+      "status": "active"
+    }
+  ],
+  "menu_calendar": [
+    {
+      "date": "2026-03-02",
+      "sessions": {
+        "LUNCH": [
+          {
+            "full_item_name": "Palak Paneer",
+            "short_item_name": "Palak",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 15000,
+            "cuisine": "indian"
+          },
+          {
+            "full_item_name": "Caesar Salad",
+            "short_item_name": "Caesar",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 15000,
+            "cuisine": "western"
+          },
+          {
+            "full_item_name": "Spaghetti and Meatballs",
+            "short_item_name": "Spaghetti",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 15000,
+            "cuisine": "kids_favorites"
+          },
+          {
+            "full_item_name": "Mango Sticky Rice",
+            "short_item_name": "Mango",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 12000,
+            "cuisine": "thai"
+          },
+          {
+            "full_item_name": "Manakish",
+            "short_item_name": "Manakish",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 25000,
+            "cuisine": "arab"
+          }
+        ],
+        "SNACK": [
+          {
+            "full_item_name": "Potato Salad",
+            "short_item_name": "Potato",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 12000,
+            "cuisine": "western"
+          },
+          {
+            "full_item_name": "Minestrone",
+            "short_item_name": "Minestrone",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 15000,
+            "cuisine": "italian"
+          },
+          {
+            "full_item_name": "Nasi Uduk",
+            "short_item_name": "Nasi",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 15000,
+            "cuisine": "indonesian"
+          },
+          {
+            "full_item_name": "Ants on a Log",
+            "short_item_name": "Ants",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 25000,
+            "cuisine": "kids_favorites"
+          },
+          {
+            "full_item_name": "Corn Dogs",
+            "short_item_name": "Corn",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 25000,
+            "cuisine": "kids_favorites"
+          }
+        ],
+        "BREAKFAST": [
+          {
+            "full_item_name": "Spaghetti and Meatballs",
+            "short_item_name": "Spaghetti",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 25000,
+            "cuisine": "kids_favorites"
+          },
+          {
+            "full_item_name": "Risotto alla Milanese",
+            "short_item_name": "Risotto",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 22000,
+            "cuisine": "italian"
+          },
+          {
+            "full_item_name": "Char Siu",
+            "short_item_name": "Char",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 15000,
+            "cuisine": "chinese"
+          },
+          {
+            "full_item_name": "Som Tum",
+            "short_item_name": "Som",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 22000,
+            "cuisine": "thai"
+          },
+          {
+            "full_item_name": "Samosas",
+            "short_item_name": "Samosas",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 25000,
+            "cuisine": "indian"
+          }
+        ]
+      }
+    },
+    {
+      "date": "2026-03-03",
+      "sessions": {
+        "LUNCH": [
+          {
+            "full_item_name": "Shakshuka",
+            "short_item_name": "Shakshuka",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 15000,
+            "cuisine": "arab"
+          },
+          {
+            "full_item_name": "Sundubu Jjigae",
+            "short_item_name": "Sundubu",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 22000,
+            "cuisine": "korean"
+          },
+          {
+            "full_item_name": "Paella (Spain)",
+            "short_item_name": "Paella",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 18000,
+            "cuisine": "other_famous_world_foods"
+          },
+          {
+            "full_item_name": "Chicken Nuggets",
+            "short_item_name": "Chicken",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 18000,
+            "cuisine": "kids_favorites"
+          },
+          {
+            "full_item_name": "Cashew Chicken",
+            "short_item_name": "Cashew",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 15000,
+            "cuisine": "thai"
+          }
+        ],
+        "SNACK": [
+          {
+            "full_item_name": "Scallion Pancakes",
+            "short_item_name": "Scallion",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 22000,
+            "cuisine": "chinese"
+          },
+          {
+            "full_item_name": "Khao Soi",
+            "short_item_name": "Khao",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 12000,
+            "cuisine": "thai"
+          },
+          {
+            "full_item_name": "Cha Gio",
+            "short_item_name": "Cha",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 18000,
+            "cuisine": "vietnamese"
+          },
+          {
+            "full_item_name": "Reuben Sandwich",
+            "short_item_name": "Reuben",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 18000,
+            "cuisine": "western"
+          },
+          {
+            "full_item_name": "Buffalo Wings",
+            "short_item_name": "Buffalo",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 25000,
+            "cuisine": "western"
+          }
+        ],
+        "BREAKFAST": [
+          {
+            "full_item_name": "Baba Ganoush",
+            "short_item_name": "Baba",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 25000,
+            "cuisine": "arab"
+          },
+          {
+            "full_item_name": "Korean Fried Chicken",
+            "short_item_name": "Korean",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 12000,
+            "cuisine": "korean"
+          },
+          {
+            "full_item_name": "English Muffin Pizzas",
+            "short_item_name": "English",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 22000,
+            "cuisine": "kids_favorites"
+          },
+          {
+            "full_item_name": "Pad Krapow Moo",
+            "short_item_name": "Pad",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 12000,
+            "cuisine": "thai"
+          },
+          {
+            "full_item_name": "Klepon",
+            "short_item_name": "Klepon",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 25000,
+            "cuisine": "indonesian"
+          }
+        ]
+      }
+    },
+    {
+      "date": "2026-03-04",
+      "sessions": {
+        "LUNCH": [
+          {
+            "full_item_name": "Musakhan",
+            "short_item_name": "Musakhan",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 18000,
+            "cuisine": "arab"
+          },
+          {
+            "full_item_name": "Jajangmyeon",
+            "short_item_name": "Jajangmyeon",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 25000,
+            "cuisine": "korean"
+          },
+          {
+            "full_item_name": "Butter Chicken",
+            "short_item_name": "Butter",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 15000,
+            "cuisine": "indian"
+          },
+          {
+            "full_item_name": "Bistecca alla Fiorentina",
+            "short_item_name": "Bistecca",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 12000,
+            "cuisine": "italian"
+          },
+          {
+            "full_item_name": "Ceviche (Peru)",
+            "short_item_name": "Ceviche",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 12000,
+            "cuisine": "other_famous_world_foods"
+          }
+        ],
+        "SNACK": [
+          {
+            "full_item_name": "Aloo Gobi",
+            "short_item_name": "Aloo",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 15000,
+            "cuisine": "indian"
+          },
+          {
+            "full_item_name": "Dan Dan Noodles",
+            "short_item_name": "Dan",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 12000,
+            "cuisine": "chinese"
+          },
+          {
+            "full_item_name": "Thai Fish Cakes",
+            "short_item_name": "Thai",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 22000,
+            "cuisine": "thai"
+          },
+          {
+            "full_item_name": "Harees",
+            "short_item_name": "Harees",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 18000,
+            "cuisine": "arab"
+          },
+          {
+            "full_item_name": "Hamburger",
+            "short_item_name": "Hamburger",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 22000,
+            "cuisine": "western"
+          }
+        ],
+        "BREAKFAST": [
+          {
+            "full_item_name": "Biryani",
+            "short_item_name": "Biryani",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 18000,
+            "cuisine": "indian"
+          },
+          {
+            "full_item_name": "Samgyetang",
+            "short_item_name": "Samgyetang",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 15000,
+            "cuisine": "korean"
+          },
+          {
+            "full_item_name": "Banh Cuon",
+            "short_item_name": "Banh",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 18000,
+            "cuisine": "vietnamese"
+          },
+          {
+            "full_item_name": "Kung Pao Chicken",
+            "short_item_name": "Kung",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 12000,
+            "cuisine": "chinese"
+          },
+          {
+            "full_item_name": "Banh Khot",
+            "short_item_name": "Banh",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 25000,
+            "cuisine": "vietnamese"
+          }
+        ]
+      }
+    },
+    {
+      "date": "2026-03-05",
+      "sessions": {
+        "LUNCH": [
+          {
+            "full_item_name": "Biryani",
+            "short_item_name": "Biryani",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 15000,
+            "cuisine": "indian"
+          },
+          {
+            "full_item_name": "Wonton Soup",
+            "short_item_name": "Wonton",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 22000,
+            "cuisine": "chinese"
+          },
+          {
+            "full_item_name": "Pissaladiere",
+            "short_item_name": "Pissaladiere",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 22000,
+            "cuisine": "french"
+          },
+          {
+            "full_item_name": "Pad Krapow Moo",
+            "short_item_name": "Pad",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 18000,
+            "cuisine": "thai"
+          },
+          {
+            "full_item_name": "Mandi",
+            "short_item_name": "Mandi",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 25000,
+            "cuisine": "arab"
+          }
+        ],
+        "SNACK": [
+          {
+            "full_item_name": "General Tso\u2019s Chicken",
+            "short_item_name": "General",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 12000,
+            "cuisine": "chinese"
+          },
+          {
+            "full_item_name": "Chole Bhature",
+            "short_item_name": "Chole",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 15000,
+            "cuisine": "indian"
+          },
+          {
+            "full_item_name": "Bun Cha",
+            "short_item_name": "Bun",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 12000,
+            "cuisine": "vietnamese"
+          },
+          {
+            "full_item_name": "Bossam",
+            "short_item_name": "Bossam",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 18000,
+            "cuisine": "korean"
+          },
+          {
+            "full_item_name": "Steamed Lime Fish",
+            "short_item_name": "Steamed",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 22000,
+            "cuisine": "thai"
+          }
+        ],
+        "BREAKFAST": [
+          {
+            "full_item_name": "Kofta",
+            "short_item_name": "Kofta",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 18000,
+            "cuisine": "arab"
+          },
+          {
+            "full_item_name": "Banana Boats",
+            "short_item_name": "Banana",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 15000,
+            "cuisine": "kids_favorites"
+          },
+          {
+            "full_item_name": "Lo Mein",
+            "short_item_name": "Lo",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 22000,
+            "cuisine": "chinese"
+          },
+          {
+            "full_item_name": "Haggis (Scotland)",
+            "short_item_name": "Haggis",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 22000,
+            "cuisine": "other_famous_world_foods"
+          },
+          {
+            "full_item_name": "Focaccia",
+            "short_item_name": "Focaccia",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 22000,
+            "cuisine": "italian"
+          }
+        ]
+      }
+    },
+    {
+      "date": "2026-03-06",
+      "sessions": {
+        "LUNCH": [
+          {
+            "full_item_name": "Pot Roast",
+            "short_item_name": "Pot",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 25000,
+            "cuisine": "western"
+          },
+          {
+            "full_item_name": "Baba Ganoush",
+            "short_item_name": "Baba",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 25000,
+            "cuisine": "arab"
+          },
+          {
+            "full_item_name": "Biscuits and Gravy",
+            "short_item_name": "Biscuits",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 18000,
+            "cuisine": "western"
+          },
+          {
+            "full_item_name": "Kibbeh",
+            "short_item_name": "Kibbeh",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 25000,
+            "cuisine": "arab"
+          },
+          {
+            "full_item_name": "Pad See Ew",
+            "short_item_name": "Pad",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 22000,
+            "cuisine": "thai"
+          }
+        ],
+        "SNACK": [
+          {
+            "full_item_name": "Borscht (Ukraine)",
+            "short_item_name": "Borscht",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 15000,
+            "cuisine": "other_famous_world_foods"
+          },
+          {
+            "full_item_name": "Arancini",
+            "short_item_name": "Arancini",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 25000,
+            "cuisine": "italian"
+          },
+          {
+            "full_item_name": "Rendang",
+            "short_item_name": "Rendang",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 22000,
+            "cuisine": "indonesian"
+          },
+          {
+            "full_item_name": "Bun Thit Nuong",
+            "short_item_name": "Bun",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 12000,
+            "cuisine": "vietnamese"
+          },
+          {
+            "full_item_name": "General Tso\u2019s Chicken",
+            "short_item_name": "General",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 12000,
+            "cuisine": "chinese"
+          }
+        ],
+        "BREAKFAST": [
+          {
+            "full_item_name": "Sushi (Japan)",
+            "short_item_name": "Sushi",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 22000,
+            "cuisine": "other_famous_world_foods"
+          },
+          {
+            "full_item_name": "Caesar Salad",
+            "short_item_name": "Caesar",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 25000,
+            "cuisine": "western"
+          },
+          {
+            "full_item_name": "Waldorf Salad",
+            "short_item_name": "Waldorf",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 12000,
+            "cuisine": "western"
+          },
+          {
+            "full_item_name": "Butter Chicken",
+            "short_item_name": "Butter",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 22000,
+            "cuisine": "indian"
+          },
+          {
+            "full_item_name": "Peking Duck",
+            "short_item_name": "Peking",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 22000,
+            "cuisine": "chinese"
+          }
+        ]
+      }
+    },
+    {
+      "date": "2026-03-07",
+      "sessions": {
+        "LUNCH": [
+          {
+            "full_item_name": "Pesto alla Genovese",
+            "short_item_name": "Pesto",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 12000,
+            "cuisine": "italian"
+          },
+          {
+            "full_item_name": "Dadar Gulung",
+            "short_item_name": "Dadar",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 12000,
+            "cuisine": "indonesian"
+          },
+          {
+            "full_item_name": "Foie Gras",
+            "short_item_name": "Foie",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 25000,
+            "cuisine": "french"
+          },
+          {
+            "full_item_name": "Maqluba",
+            "short_item_name": "Maqluba",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 18000,
+            "cuisine": "arab"
+          },
+          {
+            "full_item_name": "Pizza Margherita",
+            "short_item_name": "Pizza",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 18000,
+            "cuisine": "italian"
+          }
+        ],
+        "SNACK": [
+          {
+            "full_item_name": "Caesar Salad",
+            "short_item_name": "Caesar",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 12000,
+            "cuisine": "western"
+          },
+          {
+            "full_item_name": "Musakhan",
+            "short_item_name": "Musakhan",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 18000,
+            "cuisine": "arab"
+          },
+          {
+            "full_item_name": "Ayam Penyet",
+            "short_item_name": "Ayam",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 25000,
+            "cuisine": "indonesian"
+          },
+          {
+            "full_item_name": "Peking Duck",
+            "short_item_name": "Peking",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 15000,
+            "cuisine": "chinese"
+          },
+          {
+            "full_item_name": "Martabak Manis",
+            "short_item_name": "Martabak",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 25000,
+            "cuisine": "indonesian"
+          }
+        ],
+        "BREAKFAST": [
+          {
+            "full_item_name": "Haggis (Scotland)",
+            "short_item_name": "Haggis",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 25000,
+            "cuisine": "other_famous_world_foods"
+          },
+          {
+            "full_item_name": "Eggs Benedict",
+            "short_item_name": "Eggs",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 25000,
+            "cuisine": "western"
+          },
+          {
+            "full_item_name": "Paella (Spain)",
+            "short_item_name": "Paella",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 15000,
+            "cuisine": "other_famous_world_foods"
+          },
+          {
+            "full_item_name": "Butter Chicken",
+            "short_item_name": "Butter",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 15000,
+            "cuisine": "indian"
+          },
+          {
+            "full_item_name": "Luqaimat",
+            "short_item_name": "Luqaimat",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 18000,
+            "cuisine": "arab"
+          }
+        ]
+      }
+    },
+    {
+      "date": "2026-03-08",
+      "sessions": {
+        "LUNCH": [
+          {
+            "full_item_name": "Khao Soi",
+            "short_item_name": "Khao",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 25000,
+            "cuisine": "thai"
+          },
+          {
+            "full_item_name": "Kung Pao Chicken",
+            "short_item_name": "Kung",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 12000,
+            "cuisine": "chinese"
+          },
+          {
+            "full_item_name": "Sole Meuniere",
+            "short_item_name": "Sole",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 25000,
+            "cuisine": "french"
+          },
+          {
+            "full_item_name": "Hor Mok Pla",
+            "short_item_name": "Hor",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 18000,
+            "cuisine": "thai"
+          },
+          {
+            "full_item_name": "Croissant (France/Austria)",
+            "short_item_name": "Croissant",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 22000,
+            "cuisine": "other_famous_world_foods"
+          }
+        ],
+        "SNACK": [
+          {
+            "full_item_name": "Grilled Cheese Sandwich",
+            "short_item_name": "Grilled",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 18000,
+            "cuisine": "kids_favorites"
+          },
+          {
+            "full_item_name": "Caesar Salad",
+            "short_item_name": "Caesar",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 15000,
+            "cuisine": "western"
+          },
+          {
+            "full_item_name": "Pierogi (Poland)",
+            "short_item_name": "Pierogi",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 12000,
+            "cuisine": "other_famous_world_foods"
+          },
+          {
+            "full_item_name": "Bun Thit Nuong",
+            "short_item_name": "Bun",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 15000,
+            "cuisine": "vietnamese"
+          },
+          {
+            "full_item_name": "Moussaka (Greece)",
+            "short_item_name": "Moussaka",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 25000,
+            "cuisine": "other_famous_world_foods"
+          }
+        ],
+        "BREAKFAST": [
+          {
+            "full_item_name": "Hamburger",
+            "short_item_name": "Hamburger",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 12000,
+            "cuisine": "western"
+          },
+          {
+            "full_item_name": "Hot Dogs",
+            "short_item_name": "Hot",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 25000,
+            "cuisine": "western"
+          },
+          {
+            "full_item_name": "Tom Kha Gai",
+            "short_item_name": "Tom",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 15000,
+            "cuisine": "thai"
+          },
+          {
+            "full_item_name": "Bouillabaisse",
+            "short_item_name": "Bouillabaisse",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 15000,
+            "cuisine": "french"
+          },
+          {
+            "full_item_name": "Galbi",
+            "short_item_name": "Galbi",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 22000,
+            "cuisine": "korean"
+          }
+        ]
+      }
+    },
+    {
+      "date": "2026-03-09",
+      "sessions": {
+        "LUNCH": [
+          {
+            "full_item_name": "Lasagna alla Bolognese",
+            "short_item_name": "Lasagna",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 25000,
+            "cuisine": "italian"
+          },
+          {
+            "full_item_name": "Mapo Tofu",
+            "short_item_name": "Mapo",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 22000,
+            "cuisine": "chinese"
+          },
+          {
+            "full_item_name": "Baba Ganoush",
+            "short_item_name": "Baba",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 15000,
+            "cuisine": "arab"
+          },
+          {
+            "full_item_name": "Foie Gras",
+            "short_item_name": "Foie",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 25000,
+            "cuisine": "french"
+          },
+          {
+            "full_item_name": "Fish and Chips (UK)",
+            "short_item_name": "Fish",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 15000,
+            "cuisine": "other_famous_world_foods"
+          }
+        ],
+        "SNACK": [
+          {
+            "full_item_name": "Green Curry",
+            "short_item_name": "Green",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 18000,
+            "cuisine": "thai"
+          },
+          {
+            "full_item_name": "Ful Medames",
+            "short_item_name": "Ful",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 22000,
+            "cuisine": "arab"
+          },
+          {
+            "full_item_name": "Rendang",
+            "short_item_name": "Rendang",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 25000,
+            "cuisine": "indonesian"
+          },
+          {
+            "full_item_name": "Tandoori Chicken",
+            "short_item_name": "Tandoori",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 22000,
+            "cuisine": "indian"
+          },
+          {
+            "full_item_name": "Samosas",
+            "short_item_name": "Samosas",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 12000,
+            "cuisine": "indian"
+          }
+        ],
+        "BREAKFAST": [
+          {
+            "full_item_name": "Kibbeh",
+            "short_item_name": "Kibbeh",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 25000,
+            "cuisine": "arab"
+          },
+          {
+            "full_item_name": "Congee",
+            "short_item_name": "Congee",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 25000,
+            "cuisine": "chinese"
+          },
+          {
+            "full_item_name": "Banana Boats",
+            "short_item_name": "Banana",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 15000,
+            "cuisine": "kids_favorites"
+          },
+          {
+            "full_item_name": "Cha Gio",
+            "short_item_name": "Cha",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 25000,
+            "cuisine": "vietnamese"
+          },
+          {
+            "full_item_name": "Tater Tots",
+            "short_item_name": "Tater",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 15000,
+            "cuisine": "kids_favorites"
+          }
+        ]
+      }
+    },
+    {
+      "date": "2026-03-10",
+      "sessions": {
+        "LUNCH": [
+          {
+            "full_item_name": "Chicken Nuggets",
+            "short_item_name": "Chicken",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 15000,
+            "cuisine": "kids_favorites"
+          },
+          {
+            "full_item_name": "Turkey and Cheese Roll-ups",
+            "short_item_name": "Turkey",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 12000,
+            "cuisine": "kids_favorites"
+          },
+          {
+            "full_item_name": "Tom Yum Goong",
+            "short_item_name": "Tom",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 12000,
+            "cuisine": "thai"
+          },
+          {
+            "full_item_name": "Chicken Tikka Masala",
+            "short_item_name": "Chicken",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 18000,
+            "cuisine": "indian"
+          },
+          {
+            "full_item_name": "Mashed Potatoes",
+            "short_item_name": "Mashed",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 12000,
+            "cuisine": "kids_favorites"
+          }
+        ],
+        "SNACK": [
+          {
+            "full_item_name": "Tarte Tatin",
+            "short_item_name": "Tarte",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 15000,
+            "cuisine": "french"
+          },
+          {
+            "full_item_name": "Mansaf",
+            "short_item_name": "Mansaf",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 25000,
+            "cuisine": "arab"
+          },
+          {
+            "full_item_name": "Shakshuka",
+            "short_item_name": "Shakshuka",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 15000,
+            "cuisine": "arab"
+          },
+          {
+            "full_item_name": "Tandoori Chicken",
+            "short_item_name": "Tandoori",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 25000,
+            "cuisine": "indian"
+          },
+          {
+            "full_item_name": "Bouillabaisse",
+            "short_item_name": "Bouillabaisse",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 25000,
+            "cuisine": "french"
+          }
+        ],
+        "BREAKFAST": [
+          {
+            "full_item_name": "Coq au Vin",
+            "short_item_name": "Coq",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 15000,
+            "cuisine": "french"
+          },
+          {
+            "full_item_name": "Mandi",
+            "short_item_name": "Mandi",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 12000,
+            "cuisine": "arab"
+          },
+          {
+            "full_item_name": "Bibimbap",
+            "short_item_name": "Bibimbap",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 12000,
+            "cuisine": "korean"
+          },
+          {
+            "full_item_name": "Korean Fried Chicken",
+            "short_item_name": "Korean",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 22000,
+            "cuisine": "korean"
+          },
+          {
+            "full_item_name": "Soto Ayam",
+            "short_item_name": "Soto",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 18000,
+            "cuisine": "indonesian"
+          }
+        ]
+      }
+    },
+    {
+      "date": "2026-03-11",
+      "sessions": {
+        "LUNCH": [
+          {
+            "full_item_name": "Nasi Uduk",
+            "short_item_name": "Nasi",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 12000,
+            "cuisine": "indonesian"
+          },
+          {
+            "full_item_name": "Bakso",
+            "short_item_name": "Bakso",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 12000,
+            "cuisine": "indonesian"
+          },
+          {
+            "full_item_name": "Dadar Gulung",
+            "short_item_name": "Dadar",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 12000,
+            "cuisine": "indonesian"
+          },
+          {
+            "full_item_name": "Tacos (Mexico)",
+            "short_item_name": "Tacos",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 22000,
+            "cuisine": "other_famous_world_foods"
+          },
+          {
+            "full_item_name": "Pad Krapow Moo",
+            "short_item_name": "Pad",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 18000,
+            "cuisine": "thai"
+          }
+        ],
+        "SNACK": [
+          {
+            "full_item_name": "Tteokbokki",
+            "short_item_name": "Tteokbokki",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 15000,
+            "cuisine": "korean"
+          },
+          {
+            "full_item_name": "Sushi (Japan)",
+            "short_item_name": "Sushi",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 25000,
+            "cuisine": "other_famous_world_foods"
+          },
+          {
+            "full_item_name": "Eggs Benedict",
+            "short_item_name": "Eggs",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 22000,
+            "cuisine": "western"
+          },
+          {
+            "full_item_name": "Kibbeh",
+            "short_item_name": "Kibbeh",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 15000,
+            "cuisine": "arab"
+          },
+          {
+            "full_item_name": "Zha Jiang Mian",
+            "short_item_name": "Zha",
+            "dish_type": "Dry",
+            "active": true,
+            "cutlery_needed": false,
+            "price_rupiah": 22000,
+            "cuisine": "chinese"
+          }
+        ],
+        "BREAKFAST": [
+          {
+            "full_item_name": "Sweet and Sour Pork",
+            "short_item_name": "Sweet",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 12000,
+            "cuisine": "chinese"
+          },
+          {
+            "full_item_name": "Shakshuka",
+            "short_item_name": "Shakshuka",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 22000,
+            "cuisine": "arab"
+          },
+          {
+            "full_item_name": "Babi Guling",
+            "short_item_name": "Babi",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 25000,
+            "cuisine": "indonesian"
+          },
+          {
+            "full_item_name": "Kibbeh",
+            "short_item_name": "Kibbeh",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 12000,
+            "cuisine": "arab"
+          },
+          {
+            "full_item_name": "Fish and Chips (UK)",
+            "short_item_name": "Fish",
+            "dish_type": "Wet",
+            "active": true,
+            "cutlery_needed": true,
+            "price_rupiah": 12000,
+            "cuisine": "other_famous_world_foods"
+          }
+        ]
+      }
+    }
+  ],
+  "parents": [
+    {
+      "id": "par-001",
+      "full_name": "Emma Wilson",
+      "username": "parent1",
+      "nationality": "Australian",
+      "mobile_number": "+62811100000",
+      "school_id": "sch-001",
+      "status": "active",
+      "youngsters_count": 1
+    },
+    {
+      "id": "par-002",
+      "full_name": "Liam Brown",
+      "username": "parent2",
+      "nationality": "Australian",
+      "mobile_number": "+62811100001",
+      "school_id": "sch-002",
+      "status": "active",
+      "youngsters_count": 1
+    },
+    {
+      "id": "par-003",
+      "full_name": "Olivia Davis",
+      "username": "parent3",
+      "nationality": "American",
+      "mobile_number": "+62811100002",
+      "school_id": "sch-003",
+      "status": "active",
+      "youngsters_count": 2
+    },
+    {
+      "id": "par-004",
+      "full_name": "Noah Miller",
+      "username": "parent4",
+      "nationality": "American",
+      "mobile_number": "+62811100003",
+      "school_id": "sch-001",
+      "status": "active",
+      "youngsters_count": 2
+    },
+    {
+      "id": "par-005",
+      "full_name": "Mei Chen",
+      "username": "parent5",
+      "nationality": "Chinese",
+      "mobile_number": "+62811100004",
+      "school_id": "sch-002",
+      "status": "active",
+      "youngsters_count": 3
+    },
+    {
+      "id": "par-006",
+      "full_name": "Wei Zhang",
+      "username": "parent6",
+      "nationality": "Chinese",
+      "mobile_number": "+62811100005",
+      "school_id": "sch-003",
+      "status": "active",
+      "youngsters_count": 3
+    },
+    {
+      "id": "par-007",
+      "full_name": "Made Ayu",
+      "username": "parent7",
+      "nationality": "Indonesian",
+      "mobile_number": "+62811100006",
+      "school_id": "sch-001",
+      "status": "active",
+      "youngsters_count": 4
+    },
+    {
+      "id": "par-008",
+      "full_name": "Ketut Putra",
+      "username": "parent8",
+      "nationality": "Indonesian",
+      "mobile_number": "+62811100007",
+      "school_id": "sch-002",
+      "status": "active",
+      "youngsters_count": 4
+    },
+    {
+      "id": "par-009",
+      "full_name": "Ananya Rao",
+      "username": "parent9",
+      "nationality": "Indian",
+      "mobile_number": "+62811100008",
+      "school_id": "sch-003",
+      "status": "active",
+      "youngsters_count": 5
+    },
+    {
+      "id": "par-010",
+      "full_name": "Arjun Nair",
+      "username": "parent10",
+      "nationality": "Indian",
+      "mobile_number": "+62811100009",
+      "school_id": "sch-001",
+      "status": "active",
+      "youngsters_count": 5
+    }
+  ],
+  "youngsters": [
+    {
+      "id": "kid-001",
+      "full_name": "Youngster 1",
+      "username": "youngster1",
+      "parent_id": "par-001",
+      "school_id": "sch-001",
+      "grade": "Grade 5",
+      "dietary_restrictions": [
+        "none"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "kid-002",
+      "full_name": "Youngster 2",
+      "username": "youngster2",
+      "parent_id": "par-002",
+      "school_id": "sch-002",
+      "grade": "Grade 1",
+      "dietary_restrictions": [
+        "peanut"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "kid-003",
+      "full_name": "Youngster 3",
+      "username": "youngster3",
+      "parent_id": "par-003",
+      "school_id": "sch-003",
+      "grade": "Grade 2",
+      "dietary_restrictions": [
+        "egg"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "kid-004",
+      "full_name": "Youngster 4",
+      "username": "youngster4",
+      "parent_id": "par-003",
+      "school_id": "sch-001",
+      "grade": "Grade 4",
+      "dietary_restrictions": [
+        "egg"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "kid-005",
+      "full_name": "Youngster 5",
+      "username": "youngster5",
+      "parent_id": "par-004",
+      "school_id": "sch-001",
+      "grade": "Grade 2",
+      "dietary_restrictions": [
+        "egg"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "kid-006",
+      "full_name": "Youngster 6",
+      "username": "youngster6",
+      "parent_id": "par-004",
+      "school_id": "sch-002",
+      "grade": "Grade 1",
+      "dietary_restrictions": [
+        "peanut"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "kid-007",
+      "full_name": "Youngster 7",
+      "username": "youngster7",
+      "parent_id": "par-005",
+      "school_id": "sch-002",
+      "grade": "Grade 4",
+      "dietary_restrictions": [
+        "none"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "kid-008",
+      "full_name": "Youngster 8",
+      "username": "youngster8",
+      "parent_id": "par-005",
+      "school_id": "sch-003",
+      "grade": "Grade 4",
+      "dietary_restrictions": [
+        "dairy"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "kid-009",
+      "full_name": "Youngster 9",
+      "username": "youngster9",
+      "parent_id": "par-005",
+      "school_id": "sch-001",
+      "grade": "Grade 4",
+      "dietary_restrictions": [
+        "dairy"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "kid-010",
+      "full_name": "Youngster 10",
+      "username": "youngster10",
+      "parent_id": "par-006",
+      "school_id": "sch-003",
+      "grade": "Grade 4",
+      "dietary_restrictions": [
+        "seafood"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "kid-011",
+      "full_name": "Youngster 11",
+      "username": "youngster11",
+      "parent_id": "par-006",
+      "school_id": "sch-001",
+      "grade": "Grade 4",
+      "dietary_restrictions": [
+        "peanut"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "kid-012",
+      "full_name": "Youngster 12",
+      "username": "youngster12",
+      "parent_id": "par-006",
+      "school_id": "sch-002",
+      "grade": "Grade 2",
+      "dietary_restrictions": [
+        "dairy"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "kid-013",
+      "full_name": "Youngster 13",
+      "username": "youngster13",
+      "parent_id": "par-007",
+      "school_id": "sch-001",
+      "grade": "Grade 2",
+      "dietary_restrictions": [
+        "none"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "kid-014",
+      "full_name": "Youngster 14",
+      "username": "youngster14",
+      "parent_id": "par-007",
+      "school_id": "sch-002",
+      "grade": "Grade 5",
+      "dietary_restrictions": [
+        "seafood"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "kid-015",
+      "full_name": "Youngster 15",
+      "username": "youngster15",
+      "parent_id": "par-007",
+      "school_id": "sch-003",
+      "grade": "Grade 1",
+      "dietary_restrictions": [
+        "dairy"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "kid-016",
+      "full_name": "Youngster 16",
+      "username": "youngster16",
+      "parent_id": "par-007",
+      "school_id": "sch-001",
+      "grade": "Grade 1",
+      "dietary_restrictions": [
+        "none"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "kid-017",
+      "full_name": "Youngster 17",
+      "username": "youngster17",
+      "parent_id": "par-008",
+      "school_id": "sch-002",
+      "grade": "Grade 5",
+      "dietary_restrictions": [
+        "egg"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "kid-018",
+      "full_name": "Youngster 18",
+      "username": "youngster18",
+      "parent_id": "par-008",
+      "school_id": "sch-003",
+      "grade": "Grade 5",
+      "dietary_restrictions": [
+        "seafood"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "kid-019",
+      "full_name": "Youngster 19",
+      "username": "youngster19",
+      "parent_id": "par-008",
+      "school_id": "sch-001",
+      "grade": "Grade 2",
+      "dietary_restrictions": [
+        "none"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "kid-020",
+      "full_name": "Youngster 20",
+      "username": "youngster20",
+      "parent_id": "par-008",
+      "school_id": "sch-002",
+      "grade": "Grade 5",
+      "dietary_restrictions": [
+        "none"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "kid-021",
+      "full_name": "Youngster 21",
+      "username": "youngster21",
+      "parent_id": "par-009",
+      "school_id": "sch-003",
+      "grade": "Grade 2",
+      "dietary_restrictions": [
+        "none"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "kid-022",
+      "full_name": "Youngster 22",
+      "username": "youngster22",
+      "parent_id": "par-009",
+      "school_id": "sch-001",
+      "grade": "Grade 5",
+      "dietary_restrictions": [
+        "none"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "kid-023",
+      "full_name": "Youngster 23",
+      "username": "youngster23",
+      "parent_id": "par-009",
+      "school_id": "sch-002",
+      "grade": "Grade 2",
+      "dietary_restrictions": [
+        "egg"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "kid-024",
+      "full_name": "Youngster 24",
+      "username": "youngster24",
+      "parent_id": "par-009",
+      "school_id": "sch-003",
+      "grade": "Grade 1",
+      "dietary_restrictions": [
+        "seafood"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "kid-025",
+      "full_name": "Youngster 25",
+      "username": "youngster25",
+      "parent_id": "par-009",
+      "school_id": "sch-001",
+      "grade": "Grade 2",
+      "dietary_restrictions": [
+        "seafood"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "kid-026",
+      "full_name": "Youngster 26",
+      "username": "youngster26",
+      "parent_id": "par-010",
+      "school_id": "sch-001",
+      "grade": "Grade 5",
+      "dietary_restrictions": [
+        "none"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "kid-027",
+      "full_name": "Youngster 27",
+      "username": "youngster27",
+      "parent_id": "par-010",
+      "school_id": "sch-002",
+      "grade": "Grade 5",
+      "dietary_restrictions": [
+        "none"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "kid-028",
+      "full_name": "Youngster 28",
+      "username": "youngster28",
+      "parent_id": "par-010",
+      "school_id": "sch-003",
+      "grade": "Grade 4",
+      "dietary_restrictions": [
+        "seafood"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "kid-029",
+      "full_name": "Youngster 29",
+      "username": "youngster29",
+      "parent_id": "par-010",
+      "school_id": "sch-001",
+      "grade": "Grade 5",
+      "dietary_restrictions": [
+        "seafood"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "kid-030",
+      "full_name": "Youngster 30",
+      "username": "youngster30",
+      "parent_id": "par-010",
+      "school_id": "sch-002",
+      "grade": "Grade 3",
+      "dietary_restrictions": [
+        "dairy"
+      ],
+      "status": "active"
+    }
+  ],
+  "delivery_persons": [
+    {
+      "id": "del-001",
+      "assigned_person": "Dewa Putra",
+      "gender": "MALE",
+      "mobile_number": "+6281230001111",
+      "zone": "Denpasar West",
+      "assigned_school_ids": [
+        "sch-001"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "del-002",
+      "assigned_person": "Ayu Lestari",
+      "gender": "FEMALE",
+      "mobile_number": "+6281230002222",
+      "zone": "Badung North",
+      "assigned_school_ids": [
+        "sch-002"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "del-003",
+      "assigned_person": "Komang Arta",
+      "gender": "MALE",
+      "mobile_number": "+6281230003333",
+      "zone": "Gianyar East",
+      "assigned_school_ids": [
+        "sch-003"
+      ],
+      "status": "active"
+    }
+  ],
+  "delivery_simulation": [
+    {
+      "date": "2026-03-02",
+      "school_id": "sch-001",
+      "delivery_person_id": "del-001",
+      "delivery_status": "Completed"
+    },
+    {
+      "date": "2026-03-02",
+      "school_id": "sch-002",
+      "delivery_person_id": "del-002",
+      "delivery_status": "Completed"
+    },
+    {
+      "date": "2026-03-02",
+      "school_id": "sch-003",
+      "delivery_person_id": "del-003",
+      "delivery_status": "Completed"
+    },
+    {
+      "date": "2026-03-03",
+      "school_id": "sch-001",
+      "delivery_person_id": "del-001",
+      "delivery_status": "Completed"
+    },
+    {
+      "date": "2026-03-03",
+      "school_id": "sch-002",
+      "delivery_person_id": "del-002",
+      "delivery_status": "Unsuccessful"
+    },
+    {
+      "date": "2026-03-03",
+      "school_id": "sch-003",
+      "delivery_person_id": "del-003",
+      "delivery_status": "Completed"
+    },
+    {
+      "date": "2026-03-04",
+      "school_id": "sch-001",
+      "delivery_person_id": "del-001",
+      "delivery_status": "Completed"
+    },
+    {
+      "date": "2026-03-04",
+      "school_id": "sch-002",
+      "delivery_person_id": "del-002",
+      "delivery_status": "Unsuccessful"
+    },
+    {
+      "date": "2026-03-04",
+      "school_id": "sch-003",
+      "delivery_person_id": "del-003",
+      "delivery_status": "Completed"
+    },
+    {
+      "date": "2026-03-05",
+      "school_id": "sch-001",
+      "delivery_person_id": "del-001",
+      "delivery_status": "Completed"
+    },
+    {
+      "date": "2026-03-05",
+      "school_id": "sch-002",
+      "delivery_person_id": "del-002",
+      "delivery_status": "Completed"
+    },
+    {
+      "date": "2026-03-05",
+      "school_id": "sch-003",
+      "delivery_person_id": "del-003",
+      "delivery_status": "Unsuccessful"
+    },
+    {
+      "date": "2026-03-06",
+      "school_id": "sch-001",
+      "delivery_person_id": "del-001",
+      "delivery_status": "Completed"
+    },
+    {
+      "date": "2026-03-06",
+      "school_id": "sch-002",
+      "delivery_person_id": "del-002",
+      "delivery_status": "Completed"
+    },
+    {
+      "date": "2026-03-06",
+      "school_id": "sch-003",
+      "delivery_person_id": "del-003",
+      "delivery_status": "Completed"
+    },
+    {
+      "date": "2026-03-07",
+      "school_id": "sch-001",
+      "delivery_person_id": "del-001",
+      "delivery_status": "Completed"
+    },
+    {
+      "date": "2026-03-07",
+      "school_id": "sch-002",
+      "delivery_person_id": "del-002",
+      "delivery_status": "Completed"
+    },
+    {
+      "date": "2026-03-07",
+      "school_id": "sch-003",
+      "delivery_person_id": "del-003",
+      "delivery_status": "Completed"
+    },
+    {
+      "date": "2026-03-08",
+      "school_id": "sch-001",
+      "delivery_person_id": "del-001",
+      "delivery_status": "Completed"
+    },
+    {
+      "date": "2026-03-08",
+      "school_id": "sch-002",
+      "delivery_person_id": "del-002",
+      "delivery_status": "Completed"
+    },
+    {
+      "date": "2026-03-08",
+      "school_id": "sch-003",
+      "delivery_person_id": "del-003",
+      "delivery_status": "Completed"
+    },
+    {
+      "date": "2026-03-09",
+      "school_id": "sch-001",
+      "delivery_person_id": "del-001",
+      "delivery_status": "Completed"
+    },
+    {
+      "date": "2026-03-09",
+      "school_id": "sch-002",
+      "delivery_person_id": "del-002",
+      "delivery_status": "Completed"
+    },
+    {
+      "date": "2026-03-09",
+      "school_id": "sch-003",
+      "delivery_person_id": "del-003",
+      "delivery_status": "Unsuccessful"
+    },
+    {
+      "date": "2026-03-10",
+      "school_id": "sch-001",
+      "delivery_person_id": "del-001",
+      "delivery_status": "Completed"
+    },
+    {
+      "date": "2026-03-10",
+      "school_id": "sch-002",
+      "delivery_person_id": "del-002",
+      "delivery_status": "Completed"
+    },
+    {
+      "date": "2026-03-10",
+      "school_id": "sch-003",
+      "delivery_person_id": "del-003",
+      "delivery_status": "Completed"
+    },
+    {
+      "date": "2026-03-11",
+      "school_id": "sch-001",
+      "delivery_person_id": "del-001",
+      "delivery_status": "Completed"
+    },
+    {
+      "date": "2026-03-11",
+      "school_id": "sch-002",
+      "delivery_person_id": "del-002",
+      "delivery_status": "Completed"
+    },
+    {
+      "date": "2026-03-11",
+      "school_id": "sch-003",
+      "delivery_person_id": "del-003",
+      "delivery_status": "Completed"
+    }
+  ]
+}

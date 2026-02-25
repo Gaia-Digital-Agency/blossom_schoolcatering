@@ -3,6 +3,15 @@
 Last updated: 2026-02-25
 Target go-live: 2026-04-01
 
+## Execution Note (Next Session: 2026-02-26)
+- Steps 1-5 are completed for current scope.
+- Tomorrow focus: Steps 6-10 only.
+- For Steps 6-10, implementation must align with:
+  - `docs/specifications/*` (API/RBAC/order/data contracts)
+  - `docs/strategy/*` (approved scope and intake assumptions)
+  - `docs/master_data/*` (master data shape and sample references)
+  - `docs/app_run/*` (runtime/deploy/access constraints on VM)
+
 ## 1) Create Basline & Plan
 - [x] VM staging path prepared at `/var/www/schoolcatering`
 - [x] Nginx route serving app at `http://34.124.244.233/schoolcatering/`
@@ -13,12 +22,12 @@ Target go-live: 2026-04-01
 
 ## 2) Repo and Delivery Workflow Hardening
 - [ ] Enforce branch protection on GitHub (`main` via PR only, no force-push)
-- [x] Add `CONTRIBUTING.md` with deploy steps and rollback steps
+- [x] Add `docs/versioning/CONTRIBUTING.md` with deploy steps and rollback steps
 - [x] Add release tag convention (`vYYYY.MM.DD-N`)
-- [x] Add simple change log (`CHANGELOG.md`)
+- [x] Add simple change log (`docs/versioning/CHANGELOG.md`)
 - [x] Add standard commit scopes (`web`, `api`, `db`, `infra`, `docs`)
 - [x] Add PR template and PR build workflow (`.github/`)
-- [x] Add branch protection setup instructions (`docs/branch-protection.md`)
+- [x] Add branch protection setup instructions (`docs/versioning/branch-protection.md`)
 
 ## 3) Monorepo Structure Completion
 - [x] Initialize `apps/api` (NestJS)
@@ -103,7 +112,7 @@ Target go-live: 2026-04-01
 - [ ] Add seed scripts for demo/test datasets
 
 ## 11) API and Contract Completion
-- [ ] Implement endpoints from `docs/specs/api-contract.md`
+- [ ] Implement endpoints from `docs/specifications/api-contract.md`
 - [ ] Request validation (DTO/class-validator)
 - [ ] OpenAPI docs generation at `/api/v1/docs`
 - [ ] Error response standardization
@@ -166,7 +175,7 @@ This list maps directly to Sections **2-17** above for easy cross-reference.
 2 (Repo and Delivery Workflow Hardening) - Complete
 3 (Monorepo Structure Completion) - Complete
 4 (Authentication and Identity) - Complete
-5 (Core Master Data Modules) - 
+5 (Core Master Data Modules) - Complete
 6 (Parent and Youngsters Core Ordering Flows) - 
 7 (Advanced Ordering Features) -  
 8 (Billing, Receipt, and Delivery) - 

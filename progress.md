@@ -1,8 +1,42 @@
 # Progress Update
 
+## 2026-02-25 (Checkpoint for tomorrow)
+- Confirmed Steps 1-5 are complete in `plan.md`.
+- Next implementation window (2026-02-26): Steps 6-10.
+- Mandatory references for Steps 6-10 delivery:
+  - `docs/specifications/*`
+  - `docs/strategy/*`
+  - `docs/master_data/*`
+  - `docs/app_run/*`
+
+## 2026-02-25 (Section 5 sample dataset prepared)
+- Added consolidated master-data sample dataset:
+  - `docs/master_data/sample_dataset_v1.json`
+- Dataset includes:
+  - 3 Schools
+  - 10 service days
+  - 3 sessions/day
+  - 5 dishes/session
+  - 10 Parents
+  - Youngster distribution per parent:
+    - 2 parents with 1 youngster each
+    - 2 parents with 2 youngsters each
+    - 2 parents with 3 youngsters each
+    - 2 parents with 4 youngsters each
+    - 2 parents with 5 youngsters each
+  - Total youngsters: 30
+  - Parent nationality mix:
+    - 2 Australian
+    - 2 American
+    - 2 Chinese
+    - 2 Indonesian
+    - 2 Indian
+  - 3 delivery persons with delivery simulation records
+- Validation completed for requested counts and distribution.
+
 ## 2026-02-25 (Docs + Section 5 completion sync)
 - Added root `README.md` aligned to App Overview and current implemented server status.
-- Completed Section 5 template deliverables in `docs/templates/master-data`:
+- Completed Section 5 template deliverables in `docs/master_data`:
   - `schools.json`
   - `dish.json`
   - `ingredient.json` (with `name` + `category`)
