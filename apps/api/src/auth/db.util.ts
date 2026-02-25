@@ -14,7 +14,7 @@ export async function runSql(sql: string) {
   }
   const { stdout } = await execFileAsync(
     'psql',
-    ['-d', dbUrl, '-tA', '-c', sql],
+    ['-X', '-q', '-v', 'ON_ERROR_STOP=1', '-d', dbUrl, '-tA', '-c', sql],
     { maxBuffer: 5 * 1024 * 1024 },
   );
   return stdout.trim();
