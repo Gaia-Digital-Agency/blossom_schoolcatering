@@ -63,6 +63,10 @@ export default function LoginPage() {
       <section className="auth-panel">
         <h1>Developer Login</h1>
         <p className="auth-help">Common account for Parent, Youngsters, Admin, Kitchen, and Delivery.</p>
+        <div className="quick-credentials" aria-label="Quick Credentials">
+          <p><strong>Admin:</strong> admin / admin123</p>
+          <p><strong>Kitchen:</strong> kitchen / kitchen123</p>
+        </div>
         <form onSubmit={onSubmit} className="auth-form">
           <label>
             Username

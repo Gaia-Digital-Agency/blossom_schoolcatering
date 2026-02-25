@@ -323,6 +323,20 @@ h1 {
   margin: 0.35rem 0 1rem;
 }
 
+.quick-credentials {
+  margin: 0 0 0.9rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #ccbda2;
+  border-radius: 0.55rem;
+  background: #fff;
+}
+
+.quick-credentials p {
+  margin: 0.12rem 0;
+  font-size: 0.85rem;
+  color: #3b342b;
+}
+
 .auth-form {
   display: grid;
   gap: 0.7rem;
