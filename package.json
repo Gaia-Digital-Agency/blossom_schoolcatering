@@ -1,0 +1,26 @@
+{
+  "name": "blossom-schoolcatering",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "dev": "vite apps/web --host 0.0.0.0 --port 5173",
+    "build": "vite build apps/web",
+    "preview": "vite preview --host 0.0.0.0 --port 4173",
+    "test": "echo \"No tests yet\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com-net1io:Gaia-Digital-Agency/blossom_schoolcatering.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "vite": "^7.3.1"
+  }
+}
