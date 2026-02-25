@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: http://34.124.244.233/schoolcatering/sitemap.xml

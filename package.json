@@ -8,16 +8,17 @@
   },
   "workspaces": [
     "apps/api",
+    "apps/web",
     "packages/*"
   ],
   "scripts": {
     "dev": "npm run dev:web",
-    "dev:web": "vite apps/web --host 0.0.0.0 --port 5173",
+    "dev:web": "npm --prefix apps/web run dev",
     "dev:api": "npm --prefix apps/api run start:dev",
     "build": "npm run build:web && npm run build:api",
-    "build:web": "vite build apps/web",
+    "build:web": "npm --prefix apps/web run build",
     "build:api": "npm --prefix apps/api run build",
-    "preview": "vite preview --host 0.0.0.0 --port 4173",
+    "preview": "npm --prefix apps/web run start",
     "test": "echo \"No tests yet\"",
     "build:types": "npm --prefix packages/types run build",
     "check:config": "npm --prefix packages/config run validate"
@@ -29,8 +30,5 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
-  "devDependencies": {
-    "vite": "^7.3.1"
-  }
+  "type": "commonjs"
 }

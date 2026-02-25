@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
+  <defs>
+    <style>
+      .brand { fill: #C19757; }
+      .wordmark {
+        font-family: Cinzel, "Trajan Pro", "Times New Roman", serif;
+        font-weight: 400;
+        letter-spacing: 6px;
+      }
+    </style>
+  </defs>
+
+  <!-- Icon -->
+  <image href="data:image/png;base64,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"
+         x="190" y="90" width="420" height="320"
+         preserveAspectRatio="xMidYMid meet" />
+
+  <!-- Wordmark -->
+  <text x="400" y="560" text-anchor="middle"
+        class="brand wordmark" font-size="54">BLOSSOM</text>
+  <text x="400" y="640" text-anchor="middle"
+        class="brand wordmark" font-size="54">KITCHEN</text>
+</svg>
