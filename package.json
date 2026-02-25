@@ -6,9 +6,16 @@
   "directories": {
     "doc": "docs"
   },
+  "workspaces": [
+    "apps/api"
+  ],
   "scripts": {
-    "dev": "vite apps/web --host 0.0.0.0 --port 5173",
-    "build": "vite build apps/web",
+    "dev": "npm run dev:web",
+    "dev:web": "vite apps/web --host 0.0.0.0 --port 5173",
+    "dev:api": "npm --prefix apps/api run start:dev",
+    "build": "npm run build:web && npm run build:api",
+    "build:web": "vite build apps/web",
+    "build:api": "npm --prefix apps/api run build",
     "preview": "vite preview --host 0.0.0.0 --port 4173",
     "test": "echo \"No tests yet\""
   },
