@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 export default function HomePage() {
@@ -16,24 +17,24 @@ export default function HomePage() {
     <>
       <div className="site-wrap">
         <header className="topbar">
-          <a className="brand" href="#home">
+          <Link className="brand" href="/">
             <img className="brand-logo" src="/schoolcatering/assets/logo.svg" alt="Blossom School Catering logo" />
             <span>Blossom School Catering</span>
-          </a>
+          </Link>
           <button className="menu-btn" aria-label="Toggle menu" onClick={() => setOpen(!open)}>
             Menu
           </button>
           <nav className={`nav ${open ? 'open' : ''}`}>
-            <a href="#home">Home</a>
-            <a href="#parents">Parents</a>
-            <a href="#youngsters">Youngsters</a>
-            <a href="#admin">Admin</a>
-            <a href="#kitchen">Kitchen</a>
-            <a href="#delivery">Delivery</a>
+            <Link href="/">Home</Link>
+            <Link href="/parents">Parents</Link>
+            <Link href="/youngsters">Youngsters</Link>
+            <Link href="/admin">Admin</Link>
+            <Link href="/kitchen">Kitchen</Link>
+            <Link href="/delivery">Delivery</Link>
           </nav>
         </header>
 
-        <main id="home" className="hero">
+        <main className="hero">
           <section className="hero-card">
             <p className="eyebrow">School Catering by Blossom Kitchen</p>
             <h1>Parent and Youngsters Meal Order App</h1>
@@ -42,8 +43,8 @@ export default function HomePage() {
               Clear calorie details for each menu option.
             </p>
             <div className="auth-grid">
-              <a className="btn btn-primary" href="#">Log In</a>
-              <a className="btn btn-outline" href="#">Register</a>
+              <Link className="btn btn-primary" href="/login">Log In</Link>
+              <Link className="btn btn-outline" href="/register">Register</Link>
               <button className="btn btn-google" type="button">Continue with Google</button>
             </div>
           </section>

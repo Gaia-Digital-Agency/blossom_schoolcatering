@@ -299,6 +299,72 @@ h1 {
   transform: translateY(0);
 }
 
+.page-auth {
+  min-height: 100dvh;
+  padding: 1rem;
+  display: grid;
+  place-items: center;
+}
+
+.auth-panel {
+  width: min(680px, 100%);
+  background: #fff8ee;
+  border: 1px solid #d8cab1;
+  border-radius: 0.9rem;
+  padding: 1rem;
+}
+
+.auth-panel h1 {
+  margin-top: 0;
+}
+
+.auth-help {
+  color: var(--ink-soft);
+  margin: 0.35rem 0 1rem;
+}
+
+.auth-form {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.auth-form label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.auth-form input,
+.auth-form select {
+  min-height: 2.4rem;
+  border: 1px solid #ccbda2;
+  border-radius: 0.55rem;
+  padding: 0.45rem 0.65rem;
+  background: #fff;
+}
+
+.auth-error {
+  color: #9d2c2c;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.dev-links {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin: 0 0 0.9rem;
+}
+
+.dev-links a {
+  border: 1px solid #ccbda2;
+  background: #fff;
+  border-radius: 0.55rem;
+  padding: 0.45rem 0.65rem;
+  color: #302a22;
+  text-decoration: none;
+}
+
 @media (min-width: 860px) {
   html,
   body {
