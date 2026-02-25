@@ -1,6 +1,9 @@
-import { Body, Controller, Get, Headers, Post, UnauthorizedException } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Post, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { ROLES, Role } from './auth.types';
+import { JwtAuthGuard } from './jwt-auth.guard';
+import { Roles } from './roles.decorator';
+import { RolesGuard } from './roles.guard';
 
 type LoginBody = {
   username: string;
@@ -43,7 +46,13 @@ export class AuthController {
     return this.authService.loginWithGoogleDev(body.googleEmail, body.role);
   }
 
+  @Post('google/verify')
+  loginWithGoogleVerified(@Body() body: { idToken: string; role: string }) {
+    return this.authService.loginWithGoogleVerified(body.idToken, body.role);
+  }
+
   @Get('me')
+  @UseGuards(JwtAuthGuard)
   me(@Headers('authorization') authorization?: string) {
     const token = this.extractBearerToken(authorization);
     return this.authService.me(token);
@@ -66,6 +75,7 @@ export class AuthController {
   }
 
   @Post('onboarding')
+  @UseGuards(JwtAuthGuard)
   setOnboardingState(
     @Headers('authorization') authorization: string | undefined,
     @Body() body: OnboardingBody,
@@ -75,6 +85,8 @@ export class AuthController {
   }
 
   @Post('role-check')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('PARENT', 'YOUNGSTER', 'ADMIN', 'KITCHEN', 'DELIVERY')
   roleCheck(
     @Headers('authorization') authorization: string | undefined,
     @Body() body: RoleCheckBody,
@@ -87,6 +99,13 @@ export class AuthController {
   @Post('logout')
   logout(@Body() body: RefreshBody) {
     return this.authService.logout(body?.refreshToken);
+  }
+
+  @Get('admin-ping')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  adminPing() {
+    return { ok: true };
   }
 
   private extractBearerToken(authorization?: string) {
