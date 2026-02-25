@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AUTH_COOKIE, ROLE_COOKIE, ROLE_OPTIONS, getApiBase } from '../../lib/auth';
+import { ROLE_OPTIONS, getApiBase, setAuthState } from '../../lib/auth';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [role, setRole] = useState('PARENT');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleEmail, setGoogleEmail] = useState('teameditor@gmail.com');
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -26,14 +27,32 @@ export default function LoginPage() {
         throw new Error('Invalid username/password/role');
       }
       const data = await res.json();
-      localStorage.setItem('blossom_access_token', data.accessToken);
-      localStorage.setItem('blossom_refresh_token', data.refreshToken);
-      localStorage.setItem('blossom_role', data.user.role);
-      document.cookie = `${AUTH_COOKIE}=${data.accessToken}; path=/; max-age=86400; SameSite=Lax`;
-      document.cookie = `${ROLE_COOKIE}=${data.user.role}; path=/; max-age=86400; SameSite=Lax`;
+      setAuthState(data.accessToken, data.refreshToken, data.user.role);
       router.push('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onGoogleDev = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const res = await fetch(`${getApiBase()}/auth/google/dev`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ googleEmail, role }),
+      });
+      if (!res.ok) {
+        throw new Error('Google dev login failed');
+      }
+      const data = await res.json();
+      setAuthState(data.accessToken, data.refreshToken, data.user.role);
+      router.push('/dashboard');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Google dev login failed');
     } finally {
       setLoading(false);
     }
@@ -68,6 +87,15 @@ export default function LoginPage() {
             {loading ? 'Signing In...' : 'Sign In'}
           </button>
         </form>
+        <div className="auth-form" style={{ marginTop: '0.8rem' }}>
+          <label>
+            Google Email (Dev)
+            <input value={googleEmail} onChange={(e) => setGoogleEmail(e.target.value)} />
+          </label>
+          <button className="btn btn-google" disabled={loading} type="button" onClick={onGoogleDev}>
+            Continue with Google (Dev)
+          </button>
+        </div>
       </section>
     </main>
   );

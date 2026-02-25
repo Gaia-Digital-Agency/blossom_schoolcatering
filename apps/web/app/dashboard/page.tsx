@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AUTH_COOKIE, ROLE_COOKIE, getApiBase } from '../../lib/auth';
+import { clearAuthState, getApiBase, refreshAccessToken } from '../../lib/auth';
 
 type Profile = {
   username: string;
@@ -21,32 +21,36 @@ export default function DashboardPage() {
       router.push('/login');
       return;
     }
-    fetch(`${getApiBase()}/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(async (res) => {
-        if (!res.ok) {
-          throw new Error('Session expired. Please log in again.');
-        }
-        return res.json();
-      })
-      .then((data) => setProfile(data))
-      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load profile'));
+    const loadProfile = async () => {
+      let accessToken = token;
+      let res = await fetch(`${getApiBase()}/auth/me`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (res.status === 401) {
+        const refreshed = await refreshAccessToken();
+        if (!refreshed) throw new Error('Session expired. Please log in again.');
+        accessToken = refreshed;
+        res = await fetch(`${getApiBase()}/auth/me`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+      }
+      if (!res.ok) throw new Error('Failed to load profile');
+      const data = await res.json();
+      setProfile(data);
+    };
+    loadProfile().catch((err) => setError(err instanceof Error ? err.message : 'Failed to load profile'));
   }, [router]);
 
   const onLogout = async () => {
-    const token = localStorage.getItem('blossom_access_token');
-    if (token) {
+    const refreshToken = localStorage.getItem('blossom_refresh_token');
+    if (refreshToken) {
       await fetch(`${getApiBase()}/auth/logout`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
       }).catch(() => undefined);
     }
-    localStorage.removeItem('blossom_access_token');
-    localStorage.removeItem('blossom_refresh_token');
-    localStorage.removeItem('blossom_role');
-    document.cookie = `${AUTH_COOKIE}=; path=/; max-age=0`;
-    document.cookie = `${ROLE_COOKIE}=; path=/; max-age=0`;
+    clearAuthState();
     router.push('/login');
   };
 
