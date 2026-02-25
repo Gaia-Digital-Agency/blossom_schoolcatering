@@ -1,0 +1,83 @@
+{
+  "kids_favorites": [
+    "Macaroni and Cheese", "Chicken Nuggets", "PB&J Sandwich", "Fish Sticks", 
+    "Grilled Cheese Sandwich", "Tater Tots", "Spaghetti and Meatballs", "Corn Dogs", 
+    "Ants on a Log", "Sloppy Joes", "Chicken Fingers", "English Muffin Pizzas", 
+    "Pigs in a Blanket", "Fruit Roll-ups", "Cheese Quesadillas", "Mashed Potatoes", 
+    "Banana Boats", "Pizza Bagels", "Turkey and Cheese Roll-ups", "Alphabet Soup"
+  ],
+  "western": [
+    "Hamburger", "Hot Dogs", "Potato Salad", "Buffalo Wings", "Coleslaw", 
+    "Clam Chowder", "Reuben Sandwich", "Eggs Benedict", "Caesar Salad", "Cobb Salad", 
+    "Philly Cheesesteak", "Meatloaf", "Lobster Roll", "Barbecue Ribs", 
+    "New York Cheesecake", "Biscuits and Gravy", "Pot Roast", "Club Sandwich", 
+    "Jambalaya", "Waldorf Salad"
+  ],
+  "chinese": [
+    "Peking Duck", "Kung Pao Chicken", "Mapo Tofu", "Wonton Soup", 
+    "Xiaolongbao", "Chow Mein", "Sweet and Sour Pork", "Yangzhou Fried Rice", 
+    "Sichuan Hot Pot", "Zha Jiang Mian", "Char Siu", "Egg Drop Soup", 
+    "Beggar's Chicken", "Beef with Broccoli", "Lo Mein", "Scallion Pancakes", 
+    "General Tso’s Chicken", "Congee", "Dan Dan Noodles", "Hainan Chicken Rice"
+  ],
+  "arab": [
+    "Mansaf", "Kabsa", "Mandi", "Kibbeh", "Maqluba", "Fattoush", "Tabbouleh", 
+    "Baba Ganoush", "Kofta", "Labneh", "Manakish", "Shakshuka", "Mutabal", 
+    "Sayadieh", "Harees", "Musakhan", "Luqaimat", "Umm Ali", "Kunafa", "Ful Medames"
+  ],
+  "vietnamese": [
+    "Pho", "Banh Mi", "Goi Cuon", "Bun Cha", "Banh Xeo", "Bun Bo Hue", 
+    "Cha Gio", "Com Tam", "Cao Lau", "Mi Quang", "Bo Kho", "Canh Chua", 
+    "Bun Thit Nuong", "Banh Cuon", "Banh Khot", "Cha Ca La Vong", 
+    "Bun Rieu", "Xoi", "Bun Dau Mam Tom", "Egg Coffee"
+  ],
+  "indonesian": [
+    "Nasi Goreng", "Mie Goreng", "Rendang", "Gado-Gado", "Soto Ayam", 
+    "Bakso", "Rawon", "Opor Ayam", "Nasi Uduk", "Pempek", "Sop Buntut", 
+    "Ayam Penyet", "Tahu Sumedang", "Lontong Sayur", "Gudeg", 
+    "Pepes Ikan", "Martabak Manis", "Klepon", "Babi Guling", "Dadar Gulung"
+  ],
+  "french": [
+    "Boeuf Bourguignon", "Coq au Vin", "Ratatouille", "Quiche Lorraine", 
+    "Bouillabaisse", "Escargots de Bourgogne", "Soupe a l'Oignon", "Cassoulet", 
+    "Confit de Canard", "Salade Nicoise", "Steak Frites", "Tarte Tatin", 
+    "Creme Brulee", "Profiteroles", "Pot-au-Feu", "Foie Gras", "Pissaladiere", 
+    "Moules Marinieres", "Sole Meuniere", "Gratin Dauphinois"
+  ],
+  "italian": [
+    "Lasagna alla Bolognese", "Pizza Margherita", "Pasta Carbonara", 
+    "Risotto alla Milanese", "Osso Buco", "Focaccia", "Polenta", 
+    "Gnocchi di Patate", "Ravioli di Zucca", "Arancini", "Bruschetta", 
+    "Minestrone", "Pesto alla Genovese", "Tiramisu", "Panettone", 
+    "Saltimbocca alla Romana", "Chicken Cacciatore", "Cioppino", 
+    "Bistecca alla Fiorentina", "Panna Cotta"
+  ],
+  "indian": [
+    "Butter Chicken", "Chicken Tikka Masala", "Biryani", "Palak Paneer", 
+    "Masala Dosa", "Chana Masala", "Samosas", "Dal Makhani", "Rogan Josh", 
+    "Aloo Gobi", "Garlic Naan", "Tandoori Chicken", "Gulab Jamun", 
+    "Paneer Tikka", "Vada Pav", "Chole Bhature", "Pav Bhaji", "Rasgulla", 
+    "Hyderabadi Haleem", "Malai Kofta"
+  ],
+  "thai": [
+    "Pad Thai", "Tom Yum Goong", "Green Curry", "Som Tum", "Massaman Curry", 
+    "Khao Pad", "Pad Krapow Moo", "Tom Kha Gai", "Panang Curry", 
+    "Mango Sticky Rice", "Pad See Ew", "Moo Satay", "Laab", "Yam Nua", 
+    "Cashew Chicken", "Khao Soi", "Steamed Lime Fish", "Thai Fish Cakes", 
+    "Pad Woon Sen", "Hor Mok Pla"
+  ],
+  "korean": [
+    "Bibimbap", "Bulgogi", "Kimchi", "Japchae", "Tteokbokki", "Samgyeopsal", 
+    "Korean Fried Chicken", "Sundubu Jjigae", "Galbi", "Haemul Pajeon", 
+    "Naengmyeon", "Kimbap", "Jajangmyeon", "Samgyetang", "Kimchi Jjigae", 
+    "Bossam", "Jokbal", "Soondae", "Mandu", "Hotoke"
+  ],
+  "other_famous_world_foods": [
+    "Sushi (Japan)", "Tacos (Mexico)", "Paella (Spain)", "Fish and Chips (UK)", 
+    "Moussaka (Greece)", "Poutine (Canada)", "Ceviche (Peru)", "Feijoada (Brazil)", 
+    "Goulash (Hungary)", "Borscht (Ukraine)", "Wiener Schnitzel (Austria)", 
+    "Doner Kebab (Turkey)", "Churrasco (Brazil/Uruguay)", "Haggis (Scotland)", 
+    "Meze Platter (Mediterranean)", "Enchiladas (Mexico)", "Croissant (France/Austria)", 
+    "Pierogi (Poland)", "Sashimi (Japan)", "Arepas (Venezuela/Colombia)"
+  ]
+}

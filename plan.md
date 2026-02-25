@@ -1,101 +1,181 @@
-# Project Plan (Detailed Tracker)
+# Blossom School Catering Plan (Now -> Go-Live)
 
 Last updated: 2026-02-25
+Target go-live: 2026-04-01
 
-## 1) Current Baseline
-- Status: Completed
-- VM, Nginx, PM2 runtime configured for multi-site hosting.
-- PostgreSQL running on VM and wired to app.
-- Base web app deployed at `/schoolcatering`.
+## 1) Create Basline & Plan
+- [x] VM staging path prepared at `/var/www/schoolcatering`
+- [x] Nginx route serving app at `http://34.124.244.233/schoolcatering/`
+- [x] PostgreSQL database created and migrations applied on VM
+- [x] Shared `.env` symlinked into app, including GCS bucket/folder values
+- [x] Base homepage deployed (mobile-first, hero image, logo, favicon)
+- [x] `robots.txt`, `sitemap.xml`, and `sitemap.url` added
 
 ## 2) Repo and Delivery Workflow Hardening
-- Status: Completed
-- Server-first workflow established, then GitHub sync, then local sync.
-- Standard deploy flow documented in `start.md`.
-- Git pull/push and redeploy loop validated.
+- [ ] Enforce branch protection on GitHub (`main` via PR only, no force-push)
+- [x] Add `CONTRIBUTING.md` with deploy steps and rollback steps
+- [x] Add release tag convention (`vYYYY.MM.DD-N`)
+- [x] Add simple change log (`CHANGELOG.md`)
+- [x] Add standard commit scopes (`web`, `api`, `db`, `infra`, `docs`)
+- [x] Add PR template and PR build workflow (`.github/`)
+- [x] Add branch protection setup instructions (`docs/branch-protection.md`)
 
 ## 3) Monorepo Structure Completion
-- Status: Completed
-- Monorepo app structure stabilized for:
-  - `apps/web`
-  - `apps/api`
-  - `db/migrations`
-- Build and run commands validated for both web and api apps.
+- [x] Initialize `apps/api` (NestJS)
+- [x] Convert `apps/web` from static starter to Next.js app scaffold
+- [ ] Create shared packages:
+  - [x] `packages/types`
+  - [x] `packages/config`
+  - [ ] `packages/ui` (optional early)
+- [ ] Set root scripts:
+  - [x] `dev:web`
+  - [x] `dev:api`
+  - [x] `build:web`
+  - [x] `build:api`
+  - [x] `build`
 
 ## 4) Authentication and Identity
-- Status: Completed
-- Scope completed:
-  1. Real Google OAuth verify flow
-  2. JWT + refresh token rotation
-  3. Persistent refresh-session storage
-  4. Formal route role guards
-  5. DB-backed user auth and username generation
-  6. DB-backed onboarding state
-- Dev credential active for shared testing:
-  - Username: `teameditor`
-  - Password: `admin123`
-- Access policy:
-  - Homepage is public.
-  - All non-home routes require login state.
-- Full implementation notes: `auth_info.md`
+- [x] Implement login (Parent, Youngsters, Admin, Kitchen, Delivery)
+- [x] Implement JWT + refresh token rotation
+- [x] Implement Google OAuth login (Parent + Youngsters)
+- [x] Implement username generation + collision suffix logic
+- [x] Implement role-based route guards
+- [x] Implement first-login onboarding state in preferences
 
 ## 5) Core Master Data Modules
-- Status: Pending
-- Parent, Youngsters, Kitchen, Delivery, Menu, Session master data pages.
-- API CRUD endpoints and DB models.
+- [x] Schools master data template completed
+- [x] Dish master data template completed
+- [x] Ingredient master data template completed
+- [x] Blackout master data template completed
+- [x] Menu master data template completed
+- [x] Parents details master data template completed
+- [x] Kids details master data template completed
+- [x] Delivery details master data template completed
 
 ## 6) Parent and Youngsters Core Ordering Flows
-- Status: Pending
-- Session-based ordering journey (Breakfast, Lunch, Snack).
-- Order validation rules and limits.
+- [ ] Parent registration page (public)
+- [ ] Youngsters profile registration by parent/admin
+- [ ] Parent-child linking (max 10 youngsters per parent)
+- [ ] Session menu pages (Lunch/Snack/Breakfast order and styling)
+- [ ] Cart draft flow per youngster/date/session
+- [ ] Cart expiry at 08:00 Asia/Makassar
+- [ ] Place order and create billing record
+- [ ] Parent edit/delete before cutoff
+- [ ] Youngsters cannot edit/delete after place
+- [ ] Item limits (max 5 items/cart, max 5 items/order)
 
-## 7) Billing and Receipt Flows
-- Status: Pending
-- Billing calculations, receipts, and status updates.
+## 7) Advanced Ordering Features
+- [ ] Quick reorder from historical orders
+- [ ] Meal Plan Wizard (weekly/monthly/custom range)
+- [ ] Smart cutoff countdown timer
+- [ ] Search/filter by keyword, session, price, allergens, favourites
+- [ ] Favourite meal combos (max 20/user)
+- [ ] Dietary restriction snapshot into order
+- [ ] Parent consolidated orders page
 
-## 8) Delivery and Kitchen Execution Flows
-- Status: Pending
-- Kitchen preparation queue and delivery handoff states.
+## 8) Billing, Receipt, and Delivery
+- [ ] Billing history and summaries
+- [ ] Proof-of-payment upload (validation + size limits)
+- [ ] Admin verify/reject payment flow
+- [ ] Receipt number generation sequence
+- [ ] PDF receipt generation and GCS storage
+- [ ] Parent receipt download
+- [ ] Delivery assignment page
+- [ ] Delivery confirmation updates billing status
+- [ ] Parent consolidated billing page
 
-## 9) Admin Operations
-- Status: Pending
-- User/role management and operational controls.
+## 9) Delivery, Kitchen and Admin Operations
+- [ ] Kitchen daily summary view (polling)
+- [ ] Kitchen allergen alert dashboard
+- [ ] Print order tags with QR
+- [ ] Print reports
+- [ ] Revenue dashboard (admin)
+- [ ] Spending dashboard (parent)
+- [ ] Nutrition summary (youngster weekly)
+- [ ] Birthday highlight indicators
+- [ ] Clean Plate Club badge engine + display
 
-## 10) QA and UAT
-- Status: Pending
-- End-to-end test matrix for all roles and critical flows.
+## 10) CSV Import and Data Operations
+- [ ] Define CSV template (parents + youngsters)
+- [ ] Build CSV import endpoint + validation
+- [ ] Import result report (success/fail + reasons)
+- [ ] Add admin UI for CSV upload and review
+- [ ] Add seed scripts for demo/test datasets
 
-## 11) Observability and Ops
-- Status: Pending
-- Runtime logs, error triage flow, and health checks.
+## 11) API and Contract Completion
+- [ ] Implement endpoints from `docs/specs/api-contract.md`
+- [ ] Request validation (DTO/class-validator)
+- [ ] OpenAPI docs generation at `/api/v1/docs`
+- [ ] Error response standardization
+- [ ] Correlation ID middleware
+- [ ] Rate limiting on sensitive endpoints
 
-## 12) Security Hardening
-- Status: Pending
-- Secrets hygiene, auth edge-case handling, and access reviews.
+## 12) Security and Compliance
+- [ ] Password policy and secure reset flow
+- [ ] Strict RBAC test matrix
+- [ ] Upload scanning/validation hardening
+- [ ] SQL injection/XSS/CSRF review
+- [ ] Secrets handling audit (`.env`, server file permissions)
+- [ ] Privacy and Confidentiality page (public)
+- [ ] Basic audit trail for admin-critical actions
 
-## 13) Data Integrity and Backup
-- Status: Pending
-- Backup and restore verification, migration safety checks.
+## 13) Observability and Reliability
+- [ ] Structured logs (JSON)
+- [ ] Request/exception monitoring setup
+- [ ] DB backup and restore runbook + dry run
+- [ ] Healthcheck endpoints (`/health`, `/ready`)
+- [ ] PM2 ecosystem config and startup persistence
+- [ ] Nginx cache/compression/security headers review
+- [ ] Optional CDN hostname switch for asset delivery
 
-## 14) Performance and Stability
-- Status: Pending
-- Baseline performance checks for web and api.
+## 14) Testing and Quality Gates
+- [ ] Unit tests (validators, rules, pricing, badge logic)
+- [ ] Integration tests (API + DB flows)
+- [ ] E2E system tests per role
+- [ ] UAT scenarios with school operations
+- [ ] Regression suite for cutoff/weekdays/blackouts
+- [ ] Security testing pass
+- [ ] Performance testing under peak ordering load
 
-## 15) Documentation Completion
-- Status: In Progress
-- Keep `.env.example`, `db_infor.md`, `start.md`, and this plan updated.
+## 15) Release Preparation
+- [ ] Create production `.env` template and final values checklist
+- [ ] Final migration plan for production DB
+- [ ] Go-live runbook with hour-by-hour steps
+- [ ] Rollback plan (app + DB)
+- [ ] Final SEO check (title/meta/robots/sitemap canonical)
+- [ ] Stakeholder sign-off from product + ops + QA
 
-## 16) Production Readiness Checklist
-- Status: Pending
-- Release gate checklist before broader use.
+## 16) Go-Live Day
+- [ ] Freeze non-critical changes
+- [ ] Deploy tagged release
+- [ ] Run smoke tests (all roles + key flows)
+- [ ] Verify billing and receipt generation live
+- [ ] Verify logs/alerts and backup jobs
+- [ ] Announce go-live and monitor first-day incidents
 
-## 17) Suggested Execution Order (Critical Path)
-- a. Finalize auth/runtime stability checks on server.
-- b. Complete master data modules.
-- c. Complete order, billing, kitchen, and delivery flows.
-- d. Run full QA/UAT and fix gaps.
-- e. Finalize docs and production readiness checklist.
+## 17) Post Go-Live (Week 1-2)
+- [ ] Bug triage daily and hotfix SLA
+- [ ] Monitor conversion/drop-off in order funnel
+- [ ] Monitor performance and DB query hotspots
+- [ ] Prioritize v1.1 backlog from real usage
 
-## 18) Release and Handover
-- Status: Pending
-- Final deployment validation and operating handover notes.
+## 18) Suggested Execution Order (Critical Path)
+This list maps directly to Sections **2-17** above for easy cross-reference.
+
+1 Create Baseline & Plan - Complete
+2 (Repo and Delivery Workflow Hardening) - Complete
+3 (Monorepo Structure Completion) - Complete
+4 (Authentication and Identity) - Complete
+5 (Core Master Data Modules) - 
+6 (Parent and Youngsters Core Ordering Flows) - 
+7 (Advanced Ordering Features) -  
+8 (Billing, Receipt, and Delivery) - 
+9 (Kitchen and Admin Operations) - 
+10 (CSV Import and Data Operations) -   
+11 (API and Contract Completion) - 
+12 (Security and Compliance) - 
+13 (Observability and Reliability) -   
+14 (Testing and Quality Gates) - 
+15 (Release Preparation) - 
+16 (Go-Live Day) - 
+17 (Post Go-Live Week 1-2) - 

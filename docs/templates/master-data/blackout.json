@@ -1,0 +1,15 @@
+{
+  "blackout_days": [
+    {
+      "id": "blk-001",
+      "year": 2026,
+      "long_name": "National Independence Holiday",
+      "short_name": "Independence",
+      "from_date": "2026-08-17",
+      "to_date": "2026-08-17",
+      "days_auto": 1,
+      "status": "active",
+      "notes": "Order blocked for all sessions"
+    }
+  ]
+}

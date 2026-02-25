@@ -1,0 +1,19 @@
+{
+  "parents": [
+    {
+      "id": "par-001",
+      "user_id": "usr-parent-001",
+      "username": "parent",
+      "full_name": "Parent User",
+      "gender": "UNDISCLOSED",
+      "mobile_number": "+6281234567890",
+      "email": "parent@example.com",
+      "address": "Jl. Parent Street No. 10",
+      "city": "Denpasar",
+      "school_id": "sch-001",
+      "status": "active",
+      "youngsters_count_auto": 0,
+      "created_at": "2026-02-25T00:00:00Z"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "menu_items": [
+    {
+      "id": "menu-001",
+      "session": "LUNCH",
+      "full_item_name": "Chicken Teriyaki Rice Bowl",
+      "short_item_name": "Teriyaki",
+      "dish_type": "Wet",
+      "status": "active",
+      "cutlery_needed": true,
+      "price_rupiah": 25000,
+      "ingredient_codes": ["chicken", "rice", "soy_sauce"],
+      "allergen_tags": ["soy"],
+      "notes": "Low sugar option available"
+    }
+  ]
+}

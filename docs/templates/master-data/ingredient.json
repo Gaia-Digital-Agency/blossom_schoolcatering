@@ -1,0 +1,808 @@
+{
+  "ingredients": [
+    {
+      "name": "almond",
+      "category": "legume_nut_seed"
+    },
+    {
+      "name": "alphabet_pasta",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "anchovy",
+      "category": "other"
+    },
+    {
+      "name": "apple",
+      "category": "fruit"
+    },
+    {
+      "name": "apple_cider_vinegar",
+      "category": "seasoning"
+    },
+    {
+      "name": "arborio_rice",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "avocado",
+      "category": "fruit"
+    },
+    {
+      "name": "bacon",
+      "category": "protein"
+    },
+    {
+      "name": "bagel",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "baking_powder",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "banana",
+      "category": "fruit"
+    },
+    {
+      "name": "basil",
+      "category": "herb"
+    },
+    {
+      "name": "basmati_rice",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "bay_leaf",
+      "category": "spice"
+    },
+    {
+      "name": "bbq_sauce",
+      "category": "seasoning"
+    },
+    {
+      "name": "beef",
+      "category": "protein"
+    },
+    {
+      "name": "beef_stock",
+      "category": "processed_condiment"
+    },
+    {
+      "name": "beetroot",
+      "category": "vegetable"
+    },
+    {
+      "name": "bell_pepper",
+      "category": "vegetable"
+    },
+    {
+      "name": "black_bean",
+      "category": "legume_nut_seed"
+    },
+    {
+      "name": "black_pepper",
+      "category": "seasoning"
+    },
+    {
+      "name": "bread",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "breadcrumbs",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "broccoli",
+      "category": "vegetable"
+    },
+    {
+      "name": "brown_sugar",
+      "category": "seasoning"
+    },
+    {
+      "name": "butter",
+      "category": "dairy"
+    },
+    {
+      "name": "cabbage",
+      "category": "vegetable"
+    },
+    {
+      "name": "caper",
+      "category": "seasoning"
+    },
+    {
+      "name": "cardamom",
+      "category": "spice"
+    },
+    {
+      "name": "carrot",
+      "category": "vegetable"
+    },
+    {
+      "name": "cashew",
+      "category": "legume_nut_seed"
+    },
+    {
+      "name": "cauliflower",
+      "category": "vegetable"
+    },
+    {
+      "name": "celery",
+      "category": "vegetable"
+    },
+    {
+      "name": "cheddar",
+      "category": "dairy"
+    },
+    {
+      "name": "cheese",
+      "category": "dairy"
+    },
+    {
+      "name": "cherry_tomato",
+      "category": "vegetable"
+    },
+    {
+      "name": "chicken",
+      "category": "protein"
+    },
+    {
+      "name": "chicken_stock",
+      "category": "processed_condiment"
+    },
+    {
+      "name": "chickpea",
+      "category": "legume_nut_seed"
+    },
+    {
+      "name": "chili",
+      "category": "spice"
+    },
+    {
+      "name": "chili_flakes",
+      "category": "spice"
+    },
+    {
+      "name": "cilantro",
+      "category": "herb"
+    },
+    {
+      "name": "cinnamon",
+      "category": "spice"
+    },
+    {
+      "name": "clam",
+      "category": "protein"
+    },
+    {
+      "name": "clove",
+      "category": "spice"
+    },
+    {
+      "name": "coconut",
+      "category": "fruit"
+    },
+    {
+      "name": "coconut_milk",
+      "category": "other"
+    },
+    {
+      "name": "coriander",
+      "category": "spice"
+    },
+    {
+      "name": "corn",
+      "category": "vegetable"
+    },
+    {
+      "name": "cornstarch",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "crab",
+      "category": "protein"
+    },
+    {
+      "name": "cream",
+      "category": "dairy"
+    },
+    {
+      "name": "cream_cheese",
+      "category": "dairy"
+    },
+    {
+      "name": "croissant",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "cucumber",
+      "category": "vegetable"
+    },
+    {
+      "name": "cumin",
+      "category": "spice"
+    },
+    {
+      "name": "curry_paste",
+      "category": "other"
+    },
+    {
+      "name": "curry_powder",
+      "category": "spice"
+    },
+    {
+      "name": "dashi",
+      "category": "processed_condiment"
+    },
+    {
+      "name": "date",
+      "category": "fruit"
+    },
+    {
+      "name": "dill",
+      "category": "herb"
+    },
+    {
+      "name": "duck",
+      "category": "protein"
+    },
+    {
+      "name": "egg",
+      "category": "protein"
+    },
+    {
+      "name": "egg_noodle",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "eggplant",
+      "category": "vegetable"
+    },
+    {
+      "name": "english_muffin",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "fish",
+      "category": "protein"
+    },
+    {
+      "name": "fish_sauce",
+      "category": "seasoning"
+    },
+    {
+      "name": "flour",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "galangal",
+      "category": "herb"
+    },
+    {
+      "name": "garam_masala",
+      "category": "spice"
+    },
+    {
+      "name": "garlic",
+      "category": "vegetable"
+    },
+    {
+      "name": "ghee",
+      "category": "dairy"
+    },
+    {
+      "name": "ginger",
+      "category": "vegetable"
+    },
+    {
+      "name": "goat",
+      "category": "protein"
+    },
+    {
+      "name": "gochujang",
+      "category": "spice"
+    },
+    {
+      "name": "grape",
+      "category": "fruit"
+    },
+    {
+      "name": "green_bean",
+      "category": "vegetable"
+    },
+    {
+      "name": "ham",
+      "category": "protein"
+    },
+    {
+      "name": "herbs",
+      "category": "other"
+    },
+    {
+      "name": "hoisin_sauce",
+      "category": "seasoning"
+    },
+    {
+      "name": "honey",
+      "category": "seasoning"
+    },
+    {
+      "name": "hot_dog_sausage",
+      "category": "protein"
+    },
+    {
+      "name": "jam",
+      "category": "processed_condiment"
+    },
+    {
+      "name": "jasmine_rice",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "kale",
+      "category": "vegetable"
+    },
+    {
+      "name": "ketchup",
+      "category": "seasoning"
+    },
+    {
+      "name": "kidney_bean",
+      "category": "legume_nut_seed"
+    },
+    {
+      "name": "kimchi",
+      "category": "protein"
+    },
+    {
+      "name": "lamb",
+      "category": "protein"
+    },
+    {
+      "name": "lasagna_sheet",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "lemon",
+      "category": "fruit"
+    },
+    {
+      "name": "lemongrass",
+      "category": "herb"
+    },
+    {
+      "name": "lentil",
+      "category": "legume_nut_seed"
+    },
+    {
+      "name": "lettuce",
+      "category": "vegetable"
+    },
+    {
+      "name": "lime",
+      "category": "fruit"
+    },
+    {
+      "name": "lobster",
+      "category": "protein"
+    },
+    {
+      "name": "macaroni",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "mango",
+      "category": "fruit"
+    },
+    {
+      "name": "maple_syrup",
+      "category": "seasoning"
+    },
+    {
+      "name": "mayonnaise",
+      "category": "processed_condiment"
+    },
+    {
+      "name": "meatball",
+      "category": "protein"
+    },
+    {
+      "name": "milk",
+      "category": "dairy"
+    },
+    {
+      "name": "mint",
+      "category": "herb"
+    },
+    {
+      "name": "mirin",
+      "category": "processed_condiment"
+    },
+    {
+      "name": "miso",
+      "category": "processed_condiment"
+    },
+    {
+      "name": "mozzarella",
+      "category": "dairy"
+    },
+    {
+      "name": "mushroom",
+      "category": "vegetable"
+    },
+    {
+      "name": "mussel",
+      "category": "protein"
+    },
+    {
+      "name": "mustard",
+      "category": "seasoning"
+    },
+    {
+      "name": "naan",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "nori",
+      "category": "processed_condiment"
+    },
+    {
+      "name": "nutmeg",
+      "category": "spice"
+    },
+    {
+      "name": "oats",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "octopus",
+      "category": "protein"
+    },
+    {
+      "name": "oil",
+      "category": "seasoning"
+    },
+    {
+      "name": "olive",
+      "category": "other"
+    },
+    {
+      "name": "olive_oil",
+      "category": "seasoning"
+    },
+    {
+      "name": "onion",
+      "category": "vegetable"
+    },
+    {
+      "name": "orange",
+      "category": "fruit"
+    },
+    {
+      "name": "oregano",
+      "category": "herb"
+    },
+    {
+      "name": "oyster_sauce",
+      "category": "seasoning"
+    },
+    {
+      "name": "paneer",
+      "category": "protein"
+    },
+    {
+      "name": "paprika",
+      "category": "spice"
+    },
+    {
+      "name": "parmesan",
+      "category": "dairy"
+    },
+    {
+      "name": "parsley",
+      "category": "herb"
+    },
+    {
+      "name": "pasta",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "pea",
+      "category": "vegetable"
+    },
+    {
+      "name": "peanut",
+      "category": "legume_nut_seed"
+    },
+    {
+      "name": "pear",
+      "category": "fruit"
+    },
+    {
+      "name": "pickle",
+      "category": "processed_condiment"
+    },
+    {
+      "name": "pineapple",
+      "category": "fruit"
+    },
+    {
+      "name": "pita",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "pizza_dough",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "polenta",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "pork",
+      "category": "protein"
+    },
+    {
+      "name": "potato",
+      "category": "vegetable"
+    },
+    {
+      "name": "prawn",
+      "category": "protein"
+    },
+    {
+      "name": "prosciutto",
+      "category": "protein"
+    },
+    {
+      "name": "pumpkin",
+      "category": "vegetable"
+    },
+    {
+      "name": "quinoa",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "radish",
+      "category": "vegetable"
+    },
+    {
+      "name": "raisin",
+      "category": "fruit"
+    },
+    {
+      "name": "ramen_noodle",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "red_onion",
+      "category": "vegetable"
+    },
+    {
+      "name": "rice",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "rice_noodle",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "rice_paper",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "rice_vinegar",
+      "category": "seasoning"
+    },
+    {
+      "name": "romaine",
+      "category": "vegetable"
+    },
+    {
+      "name": "rosemary",
+      "category": "herb"
+    },
+    {
+      "name": "sage",
+      "category": "herb"
+    },
+    {
+      "name": "sake",
+      "category": "processed_condiment"
+    },
+    {
+      "name": "salmon",
+      "category": "protein"
+    },
+    {
+      "name": "salt",
+      "category": "seasoning"
+    },
+    {
+      "name": "sausage",
+      "category": "protein"
+    },
+    {
+      "name": "scallion",
+      "category": "vegetable"
+    },
+    {
+      "name": "seaweed",
+      "category": "processed_condiment"
+    },
+    {
+      "name": "semolina",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "sesame",
+      "category": "legume_nut_seed"
+    },
+    {
+      "name": "sesame_oil",
+      "category": "seasoning"
+    },
+    {
+      "name": "shallot",
+      "category": "vegetable"
+    },
+    {
+      "name": "shrimp",
+      "category": "protein"
+    },
+    {
+      "name": "smoked_paprika",
+      "category": "spice"
+    },
+    {
+      "name": "sour_cream",
+      "category": "dairy"
+    },
+    {
+      "name": "soy_sauce",
+      "category": "seasoning"
+    },
+    {
+      "name": "spaghetti",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "spinach",
+      "category": "vegetable"
+    },
+    {
+      "name": "squid",
+      "category": "protein"
+    },
+    {
+      "name": "star_anise",
+      "category": "spice"
+    },
+    {
+      "name": "sticky_rice",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "stock",
+      "category": "processed_condiment"
+    },
+    {
+      "name": "sugar",
+      "category": "seasoning"
+    },
+    {
+      "name": "sweet_potato",
+      "category": "vegetable"
+    },
+    {
+      "name": "tamarind",
+      "category": "processed_condiment"
+    },
+    {
+      "name": "tempeh",
+      "category": "protein"
+    },
+    {
+      "name": "thai_basil",
+      "category": "herb"
+    },
+    {
+      "name": "thyme",
+      "category": "herb"
+    },
+    {
+      "name": "toast_bread",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "tofu",
+      "category": "protein"
+    },
+    {
+      "name": "tomato",
+      "category": "vegetable"
+    },
+    {
+      "name": "tomato_paste",
+      "category": "vegetable"
+    },
+    {
+      "name": "tortilla",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "tuna",
+      "category": "protein"
+    },
+    {
+      "name": "turkey",
+      "category": "protein"
+    },
+    {
+      "name": "turmeric",
+      "category": "spice"
+    },
+    {
+      "name": "udon_noodle",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "vanilla",
+      "category": "seasoning"
+    },
+    {
+      "name": "vegetable_oil",
+      "category": "seasoning"
+    },
+    {
+      "name": "vegetable_stock",
+      "category": "processed_condiment"
+    },
+    {
+      "name": "vermicelli",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "vinegar",
+      "category": "seasoning"
+    },
+    {
+      "name": "walnut",
+      "category": "legume_nut_seed"
+    },
+    {
+      "name": "water",
+      "category": "other"
+    },
+    {
+      "name": "wheat_noodle",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "white_bean",
+      "category": "legume_nut_seed"
+    },
+    {
+      "name": "white_pepper",
+      "category": "seasoning"
+    },
+    {
+      "name": "worcestershire_sauce",
+      "category": "seasoning"
+    },
+    {
+      "name": "yeast",
+      "category": "grain_noodle_bread"
+    },
+    {
+      "name": "yoghurt",
+      "category": "dairy"
+    },
+    {
+      "name": "zucchini",
+      "category": "vegetable"
+    }
+  ]
+}

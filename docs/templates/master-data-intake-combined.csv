@@ -1,0 +1,13 @@
+section,schools
+shortname,full_name,address,city,active_notactive,number_of_youngster_auto_populate_from_db
+BPC,Blossom Primary Campus,"Jl. Example No.1, Denpasar",Denpasar,active,auto
+
+section,black_out_days
+year,long_name_of_blackout_day,short_blackout_day_name_one_word,from_date,to_date,days_auto_populate
+2026,National Independence Holiday,Independence,2026-08-17,2026-08-17,auto
+
+section,menu
+session_lunch_snack_breakfast,full_item_name,short_item_name_one_word,dry_wet,active_notactive,cutlery_needed,price_in_rupiah,ingredient_dropdown_multi_select_from_ingredient_json
+LUNCH,Chicken Teriyaki Rice Bowl,Teriyaki,Wet,active,Yes,25000,"chicken,rice,soy_sauce"
+SNACK,Fruit Yoghurt Parfait,Parfait,Wet,active,No,12000,"fruit,yoghurt,honey"
+BREAKFAST,Scrambled Egg Toast,EggToast,Dry,active,No,18000,"egg,bread,butter"

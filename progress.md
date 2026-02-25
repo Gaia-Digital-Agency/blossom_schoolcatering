@@ -1,5 +1,47 @@
 # Progress Update
 
+## 2026-02-25 (Docs + Section 5 completion sync)
+- Added root `README.md` aligned to App Overview and current implemented server status.
+- Completed Section 5 template deliverables in `docs/templates/master-data`:
+  - `schools.json`
+  - `dish.json`
+  - `ingredient.json` (with `name` + `category`)
+  - `blackout.json`
+  - `menu.json`
+  - `parents.json`
+  - `kids.json`
+  - `delivery.json`
+  - `maste_list_note.md`
+- Updated `plan.md` to mark Section 5 complete (template/data scope level).
+- Added/updated combined intake structure for admin data entry.
+- Google OAuth id-token flow implemented in code and deployed; server env keys still required for real Google sign-in:
+  - `GOOGLE_CLIENT_ID`
+  - `NEXT_PUBLIC_GOOGLE_CLIENT_ID`
+
+## 2026-02-25 (Server-first auth/access rollout)
+- Pulled latest from GitHub to VM, rebuilt API/Web, restarted PM2 services.
+- Fixed nginx redirect loop for `/schoolcatering` routing and confirmed stable `200` responses.
+- Completed role-based auth routing:
+  - `/admin` -> `/admin/login` when not ADMIN
+  - `/kitchen` -> `/kitchen/login` when not KITCHEN
+  - `/delivery` -> `/delivery/login` when not DELIVERY
+  - `/parents` -> `/parent/login` when not PARENT
+  - `/youngsters` -> `/youngster/login` when not YOUNGSTER
+- Added role login pages:
+  - `/admin/login`, `/kitchen/login`, `/delivery/login`, `/parent/login`, `/youngster/login`
+- Added functional registration pages:
+  - `/register/parent`, `/register/youngsters`, `/register/delivery`
+- Added password-update action on all role pages (Admin/Kitchen/Delivery/Parent/Youngsters).
+- Added quick credential help box on login page.
+- Enforced role-specific credentials and revoked shared `teameditor` account.
+- Verified live login status:
+  - `admin/admin123` (201)
+  - `kitchen/kitchen123` (201)
+  - `delivery/delivery123` (201)
+  - `parent/parent123` (201)
+  - `youngster/youngster123` (201)
+  - `teameditor/admin123` revoked (401)
+
 ## Step 0 (Checkpoint)
 - Committed current repository state before new UI work.
 - Commit: `32fd108`

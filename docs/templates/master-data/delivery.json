@@ -1,0 +1,23 @@
+{
+  "delivery_details": [
+    {
+      "id": "del-001",
+      "assigned_person": "Dewa Putra",
+      "gender": "MALE",
+      "mobile_number": "+6281230001111",
+      "alternate_mobile_number": "+6281230002222",
+      "email": "delivery1@example.com",
+      "vehicle_type": "Motorbike",
+      "vehicle_plate_number": "DK1234AB",
+      "delivery_zone": "Denpasar Barat",
+      "assigned_school_ids": ["sch-001"],
+      "assigned_parent_ids": ["par-001"],
+      "assigned_youngster_ids": ["kid-001"],
+      "shift_start": "07:00",
+      "shift_end": "15:00",
+      "status": "active",
+      "delivery_result_dropdown": ["Completed", "Unsuccessful"],
+      "notes": "Handle allergy-tagged meals carefully"
+    }
+  ]
+}
