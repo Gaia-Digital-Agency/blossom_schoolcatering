@@ -7,7 +7,8 @@
     "doc": "docs"
   },
   "workspaces": [
-    "apps/api"
+    "apps/api",
+    "packages/*"
   ],
   "scripts": {
     "dev": "npm run dev:web",
@@ -17,7 +18,9 @@
     "build:web": "vite build apps/web",
     "build:api": "npm --prefix apps/api run build",
     "preview": "vite preview --host 0.0.0.0 --port 4173",
-    "test": "echo \"No tests yet\""
+    "test": "echo \"No tests yet\"",
+    "build:types": "npm --prefix packages/types run build",
+    "check:config": "npm --prefix packages/config run validate"
   },
   "repository": {
     "type": "git",

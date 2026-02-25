@@ -1,0 +1,10 @@
+{
+  "name": "@blossom/config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "files": ["*.json", "*.js", "*.cjs", "*.mjs"],
+  "scripts": {
+    "validate": "node -e \"console.log('config package ready')\""
+  }
+}
