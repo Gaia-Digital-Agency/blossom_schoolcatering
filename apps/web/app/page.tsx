@@ -25,7 +25,7 @@ export default function HomePage() {
       const res = await fetch(`${getApiBase()}/auth/google/dev`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ googleEmail: 'teameditor@gmail.com', role: 'PARENT' }),
+        body: JSON.stringify({ googleEmail: 'parent@gmail.com', role: 'PARENT' }),
       });
       if (!res.ok) {
         throw new Error('Google login is not available');
@@ -53,11 +53,8 @@ export default function HomePage() {
           </button>
           <nav className={`nav ${open ? 'open' : ''}`}>
             <Link href="/">Home</Link>
-            <Link href="/parents">Parents</Link>
-            <Link href="/youngsters">Youngsters</Link>
-            <Link href="/admin">Admin</Link>
-            <Link href="/kitchen">Kitchen</Link>
-            <Link href="/delivery">Delivery</Link>
+            <Link href="/login">Login</Link>
+            <Link href="/register">Register</Link>
           </nav>
         </header>
 

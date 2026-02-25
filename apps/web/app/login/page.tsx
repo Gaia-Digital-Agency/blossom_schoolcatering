@@ -2,16 +2,16 @@
 
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ROLE_OPTIONS, getApiBase, setAuthState } from '../../lib/auth';
+import { getApiBase, setAuthState } from '../../lib/auth';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('admin123');
-  const [role, setRole] = useState('ADMIN');
+  const [username, setUsername] = useState('parent');
+  const [password, setPassword] = useState('parent123');
+  const [role, setRole] = useState('PARENT');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [googleEmail, setGoogleEmail] = useState('teameditor@gmail.com');
+  const [googleEmail, setGoogleEmail] = useState('parent@gmail.com');
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -61,11 +61,14 @@ export default function LoginPage() {
   return (
     <main className="page-auth">
       <section className="auth-panel">
-        <h1>Developer Login</h1>
-        <p className="auth-help">Common account for Parent, Youngsters, Admin, Kitchen, and Delivery.</p>
+        <h1>Home Login</h1>
+        <p className="auth-help">Use this page for Parent and Youngster login.</p>
         <div className="quick-credentials" aria-label="Quick Credentials">
-          <p><strong>Admin:</strong> admin / admin123</p>
-          <p><strong>Kitchen:</strong> kitchen / kitchen123</p>
+          <p><strong>Parent:</strong> parent / parent123</p>
+          <p><strong>Youngster:</strong> youngster / youngster123</p>
+          <p><strong>Admin:</strong> use /admin/login</p>
+          <p><strong>Kitchen:</strong> use /kitchen/login</p>
+          <p><strong>Delivery:</strong> use /delivery/login</p>
         </div>
         <form onSubmit={onSubmit} className="auth-form">
           <label>
@@ -79,11 +82,8 @@ export default function LoginPage() {
           <label>
             Role
             <select value={role} onChange={(e) => setRole(e.target.value)}>
-              {ROLE_OPTIONS.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
+              <option value="PARENT">PARENT</option>
+              <option value="YOUNGSTER">YOUNGSTER</option>
             </select>
           </label>
           {error ? <p className="auth-error">{error}</p> : null}
@@ -93,7 +93,7 @@ export default function LoginPage() {
         </form>
         <div className="auth-form" style={{ marginTop: '0.8rem' }}>
           <label>
-            Google Email (Dev)
+            Google Email (Dev Parent)
             <input value={googleEmail} onChange={(e) => setGoogleEmail(e.target.value)} />
           </label>
           <button className="btn btn-google" disabled={loading} type="button" onClick={onGoogleDev}>

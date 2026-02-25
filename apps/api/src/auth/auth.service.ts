@@ -38,12 +38,16 @@ type RegisterInput = {
   address?: string;
 };
 
-const DEV_USERNAME = 'teameditor';
-const DEV_PASSWORD = 'admin123';
 const ADMIN_USERNAME = 'admin';
 const ADMIN_PASSWORD = 'admin123';
 const KITCHEN_USERNAME = 'kitchen';
 const KITCHEN_PASSWORD = 'kitchen123';
+const DELIVERY_USERNAME = 'delivery';
+const DELIVERY_PASSWORD = 'delivery123';
+const PARENT_USERNAME = 'parent';
+const PARENT_PASSWORD = 'parent123';
+const YOUNGSTER_USERNAME = 'youngster';
+const YOUNGSTER_PASSWORD = 'youngster123';
 const ACCESS_TTL = '15m';
 const REFRESH_TTL = '7d';
 
@@ -151,13 +155,31 @@ export class AuthService {
         email: 'kitchen@gaiada.com',
       },
       {
-        role: 'ADMIN',
-        username: DEV_USERNAME,
-        password: DEV_PASSWORD,
-        firstName: 'Team',
-        lastName: 'Editor',
-        phoneNumber: '0000000000',
-        email: 'teameditor@gaiada.com',
+        role: 'DELIVERY',
+        username: DELIVERY_USERNAME,
+        password: DELIVERY_PASSWORD,
+        firstName: 'Delivery',
+        lastName: 'User',
+        phoneNumber: '0000000003',
+        email: 'delivery@gaiada.com',
+      },
+      {
+        role: 'PARENT',
+        username: PARENT_USERNAME,
+        password: PARENT_PASSWORD,
+        firstName: 'Parent',
+        lastName: 'User',
+        phoneNumber: '0000000004',
+        email: 'parent@gaiada.com',
+      },
+      {
+        role: 'CHILD',
+        username: YOUNGSTER_USERNAME,
+        password: YOUNGSTER_PASSWORD,
+        firstName: 'Youngster',
+        lastName: 'User',
+        phoneNumber: '0000000005',
+        email: 'youngster@gaiada.com',
       },
     ] as const;
 
@@ -187,6 +209,13 @@ export class AuthService {
         ON CONFLICT (user_id) DO NOTHING;
       `);
     }
+
+    await runSql(`
+      UPDATE users
+      SET is_active = false,
+          updated_at = now()
+      WHERE username = 'teameditor';
+    `);
   }
 
   private async findUserByUsername(username: string) {
@@ -273,6 +302,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
     const normalizedRole = this.normalizeRole(role);
+    const actualRole = this.appRoleFromDb(userRow.role);
+    if (actualRole !== normalizedRole) {
+      throw new UnauthorizedException('Role mismatch');
+    }
     const user = this.buildUser(userRow, normalizedRole);
     const tokens = await this.signTokens(user, userRow.id);
     return { ...tokens, user };
@@ -372,7 +405,7 @@ export class AuthService {
     }
 
     await this.ensureSystemUsers();
-    const userRow = await this.findUserByUsername(DEV_USERNAME);
+    const userRow = await this.findUserByUsername(PARENT_USERNAME);
     if (!userRow) throw new UnauthorizedException('Dev user not found');
     const user = this.buildUser(userRow, normalizedRole);
     const tokens = await this.signTokens(user, userRow.id);
@@ -392,7 +425,7 @@ export class AuthService {
     }
     const normalizedRole = this.normalizeRole(role);
     await this.ensureSystemUsers();
-    const userRow = await this.findUserByUsername(DEV_USERNAME);
+    const userRow = await this.findUserByUsername(PARENT_USERNAME);
     if (!userRow) throw new UnauthorizedException('Dev user not found');
     const user = this.buildUser(userRow, normalizedRole);
     const tokens = await this.signTokens(user, userRow.id);
