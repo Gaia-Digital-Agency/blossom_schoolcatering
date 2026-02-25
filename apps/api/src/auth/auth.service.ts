@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { createHmac, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'crypto';
 import { AuthUser, ROLES, Role } from './auth.types';
 import { runSql, sqlLiteral } from './db.util';
@@ -27,8 +27,23 @@ type DbUserRow = {
   password_hash: string;
 };
 
+type RegisterInput = {
+  role: Role;
+  username: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  phoneNumber: string;
+  email?: string;
+  address?: string;
+};
+
 const DEV_USERNAME = 'teameditor';
 const DEV_PASSWORD = 'admin123';
+const ADMIN_USERNAME = 'admin';
+const ADMIN_PASSWORD = 'admin123';
+const KITCHEN_USERNAME = 'kitchen';
+const KITCHEN_PASSWORD = 'kitchen123';
 const ACCESS_TTL = '15m';
 const REFRESH_TTL = '7d';
 
@@ -115,24 +130,63 @@ export class AuthService {
     return JSON.parse(line) as T;
   }
 
-  private async ensureDevUser() {
-    const hashed = this.hashPassword(DEV_PASSWORD);
-    const sql = `
-      INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email)
-      VALUES ('ADMIN', 'teameditor', ${sqlLiteral(hashed)}, 'Team', 'Editor', '0000000000', 'teameditor@gaiada.com')
-      ON CONFLICT (username) DO UPDATE
-      SET password_hash = EXCLUDED.password_hash,
-          role = EXCLUDED.role,
-          updated_at = now()
-      RETURNING row_to_json(users)::text;
-    `;
-    const userRow = this.parseJsonLine<DbUserRow>(await runSql(sql));
-    await runSql(`
-      INSERT INTO user_preferences (user_id, onboarding_completed, dark_mode_enabled, tooltips_enabled)
-      VALUES (${sqlLiteral(userRow.id)}, false, false, true)
-      ON CONFLICT (user_id) DO NOTHING;
-    `);
-    return userRow;
+  private async ensureSystemUsers() {
+    const specs = [
+      {
+        role: 'ADMIN',
+        username: ADMIN_USERNAME,
+        password: ADMIN_PASSWORD,
+        firstName: 'Admin',
+        lastName: 'User',
+        phoneNumber: '0000000001',
+        email: 'admin@gaiada.com',
+      },
+      {
+        role: 'KITCHEN',
+        username: KITCHEN_USERNAME,
+        password: KITCHEN_PASSWORD,
+        firstName: 'Kitchen',
+        lastName: 'User',
+        phoneNumber: '0000000002',
+        email: 'kitchen@gaiada.com',
+      },
+      {
+        role: 'ADMIN',
+        username: DEV_USERNAME,
+        password: DEV_PASSWORD,
+        firstName: 'Team',
+        lastName: 'Editor',
+        phoneNumber: '0000000000',
+        email: 'teameditor@gaiada.com',
+      },
+    ] as const;
+
+    for (const spec of specs) {
+      const hashed = this.hashPassword(spec.password);
+      const sql = `
+        INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email)
+        VALUES (
+          ${sqlLiteral(spec.role)},
+          ${sqlLiteral(spec.username)},
+          ${sqlLiteral(hashed)},
+          ${sqlLiteral(spec.firstName)},
+          ${sqlLiteral(spec.lastName)},
+          ${sqlLiteral(spec.phoneNumber)},
+          ${sqlLiteral(spec.email)}
+        )
+        ON CONFLICT (username) DO UPDATE
+        SET password_hash = EXCLUDED.password_hash,
+            role = EXCLUDED.role,
+            updated_at = now()
+        RETURNING id;
+      `;
+      const userId = await runSql(sql);
+      await runSql(`
+        INSERT INTO user_preferences (user_id, onboarding_completed, dark_mode_enabled, tooltips_enabled)
+        VALUES (${sqlLiteral(userId)}, false, false, true)
+        ON CONFLICT (user_id) DO NOTHING;
+      `);
+    }
   }
 
   private async findUserByUsername(username: string) {
@@ -149,6 +203,14 @@ export class AuthService {
     const out = await runSql(sql);
     if (!out) return null;
     return this.parseJsonLine<DbUserRow>(out);
+  }
+
+  private normalizeRegistrationRole(role: string): Role {
+    const normalized = this.normalizeRole(role);
+    if (!['PARENT', 'YOUNGSTER', 'DELIVERY'].includes(normalized)) {
+      throw new BadRequestException('Registration only allowed for Parent, Youngsters, and Delivery');
+    }
+    return normalized;
   }
 
   private buildUser(row: DbUserRow, role: Role): AuthUser {
@@ -205,7 +267,7 @@ export class AuthService {
   }
 
   async login(username: string, password: string, role: string) {
-    await this.ensureDevUser();
+    await this.ensureSystemUsers();
     const userRow = await this.findUserByUsername(username);
     if (!userRow || !this.verifyPassword(password, userRow.password_hash)) {
       throw new UnauthorizedException('Invalid credentials');
@@ -213,6 +275,82 @@ export class AuthService {
     const normalizedRole = this.normalizeRole(role);
     const user = this.buildUser(userRow, normalizedRole);
     const tokens = await this.signTokens(user, userRow.id);
+    return { ...tokens, user };
+  }
+
+  async register(input: RegisterInput) {
+    const role = this.normalizeRegistrationRole(input.role);
+    const username = (input.username || '').trim().toLowerCase();
+    const firstName = (input.firstName || '').trim();
+    const lastName = (input.lastName || '').trim();
+    const phoneNumber = (input.phoneNumber || '').trim();
+    const password = input.password || '';
+    const email = (input.email || '').trim().toLowerCase();
+    const address = (input.address || '').trim();
+
+    if (!username || !firstName || !lastName || !phoneNumber || !password) {
+      throw new BadRequestException('Required fields are missing');
+    }
+    if (username.length < 3 || password.length < 6) {
+      throw new BadRequestException('Username or password too short');
+    }
+    if (role === 'PARENT' && !address) {
+      throw new BadRequestException('Address is required for parent registration');
+    }
+
+    const existing = await this.findUserByUsername(username);
+    if (existing) {
+      throw new BadRequestException('Username already exists');
+    }
+
+    const hashed = this.hashPassword(password);
+    const dbRole = this.dbRoleFromApp(role);
+    let created: DbUserRow | null = null;
+    try {
+      const sql = `
+        SELECT row_to_json(t)::text
+        FROM (
+          INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email)
+          VALUES (
+            ${sqlLiteral(dbRole)},
+            ${sqlLiteral(username)},
+            ${sqlLiteral(hashed)},
+            ${sqlLiteral(firstName)},
+            ${sqlLiteral(lastName)},
+            ${sqlLiteral(phoneNumber)},
+            ${email ? sqlLiteral(email) : 'NULL'}
+          )
+          RETURNING id, username, role::text, first_name, last_name, password_hash
+        ) t;
+      `;
+      const out = await runSql(sql);
+      if (!out) {
+        throw new BadRequestException('Failed to create user');
+      }
+      created = this.parseJsonLine<DbUserRow>(out);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '';
+      if (message.toLowerCase().includes('duplicate key')) {
+        throw new BadRequestException('Username or email already exists');
+      }
+      throw err;
+    }
+
+    await runSql(`
+      INSERT INTO user_preferences (user_id, onboarding_completed, dark_mode_enabled, tooltips_enabled)
+      VALUES (${sqlLiteral(created.id)}, false, false, true)
+      ON CONFLICT (user_id) DO NOTHING;
+    `);
+
+    if (role === 'PARENT') {
+      await runSql(`
+        INSERT INTO parents (user_id, address)
+        VALUES (${sqlLiteral(created.id)}, ${sqlLiteral(address)});
+      `);
+    }
+
+    const user = this.buildUser(created, role);
+    const tokens = await this.signTokens(user, created.id);
     return { ...tokens, user };
   }
 
@@ -233,7 +371,7 @@ export class AuthService {
       throw new UnauthorizedException('Google audience mismatch');
     }
 
-    await this.ensureDevUser();
+    await this.ensureSystemUsers();
     const userRow = await this.findUserByUsername(DEV_USERNAME);
     if (!userRow) throw new UnauthorizedException('Dev user not found');
     const user = this.buildUser(userRow, normalizedRole);
@@ -253,7 +391,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid Google account');
     }
     const normalizedRole = this.normalizeRole(role);
-    await this.ensureDevUser();
+    await this.ensureSystemUsers();
     const userRow = await this.findUserByUsername(DEV_USERNAME);
     if (!userRow) throw new UnauthorizedException('Dev user not found');
     const user = this.buildUser(userRow, normalizedRole);
@@ -352,5 +490,25 @@ export class AuthService {
     const userRow = await this.findUserByUsername(payload.sub);
     if (!userRow) throw new UnauthorizedException('User not found');
     return this.buildUser(userRow, payload.role);
+  }
+
+  async changePassword(accessToken: string, currentPassword: string, newPassword: string) {
+    if (!currentPassword || !newPassword || newPassword.length < 6) {
+      throw new BadRequestException('Invalid password input');
+    }
+    const payload = this.verifyAccessToken(accessToken);
+    const userRow = await this.findUserByUsername(payload.sub);
+    if (!userRow) throw new UnauthorizedException('User not found');
+    if (!this.verifyPassword(currentPassword, userRow.password_hash)) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+    const nextHash = this.hashPassword(newPassword);
+    await runSql(`
+      UPDATE users
+      SET password_hash = ${sqlLiteral(nextHash)},
+          updated_at = now()
+      WHERE id = ${sqlLiteral(userRow.id)};
+    `);
+    return { ok: true };
   }
 }

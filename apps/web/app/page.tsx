@@ -2,16 +2,43 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { getApiBase, setAuthState } from '../lib/auth';
 
 export default function HomePage() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [showTop, setShowTop] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [googleError, setGoogleError] = useState('');
 
   useEffect(() => {
     const onScroll = () => setShowTop(window.scrollY > 140);
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  const onGoogleContinue = async () => {
+    setGoogleError('');
+    setGoogleLoading(true);
+    try {
+      const res = await fetch(`${getApiBase()}/auth/google/dev`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ googleEmail: 'teameditor@gmail.com', role: 'PARENT' }),
+      });
+      if (!res.ok) {
+        throw new Error('Google login is not available');
+      }
+      const data = await res.json();
+      setAuthState(data.accessToken, data.refreshToken, data.user.role);
+      router.push('/dashboard');
+    } catch (err) {
+      setGoogleError(err instanceof Error ? err.message : 'Google login failed');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
 
   return (
     <>
@@ -45,8 +72,11 @@ export default function HomePage() {
             <div className="auth-grid">
               <Link className="btn btn-primary" href="/login">Log In</Link>
               <Link className="btn btn-outline" href="/register">Register</Link>
-              <button className="btn btn-google" type="button">Continue with Google</button>
+              <button className="btn btn-google" type="button" onClick={onGoogleContinue} disabled={googleLoading}>
+                {googleLoading ? 'Please wait...' : 'Continue with Google'}
+              </button>
             </div>
+            {googleError ? <p className="auth-error">{googleError}</p> : null}
           </section>
         </main>
 

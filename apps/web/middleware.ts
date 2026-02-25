@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { AUTH_COOKIE } from './lib/auth';
 
 const BASE_PATH = '/schoolcatering';
-const PUBLIC_PATHS = new Set(['/', '/login']);
-
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -12,7 +10,11 @@ export function middleware(request: NextRequest) {
     : pathname;
 
   const hasToken = Boolean(request.cookies.get(AUTH_COOKIE)?.value);
-  const isPublic = PUBLIC_PATHS.has(normalizedPath);
+  const isPublic =
+    normalizedPath === '/' ||
+    normalizedPath === '/login' ||
+    normalizedPath === '/register' ||
+    normalizedPath.startsWith('/register/');
 
   if (!hasToken && !isPublic) {
     return NextResponse.redirect(new URL(`${BASE_PATH}/login`, request.url));

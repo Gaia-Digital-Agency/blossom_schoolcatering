@@ -6,9 +6,9 @@ import { ROLE_OPTIONS, getApiBase, setAuthState } from '../../lib/auth';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [username, setUsername] = useState('teameditor');
+  const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('admin123');
-  const [role, setRole] = useState('PARENT');
+  const [role, setRole] = useState('ADMIN');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleEmail, setGoogleEmail] = useState('teameditor@gmail.com');

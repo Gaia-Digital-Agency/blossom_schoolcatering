@@ -12,6 +12,17 @@ type LoginBody = {
   role?: string;
 };
 
+type RegisterBody = {
+  role?: string;
+  username?: string;
+  password?: string;
+  firstName?: string;
+  lastName?: string;
+  phoneNumber?: string;
+  email?: string;
+  address?: string;
+};
+
 type RefreshBody = {
   refreshToken: string;
 };
@@ -33,6 +44,11 @@ type RoleCheckBody = {
   allowedRoles: Role[];
 };
 
+type ChangePasswordBody = {
+  currentPassword?: string;
+  newPassword?: string;
+};
+
 @Controller('api/v1/auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -46,6 +62,31 @@ export class AuthController {
       throw new UnauthorizedException('Invalid credentials');
     }
     return this.authService.login(username, password, role);
+  }
+
+  @Post('register')
+  register(@Body() body: RegisterBody) {
+    const role = body.role;
+    const username = body.username;
+    const password = body.password;
+    const firstName = body.firstName;
+    const lastName = body.lastName;
+    const phoneNumber = body.phoneNumber;
+    const email = body.email;
+    const address = body.address;
+    if (!role || !username || !password || !firstName || !lastName || !phoneNumber) {
+      throw new UnauthorizedException('Missing required fields');
+    }
+    return this.authService.register({
+      role: role as Role,
+      username,
+      password,
+      firstName,
+      lastName,
+      phoneNumber,
+      email,
+      address,
+    });
   }
 
   @Post('google/dev')
@@ -106,6 +147,19 @@ export class AuthController {
   @Post('logout')
   logout(@Body() body: RefreshBody) {
     return this.authService.logout(body?.refreshToken);
+  }
+
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  changePassword(
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: ChangePasswordBody,
+  ) {
+    const token = this.extractBearerToken(authorization);
+    if (!body.currentPassword || !body.newPassword) {
+      throw new UnauthorizedException('Missing password fields');
+    }
+    return this.authService.changePassword(token, body.currentPassword, body.newPassword);
   }
 
   @Get('admin-ping')
