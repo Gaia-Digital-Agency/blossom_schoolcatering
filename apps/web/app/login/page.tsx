@@ -3,6 +3,7 @@
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getApiBase, setAuthState } from '../../lib/auth';
+import GoogleOAuthButton from '../_components/google-oauth-button';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,7 +12,6 @@ export default function LoginPage() {
   const [role, setRole] = useState('PARENT');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [googleEmail, setGoogleEmail] = useState('parent@gmail.com');
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -31,28 +31,6 @@ export default function LoginPage() {
       router.push('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const onGoogleDev = async () => {
-    setError('');
-    setLoading(true);
-    try {
-      const res = await fetch(`${getApiBase()}/auth/google/dev`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ googleEmail, role }),
-      });
-      if (!res.ok) {
-        throw new Error('Google dev login failed');
-      }
-      const data = await res.json();
-      setAuthState(data.accessToken, data.refreshToken, data.user.role);
-      router.push('/dashboard');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Google dev login failed');
     } finally {
       setLoading(false);
     }
@@ -92,13 +70,7 @@ export default function LoginPage() {
           </button>
         </form>
         <div className="auth-form" style={{ marginTop: '0.8rem' }}>
-          <label>
-            Google Email (Dev Parent)
-            <input value={googleEmail} onChange={(e) => setGoogleEmail(e.target.value)} />
-          </label>
-          <button className="btn btn-google" disabled={loading} type="button" onClick={onGoogleDev}>
-            Continue with Google (Dev)
-          </button>
+          <GoogleOAuthButton role={role as 'PARENT' | 'YOUNGSTER'} redirectPath="/dashboard" />
         </div>
       </section>
     </main>

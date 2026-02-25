@@ -148,6 +148,19 @@ h1 {
   gap: 0.38rem;
 }
 
+.google-oauth-wrap {
+  display: flex;
+  justify-content: center;
+}
+
+.google-oauth-wrap > div {
+  width: 100%;
+}
+
+.google-oauth-wrap iframe {
+  width: 100% !important;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;

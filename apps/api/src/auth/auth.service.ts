@@ -27,6 +27,15 @@ type DbUserRow = {
   password_hash: string;
 };
 
+type GoogleTokenInfo = {
+  sub?: string;
+  email?: string;
+  email_verified?: string;
+  aud?: string;
+  given_name?: string;
+  family_name?: string;
+};
+
 type RegisterInput = {
   role: Role;
   username: string;
@@ -242,6 +251,77 @@ export class AuthService {
     return normalized;
   }
 
+  private normalizeGoogleRole(role: string): Role {
+    const normalized = this.normalizeRole(role);
+    if (normalized !== 'PARENT' && normalized !== 'YOUNGSTER') {
+      throw new BadRequestException('Google login is only for Parent and Youngsters');
+    }
+    return normalized;
+  }
+
+  private async findUserByIdentity(providerUserId: string) {
+    const sql = `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT u.id, u.username, u.role::text, u.first_name, u.last_name, u.password_hash
+        FROM user_identities ui
+        JOIN users u ON u.id = ui.user_id
+        WHERE ui.provider = 'GOOGLE'
+          AND ui.provider_user_id = ${sqlLiteral(providerUserId)}
+          AND u.is_active = true
+        LIMIT 1
+      ) t;
+    `;
+    const out = await runSql(sql);
+    if (!out) return null;
+    return this.parseJsonLine<DbUserRow>(out);
+  }
+
+  private async createGoogleUser(role: Role, payload: GoogleTokenInfo) {
+    const email = (payload.email || '').toLowerCase();
+    const firstName = (payload.given_name || 'Google').trim();
+    const lastName = (payload.family_name || 'User').trim();
+    const phoneNumber = '0000009999';
+    const randomPassword = this.hashPassword(randomUUID());
+    const usernameBase = (email.split('@')[0] || `google_${Date.now()}`).replace(/[^a-z0-9_]/g, '');
+    const username = await runSql(
+      `SELECT generate_unique_username(${sqlLiteral(usernameBase.toLowerCase())});`,
+    );
+    const dbRole = this.dbRoleFromApp(role);
+    const sql = `
+      SELECT row_to_json(t)::text
+      FROM (
+        INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email)
+        VALUES (
+          ${sqlLiteral(dbRole)},
+          ${sqlLiteral(username)},
+          ${sqlLiteral(randomPassword)},
+          ${sqlLiteral(firstName)},
+          ${sqlLiteral(lastName)},
+          ${sqlLiteral(phoneNumber)},
+          ${sqlLiteral(email)}
+        )
+        RETURNING id, username, role::text, first_name, last_name, password_hash
+      ) t;
+    `;
+    const out = await runSql(sql);
+    if (!out) throw new UnauthorizedException('Failed to create Google user');
+    const userRow = this.parseJsonLine<DbUserRow>(out);
+    await runSql(`
+      INSERT INTO user_preferences (user_id, onboarding_completed, dark_mode_enabled, tooltips_enabled)
+      VALUES (${sqlLiteral(userRow.id)}, false, false, true)
+      ON CONFLICT (user_id) DO NOTHING;
+    `);
+    if (role === 'PARENT') {
+      await runSql(`
+        INSERT INTO parents (user_id, address)
+        VALUES (${sqlLiteral(userRow.id)}, 'Google signup address pending')
+        ON CONFLICT (user_id) DO NOTHING;
+      `);
+    }
+    return userRow;
+  }
+
   private buildUser(row: DbUserRow, role: Role): AuthUser {
     return {
       username: row.username,
@@ -388,15 +468,15 @@ export class AuthService {
   }
 
   async loginWithGoogleVerified(idToken: string, role: string) {
-    const normalizedRole = this.normalizeRole(role);
+    const normalizedRole = this.normalizeGoogleRole(role);
     const res = await fetch(
       `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`,
     );
     if (!res.ok) {
       throw new UnauthorizedException('Google token verification failed');
     }
-    const payload = (await res.json()) as { email?: string; aud?: string; email_verified?: string };
-    if (!payload.email || payload.email_verified !== 'true') {
+    const payload = (await res.json()) as GoogleTokenInfo;
+    if (!payload.sub || !payload.email || payload.email_verified !== 'true') {
       throw new UnauthorizedException('Invalid Google identity');
     }
     const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -405,16 +485,17 @@ export class AuthService {
     }
 
     await this.ensureSystemUsers();
-    const userRow = await this.findUserByUsername(PARENT_USERNAME);
-    if (!userRow) throw new UnauthorizedException('Dev user not found');
+    let userRow = await this.findUserByIdentity(payload.sub);
+    if (!userRow) {
+      userRow = await this.createGoogleUser(normalizedRole, payload);
+      await runSql(`
+        INSERT INTO user_identities (user_id, provider, provider_user_id, provider_email)
+        VALUES (${sqlLiteral(userRow.id)}, 'GOOGLE', ${sqlLiteral(payload.sub)}, ${sqlLiteral(payload.email)})
+        ON CONFLICT (provider, provider_user_id) DO NOTHING;
+      `);
+    }
     const user = this.buildUser(userRow, normalizedRole);
     const tokens = await this.signTokens(user, userRow.id);
-
-    await runSql(`
-      INSERT INTO user_identities (user_id, provider, provider_user_id, provider_email)
-      VALUES (${sqlLiteral(userRow.id)}, 'GOOGLE', ${sqlLiteral(payload.email)}, ${sqlLiteral(payload.email)})
-      ON CONFLICT (provider, provider_user_id) DO NOTHING;
-    `);
 
     return { ...tokens, user, provider: 'google' };
   }
