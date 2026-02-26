@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
+Disallow: /schoolcatering/api/
 
 Sitemap: http://34.124.244.233/schoolcatering/sitemap.xml

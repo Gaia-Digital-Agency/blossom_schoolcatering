@@ -1,6 +1,6 @@
 # Blossom School Catering Plan (Now -> Go-Live)
 
-Last updated: 2026-02-25
+Last updated: 2026-02-26
 Target go-live: 2026-04-01
 
 ## Execution Note (Next Session: 2026-02-26)
@@ -61,48 +61,55 @@ Target go-live: 2026-04-01
 - [x] Kids details master data template completed
 - [x] Delivery details master data template completed
 
-## 6) Parent and Youngsters Core Ordering Flows
-- [ ] Parent registration page (public)
-- [ ] Youngsters profile registration by parent/admin
-- [ ] Parent-child linking (max 10 youngsters per parent)
-- [ ] Session menu pages (Lunch/Snack/Breakfast order and styling)
-- [ ] Cart draft flow per youngster/date/session
-- [ ] Cart expiry at 08:00 Asia/Makassar
-- [ ] Place order and create billing record
-- [ ] Parent edit/delete before cutoff
-- [ ] Youngsters cannot edit/delete after place
-- [ ] Item limits (max 5 items/cart, max 5 items/order)
+## 6) Parent, Youngsters, and Menu Core Pages
+- [x] Module coverage: Parent + Youngsters + Menu
+- [x] DB interlinks (phase 1): wire Parent/Youngsters/Menu/Ordering/Billing relations (FKs + constraints + indexes) for order placement flow
+- [x] Parent registration page (public)
+- [x] Youngsters profile registration by parent/admin
+- [x] Parent-child linking (max 10 youngsters per parent)
+- [x] Session menu pages (Lunch/Snack/Breakfast order and styling)
+- [x] Cart draft flow per youngster/date/session
+- [x] Cart expiry at 08:00 Asia/Makassar
+- [x] Place order and create billing record
+- [x] Parent edit/delete before cutoff
+- [x] Youngsters cannot edit/delete after place
+- [x] Item limits (max 5 items/cart, max 5 items/order)
 
-## 7) Advanced Ordering Features
-- [ ] Quick reorder from historical orders
-- [ ] Meal Plan Wizard (weekly/monthly/custom range)
-- [ ] Smart cutoff countdown timer
-- [ ] Search/filter by keyword, session, price, allergens, favourites
-- [ ] Favourite meal combos (max 20/user)
-- [ ] Dietary restriction snapshot into order
-- [ ] Parent consolidated orders page
+## 7) Ordering Module Pages (Advanced)
+- [x] Module coverage: Ordering
+- [x] Quick reorder from historical orders
+- [x] Meal Plan Wizard (weekly/monthly/custom range)
+- [x] Smart cutoff countdown timer
+- [x] Search/filter by keyword, session, price, allergens, favourites
+- [x] Favourite meal combos (max 20/user)
+- [x] Dietary restriction snapshot into order
+- [x] Parent consolidated orders page
 
-## 8) Billing, Receipt, and Delivery
-- [ ] Billing history and summaries
-- [ ] Proof-of-payment upload (validation + size limits)
-- [ ] Admin verify/reject payment flow
-- [ ] Receipt number generation sequence
-- [ ] PDF receipt generation and GCS storage
-- [ ] Parent receipt download
-- [ ] Delivery assignment page
-- [ ] Delivery confirmation updates billing status
-- [ ] Parent consolidated billing page
+## 8) Billing Module Pages (Receipt + Payment)
+- [x] Module coverage: Billing
+- [x] Billing history and summaries
+- [x] Proof-of-payment upload (validation + size limits)
+- [x] Admin verify/reject payment flow
+- [x] Receipt number generation sequence
+- [x] PDF receipt generation and GCS storage
+- [x] Parent receipt download
+- [x] Parent consolidated billing page
 
-## 9) Delivery, Kitchen and Admin Operations
-- [ ] Kitchen daily summary view (polling)
-- [ ] Kitchen allergen alert dashboard
-- [ ] Print order tags with QR
-- [ ] Print reports
-- [ ] Revenue dashboard (admin)
-- [ ] Spending dashboard (parent)
-- [ ] Nutrition summary (youngster weekly)
-- [ ] Birthday highlight indicators
-- [ ] Clean Plate Club badge engine + display
+## 9) Delivery, Kitchen, and Admin Module Pages
+- [x] Module coverage: Delivery + Kitchen + Admin
+- [x] DB interlinks (phase 2): finalize end-to-end links across all 7 modules (Parent, Youngsters, Menu, Ordering, Billing, Delivery, Admin/Kitchen) including status transition integrity
+- [x] Admin menu management page (create/edit dish, ingredient selection, image upload field, price, cutlery, packing requirement, sample seed for testing)
+- [x] Delivery assignment page
+- [x] Delivery confirmation updates billing status
+- [x] Kitchen daily summary view (polling)
+- [x] Kitchen allergen alert dashboard
+- [x] Print order tags with QR (dropped)
+- [x] Print reports
+- [x] Revenue dashboard (admin)
+- [x] Spending dashboard (parent)
+- [x] Nutrition summary (youngster weekly)
+- [x] Birthday highlight indicators
+- [x] Clean Plate Club badge engine + display
 
 ## 10) CSV Import and Data Operations
 - [ ] Define CSV template (parents + youngsters)
@@ -176,10 +183,10 @@ This list maps directly to Sections **2-17** above for easy cross-reference.
 3 (Monorepo Structure Completion) - Complete
 4 (Authentication and Identity) - Complete
 5 (Core Master Data Modules) - Complete
-6 (Parent and Youngsters Core Ordering Flows) - 
-7 (Advanced Ordering Features) -  
-8 (Billing, Receipt, and Delivery) - 
-9 (Kitchen and Admin Operations) - 
+6 (Parent + Youngsters + Menu Core Pages) - 
+7 (Ordering Module Pages - Advanced) -  
+8 (Billing Module Pages - Receipt + Payment) - 
+9 (Delivery + Kitchen + Admin Module Pages) - 
 10 (CSV Import and Data Operations) -   
 11 (API and Contract Completion) - 
 12 (Security and Compliance) - 

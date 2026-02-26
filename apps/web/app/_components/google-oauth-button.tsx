@@ -51,7 +51,20 @@ export default function GoogleOAuthButton({ role, redirectPath, className }: Pro
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ idToken, role }),
           });
-          if (!res.ok) throw new Error('Google login failed');
+          if (!res.ok) {
+            let message = 'Google login failed';
+            try {
+              const errData = (await res.json()) as { message?: string | string[] };
+              if (Array.isArray(errData.message) && errData.message.length > 0) {
+                message = errData.message.join(', ');
+              } else if (typeof errData.message === 'string' && errData.message.trim()) {
+                message = errData.message;
+              }
+            } catch {
+              // ignore parse errors and keep generic fallback
+            }
+            throw new Error(message);
+          }
           const data = await res.json();
           setAuthState(data.accessToken, data.refreshToken, data.user.role);
           router.push(redirectPath);

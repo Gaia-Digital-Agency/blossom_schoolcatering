@@ -1,5 +1,5 @@
-import DevPage from '../_components/dev-page';
+import { redirect } from 'next/navigation';
 
-export default function KitchenPage() {
-  return <DevPage title="Kitchen Page" description="Simple development placeholder for Kitchen features." />;
+export default function KitchenIndexPage() {
+  redirect('/kitchen/today');
 }

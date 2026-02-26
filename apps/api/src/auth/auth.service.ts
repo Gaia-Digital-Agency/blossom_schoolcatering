@@ -243,6 +243,24 @@ export class AuthService {
     return this.parseJsonLine<DbUserRow>(out);
   }
 
+  private async findUserByEmail(email: string) {
+    const normalizedEmail = (email || '').trim().toLowerCase();
+    if (!normalizedEmail) return null;
+    const sql = `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT id, username, role::text, first_name, last_name, password_hash
+        FROM users
+        WHERE email = ${sqlLiteral(normalizedEmail)}
+          AND is_active = true
+        LIMIT 1
+      ) t;
+    `;
+    const out = await runSql(sql);
+    if (!out) return null;
+    return this.parseJsonLine<DbUserRow>(out);
+  }
+
   private normalizeRegistrationRole(role: string): Role {
     const normalized = this.normalizeRole(role);
     if (!['PARENT', 'YOUNGSTER', 'DELIVERY'].includes(normalized)) {
@@ -486,12 +504,27 @@ export class AuthService {
 
     await this.ensureSystemUsers();
     let userRow = await this.findUserByIdentity(payload.sub);
-    if (!userRow) {
-      userRow = await this.createGoogleUser(normalizedRole, payload);
+    if (userRow) {
+      const existingRole = this.appRoleFromDb(userRow.role);
+      if (existingRole !== normalizedRole) {
+        throw new UnauthorizedException('Role mismatch for Google account');
+      }
+    } else {
+      const emailUser = await this.findUserByEmail(payload.email);
+      if (emailUser) {
+        const emailUserRole = this.appRoleFromDb(emailUser.role);
+        if (emailUserRole !== normalizedRole) {
+          throw new UnauthorizedException('Role mismatch for Google account');
+        }
+        userRow = emailUser;
+      } else {
+        userRow = await this.createGoogleUser(normalizedRole, payload);
+      }
       await runSql(`
         INSERT INTO user_identities (user_id, provider, provider_user_id, provider_email)
         VALUES (${sqlLiteral(userRow.id)}, 'GOOGLE', ${sqlLiteral(payload.sub)}, ${sqlLiteral(payload.email)})
-        ON CONFLICT (provider, provider_user_id) DO NOTHING;
+        ON CONFLICT (provider, provider_user_id)
+        DO UPDATE SET provider_email = EXCLUDED.provider_email;
       `);
     }
     const user = this.buildUser(userRow, normalizedRole);

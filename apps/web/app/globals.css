@@ -331,6 +331,14 @@ h1 {
   margin-top: 0;
 }
 
+.page-auth-mobile .auth-panel {
+  width: min(680px, 100%);
+}
+
+.page-auth-desktop .auth-panel {
+  width: min(1100px, 100%);
+}
+
 .auth-help {
   color: var(--ink-soft);
   margin: 0.35rem 0 1rem;
@@ -466,6 +474,11 @@ h1 {
   .auth-grid {
     grid-template-columns: repeat(3, 1fr);
     gap: 0.55rem;
+  }
+
+  .page-auth-desktop .auth-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.8rem;
   }
 
   .chef-message {
