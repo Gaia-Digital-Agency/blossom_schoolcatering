@@ -32,6 +32,7 @@ export default function RegisterForm({ role, title, subtitle }: RegisterFormProp
       const res = await fetch(`${getApiBase()}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           role,
           username,
@@ -48,7 +49,7 @@ export default function RegisterForm({ role, title, subtitle }: RegisterFormProp
         throw new Error(body.message || 'Registration failed');
       }
       const data = await res.json();
-      setAuthState(data.accessToken, data.refreshToken, data.user.role);
+      setAuthState(data.accessToken, data.user.role);
       router.push('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');

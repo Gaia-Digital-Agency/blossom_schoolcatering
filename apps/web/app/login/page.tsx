@@ -21,13 +21,14 @@ export default function LoginPage() {
       const res = await fetch(`${getApiBase()}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ username, password, role }),
       });
       if (!res.ok) {
         throw new Error('Invalid username/password/role');
       }
       const data = await res.json();
-      setAuthState(data.accessToken, data.refreshToken, data.user.role);
+      setAuthState(data.accessToken, data.user.role);
       router.push('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');

@@ -42,14 +42,12 @@ export default function DashboardPage() {
   }, [router]);
 
   const onLogout = async () => {
-    const refreshToken = localStorage.getItem('blossom_refresh_token');
-    if (refreshToken) {
-      await fetch(`${getApiBase()}/auth/logout`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
-      }).catch(() => undefined);
-    }
+    await fetch(`${getApiBase()}/auth/logout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({}),
+    }).catch(() => undefined);
     clearAuthState();
     router.push('/login');
   };

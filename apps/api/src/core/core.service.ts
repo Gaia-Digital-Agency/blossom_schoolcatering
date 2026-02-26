@@ -327,37 +327,40 @@ export class CoreService {
   }
 
   private async getParentIdByUserId(userId: string) {
-    const out = await runSql(`
-      SELECT id
-      FROM parents
-      WHERE user_id = ${sqlLiteral(userId)}
-        AND deleted_at IS NULL
-      LIMIT 1;
-    `);
+    const out = await runSql(
+      `SELECT id
+       FROM parents
+       WHERE user_id = $1
+         AND deleted_at IS NULL
+       LIMIT 1;`,
+      [userId],
+    );
     return out || null;
   }
 
   private async getChildIdByUserId(userId: string) {
-    const out = await runSql(`
-      SELECT id
-      FROM children
-      WHERE user_id = ${sqlLiteral(userId)}
-        AND is_active = true
-        AND deleted_at IS NULL
-      LIMIT 1;
-    `);
+    const out = await runSql(
+      `SELECT id
+       FROM children
+       WHERE user_id = $1
+         AND is_active = true
+         AND deleted_at IS NULL
+       LIMIT 1;`,
+      [userId],
+    );
     return out || null;
   }
 
   private async ensureParentOwnsChild(parentId: string, childId: string) {
-    const allowed = await runSql(`
-      SELECT EXISTS (
-        SELECT 1
-        FROM parent_children
-        WHERE parent_id = ${sqlLiteral(parentId)}
-          AND child_id = ${sqlLiteral(childId)}
-      );
-    `);
+    const allowed = await runSql(
+      `SELECT EXISTS (
+         SELECT 1
+         FROM parent_children
+         WHERE parent_id = $1
+           AND child_id = $2
+       );`,
+      [parentId, childId],
+    );
     if (allowed !== 't') {
       throw new ForbiddenException('ORDER_OWNERSHIP_FORBIDDEN');
     }
@@ -372,16 +375,17 @@ export class CoreService {
 
   private async ensureCartIsOpenAndOwned(cartId: string, actor: AccessUser): Promise<CartRow> {
     this.assertValidUuid(cartId, 'cartId');
-    const out = await runSql(`
-      SELECT row_to_json(t)::text
-      FROM (
-        SELECT id, child_id, created_by_user_id, session::text AS session, service_date::text AS service_date,
-               status::text AS status, expires_at::text AS expires_at
-        FROM order_carts
-        WHERE id = ${sqlLiteral(cartId)}
-        LIMIT 1
-      ) t;
-    `);
+    const out = await runSql(
+      `SELECT row_to_json(t)::text
+       FROM (
+         SELECT id, child_id, created_by_user_id, session::text AS session, service_date::text AS service_date,
+                status::text AS status, expires_at::text AS expires_at
+         FROM order_carts
+         WHERE id = $1
+         LIMIT 1
+       ) t;`,
+      [cartId],
+    );
     if (!out) throw new NotFoundException('Cart not found');
     const cart = this.parseJsonLine<CartRow>(out);
 
@@ -400,31 +404,33 @@ export class CoreService {
       throw new BadRequestException(cart.status === 'EXPIRED' ? 'CART_EXPIRED' : 'CART_ALREADY_SUBMITTED');
     }
     if (new Date(cart.expires_at).getTime() <= Date.now()) {
-      await runSql(`
-        UPDATE order_carts
-        SET status = 'EXPIRED', updated_at = now()
-        WHERE id = ${sqlLiteral(cart.id)}
-          AND status = 'OPEN';
-      `);
+      await runSql(
+        `UPDATE order_carts
+         SET status = 'EXPIRED', updated_at = now()
+         WHERE id = $1
+           AND status = 'OPEN';`,
+        [cart.id],
+      );
       throw new BadRequestException('CART_EXPIRED');
     }
     return cart;
   }
 
   private async validateOrderDayRules(serviceDate: string) {
-    const weekday = await runSql(`SELECT extract(isodow FROM DATE ${sqlLiteral(serviceDate)})::int;`);
+    const weekday = await runSql(`SELECT extract(isodow FROM DATE $1)::int;`, [serviceDate]);
     if (!weekday || Number(weekday) > 5) {
       throw new BadRequestException('ORDER_WEEKEND_SERVICE_BLOCKED');
     }
 
-    const blocked = await runSql(`
-      SELECT EXISTS (
-        SELECT 1
-        FROM blackout_days
-        WHERE blackout_date = DATE ${sqlLiteral(serviceDate)}
-          AND type IN ('ORDER_BLOCK', 'BOTH')
-      );
-    `);
+    const blocked = await runSql(
+      `SELECT EXISTS (
+         SELECT 1
+         FROM blackout_days
+         WHERE blackout_date = DATE $1
+           AND type IN ('ORDER_BLOCK', 'BOTH')
+       );`,
+      [serviceDate],
+    );
     if (blocked === 't') {
       throw new BadRequestException('ORDER_BLACKOUT_BLOCKED');
     }
@@ -477,23 +483,25 @@ export class CoreService {
       );
     `);
     for (const session of SESSIONS) {
-      await runSql(`
-        INSERT INTO session_settings (session, is_active)
-        VALUES (${sqlLiteral(session)}::session_type, true)
-        ON CONFLICT (session) DO NOTHING;
-      `);
+      await runSql(
+        `INSERT INTO session_settings (session, is_active)
+         VALUES ($1::session_type, true)
+         ON CONFLICT (session) DO NOTHING;`,
+        [session],
+      );
     }
     this.sessionSettingsReady = true;
   }
 
   private async isSessionActive(session: SessionType) {
     await this.ensureSessionSettingsTable();
-    const out = await runSql(`
-      SELECT is_active::text
-      FROM session_settings
-      WHERE session = ${sqlLiteral(session)}::session_type
-      LIMIT 1;
-    `);
+    const out = await runSql(
+      `SELECT is_active::text
+       FROM session_settings
+       WHERE session = $1::session_type
+       LIMIT 1;`,
+      [session],
+    );
     if (!out) return true;
     return out === 'true' || out === 't';
   }
@@ -519,20 +527,22 @@ export class CoreService {
   }
 
   private async ensureMenuForDateSession(serviceDate: string, session: SessionType) {
-    const existing = await runSql(`
-      SELECT id
-      FROM menus
-      WHERE service_date = DATE ${sqlLiteral(serviceDate)}
-        AND session = ${sqlLiteral(session)}::session_type
-      LIMIT 1;
-    `);
+    const existing = await runSql(
+      `SELECT id
+       FROM menus
+       WHERE service_date = DATE $1
+         AND session = $2::session_type
+       LIMIT 1;`,
+      [serviceDate, session],
+    );
     if (existing) return existing;
 
-    return runSql(`
-      INSERT INTO menus (session, service_date, is_published)
-      VALUES (${sqlLiteral(session)}::session_type, DATE ${sqlLiteral(serviceDate)}, true)
-      RETURNING id;
-    `);
+    return runSql(
+      `INSERT INTO menus (session, service_date, is_published)
+       VALUES ($1::session_type, DATE $2, true)
+       RETURNING id;`,
+      [session, serviceDate],
+    );
   }
 
   async getSchools(active = true) {
@@ -555,18 +565,19 @@ export class CoreService {
     if (!id) throw new BadRequestException('schoolId is required');
     if (typeof isActive !== 'boolean') throw new BadRequestException('isActive must be boolean');
 
-    const out = await runSql(`
-      WITH updated AS (
-        UPDATE schools
-        SET is_active = ${isActive ? 'true' : 'false'},
-            updated_at = now()
-        WHERE id = ${sqlLiteral(id)}
-          AND deleted_at IS NULL
-        RETURNING id, name, city, address, is_active
-      )
-      SELECT row_to_json(updated)::text
-      FROM updated;
-    `);
+    const out = await runSql(
+      `WITH updated AS (
+         UPDATE schools
+         SET is_active = $1,
+             updated_at = now()
+         WHERE id = $2
+           AND deleted_at IS NULL
+         RETURNING id, name, city, address, is_active
+       )
+       SELECT row_to_json(updated)::text
+       FROM updated;`,
+      [isActive, id],
+    );
     if (!out) throw new NotFoundException('School not found');
     return this.parseJsonLine(out);
   }
@@ -592,17 +603,18 @@ export class CoreService {
       throw new BadRequestException('LUNCH session must remain active');
     }
     await this.ensureSessionSettingsTable();
-    const out = await runSql(`
-      WITH updated AS (
-        UPDATE session_settings
-        SET is_active = ${isActive ? 'true' : 'false'},
-            updated_at = now()
-        WHERE session = ${sqlLiteral(session)}::session_type
-        RETURNING session::text AS session, is_active
-      )
-      SELECT row_to_json(updated)::text
-      FROM updated;
-    `);
+    const out = await runSql(
+      `WITH updated AS (
+         UPDATE session_settings
+         SET is_active = $1,
+             updated_at = now()
+         WHERE session = $2::session_type
+         RETURNING session::text AS session, is_active
+       )
+       SELECT row_to_json(updated)::text
+       FROM updated;`,
+      [isActive, session],
+    );
     if (!out) throw new NotFoundException('Session setting not found');
     return this.parseJsonLine<{ session: SessionType; is_active: boolean }>(out);
   }
@@ -646,14 +658,15 @@ export class CoreService {
       throw new BadRequestException('Invalid gender');
     }
 
-    const schoolExists = await runSql(`
-      SELECT EXISTS (
-        SELECT 1 FROM schools
-        WHERE id = ${sqlLiteral(schoolId)}
-          AND is_active = true
-          AND deleted_at IS NULL
-      );
-    `);
+    const schoolExists = await runSql(
+      `SELECT EXISTS (
+         SELECT 1 FROM schools
+         WHERE id = $1
+           AND is_active = true
+           AND deleted_at IS NULL
+       );`,
+      [schoolId],
+    );
     if (schoolExists !== 't') {
       throw new BadRequestException('School not found or inactive');
     }
@@ -663,83 +676,69 @@ export class CoreService {
       parentId = await this.getParentIdByUserId(actor.uid);
       if (!parentId) throw new BadRequestException('Parent profile not found');
     } else if (input.parentId) {
-      const exists = await runSql(`
-        SELECT EXISTS (
-          SELECT 1
-          FROM parents
-          WHERE id = ${sqlLiteral(input.parentId)}
-            AND deleted_at IS NULL
-        );
-      `);
+      const exists = await runSql(
+        `SELECT EXISTS (
+           SELECT 1
+           FROM parents
+           WHERE id = $1
+             AND deleted_at IS NULL
+         );`,
+        [input.parentId],
+      );
       if (exists !== 't') throw new BadRequestException('Invalid parentId');
       parentId = input.parentId;
     }
 
     const usernameBase = this.sanitizeUsernamePart(`${lastName}_${firstName}`);
-    const username = await runSql(`SELECT generate_unique_username(${sqlLiteral(usernameBase)});`);
+    const username = await runSql(`SELECT generate_unique_username($1);`, [usernameBase]);
     const passwordSeed = phoneNumber.replace(/\D/g, '') || randomUUID().slice(0, 10);
     const passwordHash = this.hashPassword(passwordSeed);
 
-    const createdOut = await runSql(`
-      WITH inserted AS (
-        INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email)
-        VALUES (
-          'CHILD',
-          ${sqlLiteral(username)},
-          ${sqlLiteral(passwordHash)},
-          ${sqlLiteral(firstName)},
-          ${sqlLiteral(lastName)},
-          ${sqlLiteral(phoneNumber)},
-          ${email ? sqlLiteral(email) : 'NULL'}
-        )
-        RETURNING id, username, role::text, first_name, last_name
-      )
-      SELECT row_to_json(inserted)::text
-      FROM inserted;
-    `);
+    const createdOut = await runSql(
+      `WITH inserted AS (
+         INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email)
+         VALUES ('CHILD', $1, $2, $3, $4, $5, $6)
+         RETURNING id, username, role::text, first_name, last_name
+       )
+       SELECT row_to_json(inserted)::text
+       FROM inserted;`,
+      [username, passwordHash, firstName, lastName, phoneNumber, email || null],
+    );
     const created = this.parseJsonLine<DbUserRow>(createdOut);
 
-    await runSql(`
-      INSERT INTO user_preferences (user_id, onboarding_completed, dark_mode_enabled, tooltips_enabled)
-      VALUES (${sqlLiteral(created.id)}, false, false, true)
-      ON CONFLICT (user_id) DO NOTHING;
-    `);
+    await runSql(
+      `INSERT INTO user_preferences (user_id, onboarding_completed, dark_mode_enabled, tooltips_enabled)
+       VALUES ($1, false, false, true)
+       ON CONFLICT (user_id) DO NOTHING;`,
+      [created.id],
+    );
 
-    const childOut = await runSql(`
-      WITH inserted AS (
-        INSERT INTO children (user_id, school_id, date_of_birth, gender, school_grade, photo_url)
-        VALUES (
-          ${sqlLiteral(created.id)},
-          ${sqlLiteral(schoolId)},
-          DATE ${sqlLiteral(dateOfBirth)},
-          ${sqlLiteral(gender)}::gender_type,
-          ${sqlLiteral(schoolGrade)},
-          NULL
-        )
-        RETURNING id, user_id
-      )
-      SELECT row_to_json(inserted)::text
-      FROM inserted;
-    `);
+    const childOut = await runSql(
+      `WITH inserted AS (
+         INSERT INTO children (user_id, school_id, date_of_birth, gender, school_grade, photo_url)
+         VALUES ($1, $2, DATE $3, $4::gender_type, $5, NULL)
+         RETURNING id, user_id
+       )
+       SELECT row_to_json(inserted)::text
+       FROM inserted;`,
+      [created.id, schoolId, dateOfBirth, gender, schoolGrade],
+    );
     const child = this.parseJsonLine<{ id: string; user_id: string }>(childOut);
 
-    await runSql(`
-      INSERT INTO child_dietary_restrictions (child_id, restriction_label, restriction_details, is_active)
-      VALUES (
-        ${sqlLiteral(child.id)},
-        'ALLERGIES',
-        ${sqlLiteral(allergies)},
-        true
-      )
-      ON CONFLICT DO NOTHING;
-    `);
+    await runSql(
+      `INSERT INTO child_dietary_restrictions (child_id, restriction_label, restriction_details, is_active)
+       VALUES ($1, 'ALLERGIES', $2, true)
+       ON CONFLICT DO NOTHING;`,
+      [child.id, allergies],
+    );
 
     if (parentId) {
-      await runSql(`
-        INSERT INTO parent_children (parent_id, child_id)
-        VALUES (${sqlLiteral(parentId)}, ${sqlLiteral(child.id)})
-        ON CONFLICT (parent_id, child_id) DO NOTHING;
-      `);
+      await runSql(
+        `INSERT INTO parent_children (parent_id, child_id)
+         VALUES ($1, $2)
+         ON CONFLICT (parent_id, child_id) DO NOTHING;`,
+        [parentId, child.id],
+      );
     }
 
     return {
@@ -802,7 +801,7 @@ export class CoreService {
 
   async getAdminDashboard(dateRaw?: string) {
     const date = dateRaw ? this.validateServiceDate(dateRaw) : await runSql(`SELECT (now() AT TIME ZONE 'Asia/Makassar')::date::text;`);
-    const yesterday = await runSql(`SELECT (DATE ${sqlLiteral(date)} - INTERVAL '1 day')::date::text;`);
+    const yesterday = await runSql(`SELECT (DATE $1 - INTERVAL '1 day')::date::text;`, [date]);
 
     const parentsCount = Number(await runSql(`
       SELECT count(*)::int
@@ -836,22 +835,24 @@ export class CoreService {
         AND deleted_at IS NULL;
     `) || 0);
 
-    const todayOrdersCount = Number(await runSql(`
-      SELECT count(*)::int
-      FROM orders
-      WHERE service_date = DATE ${sqlLiteral(date)}
-        AND deleted_at IS NULL
-        AND status <> 'CANCELLED';
-    `) || 0);
+    const todayOrdersCount = Number(await runSql(
+      `SELECT count(*)::int
+       FROM orders
+       WHERE service_date = DATE $1
+         AND deleted_at IS NULL
+         AND status <> 'CANCELLED';`,
+      [date],
+    ) || 0);
 
-    const todayTotalDishes = Number(await runSql(`
-      SELECT coalesce(sum(oi.quantity), 0)::int
-      FROM orders o
-      JOIN order_items oi ON oi.order_id = o.id
-      WHERE o.service_date = DATE ${sqlLiteral(date)}
-        AND o.deleted_at IS NULL
-        AND o.status <> 'CANCELLED';
-    `) || 0);
+    const todayTotalDishes = Number(await runSql(
+      `SELECT coalesce(sum(oi.quantity), 0)::int
+       FROM orders o
+       JOIN order_items oi ON oi.order_id = o.id
+       WHERE o.service_date = DATE $1
+         AND o.deleted_at IS NULL
+         AND o.status <> 'CANCELLED';`,
+      [date],
+    ) || 0);
 
     const totalSales = Number(await runSql(`
       SELECT coalesce(sum(total_price), 0)::numeric
@@ -860,14 +861,15 @@ export class CoreService {
         AND status <> 'CANCELLED';
     `) || 0);
 
-    const yesterdayFailedOrUncheckedDelivery = Number(await runSql(`
-      SELECT count(*)::int
-      FROM orders
-      WHERE service_date = DATE ${sqlLiteral(yesterday)}
-        AND deleted_at IS NULL
-        AND status <> 'CANCELLED'
-        AND delivery_status <> 'DELIVERED';
-    `) || 0);
+    const yesterdayFailedOrUncheckedDelivery = Number(await runSql(
+      `SELECT count(*)::int
+       FROM orders
+       WHERE service_date = DATE $1
+         AND deleted_at IS NULL
+         AND status <> 'CANCELLED'
+         AND delivery_status <> 'DELIVERED';`,
+      [yesterday],
+    ) || 0);
 
     const pendingBillingCount = Number(await runSql(`
       SELECT count(*)::int
@@ -916,11 +918,19 @@ export class CoreService {
   }
 
   async getBlackoutDays(query: { fromDate?: string; toDate?: string }) {
+    const params: string[] = [];
     const conditions: string[] = [];
-    if (query.fromDate) conditions.push(`b.blackout_date >= DATE ${sqlLiteral(this.validateServiceDate(query.fromDate))}`);
-    if (query.toDate) conditions.push(`b.blackout_date <= DATE ${sqlLiteral(this.validateServiceDate(query.toDate))}`);
+    if (query.fromDate) {
+      params.push(this.validateServiceDate(query.fromDate));
+      conditions.push(`b.blackout_date >= DATE $${params.length}`);
+    }
+    if (query.toDate) {
+      params.push(this.validateServiceDate(query.toDate));
+      conditions.push(`b.blackout_date <= DATE $${params.length}`);
+    }
     const whereSql = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-    const out = await runSql(`
+    const out = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT b.id,
@@ -934,7 +944,9 @@ export class CoreService {
         ${whereSql}
         ORDER BY b.blackout_date DESC, b.created_at DESC
       ) t;
-    `);
+    `,
+      params,
+    );
     return this.parseJsonLines(out);
   }
 
@@ -947,32 +959,29 @@ export class CoreService {
       throw new BadRequestException('Invalid blackout type');
     }
 
-    const out = await runSql(`
-      WITH upserted AS (
-        INSERT INTO blackout_days (blackout_date, type, reason, created_by)
-        VALUES (
-          DATE ${sqlLiteral(blackoutDate)},
-          ${sqlLiteral(type)}::blackout_type,
-          ${reason ? sqlLiteral(reason) : 'NULL'},
-          ${sqlLiteral(actor.uid)}
-        )
-        ON CONFLICT (blackout_date)
-        DO UPDATE SET type = EXCLUDED.type, reason = EXCLUDED.reason, updated_at = now()
-        RETURNING id, blackout_date::text AS blackout_date, type::text AS type, reason
-      )
-      SELECT row_to_json(upserted)::text
-      FROM upserted;
-    `);
+    const out = await runSql(
+      `WITH upserted AS (
+         INSERT INTO blackout_days (blackout_date, type, reason, created_by)
+         VALUES (DATE $1, $2::blackout_type, $3, $4)
+         ON CONFLICT (blackout_date)
+         DO UPDATE SET type = EXCLUDED.type, reason = EXCLUDED.reason, updated_at = now()
+         RETURNING id, blackout_date::text AS blackout_date, type::text AS type, reason
+       )
+       SELECT row_to_json(upserted)::text
+       FROM upserted;`,
+      [blackoutDate, type, reason || null, actor.uid],
+    );
     return this.parseJsonLine(out);
   }
 
   async deleteBlackoutDay(actor: AccessUser, id: string) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
-    const out = await runSql(`
-      DELETE FROM blackout_days
-      WHERE id = ${sqlLiteral(id)}
-      RETURNING id;
-    `);
+    const out = await runSql(
+      `DELETE FROM blackout_days
+       WHERE id = $1
+       RETURNING id;`,
+      [id],
+    );
     if (!out) throw new NotFoundException('Blackout day not found');
     return { ok: true };
   }
@@ -982,7 +991,8 @@ export class CoreService {
     const parentId = await this.getParentIdByUserId(actor.uid);
     if (!parentId) throw new BadRequestException('Parent profile not found');
 
-    const out = await runSql(`
+    const out = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT c.id, c.user_id, u.first_name, u.last_name, c.school_id, s.name AS school_name,
@@ -1001,12 +1011,14 @@ export class CoreService {
         JOIN children c ON c.id = pc.child_id
         JOIN users u ON u.id = c.user_id
         JOIN schools s ON s.id = c.school_id
-        WHERE pc.parent_id = ${sqlLiteral(parentId)}
+        WHERE pc.parent_id = $1
           AND c.is_active = true
           AND c.deleted_at IS NULL
         ORDER BY u.first_name, u.last_name
       ) t;
-    `);
+    `,
+      [parentId],
+    );
 
     return {
       parentId,
@@ -1025,30 +1037,33 @@ export class CoreService {
       }
     }
 
-    const parentExists = await runSql(`
-      SELECT EXISTS (
-        SELECT 1 FROM parents
-        WHERE id = ${sqlLiteral(parentId)}
-          AND deleted_at IS NULL
-      );
-    `);
+    const parentExists = await runSql(
+      `SELECT EXISTS (
+         SELECT 1 FROM parents
+         WHERE id = $1
+           AND deleted_at IS NULL
+       );`,
+      [parentId],
+    );
     if (parentExists !== 't') throw new NotFoundException('Parent not found');
 
-    const childExists = await runSql(`
-      SELECT EXISTS (
-        SELECT 1 FROM children
-        WHERE id = ${sqlLiteral(childId)}
-          AND is_active = true
-          AND deleted_at IS NULL
-      );
-    `);
+    const childExists = await runSql(
+      `SELECT EXISTS (
+         SELECT 1 FROM children
+         WHERE id = $1
+           AND is_active = true
+           AND deleted_at IS NULL
+       );`,
+      [childId],
+    );
     if (childExists !== 't') throw new NotFoundException('Youngster not found');
 
-    await runSql(`
-      INSERT INTO parent_children (parent_id, child_id)
-      VALUES (${sqlLiteral(parentId)}, ${sqlLiteral(childId)})
-      ON CONFLICT (parent_id, child_id) DO NOTHING;
-    `);
+    await runSql(
+      `INSERT INTO parent_children (parent_id, child_id)
+       VALUES ($1, $2)
+       ON CONFLICT (parent_id, child_id) DO NOTHING;`,
+      [parentId, childId],
+    );
 
     return { ok: true };
   }
@@ -1177,7 +1192,8 @@ export class CoreService {
     await this.ensureMenuItemExtendedColumns();
     const serviceDate = this.validateServiceDate(query.serviceDate);
     const session = this.normalizeSession(query.session);
-    const out = await runSql(`
+    const out = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT mi.id,
@@ -1198,14 +1214,16 @@ export class CoreService {
         JOIN menu_items mi ON mi.menu_id = m.id
         LEFT JOIN menu_item_ingredients mii ON mii.menu_item_id = mi.id
         LEFT JOIN ingredients i ON i.id = mii.ingredient_id AND i.deleted_at IS NULL
-        WHERE m.service_date = DATE ${sqlLiteral(serviceDate)}
-          AND m.session = ${sqlLiteral(session)}::session_type
+        WHERE m.service_date = DATE $1
+          AND m.session = $2::session_type
           AND m.deleted_at IS NULL
           AND mi.deleted_at IS NULL
         GROUP BY mi.id
         ORDER BY mi.display_order ASC, mi.name ASC
       ) t;
-    `);
+    `,
+      [serviceDate, session],
+    );
     return {
       serviceDate,
       session,
@@ -1255,37 +1273,41 @@ export class CoreService {
     const imageUrl = await this.resolveMenuImageUrl(rawImageUrl, name);
 
     const menuId = await this.ensureMenuForDateSession(serviceDate, session);
-    const itemOut = await runSql(`
-      WITH inserted AS (
-        INSERT INTO menu_items (
-          menu_id, name, description, nutrition_facts_text, calories_kcal, price, image_url, is_available, display_order, cutlery_required, packing_requirement
-        )
-        VALUES (
-          ${sqlLiteral(menuId)},
-          ${sqlLiteral(name)},
-          ${sqlLiteral(description)},
-          ${sqlLiteral(nutritionFactsText)},
-          ${caloriesKcal === null ? 'NULL' : caloriesKcal},
-          ${price.toFixed(2)},
-          ${sqlLiteral(imageUrl)},
-          ${isAvailable ? 'true' : 'false'},
-          ${displayOrder},
-          ${cutleryRequired ? 'true' : 'false'},
-          ${packingRequirement ? sqlLiteral(packingRequirement) : 'NULL'}
-        )
-        RETURNING id, name
-      )
-      SELECT row_to_json(inserted)::text
-      FROM inserted;
-    `);
+    const itemOut = await runSql(
+      `WITH inserted AS (
+         INSERT INTO menu_items (
+           menu_id, name, description, nutrition_facts_text, calories_kcal, price, image_url, is_available, display_order, cutlery_required, packing_requirement
+         )
+         VALUES (
+           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+         )
+         RETURNING id, name
+       )
+       SELECT row_to_json(inserted)::text
+       FROM inserted;`,
+      [
+        menuId,
+        name,
+        description,
+        nutritionFactsText,
+        caloriesKcal,
+        Number(price.toFixed(2)),
+        imageUrl,
+        isAvailable,
+        displayOrder,
+        cutleryRequired,
+        packingRequirement || null,
+      ],
+    );
     const item = this.parseJsonLine<{ id: string; name: string }>(itemOut);
 
     for (const ingredientId of ingredientIds) {
-      await runSql(`
-        INSERT INTO menu_item_ingredients (menu_item_id, ingredient_id)
-        VALUES (${sqlLiteral(item.id)}, ${sqlLiteral(ingredientId)})
-        ON CONFLICT (menu_item_id, ingredient_id) DO NOTHING;
-      `);
+      await runSql(
+        `INSERT INTO menu_item_ingredients (menu_item_id, ingredient_id)
+         VALUES ($1, $2)
+         ON CONFLICT (menu_item_id, ingredient_id) DO NOTHING;`,
+        [item.id, ingredientId],
+      );
     }
 
     return { ok: true, itemId: item.id, itemName: item.name };
@@ -1336,31 +1358,46 @@ export class CoreService {
     const imageUrl = await this.resolveMenuImageUrl(rawImageUrl, name);
 
     const menuId = await this.ensureMenuForDateSession(serviceDate, session);
-    await runSql(`
-      UPDATE menu_items
-      SET menu_id = ${sqlLiteral(menuId)},
-          name = ${sqlLiteral(name)},
-          description = ${sqlLiteral(description)},
-          nutrition_facts_text = ${sqlLiteral(nutritionFactsText)},
-          calories_kcal = ${caloriesKcal === null ? 'NULL' : caloriesKcal},
-          price = ${price.toFixed(2)},
-          image_url = ${sqlLiteral(imageUrl)},
-          is_available = ${isAvailable ? 'true' : 'false'},
-          display_order = ${displayOrder},
-          cutlery_required = ${cutleryRequired ? 'true' : 'false'},
-          packing_requirement = ${packingRequirement ? sqlLiteral(packingRequirement) : 'NULL'},
-          updated_at = now()
-      WHERE id = ${sqlLiteral(itemId)}
-        AND deleted_at IS NULL;
-    `);
+    await runSql(
+      `UPDATE menu_items
+       SET menu_id = $1,
+           name = $2,
+           description = $3,
+           nutrition_facts_text = $4,
+           calories_kcal = $5,
+           price = $6,
+           image_url = $7,
+           is_available = $8,
+           display_order = $9,
+           cutlery_required = $10,
+           packing_requirement = $11,
+           updated_at = now()
+       WHERE id = $12
+         AND deleted_at IS NULL;`,
+      [
+        menuId,
+        name,
+        description,
+        nutritionFactsText,
+        caloriesKcal,
+        Number(price.toFixed(2)),
+        imageUrl,
+        isAvailable,
+        displayOrder,
+        cutleryRequired,
+        packingRequirement || null,
+        itemId,
+      ],
+    );
 
-    await runSql(`DELETE FROM menu_item_ingredients WHERE menu_item_id = ${sqlLiteral(itemId)};`);
+    await runSql(`DELETE FROM menu_item_ingredients WHERE menu_item_id = $1;`, [itemId]);
     for (const ingredientId of ingredientIds) {
-      await runSql(`
-        INSERT INTO menu_item_ingredients (menu_item_id, ingredient_id)
-        VALUES (${sqlLiteral(itemId)}, ${sqlLiteral(ingredientId)})
-        ON CONFLICT (menu_item_id, ingredient_id) DO NOTHING;
-      `);
+      await runSql(
+        `INSERT INTO menu_item_ingredients (menu_item_id, ingredient_id)
+         VALUES ($1, $2)
+         ON CONFLICT (menu_item_id, ingredient_id) DO NOTHING;`,
+        [itemId, ingredientId],
+      );
     }
     return { ok: true };
   }
@@ -1521,41 +1558,36 @@ export class CoreService {
       await this.ensureParentOwnsChild(parentId, childId);
     }
 
-    const existingOut = await runSql(`
-      SELECT row_to_json(t)::text
-      FROM (
-        SELECT id, child_id, created_by_user_id, session::text AS session, service_date::text AS service_date,
-               status::text AS status, expires_at::text AS expires_at
-        FROM order_carts
-        WHERE child_id = ${sqlLiteral(childId)}
-          AND session = ${sqlLiteral(session)}::session_type
-          AND service_date = DATE ${sqlLiteral(serviceDate)}
-          AND status = 'OPEN'
-        LIMIT 1
-      ) t;
-    `);
+    const existingOut = await runSql(
+      `SELECT row_to_json(t)::text
+       FROM (
+         SELECT id, child_id, created_by_user_id, session::text AS session, service_date::text AS service_date,
+                status::text AS status, expires_at::text AS expires_at
+         FROM order_carts
+         WHERE child_id = $1
+           AND session = $2::session_type
+           AND service_date = DATE $3
+           AND status = 'OPEN'
+         LIMIT 1
+       ) t;`,
+      [childId, session, serviceDate],
+    );
     if (existingOut) {
       return this.parseJsonLine<CartRow>(existingOut);
     }
 
     const expiresAtUtc = `${serviceDate}T00:00:00.000Z`;
-    const createdOut = await runSql(`
-      WITH inserted AS (
-        INSERT INTO order_carts (child_id, created_by_user_id, session, service_date, status, expires_at)
-        VALUES (
-          ${sqlLiteral(childId)},
-          ${sqlLiteral(actor.uid)},
-          ${sqlLiteral(session)}::session_type,
-          DATE ${sqlLiteral(serviceDate)},
-          'OPEN',
-          ${sqlLiteral(expiresAtUtc)}::timestamptz
-        )
-        RETURNING id, child_id, created_by_user_id, session::text AS session, service_date::text AS service_date,
-                  status::text AS status, expires_at::text AS expires_at
-      )
-      SELECT row_to_json(inserted)::text
-      FROM inserted;
-    `);
+    const createdOut = await runSql(
+      `WITH inserted AS (
+         INSERT INTO order_carts (child_id, created_by_user_id, session, service_date, status, expires_at)
+         VALUES ($1, $2, $3::session_type, DATE $4, 'OPEN', $5::timestamptz)
+         RETURNING id, child_id, created_by_user_id, session::text AS session, service_date::text AS service_date,
+                   status::text AS status, expires_at::text AS expires_at
+       )
+       SELECT row_to_json(inserted)::text
+       FROM inserted;`,
+      [childId, actor.uid, session, serviceDate, expiresAtUtc],
+    );
     return this.parseJsonLine<CartRow>(createdOut);
   }
 
@@ -1603,30 +1635,32 @@ export class CoreService {
       } else {
         throw err;
       }
-      const out = await runSql(`
-        SELECT row_to_json(t)::text
-        FROM (
-          SELECT id, child_id, created_by_user_id, session::text AS session, service_date::text AS service_date,
-                 status::text AS status, expires_at::text AS expires_at
-          FROM order_carts
-          WHERE id = ${sqlLiteral(cartId)}
-          LIMIT 1
-        ) t;
-      `);
+      const out = await runSql(
+        `SELECT row_to_json(t)::text
+         FROM (
+           SELECT id, child_id, created_by_user_id, session::text AS session, service_date::text AS service_date,
+                  status::text AS status, expires_at::text AS expires_at
+           FROM order_carts
+           WHERE id = $1
+           LIMIT 1
+         ) t;`,
+        [cartId],
+      );
       if (!out) throw new NotFoundException('Cart not found');
       return this.parseJsonLine<CartRow>(out);
     });
 
-    const itemsOut = await runSql(`
-      SELECT row_to_json(t)::text
-      FROM (
-        SELECT ci.id, ci.menu_item_id, ci.quantity, mi.name, mi.price
-        FROM cart_items ci
-        JOIN menu_items mi ON mi.id = ci.menu_item_id
-        WHERE ci.cart_id = ${sqlLiteral(cartId)}
-        ORDER BY ci.created_at ASC
-      ) t;
-    `);
+    const itemsOut = await runSql(
+      `SELECT row_to_json(t)::text
+       FROM (
+         SELECT ci.id, ci.menu_item_id, ci.quantity, mi.name, mi.price
+         FROM cart_items ci
+         JOIN menu_items mi ON mi.id = ci.menu_item_id
+         WHERE ci.cart_id = $1
+         ORDER BY ci.created_at ASC
+       ) t;`,
+      [cartId],
+    );
 
     return {
       ...cart,
@@ -1654,31 +1688,33 @@ export class CoreService {
     if (ids.length !== normalized.length) throw new BadRequestException('Duplicate menu items are not allowed');
 
     if (ids.length > 0) {
-      const idList = ids.map((id) => sqlLiteral(id)).join(', ');
-      const validCount = await runSql(`
-        SELECT count(*)::int
-        FROM menu_items mi
-        JOIN menus m ON m.id = mi.menu_id
-        WHERE mi.id IN (${idList})
-          AND mi.is_available = true
-          AND mi.deleted_at IS NULL
-          AND m.is_published = true
-          AND m.deleted_at IS NULL
-          AND m.service_date = DATE ${sqlLiteral(cart.service_date)}
-          AND m.session = ${sqlLiteral(cart.session)}::session_type;
-      `);
+      const placeholders = ids.map((_, i) => `$${i + 1}`).join(', ');
+      const validCount = await runSql(
+        `SELECT count(*)::int
+         FROM menu_items mi
+         JOIN menus m ON m.id = mi.menu_id
+         WHERE mi.id IN (${placeholders})
+           AND mi.is_available = true
+           AND mi.deleted_at IS NULL
+           AND m.is_published = true
+           AND m.deleted_at IS NULL
+           AND m.service_date = DATE $${ids.length + 1}
+           AND m.session = $${ids.length + 2}::session_type;`,
+        [...ids, cart.service_date, cart.session],
+      );
       if (Number(validCount || 0) !== ids.length) {
         throw new BadRequestException('CART_MENU_ITEM_UNAVAILABLE');
       }
     }
 
-    await runSql(`DELETE FROM cart_items WHERE cart_id = ${sqlLiteral(cartId)};`);
+    await runSql(`DELETE FROM cart_items WHERE cart_id = $1;`, [cartId]);
 
     for (const item of normalized) {
-      await runSql(`
-        INSERT INTO cart_items (cart_id, menu_item_id, quantity)
-        VALUES (${sqlLiteral(cartId)}, ${sqlLiteral(item.menuItemId)}, ${item.quantity});
-      `);
+      await runSql(
+        `INSERT INTO cart_items (cart_id, menu_item_id, quantity)
+         VALUES ($1, $2, $3);`,
+        [cartId, item.menuItemId, item.quantity],
+      );
     }
 
     return this.getCartById(actor, cartId);
@@ -1686,13 +1722,14 @@ export class CoreService {
 
   async discardCart(actor: AccessUser, cartId: string) {
     const cart = await this.ensureCartIsOpenAndOwned(cartId, actor);
-    await runSql(`
-      UPDATE order_carts
-      SET status = 'EXPIRED', updated_at = now()
-      WHERE id = ${sqlLiteral(cart.id)}
-        AND status = 'OPEN';
-    `);
-    await runSql(`DELETE FROM cart_items WHERE cart_id = ${sqlLiteral(cart.id)};`);
+    await runSql(
+      `UPDATE order_carts
+       SET status = 'EXPIRED', updated_at = now()
+       WHERE id = $1
+         AND status = 'OPEN';`,
+      [cart.id],
+    );
+    await runSql(`DELETE FROM cart_items WHERE cart_id = $1;`, [cart.id]);
     return { ok: true };
   }
 
@@ -1703,16 +1740,17 @@ export class CoreService {
 
     const cart = await this.ensureCartIsOpenAndOwned(cartId, actor);
 
-    const itemsOut = await runSql(`
-      SELECT row_to_json(t)::text
-      FROM (
-        SELECT ci.menu_item_id, ci.quantity, mi.name, mi.price
-        FROM cart_items ci
-        JOIN menu_items mi ON mi.id = ci.menu_item_id
-        WHERE ci.cart_id = ${sqlLiteral(cartId)}
-        ORDER BY ci.created_at ASC
-      ) t;
-    `);
+    const itemsOut = await runSql(
+      `SELECT row_to_json(t)::text
+       FROM (
+         SELECT ci.menu_item_id, ci.quantity, mi.name, mi.price
+         FROM cart_items ci
+         JOIN menu_items mi ON mi.id = ci.menu_item_id
+         WHERE ci.cart_id = $1
+         ORDER BY ci.created_at ASC
+       ) t;`,
+      [cartId],
+    );
     const items = this.parseJsonLines<{ menu_item_id: string; quantity: number; name: string; price: string }>(itemsOut);
     if (items.length === 0) throw new BadRequestException('Cart is empty');
     if (items.length > 5) throw new BadRequestException('ORDER_ITEM_LIMIT_EXCEEDED');
@@ -1720,38 +1758,39 @@ export class CoreService {
     await this.validateOrderDayRules(cart.service_date);
     await this.assertSessionActiveForOrdering(cart.session);
 
-    const dietaryOut = await runSql(`
-      SELECT coalesce(string_agg(cdr.restriction_label || ': ' || coalesce(cdr.restriction_details, ''), '; '), '')
-      FROM child_dietary_restrictions cdr
-      WHERE cdr.child_id = ${sqlLiteral(cart.child_id)}
-        AND cdr.is_active = true
-        AND cdr.deleted_at IS NULL;
-    `);
+    const dietaryOut = await runSql(
+      `SELECT coalesce(string_agg(cdr.restriction_label || ': ' || coalesce(cdr.restriction_details, ''), '; '), '')
+       FROM child_dietary_restrictions cdr
+       WHERE cdr.child_id = $1
+         AND cdr.is_active = true
+         AND cdr.deleted_at IS NULL;`,
+      [cart.child_id],
+    );
     const dietarySnapshot = dietaryOut || '';
 
     const totalPrice = items.reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0);
 
     let orderOut: string;
     try {
-      orderOut = await runSql(`
-        WITH inserted AS (
-          INSERT INTO orders (cart_id, child_id, placed_by_user_id, session, service_date, status, total_price, dietary_snapshot)
-          VALUES (
-            ${sqlLiteral(cart.id)},
-            ${sqlLiteral(cart.child_id)},
-            ${sqlLiteral(actor.uid)},
-            ${sqlLiteral(cart.session)}::session_type,
-            DATE ${sqlLiteral(cart.service_date)},
-            'PLACED',
-            ${totalPrice.toFixed(2)},
-            ${dietarySnapshot ? sqlLiteral(dietarySnapshot) : 'NULL'}
-          )
-          RETURNING id, order_number::text, child_id, session::text AS session, service_date::text AS service_date,
-                    status::text AS status, total_price, dietary_snapshot, placed_at::text AS placed_at
-        )
-        SELECT row_to_json(inserted)::text
-        FROM inserted;
-      `);
+      orderOut = await runSql(
+        `WITH inserted AS (
+           INSERT INTO orders (cart_id, child_id, placed_by_user_id, session, service_date, status, total_price, dietary_snapshot)
+           VALUES ($1, $2, $3, $4::session_type, DATE $5, 'PLACED', $6, $7)
+           RETURNING id, order_number::text, child_id, session::text AS session, service_date::text AS service_date,
+                     status::text AS status, total_price, dietary_snapshot, placed_at::text AS placed_at
+         )
+         SELECT row_to_json(inserted)::text
+         FROM inserted;`,
+        [
+          cart.id,
+          cart.child_id,
+          actor.uid,
+          cart.session,
+          cart.service_date,
+          Number(totalPrice.toFixed(2)),
+          dietarySnapshot || null,
+        ],
+      );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes('orders_child_session_date_active_uq') || msg.includes('23505')) {
@@ -1772,29 +1811,25 @@ export class CoreService {
     }>(orderOut);
 
     for (const item of items) {
-      await runSql(`
-        INSERT INTO order_items (order_id, menu_item_id, item_name_snapshot, price_snapshot, quantity)
-        VALUES (
-          ${sqlLiteral(order.id)},
-          ${sqlLiteral(item.menu_item_id)},
-          ${sqlLiteral(item.name)},
-          ${Number(item.price).toFixed(2)},
-          ${Number(item.quantity)}
-        );
-      `);
+      await runSql(
+        `INSERT INTO order_items (order_id, menu_item_id, item_name_snapshot, price_snapshot, quantity)
+         VALUES ($1, $2, $3, $4, $5);`,
+        [order.id, item.menu_item_id, item.name, Number(Number(item.price).toFixed(2)), Number(item.quantity)],
+      );
     }
 
     let billingParentId: string | null = null;
     if (actor.role === 'PARENT') {
       billingParentId = await this.getParentIdByUserId(actor.uid);
     } else {
-      const parentOut = await runSql(`
-        SELECT pc.parent_id
-        FROM parent_children pc
-        WHERE pc.child_id = ${sqlLiteral(cart.child_id)}
-        ORDER BY pc.created_at ASC
-        LIMIT 1;
-      `);
+      const parentOut = await runSql(
+        `SELECT pc.parent_id
+         FROM parent_children pc
+         WHERE pc.child_id = $1
+         ORDER BY pc.created_at ASC
+         LIMIT 1;`,
+        [cart.child_id],
+      );
       billingParentId = parentOut || null;
     }
 
@@ -1802,27 +1837,24 @@ export class CoreService {
       throw new BadRequestException('No linked parent for billing');
     }
 
-    await runSql(`
-      INSERT INTO billing_records (order_id, parent_id, status, delivery_status)
-      VALUES (${sqlLiteral(order.id)}, ${sqlLiteral(billingParentId)}, 'UNPAID', 'PENDING');
-    `);
+    await runSql(
+      `INSERT INTO billing_records (order_id, parent_id, status, delivery_status)
+       VALUES ($1, $2, 'UNPAID', 'PENDING');`,
+      [order.id, billingParentId],
+    );
 
-    await runSql(`
-      INSERT INTO order_mutations (order_id, action, actor_user_id, before_json, after_json)
-      VALUES (
-        ${sqlLiteral(order.id)},
-        'ORDER_PLACED',
-        ${sqlLiteral(actor.uid)},
-        NULL,
-        ${sqlLiteral(JSON.stringify({ cartId: cart.id, totalItems: items.length, totalPrice }))}::jsonb
-      );
-    `);
+    await runSql(
+      `INSERT INTO order_mutations (order_id, action, actor_user_id, before_json, after_json)
+       VALUES ($1, 'ORDER_PLACED', $2, NULL, $3::jsonb);`,
+      [order.id, actor.uid, JSON.stringify({ cartId: cart.id, totalItems: items.length, totalPrice })],
+    );
 
-    await runSql(`
-      UPDATE order_carts
-      SET status = 'SUBMITTED', updated_at = now()
-      WHERE id = ${sqlLiteral(cart.id)};
-    `);
+    await runSql(
+      `UPDATE order_carts
+       SET status = 'SUBMITTED', updated_at = now()
+       WHERE id = $1;`,
+      [cart.id],
+    );
 
     return {
       ...order,

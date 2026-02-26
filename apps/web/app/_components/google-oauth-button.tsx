@@ -49,6 +49,7 @@ export default function GoogleOAuthButton({ role, redirectPath, className }: Pro
           const res = await fetch(`${getApiBase()}/auth/google/verify`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ idToken, role }),
           });
           if (!res.ok) {
@@ -66,7 +67,7 @@ export default function GoogleOAuthButton({ role, redirectPath, className }: Pro
             throw new Error(message);
           }
           const data = await res.json();
-          setAuthState(data.accessToken, data.refreshToken, data.user.role);
+          setAuthState(data.accessToken, data.user.role);
           router.push(redirectPath);
         } catch (err) {
           setError(err instanceof Error ? err.message : 'Google login failed');

@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { createHmac, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'crypto';
 import { AuthUser, ROLES, Role } from './auth.types';
-import { runSql, sqlLiteral } from './db.util';
+import { runSql } from './db.util';
 
 type RefreshPayload = {
   sub: string;
@@ -194,29 +194,22 @@ export class AuthService {
 
     for (const spec of specs) {
       const hashed = this.hashPassword(spec.password);
-      const sql = `
-        INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email)
-        VALUES (
-          ${sqlLiteral(spec.role)},
-          ${sqlLiteral(spec.username)},
-          ${sqlLiteral(hashed)},
-          ${sqlLiteral(spec.firstName)},
-          ${sqlLiteral(spec.lastName)},
-          ${sqlLiteral(spec.phoneNumber)},
-          ${sqlLiteral(spec.email)}
-        )
-        ON CONFLICT (username) DO UPDATE
-        SET password_hash = EXCLUDED.password_hash,
-            role = EXCLUDED.role,
-            updated_at = now()
-        RETURNING id;
-      `;
-      const userId = await runSql(sql);
-      await runSql(`
-        INSERT INTO user_preferences (user_id, onboarding_completed, dark_mode_enabled, tooltips_enabled)
-        VALUES (${sqlLiteral(userId)}, false, false, true)
-        ON CONFLICT (user_id) DO NOTHING;
-      `);
+      const userId = await runSql(
+        `INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (username) DO UPDATE
+         SET password_hash = EXCLUDED.password_hash,
+             role = EXCLUDED.role,
+             updated_at = now()
+         RETURNING id;`,
+        [spec.role, spec.username, hashed, spec.firstName, spec.lastName, spec.phoneNumber, spec.email],
+      );
+      await runSql(
+        `INSERT INTO user_preferences (user_id, onboarding_completed, dark_mode_enabled, tooltips_enabled)
+         VALUES ($1, false, false, true)
+         ON CONFLICT (user_id) DO NOTHING;`,
+        [userId],
+      );
     }
 
     await runSql(`
@@ -228,17 +221,17 @@ export class AuthService {
   }
 
   private async findUserByUsername(username: string) {
-    const sql = `
-      SELECT row_to_json(t)::text
-      FROM (
-        SELECT id, username, role::text, first_name, last_name, password_hash
-        FROM users
-        WHERE username = ${sqlLiteral(username)}
-          AND is_active = true
-        LIMIT 1
-      ) t;
-    `;
-    const out = await runSql(sql);
+    const out = await runSql(
+      `SELECT row_to_json(t)::text
+       FROM (
+         SELECT id, username, role::text, first_name, last_name, password_hash
+         FROM users
+         WHERE username = $1
+           AND is_active = true
+         LIMIT 1
+       ) t;`,
+      [username],
+    );
     if (!out) return null;
     return this.parseJsonLine<DbUserRow>(out);
   }
@@ -246,17 +239,17 @@ export class AuthService {
   private async findUserByEmail(email: string) {
     const normalizedEmail = (email || '').trim().toLowerCase();
     if (!normalizedEmail) return null;
-    const sql = `
-      SELECT row_to_json(t)::text
-      FROM (
-        SELECT id, username, role::text, first_name, last_name, password_hash
-        FROM users
-        WHERE email = ${sqlLiteral(normalizedEmail)}
-          AND is_active = true
-        LIMIT 1
-      ) t;
-    `;
-    const out = await runSql(sql);
+    const out = await runSql(
+      `SELECT row_to_json(t)::text
+       FROM (
+         SELECT id, username, role::text, first_name, last_name, password_hash
+         FROM users
+         WHERE email = $1
+           AND is_active = true
+         LIMIT 1
+       ) t;`,
+      [normalizedEmail],
+    );
     if (!out) return null;
     return this.parseJsonLine<DbUserRow>(out);
   }
@@ -278,19 +271,19 @@ export class AuthService {
   }
 
   private async findUserByIdentity(providerUserId: string) {
-    const sql = `
-      SELECT row_to_json(t)::text
-      FROM (
-        SELECT u.id, u.username, u.role::text, u.first_name, u.last_name, u.password_hash
-        FROM user_identities ui
-        JOIN users u ON u.id = ui.user_id
-        WHERE ui.provider = 'GOOGLE'
-          AND ui.provider_user_id = ${sqlLiteral(providerUserId)}
-          AND u.is_active = true
-        LIMIT 1
-      ) t;
-    `;
-    const out = await runSql(sql);
+    const out = await runSql(
+      `SELECT row_to_json(t)::text
+       FROM (
+         SELECT u.id, u.username, u.role::text, u.first_name, u.last_name, u.password_hash
+         FROM user_identities ui
+         JOIN users u ON u.id = ui.user_id
+         WHERE ui.provider = 'GOOGLE'
+           AND ui.provider_user_id = $1
+           AND u.is_active = true
+         LIMIT 1
+       ) t;`,
+      [providerUserId],
+    );
     if (!out) return null;
     return this.parseJsonLine<DbUserRow>(out);
   }
@@ -303,40 +296,34 @@ export class AuthService {
     const randomPassword = this.hashPassword(randomUUID());
     const usernameBase = (email.split('@')[0] || `google_${Date.now()}`).replace(/[^a-z0-9_]/g, '');
     const username = await runSql(
-      `SELECT generate_unique_username(${sqlLiteral(usernameBase.toLowerCase())});`,
+      `SELECT generate_unique_username($1);`,
+      [usernameBase.toLowerCase()],
     );
     const dbRole = this.dbRoleFromApp(role);
-    const sql = `
-      WITH inserted AS (
-        INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email)
-        VALUES (
-          ${sqlLiteral(dbRole)},
-          ${sqlLiteral(username)},
-          ${sqlLiteral(randomPassword)},
-          ${sqlLiteral(firstName)},
-          ${sqlLiteral(lastName)},
-          ${sqlLiteral(phoneNumber)},
-          ${sqlLiteral(email)}
-        )
-        RETURNING id, username, role::text, first_name, last_name, password_hash
-      )
-      SELECT row_to_json(inserted)::text
-      FROM inserted;
-    `;
-    const out = await runSql(sql);
+    const out = await runSql(
+      `WITH inserted AS (
+         INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING id, username, role::text, first_name, last_name, password_hash
+       )
+       SELECT row_to_json(inserted)::text FROM inserted;`,
+      [dbRole, username, randomPassword, firstName, lastName, phoneNumber, email],
+    );
     if (!out) throw new UnauthorizedException('Failed to create Google user');
     const userRow = this.parseJsonLine<DbUserRow>(out);
-    await runSql(`
-      INSERT INTO user_preferences (user_id, onboarding_completed, dark_mode_enabled, tooltips_enabled)
-      VALUES (${sqlLiteral(userRow.id)}, false, false, true)
-      ON CONFLICT (user_id) DO NOTHING;
-    `);
+    await runSql(
+      `INSERT INTO user_preferences (user_id, onboarding_completed, dark_mode_enabled, tooltips_enabled)
+       VALUES ($1, false, false, true)
+       ON CONFLICT (user_id) DO NOTHING;`,
+      [userRow.id],
+    );
     if (role === 'PARENT') {
-      await runSql(`
-        INSERT INTO parents (user_id, address)
-        VALUES (${sqlLiteral(userRow.id)}, 'Google signup address pending')
-        ON CONFLICT (user_id) DO NOTHING;
-      `);
+      await runSql(
+        `INSERT INTO parents (user_id, address)
+         VALUES ($1, 'Google signup address pending')
+         ON CONFLICT (user_id) DO NOTHING;`,
+        [userRow.id],
+      );
     }
     return userRow;
   }
@@ -367,10 +354,11 @@ export class AuthService {
       type: 'refresh',
     };
     const refreshToken = this.signRaw(refreshPayload, this.refreshSecret, REFRESH_TTL);
-    await runSql(`
-      INSERT INTO auth_refresh_sessions (jti, user_id, app_role, expires_at)
-      VALUES (${sqlLiteral(jti)}, ${sqlLiteral(userId)}, ${sqlLiteral(user.role)}, now() + interval '7 day');
-    `);
+    await runSql(
+      `INSERT INTO auth_refresh_sessions (jti, user_id, app_role, expires_at)
+       VALUES ($1, $2, $3, now() + interval '7 day');`,
+      [jti, userId, user.role],
+    );
     return { accessToken, refreshToken };
   }
 
@@ -439,24 +427,15 @@ export class AuthService {
     const dbRole = this.dbRoleFromApp(role);
     let created: DbUserRow | null = null;
     try {
-      const sql = `
-        WITH inserted AS (
-          INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email)
-          VALUES (
-            ${sqlLiteral(dbRole)},
-            ${sqlLiteral(username)},
-            ${sqlLiteral(hashed)},
-            ${sqlLiteral(firstName)},
-            ${sqlLiteral(lastName)},
-            ${sqlLiteral(phoneNumber)},
-            ${email ? sqlLiteral(email) : 'NULL'}
-          )
-          RETURNING id, username, role::text, first_name, last_name, password_hash
-        )
-        SELECT row_to_json(inserted)::text
-        FROM inserted;
-      `;
-      const out = await runSql(sql);
+      const out = await runSql(
+        `WITH inserted AS (
+           INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           RETURNING id, username, role::text, first_name, last_name, password_hash
+         )
+         SELECT row_to_json(inserted)::text FROM inserted;`,
+        [dbRole, username, hashed, firstName, lastName, phoneNumber, email || null],
+      );
       if (!out) {
         throw new BadRequestException('Failed to create user');
       }
@@ -469,17 +448,18 @@ export class AuthService {
       throw err;
     }
 
-    await runSql(`
-      INSERT INTO user_preferences (user_id, onboarding_completed, dark_mode_enabled, tooltips_enabled)
-      VALUES (${sqlLiteral(created.id)}, false, false, true)
-      ON CONFLICT (user_id) DO NOTHING;
-    `);
+    await runSql(
+      `INSERT INTO user_preferences (user_id, onboarding_completed, dark_mode_enabled, tooltips_enabled)
+       VALUES ($1, false, false, true)
+       ON CONFLICT (user_id) DO NOTHING;`,
+      [created.id],
+    );
 
     if (role === 'PARENT') {
-      await runSql(`
-        INSERT INTO parents (user_id, address)
-        VALUES (${sqlLiteral(created.id)}, ${sqlLiteral(address)});
-      `);
+      await runSql(
+        `INSERT INTO parents (user_id, address) VALUES ($1, $2);`,
+        [created.id, address],
+      );
     }
 
     const user = this.buildUser(created, role);
@@ -522,12 +502,13 @@ export class AuthService {
       } else {
         userRow = await this.createGoogleUser(normalizedRole, payload);
       }
-      await runSql(`
-        INSERT INTO user_identities (user_id, provider, provider_user_id, provider_email)
-        VALUES (${sqlLiteral(userRow.id)}, 'GOOGLE', ${sqlLiteral(payload.sub)}, ${sqlLiteral(payload.email)})
-        ON CONFLICT (provider, provider_user_id)
-        DO UPDATE SET provider_email = EXCLUDED.provider_email;
-      `);
+      await runSql(
+        `INSERT INTO user_identities (user_id, provider, provider_user_id, provider_email)
+         VALUES ($1, 'GOOGLE', $2, $3)
+         ON CONFLICT (provider, provider_user_id)
+         DO UPDATE SET provider_email = EXCLUDED.provider_email;`,
+        [userRow.id, payload.sub, payload.email],
+      );
     }
     const user = this.buildUser(userRow, normalizedRole);
     const tokens = await this.signTokens(user, userRow.id);
@@ -557,23 +538,23 @@ export class AuthService {
 
   async refresh(refreshToken: string) {
     const payload = this.verifyRefreshToken(refreshToken);
-    const active = await runSql(`
-      SELECT EXISTS (
-        SELECT 1
-        FROM auth_refresh_sessions
-        WHERE jti = ${sqlLiteral(payload.jti)}
-          AND user_id = ${sqlLiteral(payload.uid)}
-          AND revoked_at IS NULL
-          AND expires_at > now()
-      );
-    `);
+    const active = await runSql(
+      `SELECT EXISTS (
+         SELECT 1
+         FROM auth_refresh_sessions
+         WHERE jti = $1
+           AND user_id = $2
+           AND revoked_at IS NULL
+           AND expires_at > now()
+       );`,
+      [payload.jti, payload.uid],
+    );
     if (active !== 't') throw new UnauthorizedException('Refresh token revoked');
 
-    await runSql(`
-      UPDATE auth_refresh_sessions
-      SET revoked_at = now()
-      WHERE jti = ${sqlLiteral(payload.jti)};
-    `);
+    await runSql(
+      `UPDATE auth_refresh_sessions SET revoked_at = now() WHERE jti = $1;`,
+      [payload.jti],
+    );
 
     const userRow = await this.findUserByUsername(payload.sub);
     if (!userRow) throw new UnauthorizedException('User not found');
@@ -585,11 +566,10 @@ export class AuthService {
     if (!refreshToken) return { ok: true };
     try {
       const payload = this.verifyRefreshToken(refreshToken);
-      await runSql(`
-        UPDATE auth_refresh_sessions
-        SET revoked_at = now()
-        WHERE jti = ${sqlLiteral(payload.jti)};
-      `);
+      await runSql(
+        `UPDATE auth_refresh_sessions SET revoked_at = now() WHERE jti = $1;`,
+        [payload.jti],
+      );
     } catch {
       // ignore invalid token for logout
     }
@@ -599,35 +579,35 @@ export class AuthService {
   async generateUsername(base: string) {
     const safeBase = (base || '').toLowerCase().replace(/[^a-z0-9_]/g, '').trim();
     if (!safeBase) throw new UnauthorizedException('Invalid base username');
-    const out = await runSql(
-      `SELECT generate_unique_username(${sqlLiteral(safeBase)});`,
-    );
+    const out = await runSql(`SELECT generate_unique_username($1);`, [safeBase]);
     return { username: out };
   }
 
   async getOnboardingState(accessToken: string) {
     const payload = this.verifyAccessToken(accessToken);
-    const out = await runSql(`
-      SELECT onboarding_completed
-      FROM user_preferences up
-      JOIN users u ON u.id = up.user_id
-      WHERE u.username = ${sqlLiteral(payload.sub)}
-      LIMIT 1;
-    `);
+    const out = await runSql(
+      `SELECT onboarding_completed
+       FROM user_preferences up
+       JOIN users u ON u.id = up.user_id
+       WHERE u.username = $1
+       LIMIT 1;`,
+      [payload.sub],
+    );
     return { completed: out === 't' };
   }
 
   async setOnboardingState(accessToken: string, completed: boolean) {
     const payload = this.verifyAccessToken(accessToken);
-    await runSql(`
-      INSERT INTO user_preferences (user_id, onboarding_completed, dark_mode_enabled, tooltips_enabled)
-      SELECT id, ${completed ? 'true' : 'false'}, false, true
-      FROM users
-      WHERE username = ${sqlLiteral(payload.sub)}
-      ON CONFLICT (user_id) DO UPDATE
-      SET onboarding_completed = EXCLUDED.onboarding_completed,
-          updated_at = now();
-    `);
+    await runSql(
+      `INSERT INTO user_preferences (user_id, onboarding_completed, dark_mode_enabled, tooltips_enabled)
+       SELECT id, $1, false, true
+       FROM users
+       WHERE username = $2
+       ON CONFLICT (user_id) DO UPDATE
+       SET onboarding_completed = EXCLUDED.onboarding_completed,
+           updated_at = now();`,
+      [completed, payload.sub],
+    );
     return { completed };
   }
 
@@ -652,12 +632,10 @@ export class AuthService {
       throw new UnauthorizedException('Current password is incorrect');
     }
     const nextHash = this.hashPassword(newPassword);
-    await runSql(`
-      UPDATE users
-      SET password_hash = ${sqlLiteral(nextHash)},
-          updated_at = now()
-      WHERE id = ${sqlLiteral(userRow.id)};
-    `);
+    await runSql(
+      `UPDATE users SET password_hash = $1, updated_at = now() WHERE id = $2;`,
+      [nextHash, userRow.id],
+    );
     return { ok: true };
   }
 }

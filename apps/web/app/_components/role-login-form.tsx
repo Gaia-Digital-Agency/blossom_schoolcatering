@@ -33,13 +33,14 @@ export default function RoleLoginForm({
       const res = await fetch(`${getApiBase()}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ username, password, role }),
       });
       if (!res.ok) {
         throw new Error('Invalid credentials');
       }
       const data = await res.json();
-      setAuthState(data.accessToken, data.refreshToken, data.user.role);
+      setAuthState(data.accessToken, data.user.role);
       router.push(redirectPath);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');

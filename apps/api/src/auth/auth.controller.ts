@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Headers, Post, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Post, Req, Res, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { ROLES, Role } from './auth.types';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { Roles } from './roles.decorator';
 import { RolesGuard } from './roles.guard';
+import type { Request, Response } from 'express';
 
 type LoginBody = {
   username?: string;
@@ -25,7 +26,7 @@ type RegisterBody = {
 };
 
 type RefreshBody = {
-  refreshToken: string;
+  refreshToken?: string;
 };
 
 type GoogleDevBody = {
@@ -52,23 +53,73 @@ type ChangePasswordBody = {
 
 @Controller('api/v1/auth')
 export class AuthController {
+  private readonly refreshCookieName = 'blossom_refresh_token';
+  private readonly refreshTtlMs = 7 * 24 * 60 * 60 * 1000;
+
   constructor(private readonly authService: AuthService) {}
+
+  private isSecureCookie(req: Request) {
+    const forwardedProto = req.headers['x-forwarded-proto'];
+    const isHttpsForwarded = typeof forwardedProto === 'string'
+      ? forwardedProto.includes('https')
+      : Array.isArray(forwardedProto) && forwardedProto.some((p) => p.includes('https'));
+    return req.secure || isHttpsForwarded || process.env.AUTH_COOKIE_SECURE === 'true';
+  }
+
+  private getCookie(req: Request, key: string) {
+    const raw = req.headers.cookie;
+    if (!raw) return '';
+    for (const part of raw.split(';')) {
+      const [k, ...rest] = part.trim().split('=');
+      if (k === key) return decodeURIComponent(rest.join('='));
+    }
+    return '';
+  }
+
+  private setRefreshCookie(req: Request, res: Response, refreshToken: string) {
+    res.cookie(this.refreshCookieName, refreshToken, {
+      httpOnly: true,
+      secure: this.isSecureCookie(req),
+      sameSite: 'strict',
+      path: '/',
+      maxAge: this.refreshTtlMs,
+    });
+  }
+
+  private clearRefreshCookie(req: Request, res: Response) {
+    res.clearCookie(this.refreshCookieName, {
+      httpOnly: true,
+      secure: this.isSecureCookie(req),
+      sameSite: 'strict',
+      path: '/',
+    });
+  }
 
   @Post('login')
   @Throttle({ default: { ttl: 60000, limit: 10 } })
-  login(@Body() body: LoginBody) {
+  async login(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @Body() body: LoginBody,
+  ) {
     const username = body.username ?? body.identifier;
     const password = body.password;
     const role = body.role;
     if (!username || !password || !role) {
       throw new UnauthorizedException('Invalid credentials');
     }
-    return this.authService.login(username, password, role);
+    const result = await this.authService.login(username, password, role);
+    this.setRefreshCookie(req, res, result.refreshToken);
+    return { accessToken: result.accessToken, user: result.user };
   }
 
   @Post('register')
   @Throttle({ default: { ttl: 60000, limit: 5 } })
-  register(@Body() body: RegisterBody) {
+  async register(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @Body() body: RegisterBody,
+  ) {
     const role = body.role;
     const username = body.username;
     const password = body.password;
@@ -80,7 +131,7 @@ export class AuthController {
     if (!role || !username || !password || !firstName || !lastName || !phoneNumber) {
       throw new UnauthorizedException('Missing required fields');
     }
-    return this.authService.register({
+    const result = await this.authService.register({
       role: role as Role,
       username,
       password,
@@ -90,16 +141,38 @@ export class AuthController {
       email,
       address,
     });
+    this.setRefreshCookie(req, res, result.refreshToken);
+    return { accessToken: result.accessToken, user: result.user };
   }
 
   @Post('google/dev')
-  loginWithGoogleDev(@Body() body: GoogleDevBody) {
-    return this.authService.loginWithGoogleDev(body.googleEmail, body.role);
+  async loginWithGoogleDev(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @Body() body: GoogleDevBody,
+  ) {
+    const result = await this.authService.loginWithGoogleDev(body.googleEmail, body.role);
+    this.setRefreshCookie(req, res, result.refreshToken);
+    return {
+      accessToken: result.accessToken,
+      user: result.user,
+      provider: result.provider,
+    };
   }
 
   @Post('google/verify')
-  loginWithGoogleVerified(@Body() body: { idToken: string; role: string }) {
-    return this.authService.loginWithGoogleVerified(body.idToken, body.role);
+  async loginWithGoogleVerified(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @Body() body: { idToken: string; role: string },
+  ) {
+    const result = await this.authService.loginWithGoogleVerified(body.idToken, body.role);
+    this.setRefreshCookie(req, res, result.refreshToken);
+    return {
+      accessToken: result.accessToken,
+      user: result.user,
+      provider: result.provider,
+    };
   }
 
   @Get('me')
@@ -110,8 +183,16 @@ export class AuthController {
   }
 
   @Post('refresh')
-  refresh(@Body() body: RefreshBody) {
-    return this.authService.refresh(body.refreshToken);
+  async refresh(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @Body() body: RefreshBody,
+  ) {
+    const refreshToken = this.getCookie(req, this.refreshCookieName) || body?.refreshToken;
+    if (!refreshToken) throw new UnauthorizedException('Missing refresh token');
+    const tokens = await this.authService.refresh(refreshToken);
+    this.setRefreshCookie(req, res, tokens.refreshToken);
+    return { accessToken: tokens.accessToken };
   }
 
   @Post('username/generate')
@@ -148,8 +229,15 @@ export class AuthController {
   }
 
   @Post('logout')
-  logout(@Body() body: RefreshBody) {
-    return this.authService.logout(body?.refreshToken);
+  async logout(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @Body() body: RefreshBody,
+  ) {
+    const refreshToken = this.getCookie(req, this.refreshCookieName) || body?.refreshToken;
+    const out = await this.authService.logout(refreshToken);
+    this.clearRefreshCookie(req, res);
+    return out;
   }
 
   @Post('change-password')
