@@ -464,7 +464,10 @@ export default function ParentsPage() {
           <label>Search<input value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="keyword" /></label>
           <label>Price Min<input type="number" value={priceMin} onChange={(e) => setPriceMin(e.target.value)} /></label>
           <label>Price Max<input type="number" value={priceMax} onChange={(e) => setPriceMax(e.target.value)} /></label>
-          <label>Favourites Only (Optional)<input type="checkbox" checked={favouritesOnly} onChange={(e) => setFavouritesOnly(e.target.checked)} /></label>
+          <label className="checkbox-inline">
+            <input type="checkbox" checked={favouritesOnly} onChange={(e) => setFavouritesOnly(e.target.checked)} />
+            <span>Favourites Only (Optional)</span>
+          </label>
           <p className="auth-help">Tick box meaning: show only menu items that exist in your saved favourite combos.</p>
           <button className="btn btn-outline" type="button" onClick={onLoadMenu}>Load Menu</button>
           <button className="btn btn-outline" type="button" onClick={onResumeDraft} disabled={!draftCartId || loadingDraft}>{loadingDraft ? 'Loading Draft...' : 'Resume Draft'}</button>

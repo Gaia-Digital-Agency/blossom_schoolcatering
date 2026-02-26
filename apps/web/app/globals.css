@@ -628,6 +628,18 @@ button:hover,
   min-width: 0;
 }
 
+.checkbox-inline {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.checkbox-inline input[type='checkbox'] {
+  width: auto !important;
+  min-height: 1rem;
+  margin: 0;
+}
+
 .parents-page .auth-form span {
   display: grid;
   gap: 0.3rem;
