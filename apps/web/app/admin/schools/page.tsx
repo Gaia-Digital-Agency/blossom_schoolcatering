@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ACCESS_KEY, getApiBase, refreshAccessToken } from '../../../lib/auth';
+import { apiFetch, SessionExpiredError } from '../../../lib/auth';
 import AdminNav from '../_components/admin-nav';
 
 type School = { id: string; name: string; city?: string | null; address?: string | null; is_active?: boolean };
@@ -20,30 +20,6 @@ export default function AdminSchoolsPage() {
   const [newSchoolContactEmail, setNewSchoolContactEmail] = useState('');
   const [creatingSchool, setCreatingSchool] = useState(false);
   const [deletingSchoolId, setDeletingSchoolId] = useState('');
-
-  const apiFetch = async (path: string, init?: RequestInit) => {
-    let token = localStorage.getItem(ACCESS_KEY);
-    if (!token) throw new Error('Please login first.');
-    let res = await fetch(`${getApiBase()}${path}`, {
-      ...init,
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(init?.headers || {}) },
-    });
-    if (res.status === 401) {
-      const refreshed = await refreshAccessToken();
-      if (!refreshed) throw new Error('Session expired. Please log in again.');
-      token = refreshed;
-      res = await fetch(`${getApiBase()}${path}`, {
-        ...init,
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(init?.headers || {}) },
-      });
-    }
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      throw new Error(text || `Request failed: ${res.status}`);
-    }
-    if (res.status === 204) return null;
-    return res.json();
-  };
 
   const load = async () => {
     setError('');

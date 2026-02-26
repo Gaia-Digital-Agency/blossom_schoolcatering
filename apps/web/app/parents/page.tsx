@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ACCESS_KEY, getApiBase, refreshAccessToken } from '../../lib/auth';
+import { apiFetch, SessionExpiredError } from '../../lib/auth';
 
 type Child = {
   id: string;
@@ -173,30 +173,6 @@ export default function ParentsPage() {
       .map(([id, qty]) => ({ menuItem: index.get(id), id, qty }))
       .filter((x) => Boolean(x.menuItem));
   }, [itemQty, menuItems]);
-
-  const apiFetch = async (path: string, init?: RequestInit) => {
-    let token = localStorage.getItem(ACCESS_KEY);
-    if (!token) throw new Error('Please login first.');
-    let res = await fetch(`${getApiBase()}${path}`, {
-      ...init,
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(init?.headers || {}) },
-    });
-    if (res.status === 401) {
-      const refreshed = await refreshAccessToken();
-      if (!refreshed) throw new Error('Session expired. Please log in again.');
-      token = refreshed;
-      res = await fetch(`${getApiBase()}${path}`, {
-        ...init,
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(init?.headers || {}) },
-      });
-    }
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      const resMessage = Array.isArray(body.message) ? body.message.join(', ') : body.message;
-      throw new Error(resMessage || 'Request failed');
-    }
-    return res.json();
-  };
 
   const loadOrders = async () => {
     setLoadingOrders(true);

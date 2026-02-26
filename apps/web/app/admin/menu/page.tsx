@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { ACCESS_KEY, getApiBase, refreshAccessToken } from '../../../lib/auth';
+import { apiFetch, SessionExpiredError } from '../../../lib/auth';
 import AdminNav from '../_components/admin-nav';
 
 type Ingredient = { id: string; name: string; allergen_flag: boolean; is_active: boolean };
@@ -60,29 +60,6 @@ export default function AdminMenuPage() {
     if (!q) return ingredients;
     return ingredients.filter((i) => i.name.toLowerCase().includes(q));
   }, [ingredients, ingredientSearch]);
-
-  const apiFetch = async (path: string, init?: RequestInit) => {
-    let token = localStorage.getItem(ACCESS_KEY);
-    if (!token) throw new Error('Please login first.');
-    let res = await fetch(`${getApiBase()}${path}`, {
-      ...init,
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(init?.headers || {}) },
-    });
-    if (res.status === 401) {
-      const refreshed = await refreshAccessToken();
-      if (!refreshed) throw new Error('Session expired. Please log in again.');
-      token = refreshed;
-      res = await fetch(`${getApiBase()}${path}`, {
-        ...init,
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(init?.headers || {}) },
-      });
-    }
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error(body.message || 'Request failed');
-    }
-    return res.json();
-  };
 
   const loadMenuData = async () => {
     const [ings, menu] = await Promise.all([

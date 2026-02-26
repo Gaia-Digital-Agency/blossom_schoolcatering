@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ACCESS_KEY, getApiBase, refreshAccessToken } from '../../lib/auth';
+import { apiFetch, SessionExpiredError } from '../../lib/auth';
 
 type Youngster = {
   id: string;
@@ -95,45 +95,9 @@ export default function YoungstersPage() {
   const placementExpired = cutoffRemainingMs <= 0;
   const hasOpenDraft = Boolean(draftCartId) && draftRemainingMs > 0;
 
-  const apiFetch = async (path: string, init?: RequestInit) => {
-    let token = localStorage.getItem(ACCESS_KEY);
-    if (!token) throw new Error('Please login first.');
-
-    let res = await fetch(`${getApiBase()}${path}`, {
-      ...init,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        ...(init?.headers || {}),
-      },
-    });
-
-    if (res.status === 401) {
-      const refreshed = await refreshAccessToken();
-      if (!refreshed) throw new Error('Session expired. Please log in again.');
-      token = refreshed;
-      res = await fetch(`${getApiBase()}${path}`, {
-        ...init,
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          ...(init?.headers || {}),
-        },
-      });
-    }
-
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      const resMessage = Array.isArray(body.message) ? body.message.join(', ') : body.message;
-      throw new Error(resMessage || 'Request failed');
-    }
-
-    return res.json();
-  };
-
   useEffect(() => {
     apiFetch('/children/me')
-      .then((data) => setYoungster(data))
+      .then((data) => setYoungster(data as Youngster))
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed loading youngster profile'))
       .finally(() => setLoading(false));
     apiFetch('/youngsters/me/insights')

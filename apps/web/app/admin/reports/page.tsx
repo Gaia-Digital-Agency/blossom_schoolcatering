@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ACCESS_KEY, getApiBase, refreshAccessToken } from '../../../lib/auth';
+import { apiFetch, SessionExpiredError } from '../../../lib/auth';
 import AdminNav from '../_components/admin-nav';
 
 type Revenue = {
@@ -28,23 +28,6 @@ export default function AdminReportsPage() {
   const [revenue, setRevenue] = useState<Revenue | null>(null);
   const [report, setReport] = useState<Report | null>(null);
   const [error, setError] = useState('');
-
-  const apiFetch = async (path: string) => {
-    let token = localStorage.getItem(ACCESS_KEY);
-    if (!token) throw new Error('Please login first.');
-    let res = await fetch(`${getApiBase()}${path}`, { headers: { Authorization: `Bearer ${token}` } });
-    if (res.status === 401) {
-      const refreshed = await refreshAccessToken();
-      if (!refreshed) throw new Error('Session expired. Please log in again.');
-      token = refreshed;
-      res = await fetch(`${getApiBase()}${path}`, { headers: { Authorization: `Bearer ${token}` } });
-    }
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error(body.message || 'Request failed');
-    }
-    return res.json();
-  };
 
   const load = async () => {
     setError('');

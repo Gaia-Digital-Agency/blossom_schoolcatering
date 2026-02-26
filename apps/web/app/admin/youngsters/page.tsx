@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import { ACCESS_KEY, getApiBase, refreshAccessToken } from '../../../lib/auth';
+import { apiFetch, SessionExpiredError } from '../../../lib/auth';
 import AdminNav from '../_components/admin-nav';
 
 type School = { id: string; name: string; city?: string | null };
@@ -25,29 +25,6 @@ export default function AdminYoungstersPage() {
   const [schoolId, setSchoolId] = useState('');
   const [schoolGrade, setSchoolGrade] = useState('');
   const [allergies, setAllergies] = useState('');
-
-  const apiFetch = async (path: string, init?: RequestInit) => {
-    let token = localStorage.getItem(ACCESS_KEY);
-    if (!token) throw new Error('Please login first.');
-    let res = await fetch(`${getApiBase()}${path}`, {
-      ...init,
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(init?.headers || {}) },
-    });
-    if (res.status === 401) {
-      const refreshed = await refreshAccessToken();
-      if (!refreshed) throw new Error('Session expired. Please log in again.');
-      token = refreshed;
-      res = await fetch(`${getApiBase()}${path}`, {
-        ...init,
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(init?.headers || {}) },
-      });
-    }
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error(body.message || 'Request failed');
-    }
-    return res.json();
-  };
 
   const load = async () => {
     const [s, p, c] = await Promise.all([

@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import { ACCESS_KEY, getApiBase, refreshAccessToken } from '../../../lib/auth';
+import { apiFetch, SessionExpiredError } from '../../../lib/auth';
 import AdminNav from '../_components/admin-nav';
 
 type BlackoutDay = {
@@ -33,30 +33,6 @@ export default function AdminBlackoutDatesPage() {
   const [blackoutDate, setBlackoutDate] = useState(todayIsoLocal());
   const [type, setType] = useState<'ORDER_BLOCK' | 'SERVICE_BLOCK' | 'BOTH'>('BOTH');
   const [reason, setReason] = useState('');
-
-  const apiFetch = async (path: string, init?: RequestInit) => {
-    let token = localStorage.getItem(ACCESS_KEY);
-    if (!token) throw new Error('Please login first.');
-    let res = await fetch(`${getApiBase()}${path}`, {
-      ...init,
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(init?.headers || {}) },
-    });
-    if (res.status === 401) {
-      const refreshed = await refreshAccessToken();
-      if (!refreshed) throw new Error('Session expired. Please log in again.');
-      token = refreshed;
-      res = await fetch(`${getApiBase()}${path}`, {
-        ...init,
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(init?.headers || {}) },
-      });
-    }
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      const msg = Array.isArray(body.message) ? body.message.join(', ') : body.message;
-      throw new Error(msg || 'Request failed');
-    }
-    return res.json();
-  };
 
   const load = async () => {
     setLoading(true);

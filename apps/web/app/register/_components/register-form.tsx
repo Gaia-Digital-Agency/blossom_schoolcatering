@@ -15,7 +15,7 @@ type RegisterFormProps = {
 
 export default function RegisterForm({ role, allowedRoles, title, subtitle }: RegisterFormProps) {
   const router = useRouter();
-  const availableRoles = allowedRoles && allowedRoles.length > 0 ? allowedRoles : role ? [role] : ['YOUNGSTER'];
+  const availableRoles = (allowedRoles && allowedRoles.length > 0 ? allowedRoles : role ? [role] : ['YOUNGSTER' as RegisterRole]);
   const [selectedRole, setSelectedRole] = useState<RegisterRole>(availableRoles[0]);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');

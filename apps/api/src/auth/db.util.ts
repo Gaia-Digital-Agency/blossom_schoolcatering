@@ -16,12 +16,17 @@ function getPgPool() {
   if (pool) return pool;
   try {
     // Avoid hard compile-time dependency so build still works without npm network install.
-    const pg = eval('require')('pg') as { Pool?: new (opts: { connectionString: string }) => any };
+    const pg = eval('require')('pg') as { Pool?: new (opts: object) => any };
     if (!pg?.Pool) {
       pgUnavailable = true;
       return null;
     }
-    pool = new pg.Pool({ connectionString: getDatabaseUrl() });
+    pool = new pg.Pool({
+      connectionString: getDatabaseUrl(),
+      max: 10,                    // max pool size (default is 10, explicit for clarity)
+      idleTimeoutMillis: 30000,   // close idle clients after 30s
+      connectionTimeoutMillis: 5000, // fail fast if no connection in 5s
+    });
     return pool;
   } catch {
     pgUnavailable = true;
