@@ -51,11 +51,14 @@
 
 ## Registration
 
-### POST `/auth/register/parent`
+### POST `/auth/register`
 - Public
 - Request:
 ```json
 {
+  "role": "PARENT",
+  "username": "ayu_parent",
+  "password": "parent123",
   "first_name": "Ayu",
   "last_name": "Wijaya",
   "phone_number": "628123450001",
@@ -63,7 +66,10 @@
   "address": "Jl. Sunset Road No. 88, Kuta, Bali"
 }
 ```
-- Creates user record (role=PARENT), parent profile, user_preferences record
+- Creates user record (`role` allowed: `PARENT`, `YOUNGSTER`, `DELIVERY`) and user_preferences record
+- `email` is required
+- `address` is required only when role is `PARENT`
+- `/register/youngsters` page is the combined parent + youngster registration UI path
 - Username collision handling: append `-1`, `-2`, ... when generated username already exists
 - Response: user + access tokens (auto-login after registration)
 

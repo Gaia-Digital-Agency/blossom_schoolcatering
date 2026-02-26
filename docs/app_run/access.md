@@ -49,7 +49,6 @@ Reference:
 
 ## Registration
 - Available for:
-  - Parent: `/register/parent`
-  - Youngsters: `/register/youngsters`
+  - Parent + Youngsters (combined): `/register/youngsters`
   - Delivery: `/register/delivery`
 - Admin and Kitchen do not have registration pages.

@@ -7,13 +7,16 @@ import { getApiBase, setAuthState } from '../../../lib/auth';
 type RegisterRole = 'PARENT' | 'YOUNGSTER' | 'DELIVERY';
 
 type RegisterFormProps = {
-  role: RegisterRole;
+  role?: RegisterRole;
+  allowedRoles?: RegisterRole[];
   title: string;
   subtitle: string;
 };
 
-export default function RegisterForm({ role, title, subtitle }: RegisterFormProps) {
+export default function RegisterForm({ role, allowedRoles, title, subtitle }: RegisterFormProps) {
   const router = useRouter();
+  const availableRoles = allowedRoles && allowedRoles.length > 0 ? allowedRoles : role ? [role] : ['YOUNGSTER'];
+  const [selectedRole, setSelectedRole] = useState<RegisterRole>(availableRoles[0]);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -23,6 +26,7 @@ export default function RegisterForm({ role, title, subtitle }: RegisterFormProp
   const [address, setAddress] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const isParentRole = selectedRole === 'PARENT';
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -34,14 +38,14 @@ export default function RegisterForm({ role, title, subtitle }: RegisterFormProp
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          role,
+          role: selectedRole,
           username,
           password,
           firstName,
           lastName,
           phoneNumber,
           email,
-          address: role === 'PARENT' ? address : undefined,
+          address: isParentRole ? address : undefined,
         }),
       });
       if (!res.ok) {
@@ -64,6 +68,22 @@ export default function RegisterForm({ role, title, subtitle }: RegisterFormProp
         <h1>{title}</h1>
         <p className="auth-help">{subtitle}</p>
         <form onSubmit={onSubmit} className="auth-form">
+          {availableRoles.length > 1 ? (
+            <label>
+              Register As
+              <select
+                value={selectedRole}
+                onChange={(e) => setSelectedRole(e.target.value as RegisterRole)}
+                required
+              >
+                {availableRoles.map((availableRole) => (
+                  <option key={availableRole} value={availableRole}>
+                    {availableRole === 'YOUNGSTER' ? 'Youngster' : availableRole === 'PARENT' ? 'Parent' : 'Delivery'}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <label>
             Username
             <input value={username} onChange={(e) => setUsername(e.target.value)} required />
@@ -91,10 +111,10 @@ export default function RegisterForm({ role, title, subtitle }: RegisterFormProp
             <input value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} required />
           </label>
           <label>
-            Email (Optional)
-            <input value={email} onChange={(e) => setEmail(e.target.value)} />
+            Email
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </label>
-          {role === 'PARENT' ? (
+          {isParentRole ? (
             <label>
               Address
               <input value={address} onChange={(e) => setAddress(e.target.value)} required />

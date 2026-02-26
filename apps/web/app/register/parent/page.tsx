@@ -1,11 +1,5 @@
-import RegisterForm from '../_components/register-form';
+import { redirect } from 'next/navigation';
 
 export default function ParentRegisterPage() {
-  return (
-    <RegisterForm
-      role="PARENT"
-      title="Parent Registration"
-      subtitle="Create a parent account for meal ordering and youngster management."
-    />
-  );
+  redirect('/register/youngsters');
 }

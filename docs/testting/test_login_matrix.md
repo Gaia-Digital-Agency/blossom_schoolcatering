@@ -14,8 +14,7 @@ Base URL: `http://34.124.244.233/schoolcatering`
 | Youngster | `youngster` | `youngster123` | `/youngster/login` | `/youngsters` |
 
 ## Registration Paths
-- Parent: `/register/parent`
-- Youngster: `/register/youngsters`
+- Parent + Youngster (combined): `/register/youngsters`
 - Delivery: `/register/delivery`
 
 ## Notes

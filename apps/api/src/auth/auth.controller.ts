@@ -128,7 +128,7 @@ export class AuthController {
     const phoneNumber = body.phoneNumber;
     const email = body.email;
     const address = body.address;
-    if (!role || !username || !password || !firstName || !lastName || !phoneNumber) {
+    if (!role || !username || !password || !firstName || !lastName || !phoneNumber || !email) {
       throw new UnauthorizedException('Missing required fields');
     }
     const result = await this.authService.register({

@@ -12,9 +12,9 @@ API Base: `/schoolcatering/api/v1`
 | `/` | Landing page | Links: Home, Login, Register |
 | `/home` | Alias route for landing page | Same content as `/` |
 | `/login` | Home login (Parent/Youngster) | On success -> `/dashboard` |
-| `/register` | Registration role chooser | Links to `/register/parent`, `/register/youngsters`, `/register/delivery` |
-| `/register/parent` | Parent registration | On success -> `/dashboard` |
-| `/register/youngsters` | Youngster registration (account role) | On success -> `/dashboard` |
+| `/register` | Registration role chooser | Links to `/register/youngsters`, `/register/delivery` |
+| `/register/parent` | Legacy parent registration path | Redirects to `/register/youngsters` |
+| `/register/youngsters` | Parent + Youngster combined registration (account role selected in form) | On success -> `/dashboard` |
 | `/register/delivery` | Delivery registration (account role) | On success -> `/dashboard` |
 | `/dashboard` | Post-login landing | Role-specific navigation continues |
 
@@ -84,14 +84,14 @@ Admin top nav component: `Dashboard, Menu, Parents, Youngsters, Schools, Blackou
 - `password`
 
 ### Registration pages (`/register/*`)
-- `role` (route-fixed)
+- `role` (selected in form on `/register/youngsters`; route-fixed for delivery)
 - `username`
 - `password`
 - `firstName`
 - `lastName`
 - `phoneNumber`
-- `email` (optional)
-- `address` (required for parent route)
+- `email` (required)
+- `address` (required when role is `PARENT`)
 
 ### `/parents` (single consolidated parent module page)
 - Youngster selector: `selectedChildId`
@@ -178,7 +178,7 @@ Admin top nav component: `Dashboard, Menu, Parents, Youngsters, Schools, Blackou
 | Method | Path | Request fields |
 |---|---|---|
 | POST | `/login` | `username`/`identifier`, `password`, `role` |
-| POST | `/register` | `role`, `username`, `password`, `firstName`, `lastName`, `phoneNumber`, `email?`, `address?` |
+| POST | `/register` | `role`, `username`, `password`, `firstName`, `lastName`, `phoneNumber`, `email`, `address?` |
 | POST | `/google/dev` | `googleEmail`, `role` |
 | POST | `/google/verify` | `idToken`, `role` |
 | GET | `/me` | Bearer token |

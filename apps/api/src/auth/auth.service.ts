@@ -408,7 +408,7 @@ export class AuthService {
     const email = (input.email || '').trim().toLowerCase();
     const address = (input.address || '').trim();
 
-    if (!username || !firstName || !lastName || !phoneNumber || !password) {
+    if (!username || !firstName || !lastName || !phoneNumber || !password || !email) {
       throw new BadRequestException('Required fields are missing');
     }
     if (username.length < 3 || password.length < 6) {
