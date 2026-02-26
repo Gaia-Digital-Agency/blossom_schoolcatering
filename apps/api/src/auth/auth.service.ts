@@ -307,8 +307,7 @@ export class AuthService {
     );
     const dbRole = this.dbRoleFromApp(role);
     const sql = `
-      SELECT row_to_json(t)::text
-      FROM (
+      WITH inserted AS (
         INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email)
         VALUES (
           ${sqlLiteral(dbRole)},
@@ -320,7 +319,9 @@ export class AuthService {
           ${sqlLiteral(email)}
         )
         RETURNING id, username, role::text, first_name, last_name, password_hash
-      ) t;
+      )
+      SELECT row_to_json(inserted)::text
+      FROM inserted;
     `;
     const out = await runSql(sql);
     if (!out) throw new UnauthorizedException('Failed to create Google user');
@@ -439,8 +440,7 @@ export class AuthService {
     let created: DbUserRow | null = null;
     try {
       const sql = `
-        SELECT row_to_json(t)::text
-        FROM (
+        WITH inserted AS (
           INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email)
           VALUES (
             ${sqlLiteral(dbRole)},
@@ -452,7 +452,9 @@ export class AuthService {
             ${email ? sqlLiteral(email) : 'NULL'}
           )
           RETURNING id, username, role::text, first_name, last_name, password_hash
-        ) t;
+        )
+        SELECT row_to_json(inserted)::text
+        FROM inserted;
       `;
       const out = await runSql(sql);
       if (!out) {

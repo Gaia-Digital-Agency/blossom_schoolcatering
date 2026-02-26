@@ -1,6 +1,6 @@
 # Authentication and Identity Completion Details
 
-Last updated: 2026-02-25
+Last updated: 2026-02-26
 
 ## Scope
 Completed the 6 remaining items under Section 4 (Authentication and Identity):
@@ -54,7 +54,7 @@ Completed the 6 remaining items under Section 4 (Authentication and Identity):
 ## 5) DB-backed User Auth + Username Collision Logic
 - Auth now uses `users` table instead of in-memory credentials.
 - Dev account bootstrap:
-  - Ensures `teameditor` exists in DB with hashed password.
+  - Ensures required test/runtime role users can be created with hashed passwords.
 - Password hashing:
   - `scrypt` (Node built-in `crypto`)
 - Username generation:
@@ -75,6 +75,9 @@ Completed the 6 remaining items under Section 4 (Authentication and Identity):
   - `AUTH_JWT_SECRET`
   - `AUTH_JWT_REFRESH_SECRET`
   - `GOOGLE_CLIENT_ID` (for strict Google audience validation)
+- Receipt generation and storage-related flows additionally require:
+  - `GOOGLE_CLIENT_EMAIL` + `GOOGLE_PRIVATE_KEY`, or
+  - `GOOGLE_APPLICATION_CREDENTIALS`
 
 ## Web App Integration
 - Protected routing middleware keeps homepage public and redirects other pages to login when unauthenticated.
@@ -93,3 +96,5 @@ Completed the 6 remaining items under Section 4 (Authentication and Identity):
   - Nginx reverse proxy:
     - `/schoolcatering/api/v1/*` -> API
     - `/schoolcatering/*` -> Next web
+- Latest production hotfix status:
+  - SQL wrapper issues in auth/core create/register paths were fixed and redeployed on 2026-02-26.

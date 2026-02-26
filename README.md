@@ -1,6 +1,7 @@
 # Blossom School Catering
 
 Creation date: 2026-02-24  
+Last updated: 2026-02-26  
 Developed by Gaiada.com (C) 2026  
 Repository: `git@github.com-net1io:Gaia-Digital-Agency/blossom_schoolcatering.git`
 
@@ -37,6 +38,25 @@ Blossom School Catering is a mobile-first school meal ordering app for Bali scho
 - Frontend process: `schoolcatering-web`
 - API process: `schoolcatering-api`
 - Database: PostgreSQL on same VM
+
+## Latest Verified State (2026-02-26)
+- Production SQL runtime fixes applied and deployed for:
+  - registration path SQL wrapper issue in auth service
+  - core service insert-returning query wrappers
+- Duplicate-order collision pressure reduced for repeated tests by expanding menu seed horizon (next 120 weekdays).
+- Consolidated QA (39 scenarios):
+  - Passed: 27
+  - Failed: 12
+- Blackout date rule validated:
+  - Admin can set blackout
+  - parent/youngster order attempt on blackout date returns blocked (`ORDER_BLACKOUT_BLOCKED`)
+- Allergen + badge visibility validated:
+  - kitchen order view sees allergens
+  - admin order/detail views include dietary snapshots
+  - parent/youngster badge matrix data visible in admin lists
+- Known production gaps still open:
+  - missing CRUD endpoints for some admin entities (parent, youngster, ingredient, school create/delete, delivery deactivate/delete, menu delete)
+  - receipt generation requires Google credential env to be set on runtime host
 
 ## Implemented Status (Current)
 ### 1) Baseline + Infra
@@ -176,11 +196,13 @@ pm2 restart schoolcatering-web
 ## Key Project Files
 - `plan.md`: section-by-section implementation checklist
 - `progress.md`: dated implementation log
-- `test.md`: latest staging deploy + sweep result
+- `docs/complementary/test.md`: latest staging deploy + sweep result
 - `docs/app_run/start.md`: operational run/start guidance
 - `docs/app_run/access.md`: access rules and role paths
 - `docs/app_run/auth_info.md`: auth implementation details
 - `docs/app_run/db_infor.md`: database/environment records
 - `docs/versioning/CHANGELOG.md`: release changes
 - `docs/versioning/CONTRIBUTING.md`: contribution and deployment process
-- `parents.md`, `youngsters.md`, `delivery.md`, `kitchen.md`: role user guides
+- `docs/guides/parents.md`, `docs/guides/youngsters.md`, `docs/guides/delivery.md`, `docs/guides/kitchen.md`: role user guides
+- `docs/testting/consolidated_test_report.md`: grouped pass/fail QA status
+- `docs/testting/test_login_matrix.md`: seeded-role login matrix for test runs

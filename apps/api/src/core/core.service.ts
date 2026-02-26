@@ -672,8 +672,7 @@ export class CoreService {
     const passwordHash = this.hashPassword(passwordSeed);
 
     const createdOut = await runSql(`
-      SELECT row_to_json(t)::text
-      FROM (
+      WITH inserted AS (
         INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email)
         VALUES (
           'CHILD',
@@ -685,7 +684,9 @@ export class CoreService {
           ${email ? sqlLiteral(email) : 'NULL'}
         )
         RETURNING id, username, role::text, first_name, last_name
-      ) t;
+      )
+      SELECT row_to_json(inserted)::text
+      FROM inserted;
     `);
     const created = this.parseJsonLine<DbUserRow>(createdOut);
 
@@ -696,8 +697,7 @@ export class CoreService {
     `);
 
     const childOut = await runSql(`
-      SELECT row_to_json(t)::text
-      FROM (
+      WITH inserted AS (
         INSERT INTO children (user_id, school_id, date_of_birth, gender, school_grade, photo_url)
         VALUES (
           ${sqlLiteral(created.id)},
@@ -708,7 +708,9 @@ export class CoreService {
           NULL
         )
         RETURNING id, user_id
-      ) t;
+      )
+      SELECT row_to_json(inserted)::text
+      FROM inserted;
     `);
     const child = this.parseJsonLine<{ id: string; user_id: string }>(childOut);
 
@@ -1245,8 +1247,7 @@ export class CoreService {
 
     const menuId = await this.ensureMenuForDateSession(serviceDate, session);
     const itemOut = await runSql(`
-      SELECT row_to_json(t)::text
-      FROM (
+      WITH inserted AS (
         INSERT INTO menu_items (
           menu_id, name, description, nutrition_facts_text, calories_kcal, price, image_url, is_available, display_order, cutlery_required, packing_requirement
         )
@@ -1264,7 +1265,9 @@ export class CoreService {
           ${packingRequirement ? sqlLiteral(packingRequirement) : 'NULL'}
         )
         RETURNING id, name
-      ) t;
+      )
+      SELECT row_to_json(inserted)::text
+      FROM inserted;
     `);
     const item = this.parseJsonLine<{ id: string; name: string }>(itemOut);
 
@@ -1528,8 +1531,7 @@ export class CoreService {
 
     const expiresAtUtc = `${serviceDate}T00:00:00.000Z`;
     const createdOut = await runSql(`
-      SELECT row_to_json(t)::text
-      FROM (
+      WITH inserted AS (
         INSERT INTO order_carts (child_id, created_by_user_id, session, service_date, status, expires_at)
         VALUES (
           ${sqlLiteral(childId)},
@@ -1541,7 +1543,9 @@ export class CoreService {
         )
         RETURNING id, child_id, created_by_user_id, session::text AS session, service_date::text AS service_date,
                   status::text AS status, expires_at::text AS expires_at
-      ) t;
+      )
+      SELECT row_to_json(inserted)::text
+      FROM inserted;
     `);
     return this.parseJsonLine<CartRow>(createdOut);
   }
@@ -1719,8 +1723,7 @@ export class CoreService {
     const totalPrice = items.reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0);
 
     const orderOut = await runSql(`
-      SELECT row_to_json(t)::text
-      FROM (
+      WITH inserted AS (
         INSERT INTO orders (cart_id, child_id, placed_by_user_id, session, service_date, status, total_price, dietary_snapshot)
         VALUES (
           ${sqlLiteral(cart.id)},
@@ -1734,7 +1737,9 @@ export class CoreService {
         )
         RETURNING id, order_number::text, child_id, session::text AS session, service_date::text AS service_date,
                   status::text AS status, total_price, dietary_snapshot, placed_at::text AS placed_at
-      ) t;
+      )
+      SELECT row_to_json(inserted)::text
+      FROM inserted;
     `);
     const order = this.parseJsonLine<{
       id: string;
@@ -2014,8 +2019,7 @@ export class CoreService {
     if (activeCount >= 20) throw new BadRequestException('FAVOURITES_LIMIT_EXCEEDED');
 
     const favOut = await runSql(`
-      SELECT row_to_json(t)::text
-      FROM (
+      WITH inserted AS (
         INSERT INTO favourite_meals (created_by_user_id, child_id, label, session, is_active)
         VALUES (
           ${sqlLiteral(actor.uid)},
@@ -2025,7 +2029,9 @@ export class CoreService {
           true
         )
         RETURNING id, label
-      ) t;
+      )
+      SELECT row_to_json(inserted)::text
+      FROM inserted;
     `);
     const fav = this.parseJsonLine<{ id: string; label: string }>(favOut);
     for (const item of items) {

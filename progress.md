@@ -1,5 +1,43 @@
 # Progress Update
 
+## 2026-02-26 (Production fixes + exhaustive seed/testing + docs sync)
+- Applied and deployed real production fixes for SQL runtime issues:
+  - `apps/api/src/auth/auth.service.ts`
+  - `apps/api/src/core/core.service.ts`
+- Rebuilt and restarted staging runtime:
+  - `schoolcatering-api`
+  - `schoolcatering-web`
+- Expanded seed/menu coverage to reduce repeated-run duplicate order collisions:
+  - increased forward service-day/menu availability window
+  - broader menu item assignment across sessions
+- Added and executed grouped test scripts:
+  - `docs/testting/test_script.mjs`
+  - `docs/testting/admin_crud_test.mjs`
+  - `docs/testting/extra_kitchen_billing_test.mjs`
+  - `docs/testting/allergen_badge_test.mjs`
+  - `docs/testting/consolidated_runner.mjs`
+- Consolidated scenario outcomes:
+  - total: `39`
+  - pass: `27`
+  - fail: `12`
+- Confirmed:
+  - parent and youngster order block on blackout date (`ORDER_BLACKOUT_BLOCKED`)
+  - kitchen sees allergen data on orders
+  - admin sees allergen snapshot and badge tiers in management lists
+- Identified remaining production gaps (not test-script defects):
+  - missing CRUD endpoints for parent/youngster update-delete
+  - missing ingredient create-update-delete
+  - missing school create-delete
+  - missing menu/dish delete
+  - missing delivery deactivate/delete endpoint
+  - receipt generation blocked without Google service credentials in env
+- Updated runtime/testing documentation to reflect latest validated state:
+  - `README.md`
+  - `docs/complementary/test.md`
+  - `docs/testting/consolidated_test_report.md`
+  - `docs/testting/test_login_matrix.md`
+  - `docs/app_run/auth_info.md`
+
 ## 2026-02-26 (Step 6-9 completion hardening + deploy + QA sweep)
 - Implemented admin school activation controls:
   - API: `PATCH /api/v1/admin/schools/:schoolId`
