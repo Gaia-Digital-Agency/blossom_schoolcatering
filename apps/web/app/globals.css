@@ -588,12 +588,50 @@ button:hover,
   padding: 0.8rem;
   margin: 0.9rem 0 1.1rem;
   min-width: 0;
+  display: grid;
+  gap: 0.7rem;
 }
 
 .module-section h2 {
   margin: 0 0 0.7rem;
   padding-bottom: 0.45rem;
   border-bottom: 1px solid #e8dcc8;
+}
+
+.parents-page .module-section > label,
+.parents-page .module-section > input,
+.parents-page .module-section > select,
+.parents-page .module-section > button,
+.parents-page .module-section > p,
+.youngsters-page .module-section > label,
+.youngsters-page .module-section > input,
+.youngsters-page .module-section > select,
+.youngsters-page .module-section > button,
+.youngsters-page .module-section > p {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.parents-page .module-section > label,
+.youngsters-page .module-section > label {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.parents-page .module-section > label input,
+.parents-page .module-section > label select,
+.youngsters-page .module-section > label input,
+.youngsters-page .module-section > label select {
+  width: 100%;
+  min-width: 0;
+}
+
+.parents-page .auth-form span {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
 }
 
 .youngsters-page .auth-panel > label,
