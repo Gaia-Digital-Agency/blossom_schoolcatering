@@ -57,7 +57,7 @@ export default function AdminParentsPage() {
     setMessage('');
     try {
       await apiFetch(`/parents/${selectedParentId}/children/${selectedChildId}/link`, { method: 'POST' });
-      setMessage('Parent-child link saved.');
+      setMessage('Parent-youngster link saved.');
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed');

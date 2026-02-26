@@ -348,7 +348,7 @@ export default function ParentsPage() {
 
   const onRunMealPlanWizard = async () => {
     const dates = wizardDates.split(',').map((x) => x.trim()).filter(Boolean);
-    if (!selectedChildId || !wizardSourceOrderId || dates.length === 0) return setError('Meal plan needs child, source order id, and dates.');
+    if (!selectedChildId || !wizardSourceOrderId || dates.length === 0) return setError('Meal plan needs youngster, source order id, and dates.');
     setError(''); setMessage('');
     try {
       const out = await apiFetch('/meal-plans/wizard', { method: 'POST', body: JSON.stringify({ childId: selectedChildId, sourceOrderId: wizardSourceOrderId, dates }) }) as { successCount: number; failureCount: number };

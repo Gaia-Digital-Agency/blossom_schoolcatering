@@ -182,7 +182,7 @@ export default function AdminDeliveryPage() {
               <label key={a.id}>
                 <strong>{a.service_date} {a.session}</strong>
                 <small>Order: {a.order_id}</small>
-                <small>Child: {a.child_name} | Parent: {a.parent_name}</small>
+                <small>Youngster: {a.child_name} | Parent: {a.parent_name}</small>
                 <small>Status: {a.delivery_status} | Confirmed: {a.confirmed_at || '-'}</small>
               </label>
             ))}

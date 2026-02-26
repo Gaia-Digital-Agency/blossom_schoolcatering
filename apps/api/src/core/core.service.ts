@@ -1010,7 +1010,7 @@ export class CoreService {
     if (actor.role === 'PARENT') {
       const myParentId = await this.getParentIdByUserId(actor.uid);
       if (!myParentId || myParentId !== parentId) {
-        throw new ForbiddenException('Cannot link child to another parent account');
+        throw new ForbiddenException('Cannot link youngster to another parent account');
       }
     }
 
@@ -1031,7 +1031,7 @@ export class CoreService {
           AND deleted_at IS NULL
       );
     `);
-    if (childExists !== 't') throw new NotFoundException('Child not found');
+    if (childExists !== 't') throw new NotFoundException('Youngster not found');
 
     await runSql(`
       INSERT INTO parent_children (parent_id, child_id)
@@ -1494,7 +1494,7 @@ export class CoreService {
     const serviceDate = this.validateServiceDate(input.serviceDate);
     const session = this.normalizeSession(input.session);
     const childId = (input.childId || '').trim();
-    if (!childId) throw new BadRequestException('childId is required');
+    if (!childId) throw new BadRequestException('youngsterId is required');
 
     await this.validateOrderDayRules(serviceDate);
     await this.assertSessionActiveForOrdering(session);

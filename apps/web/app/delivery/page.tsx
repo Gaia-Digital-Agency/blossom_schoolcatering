@@ -104,7 +104,7 @@ export default function DeliveryPage() {
               <label key={row.id}>
                 <strong>{row.service_date} {row.session}</strong>
                 <small>Order: {row.order_id}</small>
-                <small>Child: {row.child_name}</small>
+                <small>Youngster: {row.child_name}</small>
                 <small>Parent: {row.parent_name}</small>
                 <small>Status: {row.delivery_status} | Confirmed: {row.confirmed_at || '-'}</small>
                 <button className="btn btn-primary" type="button" onClick={() => onConfirm(row.id)} disabled={Boolean(row.confirmed_at)}>
