@@ -171,6 +171,7 @@ h1 {
   font-weight: 600;
   border: 1px solid transparent;
   font-size: 0.82rem;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
 }
 
 .btn-primary {
@@ -188,6 +189,28 @@ h1 {
   border-color: #d0c1a5;
   background: #fff;
   color: #302a22;
+}
+
+button:hover,
+.btn:hover {
+  filter: saturate(1.04);
+  transform: translateY(-1px);
+}
+
+.btn-primary:hover {
+  background: #2f271d;
+  color: #fff2d2;
+}
+
+.btn-outline:hover {
+  background: #f0e0c4;
+  color: #35220c;
+  border-color: #9e6b20;
+}
+
+.btn-google:hover {
+  background: #f5f5f5;
+  border-color: #b8b0a2;
 }
 
 .chef-message {
@@ -325,6 +348,7 @@ h1 {
   border: 1px solid #d8cab1;
   border-radius: 0.9rem;
   padding: 1rem;
+  overflow-wrap: anywhere;
 }
 
 .auth-panel h1 {
@@ -361,12 +385,14 @@ h1 {
 .auth-form {
   display: grid;
   gap: 0.7rem;
+  align-items: start;
 }
 
 .auth-form label {
   display: grid;
   gap: 0.25rem;
   font-size: 0.9rem;
+  min-width: 0;
 }
 
 .auth-form input,
@@ -376,6 +402,34 @@ h1 {
   border-radius: 0.55rem;
   padding: 0.45rem 0.65rem;
   background: #fff;
+  min-width: 0;
+}
+
+.auth-form button,
+.auth-form .btn {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.ingredient-selected-box,
+.ingredient-picker-box {
+  border: 1px solid #ccbda2;
+  border-radius: 0.55rem;
+  background: #fff;
+  padding: 0.6rem;
+  min-width: 0;
+}
+
+.ingredient-chip-wrap,
+.ingredient-picker-box {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.ingredient-chip {
+  min-height: 1.9rem;
+  padding-inline: 0.55rem;
 }
 
 .auth-error {

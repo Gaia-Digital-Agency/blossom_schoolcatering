@@ -1291,6 +1291,9 @@ export class CoreService {
     if (caloriesKcal !== null && (!Number.isInteger(caloriesKcal) || caloriesKcal < 0)) {
       throw new BadRequestException('Invalid caloriesKcal');
     }
+    if (ingredientIds.length > 20) {
+      throw new BadRequestException('Maximum 20 ingredients per dish');
+    }
     const imageUrl = await this.resolveMenuImageUrl(rawImageUrl, name);
 
     const menuId = await this.ensureMenuForDateSession(serviceDate, session);
@@ -1375,6 +1378,9 @@ export class CoreService {
     }
     if (caloriesKcal !== null && (!Number.isInteger(caloriesKcal) || caloriesKcal < 0)) {
       throw new BadRequestException('Invalid caloriesKcal');
+    }
+    if (ingredientIds.length > 20) {
+      throw new BadRequestException('Maximum 20 ingredients per dish');
     }
     const imageUrl = await this.resolveMenuImageUrl(rawImageUrl, name);
 
@@ -3818,6 +3824,52 @@ export class CoreService {
   }
 
   // ─── Missing CRUD: Delivery user deactivate ──────────────────────────────
+
+  async createDeliveryUser(
+    actor: AccessUser,
+    input: { username?: string; password?: string; firstName?: string; lastName?: string; phoneNumber?: string; email?: string },
+  ) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    const username = (input.username || '').trim().toLowerCase();
+    const password = (input.password || '').trim();
+    const firstName = (input.firstName || '').trim();
+    const lastName = (input.lastName || '').trim();
+    const phoneNumber = (input.phoneNumber || '').trim();
+    const email = (input.email || '').trim().toLowerCase();
+    if (!username || !password || !firstName || !lastName || !phoneNumber) {
+      throw new BadRequestException('username, password, firstName, lastName, phoneNumber are required');
+    }
+    if (username.length < 3 || password.length < 6) {
+      throw new BadRequestException('Username or password too short');
+    }
+    const exists = await runSql(
+      `SELECT EXISTS (
+         SELECT 1 FROM users
+         WHERE username = $1
+       );`,
+      [username],
+    );
+    if (exists === 't') throw new ConflictException('Username already exists');
+    const passwordHash = this.hashPassword(password);
+    const out = await runSql(
+      `WITH inserted AS (
+         INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email, is_active)
+         VALUES ('DELIVERY', $1, $2, $3, $4, $5, $6, true)
+         RETURNING id, username, first_name, last_name
+       )
+       SELECT row_to_json(inserted)::text FROM inserted;`,
+      [username, passwordHash, firstName, lastName, phoneNumber, email || null],
+    );
+    if (!out) throw new BadRequestException('Failed to create delivery user');
+    const user = this.parseJsonLine<{ id: string; username: string; first_name: string; last_name: string }>(out);
+    await runSql(
+      `INSERT INTO user_preferences (user_id, onboarding_completed, dark_mode_enabled, tooltips_enabled)
+       VALUES ($1, false, false, true)
+       ON CONFLICT (user_id) DO NOTHING;`,
+      [user.id],
+    );
+    return user;
+  }
 
   async deactivateDeliveryUser(actor: AccessUser, targetUserId: string) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');

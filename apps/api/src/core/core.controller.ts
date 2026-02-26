@@ -395,6 +395,15 @@ export class CoreController {
     return this.coreService.getDeliveryUsers();
   }
 
+  @Post('admin/delivery/users')
+  @Roles('ADMIN')
+  createDeliveryUser(
+    @Req() req: AuthRequest,
+    @Body() body: { username?: string; password?: string; firstName?: string; lastName?: string; phoneNumber?: string; email?: string },
+  ) {
+    return this.coreService.createDeliveryUser(req.user, body);
+  }
+
   @Patch('admin/delivery/users/:userId/deactivate')
   @Roles('ADMIN')
   deactivateDeliveryUser(@Req() req: AuthRequest, @Param('userId', ParseUUIDPipe) userId: string) {

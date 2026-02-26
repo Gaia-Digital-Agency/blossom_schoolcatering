@@ -48,11 +48,18 @@ export default function AdminMenuPage() {
   const [itemCutleryRequired, setItemCutleryRequired] = useState(true);
   const [itemPackingRequirement, setItemPackingRequirement] = useState('');
   const [itemIngredientIds, setItemIngredientIds] = useState<string[]>([]);
+  const [ingredientSearch, setIngredientSearch] = useState('');
+  const ingredientLimit = 20;
 
   const selectedIngredientNames = useMemo(
     () => ingredients.filter((i) => itemIngredientIds.includes(i.id)).map((i) => i.name),
     [ingredients, itemIngredientIds],
   );
+  const filteredIngredients = useMemo(() => {
+    const q = ingredientSearch.trim().toLowerCase();
+    if (!q) return ingredients;
+    return ingredients.filter((i) => i.name.toLowerCase().includes(q));
+  }, [ingredients, ingredientSearch]);
 
   const apiFetch = async (path: string, init?: RequestInit) => {
     let token = localStorage.getItem(ACCESS_KEY);
@@ -104,6 +111,7 @@ export default function AdminMenuPage() {
     setItemCutleryRequired(true);
     setItemPackingRequirement('');
     setItemIngredientIds([]);
+    setIngredientSearch('');
   };
 
   const onImageUpload = async (file?: File | null) => {
@@ -121,6 +129,10 @@ export default function AdminMenuPage() {
     e.preventDefault();
     setError('');
     setMessage('');
+    if (itemIngredientIds.length > ingredientLimit) {
+      setError(`Maximum ${ingredientLimit} ingredients per dish.`);
+      return;
+    }
     const payload = {
       serviceDate: menuServiceDate,
       session: menuSession,
@@ -145,6 +157,17 @@ export default function AdminMenuPage() {
     }
     resetForm();
     await loadMenuData();
+  };
+
+  const onToggleIngredient = (ingredientId: string) => {
+    setItemIngredientIds((prev) => {
+      if (prev.includes(ingredientId)) return prev.filter((id) => id !== ingredientId);
+      if (prev.length >= ingredientLimit) {
+        setError(`Maximum ${ingredientLimit} ingredients per dish.`);
+        return prev;
+      }
+      return [...prev, ingredientId];
+    });
   };
 
   const onSeed = async () => {
@@ -197,12 +220,44 @@ export default function AdminMenuPage() {
           <label>Display Order<input type="number" min={0} value={itemDisplayOrder} onChange={(e) => setItemDisplayOrder(e.target.value)} required /></label>
           <label>Image URL / Data URL<input value={itemImageUrl} onChange={(e) => setItemImageUrl(e.target.value)} required /></label>
           <label>Upload Image<input type="file" accept="image/*" onChange={(e) => onImageUpload(e.target.files?.[0])} /></label>
-          <label>
-            Ingredients
-            <select multiple value={itemIngredientIds} onChange={(e) => setItemIngredientIds(Array.from(e.target.selectedOptions).map((opt) => opt.value))}>
-              {ingredients.map((i) => (<option key={i.id} value={i.id}>{i.name}{i.allergen_flag ? ' (allergen)' : ''}</option>))}
-            </select>
+          <label>Ingredient Search
+            <input
+              value={ingredientSearch}
+              onChange={(e) => setIngredientSearch(e.target.value)}
+              placeholder="Search ingredient..."
+            />
           </label>
+          <div className="ingredient-selected-box">
+            <strong>Selected Ingredients ({itemIngredientIds.length}/{ingredientLimit})</strong>
+            <div className="ingredient-chip-wrap">
+              {itemIngredientIds.length === 0 ? <small>-</small> : null}
+              {itemIngredientIds.map((id) => {
+                const ing = ingredients.find((x) => x.id === id);
+                if (!ing) return null;
+                return (
+                  <button key={id} className="btn btn-outline ingredient-chip" type="button" onClick={() => onToggleIngredient(id)}>
+                    {ing.name}{ing.allergen_flag ? ' (allergen)' : ''} x
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="ingredient-picker-box">
+            {filteredIngredients.map((i) => {
+              const active = itemIngredientIds.includes(i.id);
+              return (
+                <button
+                  key={i.id}
+                  type="button"
+                  className={`btn ${active ? 'btn-primary' : 'btn-outline'}`}
+                  onClick={() => onToggleIngredient(i.id)}
+                >
+                  {i.name}{i.allergen_flag ? ' (allergen)' : ''}
+                </button>
+              );
+            })}
+            {filteredIngredients.length === 0 ? <small>No ingredients found.</small> : null}
+          </div>
           <small>Selected: {selectedIngredientNames.join(', ') || '-'}</small>
           <label>Cutlery Required<input type="checkbox" checked={itemCutleryRequired} onChange={(e) => setItemCutleryRequired(e.target.checked)} /></label>
           <label>Packing Requirement<input value={itemPackingRequirement} onChange={(e) => setItemPackingRequirement(e.target.value)} /></label>

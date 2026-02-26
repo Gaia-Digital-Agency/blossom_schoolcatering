@@ -43,6 +43,14 @@ export default function AdminDeliveryPage() {
   const [selectedSchoolId, setSelectedSchoolId] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [newUsername, setNewUsername] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [newFirstName, setNewFirstName] = useState('');
+  const [newLastName, setNewLastName] = useState('');
+  const [newPhoneNumber, setNewPhoneNumber] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [creatingUser, setCreatingUser] = useState(false);
+  const [deactivatingUserId, setDeactivatingUserId] = useState('');
 
   const apiFetch = async (path: string, init?: RequestInit) => {
     let token = localStorage.getItem(ACCESS_KEY);
@@ -126,6 +134,56 @@ export default function AdminDeliveryPage() {
     } catch (e) { setError(e instanceof Error ? e.message : 'Failed auto-assignment'); }
   };
 
+  const onCreateDeliveryUser = async () => {
+    setError('');
+    setMessage('');
+    if (!newUsername.trim() || !newPassword.trim() || !newFirstName.trim() || !newLastName.trim() || !newPhoneNumber.trim()) {
+      setError('username, password, first name, last name, phone number are required');
+      return;
+    }
+    setCreatingUser(true);
+    try {
+      const out = await apiFetch('/admin/delivery/users', {
+        method: 'POST',
+        body: JSON.stringify({
+          username: newUsername.trim(),
+          password: newPassword.trim(),
+          firstName: newFirstName.trim(),
+          lastName: newLastName.trim(),
+          phoneNumber: newPhoneNumber.trim(),
+          email: newEmail.trim() || undefined,
+        }),
+      }) as { username: string };
+      setMessage(`Delivery user created: ${out.username}`);
+      setNewUsername('');
+      setNewPassword('');
+      setNewFirstName('');
+      setNewLastName('');
+      setNewPhoneNumber('');
+      setNewEmail('');
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed creating delivery user');
+    } finally {
+      setCreatingUser(false);
+    }
+  };
+
+  const onDeactivateDeliveryUser = async (user: DeliveryUser) => {
+    setError('');
+    setMessage('');
+    setDeactivatingUserId(user.id);
+    try {
+      await apiFetch(`/admin/delivery/users/${user.id}/deactivate`, { method: 'PATCH' });
+      setMessage(`Delivery user deactivated: ${user.username}`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed deactivating delivery user');
+    } finally {
+      setDeactivatingUserId('');
+    }
+  };
+
   return (
     <main className="page-auth page-auth-desktop">
       <section className="auth-panel">
@@ -135,6 +193,34 @@ export default function AdminDeliveryPage() {
         {error ? <p className="auth-error">{error}</p> : null}
 
         <h2>School To Deliverer Mapping</h2>
+        <div className="auth-form">
+          <label>Username<input value={newUsername} onChange={(e) => setNewUsername(e.target.value)} /></label>
+          <label>Password<input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} /></label>
+          <label>First Name<input value={newFirstName} onChange={(e) => setNewFirstName(e.target.value)} /></label>
+          <label>Last Name<input value={newLastName} onChange={(e) => setNewLastName(e.target.value)} /></label>
+          <label>Phone Number<input value={newPhoneNumber} onChange={(e) => setNewPhoneNumber(e.target.value)} /></label>
+          <label>Email<input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} /></label>
+          <button className="btn btn-primary" type="button" onClick={onCreateDeliveryUser} disabled={creatingUser}>
+            {creatingUser ? 'Creating...' : 'Create Delivery User'}
+          </button>
+        </div>
+        <div className="auth-form">
+          {users.map((u) => (
+            <label key={u.id}>
+              <strong>{u.first_name} {u.last_name}</strong>
+              <small>{u.username}</small>
+              <button
+                className="btn btn-outline"
+                type="button"
+                onClick={() => onDeactivateDeliveryUser(u)}
+                disabled={deactivatingUserId === u.id}
+              >
+                {deactivatingUserId === u.id ? 'Deactivating...' : 'Deactivate User'}
+              </button>
+            </label>
+          ))}
+        </div>
+
         <label>
           School
           <select value={selectedSchoolId} onChange={(e) => setSelectedSchoolId(e.target.value)}>

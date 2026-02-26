@@ -14,6 +14,12 @@ export default function AdminSchoolsPage() {
   const [message, setMessage] = useState('');
   const [savingSchoolId, setSavingSchoolId] = useState('');
   const [savingSession, setSavingSession] = useState('');
+  const [newSchoolName, setNewSchoolName] = useState('');
+  const [newSchoolCity, setNewSchoolCity] = useState('');
+  const [newSchoolAddress, setNewSchoolAddress] = useState('');
+  const [newSchoolContactEmail, setNewSchoolContactEmail] = useState('');
+  const [creatingSchool, setCreatingSchool] = useState(false);
+  const [deletingSchoolId, setDeletingSchoolId] = useState('');
 
   const apiFetch = async (path: string, init?: RequestInit) => {
     let token = localStorage.getItem(ACCESS_KEY);
@@ -73,6 +79,52 @@ export default function AdminSchoolsPage() {
     }
   };
 
+  const onCreateSchool = async () => {
+    setError('');
+    setMessage('');
+    if (!newSchoolName.trim()) {
+      setError('School name is required');
+      return;
+    }
+    setCreatingSchool(true);
+    try {
+      await apiFetch('/admin/schools', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: newSchoolName.trim(),
+          city: newSchoolCity.trim() || undefined,
+          address: newSchoolAddress.trim() || undefined,
+          contactEmail: newSchoolContactEmail.trim() || undefined,
+        }),
+      });
+      setNewSchoolName('');
+      setNewSchoolCity('');
+      setNewSchoolAddress('');
+      setNewSchoolContactEmail('');
+      setMessage('School created.');
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed');
+    } finally {
+      setCreatingSchool(false);
+    }
+  };
+
+  const onDeleteSchool = async (school: School) => {
+    setError('');
+    setMessage('');
+    setDeletingSchoolId(school.id);
+    try {
+      await apiFetch(`/admin/schools/${school.id}`, { method: 'DELETE' });
+      setMessage(`School deleted: ${school.name}`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed');
+    } finally {
+      setDeletingSchoolId('');
+    }
+  };
+
   const onToggleSession = async (session: SessionSetting, isActive: boolean) => {
     if (session.session === 'LUNCH' && !isActive) return;
     setSavingSession(session.session);
@@ -129,6 +181,15 @@ export default function AdminSchoolsPage() {
         </div>
         <h2>Schools</h2>
         <div className="auth-form">
+          <label>School Name<input value={newSchoolName} onChange={(e) => setNewSchoolName(e.target.value)} /></label>
+          <label>City<input value={newSchoolCity} onChange={(e) => setNewSchoolCity(e.target.value)} /></label>
+          <label>Address<input value={newSchoolAddress} onChange={(e) => setNewSchoolAddress(e.target.value)} /></label>
+          <label>Contact Email<input value={newSchoolContactEmail} onChange={(e) => setNewSchoolContactEmail(e.target.value)} /></label>
+          <button className="btn btn-primary" type="button" onClick={onCreateSchool} disabled={creatingSchool}>
+            {creatingSchool ? 'Creating...' : 'Create School'}
+          </button>
+        </div>
+        <div className="auth-form">
           {schools.map((school) => (
             <label key={school.id}>
               <strong>{school.name}</strong>
@@ -154,6 +215,14 @@ export default function AdminSchoolsPage() {
                   Activate
                 </button>
               )}
+              <button
+                className="btn btn-outline"
+                type="button"
+                onClick={() => onDeleteSchool(school)}
+                disabled={deletingSchoolId === school.id}
+              >
+                {deletingSchoolId === school.id ? 'Deleting...' : 'Delete'}
+              </button>
             </label>
           ))}
           {schools.length === 0 ? <p className="auth-help">No schools found.</p> : null}
