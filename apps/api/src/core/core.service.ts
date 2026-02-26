@@ -2756,14 +2756,24 @@ export class CoreService {
        DO UPDATE SET is_active = EXCLUDED.is_active, updated_at = now();`,
       [deliveryUserId, schoolId, isActive],
     );
+    // Keep school->delivery routing deterministic: only one active delivery user per school.
+    if (isActive) {
+      await runSql(
+        `UPDATE delivery_school_assignments
+         SET is_active = false,
+             updated_at = now()
+         WHERE school_id = $1
+           AND delivery_user_id <> $2
+           AND is_active = true;`,
+        [schoolId, deliveryUserId],
+      );
+    }
+    await this.autoAssignDeliveriesForDate(new Date().toISOString().slice(0, 10));
     return { ok: true };
   }
 
-  async autoAssignDeliveries(actor: AccessUser, dateRaw?: string) {
-    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+  private async autoAssignDeliveriesForDate(serviceDate: string) {
     await this.ensureDeliverySchoolAssignmentsTable();
-    const serviceDate = dateRaw ? this.validateServiceDate(dateRaw) : new Date().toISOString().slice(0, 10);
-
     const ordersOut = await runSql(
       `
       SELECT row_to_json(t)::text
@@ -2853,6 +2863,12 @@ export class CoreService {
     return { ok: true, serviceDate, assignedCount, skippedOrderIds };
   }
 
+  async autoAssignDeliveries(actor: AccessUser, dateRaw?: string) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    const serviceDate = dateRaw ? this.validateServiceDate(dateRaw) : new Date().toISOString().slice(0, 10);
+    return this.autoAssignDeliveriesForDate(serviceDate);
+  }
+
   async assignDelivery(actor: AccessUser, input: { orderIds?: string[]; deliveryUserId?: string }) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     const orderIds = Array.isArray(input.orderIds) ? input.orderIds.filter(Boolean) : [];
@@ -2885,11 +2901,20 @@ export class CoreService {
   async getDeliveryAssignments(actor: AccessUser, dateRaw?: string) {
     if (!['DELIVERY', 'ADMIN'].includes(actor.role)) throw new ForbiddenException('Role not allowed');
     const serviceDate = dateRaw ? this.validateServiceDate(dateRaw) : null;
+    await this.autoAssignDeliveriesForDate(serviceDate || new Date().toISOString().slice(0, 10));
     const params: unknown[] = [];
     const roleFilter = actor.role === 'DELIVERY'
       ? (() => {
           params.push(actor.uid);
-          return `AND da.delivery_user_id = $${params.length}`;
+          const deliveryParamIdx = params.length;
+          return `AND da.delivery_user_id = $${deliveryParamIdx}
+                  AND EXISTS (
+                    SELECT 1
+                    FROM delivery_school_assignments dsa
+                    WHERE dsa.delivery_user_id = $${deliveryParamIdx}
+                      AND dsa.school_id = c.school_id
+                      AND dsa.is_active = true
+                  )`;
         })()
       : '';
     const dateFilter = serviceDate
