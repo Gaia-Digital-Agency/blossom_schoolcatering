@@ -961,11 +961,11 @@ export class CoreService {
     const conditions: string[] = [];
     if (query.fromDate) {
       params.push(this.validateServiceDate(query.fromDate));
-      conditions.push(`b.blackout_date >= $${params.length}`);
+      conditions.push(`b.blackout_date >= $${params.length}::date`);
     }
     if (query.toDate) {
       params.push(this.validateServiceDate(query.toDate));
-      conditions.push(`b.blackout_date <= $${params.length}`);
+      conditions.push(`b.blackout_date <= $${params.length}::date`);
     }
     const whereSql = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const out = await runSql(
@@ -1674,7 +1674,7 @@ export class CoreService {
     }
     if (query.serviceDate) {
       params.push(this.validateServiceDate(query.serviceDate));
-      conditions.push(`oc.service_date = $${params.length}`);
+      conditions.push(`oc.service_date = $${params.length}::date`);
     }
     if (query.session) {
       params.push(this.normalizeSession(query.session));
@@ -1783,7 +1783,7 @@ export class CoreService {
            AND mi.deleted_at IS NULL
            AND m.is_published = true
            AND m.deleted_at IS NULL
-           AND m.service_date = $${ids.length + 1}
+           AND m.service_date = $${ids.length + 1}::date
            AND m.session = $${ids.length + 2}::session_type;`,
         [...ids, cart.service_date, cart.session],
       );
@@ -2301,7 +2301,7 @@ export class CoreService {
             AND mi.deleted_at IS NULL
             AND m.is_published = true
             AND m.deleted_at IS NULL
-            AND m.service_date = $${ids.length + 1}
+            AND m.service_date = $${ids.length + 1}::date
             AND m.session = $${ids.length + 2}::session_type
         ) t;
       `,
@@ -2464,7 +2464,7 @@ export class CoreService {
             AND mi.deleted_at IS NULL
             AND m.is_published = true
             AND m.deleted_at IS NULL
-            AND m.service_date = $${ids.length + 1}
+            AND m.service_date = $${ids.length + 1}::date
             AND m.session = $${ids.length + 2}::session_type
         ) t;
       `,
@@ -2991,7 +2991,7 @@ export class CoreService {
     const dateFilter = serviceDate
       ? (() => {
           params.push(serviceDate);
-          return `AND o.service_date = $${params.length}`;
+          return `AND o.service_date = $${params.length}::date`;
         })()
       : '';
     const out = await runSql(
@@ -3236,7 +3236,7 @@ export class CoreService {
           AND mi.deleted_at IS NULL
           AND m.is_published = true
           AND m.deleted_at IS NULL
-          AND m.service_date = $${ids.length + 1}
+          AND m.service_date = $${ids.length + 1}::date
           AND m.session = $${ids.length + 2}::session_type
       ) t;
     `,
