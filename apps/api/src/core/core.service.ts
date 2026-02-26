@@ -547,15 +547,16 @@ export class CoreService {
     if (typeof isActive !== 'boolean') throw new BadRequestException('isActive must be boolean');
 
     const out = await runSql(`
-      SELECT row_to_json(t)::text
-      FROM (
+      WITH updated AS (
         UPDATE schools
         SET is_active = ${isActive ? 'true' : 'false'},
             updated_at = now()
         WHERE id = ${sqlLiteral(id)}
           AND deleted_at IS NULL
         RETURNING id, name, city, address, is_active
-      ) t;
+      )
+      SELECT row_to_json(updated)::text
+      FROM updated;
     `);
     if (!out) throw new NotFoundException('School not found');
     return this.parseJsonLine(out);
@@ -583,14 +584,15 @@ export class CoreService {
     }
     await this.ensureSessionSettingsTable();
     const out = await runSql(`
-      SELECT row_to_json(t)::text
-      FROM (
+      WITH updated AS (
         UPDATE session_settings
         SET is_active = ${isActive ? 'true' : 'false'},
             updated_at = now()
         WHERE session = ${sqlLiteral(session)}::session_type
         RETURNING session::text AS session, is_active
-      ) t;
+      )
+      SELECT row_to_json(updated)::text
+      FROM updated;
     `);
     if (!out) throw new NotFoundException('Session setting not found');
     return this.parseJsonLine<{ session: SessionType; is_active: boolean }>(out);
@@ -935,8 +937,7 @@ export class CoreService {
     }
 
     const out = await runSql(`
-      SELECT row_to_json(t)::text
-      FROM (
+      WITH upserted AS (
         INSERT INTO blackout_days (blackout_date, type, reason, created_by)
         VALUES (
           DATE ${sqlLiteral(blackoutDate)},
@@ -947,7 +948,9 @@ export class CoreService {
         ON CONFLICT (blackout_date)
         DO UPDATE SET type = EXCLUDED.type, reason = EXCLUDED.reason, updated_at = now()
         RETURNING id, blackout_date::text AS blackout_date, type::text AS type, reason
-      ) t;
+      )
+      SELECT row_to_json(upserted)::text
+      FROM upserted;
     `);
     return this.parseJsonLine(out);
   }
@@ -1134,7 +1137,7 @@ export class CoreService {
           AND mi.is_available = true
           AND mi.deleted_at IS NULL
           ${filterSql}
-        GROUP BY mi.id
+        GROUP BY mi.id, m.session
         ORDER BY m.session ASC, mi.display_order ASC, mi.name ASC
       ) t;
     `);
@@ -2565,6 +2568,28 @@ export class CoreService {
     const schoolId = (input.schoolId || '').trim();
     if (!deliveryUserId || !schoolId) throw new BadRequestException('deliveryUserId and schoolId are required');
     const isActive = input.isActive !== false;
+
+    const deliveryExists = await runSql(`
+      SELECT EXISTS (
+        SELECT 1
+        FROM users
+        WHERE id = ${sqlLiteral(deliveryUserId)}
+          AND role = 'DELIVERY'
+          AND is_active = true
+      );
+    `);
+    if (deliveryExists !== 't') throw new BadRequestException('Delivery user not found or inactive');
+
+    const schoolExists = await runSql(`
+      SELECT EXISTS (
+        SELECT 1
+        FROM schools
+        WHERE id = ${sqlLiteral(schoolId)}
+          AND deleted_at IS NULL
+      );
+    `);
+    if (schoolExists !== 't') throw new BadRequestException('School not found');
+
     await runSql(`
       INSERT INTO delivery_school_assignments (delivery_user_id, school_id, is_active, updated_at)
       VALUES (${sqlLiteral(deliveryUserId)}, ${sqlLiteral(schoolId)}, ${isActive ? 'true' : 'false'}, now())
