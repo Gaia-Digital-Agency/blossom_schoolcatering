@@ -106,8 +106,6 @@ export default function ParentsPage() {
   const [nowMs, setNowMs] = useState(Date.now());
 
   const [searchText, setSearchText] = useState('');
-  const [priceMin, setPriceMin] = useState('');
-  const [priceMax, setPriceMax] = useState('');
   const [favouritesOnly, setFavouritesOnly] = useState(false);
 
   const [draftCartId, setDraftCartId] = useState('');
@@ -155,6 +153,26 @@ export default function ParentsPage() {
     const fullName = `${selected.first_name} ${selected.last_name}`.trim();
     return (spending.byChild || []).filter((row) => row.child_name === fullName);
   }, [spending, selectedChildId, children]);
+  const searchResults = useMemo(() => {
+    const needle = searchText.trim().toLowerCase();
+    return (menuItems || []).filter((item) => {
+      if (favouritesOnly) {
+        const favouriteMenuIds = new Set(
+          favourites.flatMap((f) => (f.items || []).map((i) => i.menu_item_id)),
+        );
+        if (!favouriteMenuIds.has(item.id)) return false;
+      }
+      if (!needle) return true;
+      return item.name.toLowerCase().includes(needle) || item.description.toLowerCase().includes(needle);
+    });
+  }, [menuItems, searchText, favouritesOnly, favourites]);
+  const draftItems = useMemo(() => {
+    const index = new Map(menuItems.map((m) => [m.id, m]));
+    return Object.entries(itemQty)
+      .filter(([, qty]) => qty > 0)
+      .map(([id, qty]) => ({ menuItem: index.get(id), id, qty }))
+      .filter((x) => Boolean(x.menuItem));
+  }, [itemQty, menuItems]);
 
   const apiFetch = async (path: string, init?: RequestInit) => {
     let token = localStorage.getItem(ACCESS_KEY);
@@ -224,19 +242,18 @@ export default function ParentsPage() {
     return () => window.clearInterval(timer);
   }, []);
 
-  const onLoadMenu = async () => {
+  const onAddDraftItem = (menuItemId: string) => {
+    const alreadySelected = Object.values(itemQty).filter((qty) => qty > 0).length;
+    if (!itemQty[menuItemId] && alreadySelected >= 5) {
+      setError('Maximum 5 items per cart/order.');
+      return;
+    }
     setError('');
-    setMessage('');
-    const qs = new URLSearchParams();
-    qs.set('service_date', serviceDate);
-    qs.set('session', session);
-    if (searchText) qs.set('search', searchText);
-    if (priceMin) qs.set('price_min', priceMin);
-    if (priceMax) qs.set('price_max', priceMax);
-    if (favouritesOnly) qs.set('favourites_only', 'true');
-    const data = await apiFetch(`/menus?${qs.toString()}`) as { items: MenuItem[] };
-    setMenuItems(data.items || []);
-    setItemQty({});
+    setItemQty((prev) => ({ ...prev, [menuItemId]: Math.max(1, prev[menuItemId] || 0) }));
+  };
+
+  const onRemoveDraftItem = (menuItemId: string) => {
+    setItemQty((prev) => ({ ...prev, [menuItemId]: 0 }));
   };
 
   const loadDraftItems = async (cartId: string) => {
@@ -461,35 +478,55 @@ export default function ParentsPage() {
           <p className="auth-help">Place-order cutoff countdown: {formatRemaining(placeCutoffMs)} (08:00 Asia/Makassar)</p>
           {draftCartId ? <p className="auth-help">Draft status: {hasOpenDraft ? 'OPEN' : 'EXPIRED'} | Draft countdown: {formatRemaining(draftRemainingMs)}</p> : <p className="auth-help">Draft status: none</p>}
           <label>Session<select value={session} onChange={(e) => setSession(e.target.value as 'LUNCH' | 'SNACK' | 'BREAKFAST')}><option value="LUNCH">LUNCH</option><option value="SNACK">SNACK</option><option value="BREAKFAST">BREAKFAST</option></select></label>
-          <label>Search<input value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="keyword" /></label>
-          <label>Price Min<input type="number" value={priceMin} onChange={(e) => setPriceMin(e.target.value)} /></label>
-          <label>Price Max<input type="number" value={priceMax} onChange={(e) => setPriceMax(e.target.value)} /></label>
+          <label>Search Name Of Dish<input value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="Type dish name..." /></label>
           <label className="checkbox-inline">
             <input type="checkbox" checked={favouritesOnly} onChange={(e) => setFavouritesOnly(e.target.checked)} />
             <span>Favourites Only (Optional)</span>
           </label>
           <p className="auth-help">Tick box meaning: show only menu items that exist in your saved favourite combos.</p>
-          <button className="btn btn-outline" type="button" onClick={onLoadMenu}>Load Menu</button>
+          <button className="btn btn-outline" type="button" onClick={() => loadMenuAndDraft().catch(() => undefined)}>Refresh Menu</button>
           <button className="btn btn-outline" type="button" onClick={onResumeDraft} disabled={!draftCartId || loadingDraft}>{loadingDraft ? 'Loading Draft...' : 'Resume Draft'}</button>
           <button className="btn btn-outline" type="button" onClick={onDiscardDraft} disabled={!draftCartId || loadingDraft}>Discard Draft</button>
 
           {menuItems.length > 0 ? (
-            <div className="auth-form">
-              {menuItems.map((item) => (
-                <label key={item.id}>
-                  <span><strong>{item.name}</strong> - Rp {Number(item.price).toLocaleString('id-ID')}{item.has_allergen ? ' (Contains allergen)' : ''}</span>
-                  <small>{item.description}</small>
-                  <small>{item.nutrition_facts_text}</small>
-                  <small>Ingredients: {item.ingredients.join(', ') || '-'}</small>
-                  <input type="number" min={0} max={5} value={itemQty[item.id] || 0} onChange={(e) => setItemQty((prev) => ({ ...prev, [item.id]: Number(e.target.value || 0) }))} />
-                </label>
-              ))}
-              <p className="auth-help">Selected items: {selectedCount} / 5</p>
-              <label>Favourite Label<input value={favLabel} onChange={(e) => setFavLabel(e.target.value)} placeholder="My combo" /></label>
-              <button className="btn btn-primary" type="button" disabled={submitting || placementExpired} onClick={onPlaceOrder}>{submitting ? 'Placing Order...' : 'Place Order'}</button>
-              <button className="btn btn-outline" type="button" onClick={onSaveFavourite}>Save Favourite Combo (OPTIONAL)</button>
+            <div className="menu-flow-grid">
+              <div className="menu-search-section">
+                <h3>Search Results</h3>
+                {searchResults.length === 0 ? <p className="auth-help">No dishes found.</p> : (
+                  <div className="auth-form">
+                    {searchResults.map((item) => (
+                      <label key={item.id}>
+                        <span><strong>{item.name}</strong> - Rp {Number(item.price).toLocaleString('id-ID')}{item.has_allergen ? ' (Contains allergen)' : ''}</span>
+                        <small>{item.description}</small>
+                        <small>{item.nutrition_facts_text}</small>
+                        <small>Ingredients: {item.ingredients.join(', ') || '-'}</small>
+                        <button className="btn btn-outline" type="button" onClick={() => onAddDraftItem(item.id)}>Add</button>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="menu-draft-section">
+                <h3>Draft Section</h3>
+                {draftItems.length === 0 ? <p className="auth-help">No dishes in draft. Use Add from search results.</p> : (
+                  <div className="auth-form">
+                    {draftItems.map((d) => (
+                      <label key={d.id}>
+                        <span><strong>{d.menuItem?.name}</strong> - Rp {Number(d.menuItem?.price || 0).toLocaleString('id-ID')}</span>
+                        <small>{d.menuItem?.description}</small>
+                        <input type="number" min={0} max={5} value={d.qty} onChange={(e) => setItemQty((prev) => ({ ...prev, [d.id]: Number(e.target.value || 0) }))} />
+                        <button className="btn btn-outline" type="button" onClick={() => onRemoveDraftItem(d.id)}>Remove</button>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                <p className="auth-help">Selected items: {selectedCount} / 5</p>
+                <label>Favourite Label<input value={favLabel} onChange={(e) => setFavLabel(e.target.value)} placeholder="My combo" /></label>
+                <button className="btn btn-primary" type="button" disabled={submitting || placementExpired} onClick={onPlaceOrder}>{submitting ? 'Placing Order...' : 'Place Order'}</button>
+                <button className="btn btn-outline" type="button" onClick={onSaveFavourite}>Save Favourite Combo (OPTIONAL)</button>
+              </div>
             </div>
-          ) : <p className="auth-help">Load menu to start cart drafting.</p>}
+          ) : <p className="auth-help">Loading menu for selected date/session...</p>}
         </div>
 
         <div className="module-section">

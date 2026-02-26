@@ -646,6 +646,33 @@ button:hover,
   min-width: 0;
 }
 
+.menu-flow-grid {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.menu-search-section,
+.menu-draft-section {
+  border: 1px solid #e8dcc8;
+  border-radius: 0.65rem;
+  background: #fffcf7;
+  padding: 0.7rem;
+}
+
+.menu-search-section h3,
+.menu-draft-section h3 {
+  margin: 0 0 0.55rem;
+  font-size: 1rem;
+  color: #3b342b;
+}
+
+@media (min-width: 860px) {
+  .menu-flow-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+}
+
 .youngsters-page .auth-panel > label,
 .youngsters-page .auth-panel > input,
 .youngsters-page .auth-panel > select,
