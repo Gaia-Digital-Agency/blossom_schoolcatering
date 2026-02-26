@@ -29,6 +29,7 @@ type OrderItem = {
 };
 type ConsolidatedOrder = {
   id: string;
+  child_id: string;
   child_name: string;
   session: 'LUNCH' | 'SNACK' | 'BREAKFAST';
   service_date: string;
@@ -49,6 +50,7 @@ type Favourite = {
 type BillingRow = {
   id: string;
   order_id: string;
+  child_id: string;
   status: 'UNPAID' | 'PENDING_VERIFICATION' | 'VERIFIED' | 'REJECTED';
   delivery_status: string;
   service_date: string;
@@ -137,6 +139,22 @@ export default function ParentsPage() {
   const placementExpired = placeCutoffMs <= 0;
   const editExpired = Boolean(editServiceDate) && editCutoffMs <= 0;
   const hasOpenDraft = Boolean(draftCartId) && draftRemainingMs > 0;
+  const visibleOrders = useMemo(
+    () => (selectedChildId ? orders.filter((o) => o.child_id === selectedChildId) : orders),
+    [orders, selectedChildId],
+  );
+  const visibleBillings = useMemo(
+    () => (selectedChildId ? billings.filter((b) => b.child_id === selectedChildId) : billings),
+    [billings, selectedChildId],
+  );
+  const visibleSpendingByChild = useMemo(() => {
+    if (!spending) return [];
+    if (!selectedChildId) return spending.byChild || [];
+    const selected = children.find((c) => c.id === selectedChildId);
+    if (!selected) return spending.byChild || [];
+    const fullName = `${selected.first_name} ${selected.last_name}`.trim();
+    return (spending.byChild || []).filter((row) => row.child_name === fullName);
+  }, [spending, selectedChildId, children]);
 
   const apiFetch = async (path: string, init?: RequestInit) => {
     let token = localStorage.getItem(ACCESS_KEY);
@@ -495,9 +513,9 @@ export default function ParentsPage() {
           <label>Quick Reorder Target Date<input type="date" value={quickReorderDate} onChange={(e) => setQuickReorderDate(e.target.value)} /></label>
           <button className="btn btn-outline" type="button" onClick={loadOrders} disabled={loadingOrders}>{loadingOrders ? 'Refreshing...' : 'Refresh Orders'}</button>
 
-          {orders.length === 0 ? <p className="auth-help">No orders yet.</p> : (
+          {visibleOrders.length === 0 ? <p className="auth-help">No orders yet for selected youngster.</p> : (
             <div className="auth-form">
-              {orders.map((order) => (
+              {visibleOrders.map((order) => (
                 <label key={order.id}>
                   <span><strong>{order.child_name}</strong> - {order.service_date} {order.session}</span>
                   <small>Order: {order.id}</small>
@@ -540,9 +558,9 @@ export default function ParentsPage() {
         <div className="module-section">
           <h2>Consolidated Billing</h2>
           <button className="btn btn-outline" type="button" onClick={loadBilling}>Refresh Billing</button>
-          {billings.length === 0 ? <p className="auth-help">No billing records.</p> : (
+          {visibleBillings.length === 0 ? <p className="auth-help">No billing records for selected youngster.</p> : (
             <div className="auth-form">
-              {billings.map((b) => (
+              {visibleBillings.map((b) => (
                 <label key={b.id}>
                   <strong>{b.service_date} {b.session}</strong>
                   <small>Order: {b.order_id}</small>
@@ -576,7 +594,7 @@ export default function ParentsPage() {
                 <small>Total Spend: Rp {Number(spending.totalMonthSpend).toLocaleString('id-ID')}</small>
                 <small>Birthdays in 30 days: {(spending.birthdayHighlights || []).map((b) => `${b.child_name} (${b.days_until}d)`).join(', ') || '-'}</small>
               </label>
-              {(spending.byChild || []).map((row) => (
+              {visibleSpendingByChild.map((row) => (
                 <label key={row.child_name}>
                   <strong>{row.child_name}</strong>
                   <small>Orders: {row.orders_count}</small>

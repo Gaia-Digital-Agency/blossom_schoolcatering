@@ -2491,6 +2491,7 @@ export class CoreService {
       FROM (
         SELECT br.id,
                br.order_id,
+               o.child_id,
                br.status::text AS status,
                br.delivery_status::text AS delivery_status,
                br.proof_image_url,
