@@ -544,6 +544,43 @@ button:hover,
   text-decoration: none;
 }
 
+.parents-page .auth-panel > label,
+.parents-page .auth-panel > input,
+.parents-page .auth-panel > select,
+.parents-page .auth-panel > button,
+.parents-page .auth-panel > p {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  margin-bottom: 0.7rem;
+}
+
+.parents-page .auth-panel > label {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.parents-page .auth-panel > label input,
+.parents-page .auth-panel > label select,
+.parents-page .auth-panel > input,
+.parents-page .auth-panel > select {
+  width: 100%;
+  min-width: 0;
+}
+
+.parents-page .auth-form > label,
+.parents-page .auth-form > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.parents-page .auth-form > label > span,
+.parents-page .auth-form > label > small {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 @media (min-width: 860px) {
   html,
   body {
