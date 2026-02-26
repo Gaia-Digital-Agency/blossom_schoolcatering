@@ -536,6 +536,7 @@ export default function ParentsPage() {
 
         <div className="module-section">
           <h2>Favourite Meal Combos</h2>
+          <p className="auth-help">Note: Saves a reusable item set (template).</p>
           <button className="btn btn-outline" type="button" onClick={loadFavourites}>Refresh Favourites</button>
           {favourites.length === 0 ? <p className="auth-help">No favourite combos saved.</p> : (
             <div className="auth-form">
@@ -593,6 +594,7 @@ export default function ParentsPage() {
 
         <div className="module-section">
           <h2>Meal Plan Wizard</h2>
+          <p className="auth-help">Note: Copies one existing order to multiple target dates in one run.</p>
           <label>Source Order ID<input value={wizardSourceOrderId} onChange={(e) => setWizardSourceOrderId(e.target.value)} placeholder="order uuid" /></label>
           <label>Target Dates (comma separated YYYY-MM-DD)<input value={wizardDates} onChange={(e) => setWizardDates(e.target.value)} placeholder="2026-03-02,2026-03-03" /></label>
           <button className="btn btn-outline" type="button" onClick={onRunMealPlanWizard}>Run Meal Plan Wizard</button>
