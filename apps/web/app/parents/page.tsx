@@ -106,7 +106,6 @@ export default function ParentsPage() {
   const [searchText, setSearchText] = useState('');
   const [priceMin, setPriceMin] = useState('');
   const [priceMax, setPriceMax] = useState('');
-  const [allergenExclude, setAllergenExclude] = useState('');
   const [favouritesOnly, setFavouritesOnly] = useState(false);
 
   const [draftCartId, setDraftCartId] = useState('');
@@ -132,7 +131,6 @@ export default function ParentsPage() {
 
   const selectedCount = useMemo(() => Object.values(itemQty).filter((qty) => qty > 0).length, [itemQty]);
   const editSelectedCount = useMemo(() => Object.values(editQty).filter((qty) => qty > 0).length, [editQty]);
-  const selectedChild = useMemo(() => children.find((c) => c.id === selectedChildId) || null, [children, selectedChildId]);
   const placeCutoffMs = getCutoffTimestamp(serviceDate) - nowMs;
   const editCutoffMs = editServiceDate ? getCutoffTimestamp(editServiceDate) - nowMs : 0;
   const draftRemainingMs = draftExpiresAt ? new Date(draftExpiresAt).getTime() - nowMs : 0;
@@ -217,7 +215,6 @@ export default function ParentsPage() {
     if (searchText) qs.set('search', searchText);
     if (priceMin) qs.set('price_min', priceMin);
     if (priceMax) qs.set('price_max', priceMax);
-    if (allergenExclude) qs.set('allergen_exclude', allergenExclude);
     if (favouritesOnly) qs.set('favourites_only', 'true');
     const data = await apiFetch(`/menus?${qs.toString()}`) as { items: MenuItem[] };
     setMenuItems(data.items || []);
@@ -446,12 +443,11 @@ export default function ParentsPage() {
           <p className="auth-help">Place-order cutoff countdown: {formatRemaining(placeCutoffMs)} (08:00 Asia/Makassar)</p>
           {draftCartId ? <p className="auth-help">Draft status: {hasOpenDraft ? 'OPEN' : 'EXPIRED'} | Draft countdown: {formatRemaining(draftRemainingMs)}</p> : <p className="auth-help">Draft status: none</p>}
           <label>Session<select value={session} onChange={(e) => setSession(e.target.value as 'LUNCH' | 'SNACK' | 'BREAKFAST')}><option value="LUNCH">LUNCH</option><option value="SNACK">SNACK</option><option value="BREAKFAST">BREAKFAST</option></select></label>
-          <label>Youngster Allergies<input value={selectedChild?.dietary_allergies || 'No Allergies'} readOnly /></label>
           <label>Search<input value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="keyword" /></label>
           <label>Price Min<input type="number" value={priceMin} onChange={(e) => setPriceMin(e.target.value)} /></label>
           <label>Price Max<input type="number" value={priceMax} onChange={(e) => setPriceMax(e.target.value)} /></label>
-          <label>Allergen Exclude IDs (comma)<input value={allergenExclude} onChange={(e) => setAllergenExclude(e.target.value)} placeholder="uuid,uuid" /></label>
-          <label>Favourites Only<input type="checkbox" checked={favouritesOnly} onChange={(e) => setFavouritesOnly(e.target.checked)} /></label>
+          <label>Favourites Only (Optional)<input type="checkbox" checked={favouritesOnly} onChange={(e) => setFavouritesOnly(e.target.checked)} /></label>
+          <p className="auth-help">Tick box meaning: show only menu items that exist in your saved favourite combos.</p>
           <button className="btn btn-outline" type="button" onClick={onLoadMenu}>Load Menu</button>
           <button className="btn btn-outline" type="button" onClick={onResumeDraft} disabled={!draftCartId || loadingDraft}>{loadingDraft ? 'Loading Draft...' : 'Resume Draft'}</button>
           <button className="btn btn-outline" type="button" onClick={onDiscardDraft} disabled={!draftCartId || loadingDraft}>Discard Draft</button>
