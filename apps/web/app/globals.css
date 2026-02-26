@@ -581,6 +581,46 @@ button:hover,
   word-break: break-word;
 }
 
+.module-section {
+  border: 1px solid #d8cab1;
+  border-radius: 0.75rem;
+  background: #fff;
+  padding: 0.8rem;
+  margin: 0.9rem 0 1.1rem;
+  min-width: 0;
+}
+
+.module-section h2 {
+  margin: 0 0 0.7rem;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid #e8dcc8;
+}
+
+.youngsters-page .auth-panel > label,
+.youngsters-page .auth-panel > input,
+.youngsters-page .auth-panel > select,
+.youngsters-page .auth-panel > button,
+.youngsters-page .auth-panel > p {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  margin-bottom: 0.7rem;
+}
+
+.youngsters-page .auth-panel > label {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.youngsters-page .auth-panel > label input,
+.youngsters-page .auth-panel > label select,
+.youngsters-page .auth-panel > input,
+.youngsters-page .auth-panel > select {
+  width: 100%;
+  min-width: 0;
+}
+
 @media (min-width: 860px) {
   html,
   body {

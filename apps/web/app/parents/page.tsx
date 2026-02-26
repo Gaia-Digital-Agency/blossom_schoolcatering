@@ -466,158 +466,174 @@ export default function ParentsPage() {
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
 
-        <h2>Linked Youngsters</h2>
-        <label>Select Youngster<select value={selectedChildId} onChange={(e) => setSelectedChildId(e.target.value)}><option value="">Select...</option>{children.map((child) => <option key={child.id} value={child.id}>{child.first_name} {child.last_name} ({child.school_grade})</option>)}</select></label>
+        <div className="module-section">
+          <h2>Linked Youngsters</h2>
+          <label>Select Youngster<select value={selectedChildId} onChange={(e) => setSelectedChildId(e.target.value)}><option value="">Select...</option>{children.map((child) => <option key={child.id} value={child.id}>{child.first_name} {child.last_name} ({child.school_grade})</option>)}</select></label>
+        </div>
 
-        <h2>Register Youngster</h2>
-        <form className="auth-form" onSubmit={onRegisterChild}>
-          <label>First Name<input value={childFirstName} onChange={(e) => setChildFirstName(e.target.value)} required /></label>
-          <label>Last Name<input value={childLastName} onChange={(e) => setChildLastName(e.target.value)} required /></label>
-          <label>Phone Number<input value={childPhone} onChange={(e) => setChildPhone(e.target.value)} required /></label>
-          <label>Email (Optional)<input value={childEmail} onChange={(e) => setChildEmail(e.target.value)} /></label>
-          <label>Date of Birth<input type="date" value={childDob} onChange={(e) => setChildDob(e.target.value)} required /></label>
-          <label>Gender<select value={childGender} onChange={(e) => setChildGender(e.target.value)}><option value="MALE">MALE</option><option value="FEMALE">FEMALE</option><option value="OTHER">OTHER</option><option value="UNDISCLOSED">UNDISCLOSED</option></select></label>
-          <label>School<select value={childSchoolId} onChange={(e) => setChildSchoolId(e.target.value)} required><option value="">Select...</option>{schools.map((school) => <option key={school.id} value={school.id}>{school.name}{school.city ? ` (${school.city})` : ''}</option>)}</select></label>
-          <label>Grade<select value={childGrade} onChange={(e) => setChildGrade(e.target.value)} required><option value="">Select grade...</option>{gradeOptions.map((g) => <option key={g} value={`Grade ${g}`}>Grade {g}</option>)}</select></label>
-          <label>Allergies (max 9 words)<input value={childAllergies} onChange={(e) => setChildAllergies(e.target.value)} placeholder="e.g. peanut shrimp" required /></label>
-          <button className="btn btn-primary" type="submit">Create Youngster</button>
-        </form>
+        <div className="module-section">
+          <h2>Register Youngster</h2>
+          <form className="auth-form" onSubmit={onRegisterChild}>
+            <label>First Name<input value={childFirstName} onChange={(e) => setChildFirstName(e.target.value)} required /></label>
+            <label>Last Name<input value={childLastName} onChange={(e) => setChildLastName(e.target.value)} required /></label>
+            <label>Phone Number<input value={childPhone} onChange={(e) => setChildPhone(e.target.value)} required /></label>
+            <label>Email (Optional)<input value={childEmail} onChange={(e) => setChildEmail(e.target.value)} /></label>
+            <label>Date of Birth<input type="date" value={childDob} onChange={(e) => setChildDob(e.target.value)} required /></label>
+            <label>Gender<select value={childGender} onChange={(e) => setChildGender(e.target.value)}><option value="MALE">MALE</option><option value="FEMALE">FEMALE</option><option value="OTHER">OTHER</option><option value="UNDISCLOSED">UNDISCLOSED</option></select></label>
+            <label>School<select value={childSchoolId} onChange={(e) => setChildSchoolId(e.target.value)} required><option value="">Select...</option>{schools.map((school) => <option key={school.id} value={school.id}>{school.name}{school.city ? ` (${school.city})` : ''}</option>)}</select></label>
+            <label>Grade<select value={childGrade} onChange={(e) => setChildGrade(e.target.value)} required><option value="">Select grade...</option>{gradeOptions.map((g) => <option key={g} value={`Grade ${g}`}>Grade {g}</option>)}</select></label>
+            <label>Allergies (max 9 words)<input value={childAllergies} onChange={(e) => setChildAllergies(e.target.value)} placeholder="e.g. peanut shrimp" required /></label>
+            <button className="btn btn-primary" type="submit">Create Youngster</button>
+          </form>
+        </div>
 
-        <h2>Session Menu and Cart</h2>
-        <label>Service Date<input type="date" value={serviceDate} onChange={(e) => setServiceDate(e.target.value)} /></label>
-        <p className="auth-help">Place-order cutoff countdown: {formatRemaining(placeCutoffMs)} (08:00 Asia/Makassar)</p>
-        {draftCartId ? <p className="auth-help">Draft status: {hasOpenDraft ? 'OPEN' : 'EXPIRED'} | Draft countdown: {formatRemaining(draftRemainingMs)}</p> : <p className="auth-help">Draft status: none</p>}
-        <label>Session<select value={session} onChange={(e) => setSession(e.target.value as 'LUNCH' | 'SNACK' | 'BREAKFAST')}><option value="LUNCH">LUNCH</option><option value="SNACK">SNACK</option><option value="BREAKFAST">BREAKFAST</option></select></label>
-        <label>Youngster Allergies<input value={selectedChild?.dietary_allergies || 'No Allergies'} readOnly /></label>
-        <label>Search<input value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="keyword" /></label>
-        <label>Price Min<input type="number" value={priceMin} onChange={(e) => setPriceMin(e.target.value)} /></label>
-        <label>Price Max<input type="number" value={priceMax} onChange={(e) => setPriceMax(e.target.value)} /></label>
-        <label>Allergen Exclude IDs (comma)<input value={allergenExclude} onChange={(e) => setAllergenExclude(e.target.value)} placeholder="uuid,uuid" /></label>
-        <label>Favourites Only<input type="checkbox" checked={favouritesOnly} onChange={(e) => setFavouritesOnly(e.target.checked)} /></label>
-        <button className="btn btn-outline" type="button" onClick={onLoadMenu}>Load Menu</button>
-        <button className="btn btn-outline" type="button" onClick={onResumeDraft} disabled={!draftCartId || loadingDraft}>{loadingDraft ? 'Loading Draft...' : 'Resume Draft'}</button>
-        <button className="btn btn-outline" type="button" onClick={onDiscardDraft} disabled={!draftCartId || loadingDraft}>Discard Draft</button>
+        <div className="module-section">
+          <h2>Session Menu and Cart</h2>
+          <label>Service Date<input type="date" value={serviceDate} onChange={(e) => setServiceDate(e.target.value)} /></label>
+          <p className="auth-help">Place-order cutoff countdown: {formatRemaining(placeCutoffMs)} (08:00 Asia/Makassar)</p>
+          {draftCartId ? <p className="auth-help">Draft status: {hasOpenDraft ? 'OPEN' : 'EXPIRED'} | Draft countdown: {formatRemaining(draftRemainingMs)}</p> : <p className="auth-help">Draft status: none</p>}
+          <label>Session<select value={session} onChange={(e) => setSession(e.target.value as 'LUNCH' | 'SNACK' | 'BREAKFAST')}><option value="LUNCH">LUNCH</option><option value="SNACK">SNACK</option><option value="BREAKFAST">BREAKFAST</option></select></label>
+          <label>Youngster Allergies<input value={selectedChild?.dietary_allergies || 'No Allergies'} readOnly /></label>
+          <label>Search<input value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="keyword" /></label>
+          <label>Price Min<input type="number" value={priceMin} onChange={(e) => setPriceMin(e.target.value)} /></label>
+          <label>Price Max<input type="number" value={priceMax} onChange={(e) => setPriceMax(e.target.value)} /></label>
+          <label>Allergen Exclude IDs (comma)<input value={allergenExclude} onChange={(e) => setAllergenExclude(e.target.value)} placeholder="uuid,uuid" /></label>
+          <label>Favourites Only<input type="checkbox" checked={favouritesOnly} onChange={(e) => setFavouritesOnly(e.target.checked)} /></label>
+          <button className="btn btn-outline" type="button" onClick={onLoadMenu}>Load Menu</button>
+          <button className="btn btn-outline" type="button" onClick={onResumeDraft} disabled={!draftCartId || loadingDraft}>{loadingDraft ? 'Loading Draft...' : 'Resume Draft'}</button>
+          <button className="btn btn-outline" type="button" onClick={onDiscardDraft} disabled={!draftCartId || loadingDraft}>Discard Draft</button>
 
-        {menuItems.length > 0 ? (
-          <div className="auth-form">
-            {menuItems.map((item) => (
-              <label key={item.id}>
-                <span><strong>{item.name}</strong> - Rp {Number(item.price).toLocaleString('id-ID')}{item.has_allergen ? ' (Contains allergen)' : ''}</span>
-                <small>{item.description}</small>
-                <small>{item.nutrition_facts_text}</small>
-                <small>Ingredients: {item.ingredients.join(', ') || '-'}</small>
-                <input type="number" min={0} max={5} value={itemQty[item.id] || 0} onChange={(e) => setItemQty((prev) => ({ ...prev, [item.id]: Number(e.target.value || 0) }))} />
+          {menuItems.length > 0 ? (
+            <div className="auth-form">
+              {menuItems.map((item) => (
+                <label key={item.id}>
+                  <span><strong>{item.name}</strong> - Rp {Number(item.price).toLocaleString('id-ID')}{item.has_allergen ? ' (Contains allergen)' : ''}</span>
+                  <small>{item.description}</small>
+                  <small>{item.nutrition_facts_text}</small>
+                  <small>Ingredients: {item.ingredients.join(', ') || '-'}</small>
+                  <input type="number" min={0} max={5} value={itemQty[item.id] || 0} onChange={(e) => setItemQty((prev) => ({ ...prev, [item.id]: Number(e.target.value || 0) }))} />
+                </label>
+              ))}
+              <p className="auth-help">Selected items: {selectedCount} / 5</p>
+              <label>Favourite Label<input value={favLabel} onChange={(e) => setFavLabel(e.target.value)} placeholder="My combo" /></label>
+              <button className="btn btn-primary" type="button" disabled={submitting || placementExpired} onClick={onPlaceOrder}>{submitting ? 'Placing Order...' : 'Place Order'}</button>
+              <button className="btn btn-outline" type="button" onClick={onSaveFavourite}>Save Favourite Combo</button>
+            </div>
+          ) : <p className="auth-help">Load menu to start cart drafting.</p>}
+        </div>
+
+        <div className="module-section">
+          <h2>Favourite Meal Combos</h2>
+          <button className="btn btn-outline" type="button" onClick={loadFavourites}>Refresh Favourites</button>
+          {favourites.length === 0 ? <p className="auth-help">No favourite combos saved.</p> : (
+            <div className="auth-form">
+              {favourites.map((fav) => (
+                <label key={fav.id}>
+                  <strong>{fav.label}</strong>
+                  <small>Session: {fav.session}</small>
+                  <small>Items: {fav.items.map((i) => `${i.name || i.menu_item_id} x${i.quantity}`).join(', ')}</small>
+                  <button className="btn btn-outline" type="button" onClick={() => onApplyFavourite(fav.id)}>Apply Favourite</button>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="module-section">
+          <h2>Consolidated Orders</h2>
+          <label>Quick Reorder Target Date<input type="date" value={quickReorderDate} onChange={(e) => setQuickReorderDate(e.target.value)} /></label>
+          <button className="btn btn-outline" type="button" onClick={loadOrders} disabled={loadingOrders}>{loadingOrders ? 'Refreshing...' : 'Refresh Orders'}</button>
+
+          {orders.length === 0 ? <p className="auth-help">No orders yet.</p> : (
+            <div className="auth-form">
+              {orders.map((order) => (
+                <label key={order.id}>
+                  <span><strong>{order.child_name}</strong> - {order.service_date} {order.session}</span>
+                  <small>Order: {order.id}</small>
+                  <small>Status: {order.status} | Billing: {order.billing_status || '-'} | Delivery: {order.delivery_status || '-'}</small>
+                  <small>Total: Rp {Number(order.total_price).toLocaleString('id-ID')}</small>
+                  <small>Dietary snapshot source: persisted at order creation/update.</small>
+                  <small>Items: {order.items.map((item) => `${item.item_name_snapshot} x${item.quantity}`).join(', ') || '-'}</small>
+                  {editingOrderId === order.id ? (
+                    <>
+                      <input type="date" value={editServiceDate} onChange={(e) => setEditServiceDate(e.target.value)} />
+                      <small>Edit cutoff countdown: {formatRemaining(editCutoffMs)} (08:00 Asia/Makassar)</small>
+                      <select value={editSession} onChange={(e) => setEditSession(e.target.value as 'LUNCH' | 'SNACK' | 'BREAKFAST')}><option value="LUNCH">LUNCH</option><option value="SNACK">SNACK</option><option value="BREAKFAST">BREAKFAST</option></select>
+                      {editMenuItems.map((item) => <span key={item.id}>{item.name} (Rp {Number(item.price).toLocaleString('id-ID')})<input type="number" min={0} max={5} value={editQty[item.id] || 0} onChange={(e) => setEditQty((prev) => ({ ...prev, [item.id]: Number(e.target.value || 0) }))} /></span>)}
+                      <small>Selected items: {editSelectedCount} / 5</small>
+                      <button className="btn btn-primary" type="button" onClick={onSaveOrderEdit} disabled={submitting || editExpired}>{submitting ? 'Saving...' : 'Save Edit'}</button>
+                      <button className="btn btn-outline" type="button" onClick={() => { setEditingOrderId(''); setEditMenuItems([]); setEditQty({}); }} disabled={submitting}>Cancel</button>
+                    </>
+                  ) : (
+                    <>
+                      <button className="btn btn-outline" type="button" onClick={() => onStartEditOrder(order)} disabled={!order.can_edit || submitting}>Edit Before Cutoff</button>
+                      <button className="btn btn-outline" type="button" onClick={() => onDeleteOrder(order.id)} disabled={!order.can_edit || submitting}>Delete Before Cutoff</button>
+                      <button className="btn btn-outline" type="button" onClick={() => onQuickReorder(order.id)}>Quick Reorder</button>
+                      {!order.can_edit ? <small>Cutoff passed or order status is not editable.</small> : null}
+                    </>
+                  )}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="module-section">
+          <h2>Meal Plan Wizard</h2>
+          <label>Source Order ID<input value={wizardSourceOrderId} onChange={(e) => setWizardSourceOrderId(e.target.value)} placeholder="order uuid" /></label>
+          <label>Target Dates (comma separated YYYY-MM-DD)<input value={wizardDates} onChange={(e) => setWizardDates(e.target.value)} placeholder="2026-03-02,2026-03-03" /></label>
+          <button className="btn btn-outline" type="button" onClick={onRunMealPlanWizard}>Run Meal Plan Wizard</button>
+        </div>
+
+        <div className="module-section">
+          <h2>Consolidated Billing</h2>
+          <button className="btn btn-outline" type="button" onClick={loadBilling}>Refresh Billing</button>
+          {billings.length === 0 ? <p className="auth-help">No billing records.</p> : (
+            <div className="auth-form">
+              {billings.map((b) => (
+                <label key={b.id}>
+                  <strong>{b.service_date} {b.session}</strong>
+                  <small>Order: {b.order_id}</small>
+                  <small>Status: {b.status} | Delivery: {b.delivery_status}</small>
+                  <small>Total: Rp {Number(b.total_price).toLocaleString('id-ID')}</small>
+                  <small>Receipt: {b.receipt_number || '-'}</small>
+                  <input
+                    value={billingProof[b.id] || ''}
+                    onChange={(e) => setBillingProof((prev) => ({ ...prev, [b.id]: e.target.value }))}
+                    placeholder="proof image URL or data URL"
+                  />
+                  <button className="btn btn-outline" type="button" onClick={() => onUploadProof(b.id)}>
+                    Upload Proof
+                  </button>
+                  <button className="btn btn-outline" type="button" onClick={() => onOpenReceipt(b.id)}>
+                    Open Receipt
+                  </button>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="module-section">
+          <h2>Spending Dashboard</h2>
+          <button className="btn btn-outline" type="button" onClick={loadSpending}>Refresh Spending</button>
+          {spending ? (
+            <div className="auth-form">
+              <label>
+                <strong>Month {spending.month}</strong>
+                <small>Total Spend: Rp {Number(spending.totalMonthSpend).toLocaleString('id-ID')}</small>
+                <small>Birthdays in 30 days: {(spending.birthdayHighlights || []).map((b) => `${b.child_name} (${b.days_until}d)`).join(', ') || '-'}</small>
               </label>
-            ))}
-            <p className="auth-help">Selected items: {selectedCount} / 5</p>
-            <button className="btn btn-primary" type="button" disabled={submitting || placementExpired} onClick={onPlaceOrder}>{submitting ? 'Placing Order...' : 'Place Order'}</button>
-            <label>Favourite Label<input value={favLabel} onChange={(e) => setFavLabel(e.target.value)} placeholder="My combo" /></label>
-            <button className="btn btn-outline" type="button" onClick={onSaveFavourite}>Save Favourite Combo</button>
-          </div>
-        ) : <p className="auth-help">Load menu to start cart drafting.</p>}
-
-        <h2>Favourite Meal Combos</h2>
-        <button className="btn btn-outline" type="button" onClick={loadFavourites}>Refresh Favourites</button>
-        {favourites.length === 0 ? <p className="auth-help">No favourite combos saved.</p> : (
-          <div className="auth-form">
-            {favourites.map((fav) => (
-              <label key={fav.id}>
-                <strong>{fav.label}</strong>
-                <small>Session: {fav.session}</small>
-                <small>Items: {fav.items.map((i) => `${i.name || i.menu_item_id} x${i.quantity}`).join(', ')}</small>
-                <button className="btn btn-outline" type="button" onClick={() => onApplyFavourite(fav.id)}>Apply Favourite</button>
-              </label>
-            ))}
-          </div>
-        )}
-
-        <h2>Consolidated Orders</h2>
-        <label>Quick Reorder Target Date<input type="date" value={quickReorderDate} onChange={(e) => setQuickReorderDate(e.target.value)} /></label>
-        <button className="btn btn-outline" type="button" onClick={loadOrders} disabled={loadingOrders}>{loadingOrders ? 'Refreshing...' : 'Refresh Orders'}</button>
-
-        {orders.length === 0 ? <p className="auth-help">No orders yet.</p> : (
-          <div className="auth-form">
-            {orders.map((order) => (
-              <label key={order.id}>
-                <span><strong>{order.child_name}</strong> - {order.service_date} {order.session}</span>
-                <small>Order: {order.id}</small>
-                <small>Status: {order.status} | Billing: {order.billing_status || '-'} | Delivery: {order.delivery_status || '-'}</small>
-                <small>Total: Rp {Number(order.total_price).toLocaleString('id-ID')}</small>
-                <small>Dietary snapshot source: persisted at order creation/update.</small>
-                <small>Items: {order.items.map((item) => `${item.item_name_snapshot} x${item.quantity}`).join(', ') || '-'}</small>
-                {editingOrderId === order.id ? (
-                  <>
-                    <input type="date" value={editServiceDate} onChange={(e) => setEditServiceDate(e.target.value)} />
-                    <small>Edit cutoff countdown: {formatRemaining(editCutoffMs)} (08:00 Asia/Makassar)</small>
-                    <select value={editSession} onChange={(e) => setEditSession(e.target.value as 'LUNCH' | 'SNACK' | 'BREAKFAST')}><option value="LUNCH">LUNCH</option><option value="SNACK">SNACK</option><option value="BREAKFAST">BREAKFAST</option></select>
-                    {editMenuItems.map((item) => <span key={item.id}>{item.name} (Rp {Number(item.price).toLocaleString('id-ID')})<input type="number" min={0} max={5} value={editQty[item.id] || 0} onChange={(e) => setEditQty((prev) => ({ ...prev, [item.id]: Number(e.target.value || 0) }))} /></span>)}
-                    <small>Selected items: {editSelectedCount} / 5</small>
-                    <button className="btn btn-primary" type="button" onClick={onSaveOrderEdit} disabled={submitting || editExpired}>{submitting ? 'Saving...' : 'Save Edit'}</button>
-                    <button className="btn btn-outline" type="button" onClick={() => { setEditingOrderId(''); setEditMenuItems([]); setEditQty({}); }} disabled={submitting}>Cancel</button>
-                  </>
-                ) : (
-                  <>
-                    <button className="btn btn-outline" type="button" onClick={() => onStartEditOrder(order)} disabled={!order.can_edit || submitting}>Edit Before Cutoff</button>
-                    <button className="btn btn-outline" type="button" onClick={() => onDeleteOrder(order.id)} disabled={!order.can_edit || submitting}>Delete Before Cutoff</button>
-                    <button className="btn btn-outline" type="button" onClick={() => onQuickReorder(order.id)}>Quick Reorder</button>
-                    {!order.can_edit ? <small>Cutoff passed or order status is not editable.</small> : null}
-                  </>
-                )}
-              </label>
-            ))}
-          </div>
-        )}
-
-        <h2>Meal Plan Wizard</h2>
-        <label>Source Order ID<input value={wizardSourceOrderId} onChange={(e) => setWizardSourceOrderId(e.target.value)} placeholder="order uuid" /></label>
-        <label>Target Dates (comma separated YYYY-MM-DD)<input value={wizardDates} onChange={(e) => setWizardDates(e.target.value)} placeholder="2026-03-02,2026-03-03" /></label>
-        <button className="btn btn-outline" type="button" onClick={onRunMealPlanWizard}>Run Meal Plan Wizard</button>
-
-        <h2>Consolidated Billing</h2>
-        <button className="btn btn-outline" type="button" onClick={loadBilling}>Refresh Billing</button>
-        {billings.length === 0 ? <p className="auth-help">No billing records.</p> : (
-          <div className="auth-form">
-            {billings.map((b) => (
-              <label key={b.id}>
-                <strong>{b.service_date} {b.session}</strong>
-                <small>Order: {b.order_id}</small>
-                <small>Status: {b.status} | Delivery: {b.delivery_status}</small>
-                <small>Total: Rp {Number(b.total_price).toLocaleString('id-ID')}</small>
-                <small>Receipt: {b.receipt_number || '-'}</small>
-                <input
-                  value={billingProof[b.id] || ''}
-                  onChange={(e) => setBillingProof((prev) => ({ ...prev, [b.id]: e.target.value }))}
-                  placeholder="proof image URL or data URL"
-                />
-                <button className="btn btn-outline" type="button" onClick={() => onUploadProof(b.id)}>
-                  Upload Proof
-                </button>
-                <button className="btn btn-outline" type="button" onClick={() => onOpenReceipt(b.id)}>
-                  Open Receipt
-                </button>
-              </label>
-            ))}
-          </div>
-        )}
-
-        <h2>Spending Dashboard</h2>
-        <button className="btn btn-outline" type="button" onClick={loadSpending}>Refresh Spending</button>
-        {spending ? (
-          <div className="auth-form">
-            <label>
-              <strong>Month {spending.month}</strong>
-              <small>Total Spend: Rp {Number(spending.totalMonthSpend).toLocaleString('id-ID')}</small>
-              <small>Birthdays in 30 days: {(spending.birthdayHighlights || []).map((b) => `${b.child_name} (${b.days_until}d)`).join(', ') || '-'}</small>
-            </label>
-            {(spending.byChild || []).map((row) => (
-              <label key={row.child_name}>
-                <strong>{row.child_name}</strong>
-                <small>Orders: {row.orders_count}</small>
-                <small>Spend: Rp {Number(row.total_spend).toLocaleString('id-ID')}</small>
-              </label>
-            ))}
-          </div>
-        ) : null}
+              {(spending.byChild || []).map((row) => (
+                <label key={row.child_name}>
+                  <strong>{row.child_name}</strong>
+                  <small>Orders: {row.orders_count}</small>
+                  <small>Spend: Rp {Number(row.total_spend).toLocaleString('id-ID')}</small>
+                </label>
+              ))}
+            </div>
+          ) : null}
+        </div>
       </section>
     </main>
   );

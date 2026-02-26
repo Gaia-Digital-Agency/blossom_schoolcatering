@@ -284,7 +284,7 @@ export default function YoungstersPage() {
   }
 
   return (
-    <main className="page-auth page-auth-mobile">
+    <main className="page-auth page-auth-mobile youngsters-page">
       <section className="auth-panel">
         <h1>Youngsters Module (Step 6)</h1>
         {youngster ? (
@@ -295,44 +295,47 @@ export default function YoungstersPage() {
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
 
-        <h2>Weekly Nutrition + Badge</h2>
-        {insights ? (
-          <div className="auth-form">
-            <label>
-              <strong>Clean Plate Club Badge: {insights.badge.level}</strong>
-              <small>Max consecutive order days: {insights.badge.maxConsecutiveOrderDays}</small>
-              <small>Current month orders: {insights.badge.currentMonthOrders}</small>
-            </label>
-            <label>
-              <strong>Nutrition Week {insights.week.start} to {insights.week.end}</strong>
-              <small>Total Calories: {insights.week.totalCalories} kcal</small>
-              <small>Birthday in {insights.birthdayHighlight.days_until} day(s)</small>
-            </label>
-            {insights.week.days.map((d) => (
-              <label key={d.service_date}>
-                <strong>{d.service_date}</strong>
-                <small>Calories: {d.calories_display}</small>
-                <small>{d.tba_items > 0 ? `TBA items: ${d.tba_items}` : 'All calorie data available'}</small>
+        <div className="module-section">
+          <h2>Weekly Nutrition + Badge</h2>
+          {insights ? (
+            <div className="auth-form">
+              <label>
+                <strong>Clean Plate Club Badge: {insights.badge.level}</strong>
+                <small>Max consecutive order days: {insights.badge.maxConsecutiveOrderDays}</small>
+                <small>Current month orders: {insights.badge.currentMonthOrders}</small>
               </label>
-            ))}
-          </div>
-        ) : (
-          <p className="auth-help">Loading nutrition insights...</p>
-        )}
+              <label>
+                <strong>Nutrition Week {insights.week.start} to {insights.week.end}</strong>
+                <small>Total Calories: {insights.week.totalCalories} kcal</small>
+                <small>Birthday in {insights.birthdayHighlight.days_until} day(s)</small>
+              </label>
+              {insights.week.days.map((d) => (
+                <label key={d.service_date}>
+                  <strong>{d.service_date}</strong>
+                  <small>Calories: {d.calories_display}</small>
+                  <small>{d.tba_items > 0 ? `TBA items: ${d.tba_items}` : 'All calorie data available'}</small>
+                </label>
+              ))}
+            </div>
+          ) : (
+            <p className="auth-help">Loading nutrition insights...</p>
+          )}
+        </div>
 
-        <h2>Session Menu and Cart</h2>
-        <label>
-          Service Date
-          <input type="date" value={serviceDate} onChange={(e) => setServiceDate(e.target.value)} />
-        </label>
-        <p className="auth-help">Place-order cutoff countdown: {formatRemaining(cutoffRemainingMs)} (08:00 Asia/Makassar)</p>
-        {draftCartId ? (
-          <p className="auth-help">
-            Draft status: {hasOpenDraft ? 'OPEN' : 'EXPIRED'} | Draft countdown: {formatRemaining(draftRemainingMs)}
-          </p>
-        ) : (
-          <p className="auth-help">Draft status: none</p>
-        )}
+        <div className="module-section">
+          <h2>Session Menu and Cart</h2>
+          <label>
+            Service Date
+            <input type="date" value={serviceDate} onChange={(e) => setServiceDate(e.target.value)} />
+          </label>
+          <p className="auth-help">Place-order cutoff countdown: {formatRemaining(cutoffRemainingMs)} (08:00 Asia/Makassar)</p>
+          {draftCartId ? (
+            <p className="auth-help">
+              Draft status: {hasOpenDraft ? 'OPEN' : 'EXPIRED'} | Draft countdown: {formatRemaining(draftRemainingMs)}
+            </p>
+          ) : (
+            <p className="auth-help">Draft status: none</p>
+          )}
           <label>
             Session
             <select value={session} onChange={(e) => setSession(e.target.value as 'LUNCH' | 'SNACK' | 'BREAKFAST')}>
@@ -346,41 +349,42 @@ export default function YoungstersPage() {
             <input value={youngster?.dietary_allergies || 'No Allergies'} readOnly />
           </label>
           <button className="btn btn-outline" type="button" onClick={onLoadMenu}>Load Menu</button>
-        <button className="btn btn-outline" type="button" onClick={onResumeDraft} disabled={!draftCartId || loadingDraft}>
-          {loadingDraft ? 'Loading Draft...' : 'Resume Draft'}
-        </button>
-        <button className="btn btn-outline" type="button" onClick={onDiscardDraft} disabled={!draftCartId || loadingDraft}>
-          Discard Draft
-        </button>
+          <button className="btn btn-outline" type="button" onClick={onResumeDraft} disabled={!draftCartId || loadingDraft}>
+            {loadingDraft ? 'Loading Draft...' : 'Resume Draft'}
+          </button>
+          <button className="btn btn-outline" type="button" onClick={onDiscardDraft} disabled={!draftCartId || loadingDraft}>
+            Discard Draft
+          </button>
 
-        {menuItems.length > 0 ? (
-          <div className="auth-form">
-            {menuItems.map((item) => (
-              <label key={item.id}>
-                <span>
-                  <strong>{item.name}</strong> - Rp {Number(item.price).toLocaleString('id-ID')}
-                  {item.has_allergen ? ' (Contains allergen)' : ''}
-                </span>
-                <small>{item.description}</small>
-                <small>{item.nutrition_facts_text}</small>
-                <small>Ingredients: {item.ingredients.join(', ') || '-'}</small>
-                <input
-                  type="number"
-                  min={0}
-                  max={5}
-                  value={itemQty[item.id] || 0}
-                  onChange={(e) => setItemQty((prev) => ({ ...prev, [item.id]: Number(e.target.value || 0) }))}
-                />
-              </label>
-            ))}
-            <p className="auth-help">Selected items: {selectedCount} / 5</p>
-            <button className="btn btn-primary" type="button" disabled={submitting || placementExpired} onClick={onPlaceOrder}>
-              {submitting ? 'Placing Order...' : 'Place Order'}
-            </button>
-          </div>
-        ) : (
-          <p className="auth-help">Load menu to start cart drafting.</p>
-        )}
+          {menuItems.length > 0 ? (
+            <div className="auth-form">
+              {menuItems.map((item) => (
+                <label key={item.id}>
+                  <span>
+                    <strong>{item.name}</strong> - Rp {Number(item.price).toLocaleString('id-ID')}
+                    {item.has_allergen ? ' (Contains allergen)' : ''}
+                  </span>
+                  <small>{item.description}</small>
+                  <small>{item.nutrition_facts_text}</small>
+                  <small>Ingredients: {item.ingredients.join(', ') || '-'}</small>
+                  <input
+                    type="number"
+                    min={0}
+                    max={5}
+                    value={itemQty[item.id] || 0}
+                    onChange={(e) => setItemQty((prev) => ({ ...prev, [item.id]: Number(e.target.value || 0) }))}
+                  />
+                </label>
+              ))}
+              <p className="auth-help">Selected items: {selectedCount} / 5</p>
+              <button className="btn btn-primary" type="button" disabled={submitting || placementExpired} onClick={onPlaceOrder}>
+                {submitting ? 'Placing Order...' : 'Place Order'}
+              </button>
+            </div>
+          ) : (
+            <p className="auth-help">Load menu to start cart drafting.</p>
+          )}
+        </div>
       </section>
     </main>
   );
