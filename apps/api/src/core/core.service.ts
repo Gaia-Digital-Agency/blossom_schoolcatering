@@ -2939,7 +2939,8 @@ export class CoreService {
                o.total_price,
                s.name AS school_name,
                (uc.first_name || ' ' || uc.last_name) AS child_name,
-               (up.first_name || ' ' || up.last_name) AS parent_name
+               (up.first_name || ' ' || up.last_name) AS parent_name,
+               COALESCE(NULLIF(TRIM(uc.phone_number), ''), NULLIF(TRIM(up.phone_number), '')) AS youngster_mobile
         FROM delivery_assignments da
         JOIN orders o ON o.id = da.order_id
         JOIN children c ON c.id = o.child_id

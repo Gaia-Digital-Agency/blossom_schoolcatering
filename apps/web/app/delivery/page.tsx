@@ -10,6 +10,7 @@ type Assignment = {
   session: string;
   school_name?: string;
   child_name: string;
+  youngster_mobile?: string | null;
   parent_name: string;
   delivery_status: string;
   confirmed_at?: string | null;
@@ -143,6 +144,7 @@ export default function DeliveryPage() {
                     <strong>{row.service_date} {row.session}</strong>
                     <small>Order: {row.order_id}</small>
                     <small>Youngster: {row.child_name}</small>
+                    <small>Youngster Mobile: {row.youngster_mobile || '-'}</small>
                     <small>Parent: {row.parent_name}</small>
                     <small>Status: {row.delivery_status} | Confirmed: {row.confirmed_at || '-'}</small>
                     <button
