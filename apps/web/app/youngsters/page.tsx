@@ -285,9 +285,6 @@ export default function YoungstersPage() {
             {youngster.first_name} {youngster.last_name} - {youngster.school_name} ({youngster.school_grade})
           </p>
         ) : null}
-        <button className="btn btn-outline" type="button" onClick={() => { window.location.href = '/register/youngsters'; }}>
-          Update Registration Details
-        </button>
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
 
@@ -406,6 +403,12 @@ export default function YoungstersPage() {
           ) : (
             <p className="auth-help">Loading menu for selected date/session...</p>
           )}
+        </div>
+
+        <div className="youngsters-bottom-action">
+          <button className="btn btn-outline" type="button" onClick={() => { window.location.href = '/register/youngsters'; }}>
+            Update Registration Details
+          </button>
         </div>
       </section>
     </main>

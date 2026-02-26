@@ -698,6 +698,21 @@ button:hover,
   min-width: 0;
 }
 
+.youngsters-bottom-action {
+  width: 100%;
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 0.4rem;
+  padding-top: 0.25rem;
+}
+
+.youngsters-bottom-action .btn {
+  width: auto;
+  min-height: 1.8rem;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.74rem;
+}
+
 @media (min-width: 860px) {
   html,
   body {
