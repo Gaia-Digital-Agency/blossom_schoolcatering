@@ -12,7 +12,7 @@
 ## Linked Youngsters
 - Parent-side youngster registration is not required on this page
 - Youngster registration is done at `/schoolcatering/register/youngsters`
-- Linking is auto-synced by matching parent and youngster last name
+- Youngster registration creates or links the parent account and links youngster + parent automatically
 
 ## Ordering
 - Set `Service Date` and `Session`

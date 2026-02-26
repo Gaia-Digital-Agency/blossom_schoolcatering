@@ -25,6 +25,22 @@ type RegisterBody = {
   address?: string;
 };
 
+type YoungsterRegistrationBody = {
+  youngsterFirstName?: string;
+  youngsterLastName?: string;
+  youngsterGender?: string;
+  youngsterDateOfBirth?: string;
+  youngsterSchoolId?: string;
+  youngsterGrade?: string;
+  youngsterPhone?: string;
+  youngsterEmail?: string;
+  parentFirstName?: string;
+  parentLastName?: string;
+  parentMobileNumber?: string;
+  parentEmail?: string;
+  parentAddress?: string;
+};
+
 type RefreshBody = {
   refreshToken?: string;
 };
@@ -143,6 +159,31 @@ export class AuthController {
     });
     this.setRefreshCookie(req, res, result.refreshToken);
     return { accessToken: result.accessToken, user: result.user };
+  }
+
+  @Get('register/schools')
+  async registrationSchools() {
+    return this.authService.getRegistrationSchools();
+  }
+
+  @Post('register/youngsters')
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  async registerYoungsterWithParent(@Body() body: YoungsterRegistrationBody) {
+    return this.authService.registerYoungsterWithParent({
+      youngsterFirstName: body.youngsterFirstName || '',
+      youngsterLastName: body.youngsterLastName || '',
+      youngsterGender: body.youngsterGender || '',
+      youngsterDateOfBirth: body.youngsterDateOfBirth || '',
+      youngsterSchoolId: body.youngsterSchoolId || '',
+      youngsterGrade: body.youngsterGrade || '',
+      youngsterPhone: body.youngsterPhone || '',
+      youngsterEmail: body.youngsterEmail || '',
+      parentFirstName: body.parentFirstName || '',
+      parentLastName: body.parentLastName || '',
+      parentMobileNumber: body.parentMobileNumber || '',
+      parentEmail: body.parentEmail || '',
+      parentAddress: body.parentAddress || '',
+    });
   }
 
   @Post('google/dev')

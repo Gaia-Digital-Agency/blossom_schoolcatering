@@ -47,6 +47,28 @@ type RegisterInput = {
   address?: string;
 };
 
+type RegisterYoungsterWithParentInput = {
+  youngsterFirstName: string;
+  youngsterLastName: string;
+  youngsterGender: string;
+  youngsterDateOfBirth: string;
+  youngsterSchoolId: string;
+  youngsterGrade: string;
+  youngsterPhone: string;
+  youngsterEmail?: string;
+  parentFirstName: string;
+  parentLastName?: string;
+  parentMobileNumber: string;
+  parentEmail: string;
+  parentAddress?: string;
+};
+
+type RegistrationSchoolRow = {
+  id: string;
+  name: string;
+  city: string | null;
+};
+
 const ADMIN_USERNAME = 'admin';
 const ADMIN_PASSWORD = 'admin123';
 const KITCHEN_USERNAME = 'kitchen';
@@ -141,6 +163,56 @@ export class AuthService {
   private parseJsonLine<T>(line: string): T {
     if (!line) throw new UnauthorizedException('No result');
     return JSON.parse(line) as T;
+  }
+
+  private parseJsonLines<T>(lines: string): T[] {
+    if (!lines) return [];
+    return lines
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as T);
+  }
+
+  private sanitizeUsernamePart(raw: string) {
+    return (raw || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9_]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 100) || `user_${Date.now()}`;
+  }
+
+  private buildGeneratedPassword(phoneLike: string) {
+    const digits = (phoneLike || '').replace(/\D/g, '');
+    if (digits.length >= 6) return digits;
+    return `${digits}123456`.slice(0, 6);
+  }
+
+  private async generateUniqueYoungsterLastName(firstName: string, desiredLastName: string) {
+    const rowsOut = await runSql(
+      `SELECT row_to_json(t)::text
+       FROM (
+         SELECT u.last_name
+         FROM children c
+         JOIN users u ON u.id = c.user_id
+         WHERE lower(u.first_name) = lower($1)
+           AND lower(u.last_name) LIKE lower($2) || '%'
+           AND c.deleted_at IS NULL
+           AND u.is_active = true
+       ) t;`,
+      [firstName, desiredLastName],
+    );
+    const rows = this.parseJsonLines<{ last_name: string }>(rowsOut);
+    const existing = new Set(rows.map((r) => (r.last_name || '').toLowerCase()));
+    if (!existing.has(desiredLastName.toLowerCase())) return desiredLastName;
+
+    let suffix = 1;
+    while (suffix < 1000) {
+      const candidate = `${desiredLastName}_${suffix}`;
+      if (!existing.has(candidate.toLowerCase())) return candidate;
+      suffix += 1;
+    }
+    throw new BadRequestException('Unable to generate unique youngster last name');
   }
 
   private async ensureSystemUsers() {
@@ -465,6 +537,235 @@ export class AuthService {
     const user = this.buildUser(created, role);
     const tokens = await this.signTokens(user, created.id);
     return { ...tokens, user };
+  }
+
+  async getRegistrationSchools() {
+    const out = await runSql(
+      `SELECT row_to_json(t)::text
+       FROM (
+         SELECT id, name, city
+         FROM schools
+         WHERE is_active = true
+           AND deleted_at IS NULL
+         ORDER BY name
+       ) t;`,
+    );
+    const rows = this.parseJsonLines<RegistrationSchoolRow>(out);
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      city: row.city || null,
+    }));
+  }
+
+  async registerYoungsterWithParent(input: RegisterYoungsterWithParentInput) {
+    const youngsterFirstName = (input.youngsterFirstName || '').trim();
+    const youngsterLastNameRaw = (input.youngsterLastName || '').trim();
+    const youngsterGender = (input.youngsterGender || '').trim().toUpperCase();
+    const youngsterDateOfBirth = (input.youngsterDateOfBirth || '').trim();
+    const youngsterSchoolId = (input.youngsterSchoolId || '').trim();
+    const youngsterGrade = (input.youngsterGrade || '').trim();
+    const youngsterPhone = (input.youngsterPhone || '').trim();
+    const youngsterEmail = (input.youngsterEmail || '').trim().toLowerCase();
+    const parentFirstName = (input.parentFirstName || '').trim();
+    const parentLastNameInput = (input.parentLastName || '').trim();
+    const parentMobileNumber = (input.parentMobileNumber || '').trim();
+    const parentEmail = (input.parentEmail || '').trim().toLowerCase();
+    const parentAddress = (input.parentAddress || '').trim();
+
+    if (
+      !youngsterFirstName ||
+      !youngsterLastNameRaw ||
+      !youngsterGender ||
+      !youngsterDateOfBirth ||
+      !youngsterSchoolId ||
+      !youngsterGrade ||
+      !youngsterPhone ||
+      !parentFirstName ||
+      !parentMobileNumber ||
+      !parentEmail
+    ) {
+      throw new BadRequestException('Missing required youngster/parent fields');
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(youngsterDateOfBirth)) {
+      throw new BadRequestException('Youngster date of birth must be YYYY-MM-DD');
+    }
+    if (!['MALE', 'FEMALE', 'OTHER', 'UNDISCLOSED'].includes(youngsterGender)) {
+      throw new BadRequestException('Invalid youngster gender');
+    }
+    if (!parentEmail.includes('@')) {
+      throw new BadRequestException('Invalid parent email');
+    }
+    if (youngsterEmail && !youngsterEmail.includes('@')) {
+      throw new BadRequestException('Invalid youngster email');
+    }
+
+    const schoolExists = await runSql(
+      `SELECT EXISTS (
+         SELECT 1 FROM schools
+         WHERE id = $1
+           AND is_active = true
+           AND deleted_at IS NULL
+       );`,
+      [youngsterSchoolId],
+    );
+    if (schoolExists !== 't') {
+      throw new BadRequestException('School not found or inactive');
+    }
+
+    const youngsterLastName = await this.generateUniqueYoungsterLastName(
+      youngsterFirstName,
+      youngsterLastNameRaw,
+    );
+    const parentLastName = parentLastNameInput || youngsterLastNameRaw;
+
+    const existingParentByEmail = await this.findUserByEmail(parentEmail);
+    let parentUserId = '';
+    let parentUsername = '';
+    let parentGeneratedPassword = '';
+    let parentWasExisting = false;
+
+    if (existingParentByEmail) {
+      if (this.appRoleFromDb(existingParentByEmail.role) !== 'PARENT') {
+        throw new BadRequestException('Parent email is already used by another role');
+      }
+      parentWasExisting = true;
+      parentUserId = existingParentByEmail.id;
+      parentUsername = existingParentByEmail.username;
+      const parentProfileExists = await runSql(
+        `SELECT EXISTS (
+           SELECT 1 FROM parents
+           WHERE user_id = $1
+             AND deleted_at IS NULL
+         );`,
+        [parentUserId],
+      );
+      if (parentProfileExists !== 't') {
+        await runSql(
+          `INSERT INTO parents (user_id, address)
+           VALUES ($1, $2);`,
+          [parentUserId, parentAddress || 'Address pending from youngster registration'],
+        );
+      }
+    } else {
+      const parentUsernameBase = this.sanitizeUsernamePart(`${parentFirstName}_${parentLastName}`);
+      parentUsername = await runSql(`SELECT generate_unique_username($1);`, [parentUsernameBase]);
+      parentGeneratedPassword = this.buildGeneratedPassword(parentMobileNumber);
+      const parentPasswordHash = this.hashPassword(parentGeneratedPassword);
+      const parentOut = await runSql(
+        `WITH inserted AS (
+           INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email)
+           VALUES ('PARENT', $1, $2, $3, $4, $5, $6)
+           RETURNING id, username
+         )
+         SELECT row_to_json(inserted)::text
+         FROM inserted;`,
+        [parentUsername, parentPasswordHash, parentFirstName, parentLastName, parentMobileNumber, parentEmail],
+      );
+      const parentCreated = this.parseJsonLine<{ id: string; username: string }>(parentOut);
+      parentUserId = parentCreated.id;
+
+      await runSql(
+        `INSERT INTO user_preferences (user_id, onboarding_completed, dark_mode_enabled, tooltips_enabled)
+         VALUES ($1, false, false, true)
+         ON CONFLICT (user_id) DO NOTHING;`,
+        [parentUserId],
+      );
+      await runSql(
+        `INSERT INTO parents (user_id, address)
+         VALUES ($1, $2);`,
+        [parentUserId, parentAddress || 'Address pending from youngster registration'],
+      );
+    }
+
+    if (youngsterEmail) {
+      const existingYoungsterEmail = await this.findUserByEmail(youngsterEmail);
+      if (existingYoungsterEmail) {
+        throw new BadRequestException('Youngster email already exists');
+      }
+    }
+
+    const parentId = await runSql(
+      `SELECT id
+       FROM parents
+       WHERE user_id = $1
+         AND deleted_at IS NULL
+       LIMIT 1;`,
+      [parentUserId],
+    );
+    if (!parentId) {
+      throw new BadRequestException('Failed to resolve parent profile');
+    }
+
+    const youngsterUsernameBase = this.sanitizeUsernamePart(`${youngsterLastName}_${youngsterFirstName}`);
+    const youngsterUsername = await runSql(`SELECT generate_unique_username($1);`, [youngsterUsernameBase]);
+    const youngsterGeneratedPassword = this.buildGeneratedPassword(youngsterPhone);
+    const youngsterPasswordHash = this.hashPassword(youngsterGeneratedPassword);
+    const youngsterOut = await runSql(
+      `WITH inserted AS (
+         INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email)
+         VALUES ('CHILD', $1, $2, $3, $4, $5, $6)
+         RETURNING id, username, first_name, last_name
+       )
+       SELECT row_to_json(inserted)::text
+       FROM inserted;`,
+      [youngsterUsername, youngsterPasswordHash, youngsterFirstName, youngsterLastName, youngsterPhone, youngsterEmail || null],
+    );
+    const youngsterCreated = this.parseJsonLine<{ id: string; username: string; first_name: string; last_name: string }>(youngsterOut);
+
+    await runSql(
+      `INSERT INTO user_preferences (user_id, onboarding_completed, dark_mode_enabled, tooltips_enabled)
+       VALUES ($1, false, false, true)
+       ON CONFLICT (user_id) DO NOTHING;`,
+      [youngsterCreated.id],
+    );
+
+    const youngsterChildOut = await runSql(
+      `WITH inserted AS (
+         INSERT INTO children (user_id, school_id, date_of_birth, gender, school_grade, photo_url)
+         VALUES ($1, $2, $3::date, $4::gender_type, $5, NULL)
+         RETURNING id
+       )
+       SELECT row_to_json(inserted)::text
+       FROM inserted;`,
+      [youngsterCreated.id, youngsterSchoolId, youngsterDateOfBirth, youngsterGender, youngsterGrade],
+    );
+    const youngsterChild = this.parseJsonLine<{ id: string }>(youngsterChildOut);
+
+    await runSql(
+      `INSERT INTO parent_children (parent_id, child_id)
+       VALUES ($1, $2)
+       ON CONFLICT (parent_id, child_id) DO NOTHING;`,
+      [parentId, youngsterChild.id],
+    );
+
+    return {
+      parent: {
+        userId: parentUserId,
+        username: parentUsername,
+        generatedPassword: parentGeneratedPassword || null,
+        firstName: parentFirstName,
+        lastName: parentLastName,
+        mobileNumber: parentMobileNumber,
+        email: parentEmail,
+        existed: parentWasExisting,
+      },
+      youngster: {
+        userId: youngsterCreated.id,
+        childId: youngsterChild.id,
+        username: youngsterCreated.username,
+        generatedPassword: youngsterGeneratedPassword,
+        firstName: youngsterFirstName,
+        requestedLastName: youngsterLastNameRaw,
+        lastName: youngsterLastName,
+        mobileNumber: youngsterPhone,
+        email: youngsterEmail || null,
+      },
+      link: {
+        parentId,
+        childId: youngsterChild.id,
+      },
+    };
   }
 
   async loginWithGoogleVerified(idToken: string, role: string) {
