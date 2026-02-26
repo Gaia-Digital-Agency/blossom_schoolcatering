@@ -2943,9 +2943,7 @@ export class CoreService {
         JOIN orders o ON o.id = da.order_id
         JOIN children c ON c.id = o.child_id
         JOIN users uc ON uc.id = c.user_id
-        JOIN parent_children pc ON pc.child_id = c.id
-        JOIN parents p ON p.id = pc.parent_id
-        JOIN users up ON up.id = p.user_id
+        LEFT JOIN users up ON up.id = o.placed_by_user_id
         WHERE 1=1
           ${roleFilter}
           ${dateFilter}
@@ -3002,6 +3000,81 @@ export class CoreService {
       [assignment.order_id],
     );
     return { ok: true };
+  }
+
+  async toggleDeliveryCompletion(actor: AccessUser, assignmentId: string, note?: string) {
+    if (actor.role !== 'DELIVERY') throw new ForbiddenException('Role not allowed');
+    const out = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT id, order_id, delivery_user_id, confirmed_at
+        FROM delivery_assignments
+        WHERE id = $1
+        LIMIT 1
+      ) t;
+    `,
+      [assignmentId],
+    );
+    if (!out) throw new NotFoundException('Assignment not found');
+    const assignment = this.parseJsonLine<{ id: string; order_id: string; delivery_user_id: string; confirmed_at?: string | null }>(out);
+    if (assignment.delivery_user_id !== actor.uid) throw new ForbiddenException('DELIVERY_ASSIGNMENT_FORBIDDEN');
+
+    if (!assignment.confirmed_at) {
+      await runSql(
+        `UPDATE delivery_assignments
+         SET confirmed_at = now(),
+             confirmation_note = $1,
+             updated_at = now()
+         WHERE id = $2;`,
+        [note ? note.trim().slice(0, 500) : null, assignment.id],
+      );
+      await runSql(
+        `UPDATE orders
+         SET delivery_status = 'DELIVERED',
+             delivered_at = now(),
+             delivered_by_user_id = $1,
+             updated_at = now()
+         WHERE id = $2;`,
+        [actor.uid, assignment.order_id],
+      );
+      await runSql(
+        `UPDATE billing_records
+         SET delivery_status = 'DELIVERED',
+             delivered_at = now(),
+             updated_at = now()
+         WHERE order_id = $1;`,
+        [assignment.order_id],
+      );
+      return { ok: true, completed: true };
+    }
+
+    await runSql(
+      `UPDATE delivery_assignments
+       SET confirmed_at = NULL,
+           confirmation_note = NULL,
+           updated_at = now()
+       WHERE id = $1;`,
+      [assignment.id],
+    );
+    await runSql(
+      `UPDATE orders
+       SET delivery_status = 'ASSIGNED',
+           delivered_at = NULL,
+           delivered_by_user_id = NULL,
+           updated_at = now()
+       WHERE id = $1;`,
+      [assignment.order_id],
+    );
+    await runSql(
+      `UPDATE billing_records
+       SET delivery_status = 'ASSIGNED',
+           delivered_at = NULL,
+           updated_at = now()
+       WHERE order_id = $1;`,
+      [assignment.order_id],
+    );
+    return { ok: true, completed: false };
   }
 
   async updateOrder(

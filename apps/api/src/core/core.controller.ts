@@ -456,6 +456,16 @@ export class CoreController {
     return this.coreService.confirmDelivery(req.user, assignmentId, body.note);
   }
 
+  @Patch('delivery/assignments/:assignmentId/toggle')
+  @Roles('DELIVERY')
+  toggleDeliveryCompletion(
+    @Req() req: AuthRequest,
+    @Param('assignmentId', ParseUUIDPipe) assignmentId: string,
+    @Body() body: { note?: string },
+  ) {
+    return this.coreService.toggleDeliveryCompletion(req.user, assignmentId, body.note);
+  }
+
   @Get('carts')
   @Roles('PARENT', 'YOUNGSTER', 'ADMIN')
   getCarts(

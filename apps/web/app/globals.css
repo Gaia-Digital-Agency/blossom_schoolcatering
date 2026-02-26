@@ -179,6 +179,12 @@ h1 {
   color: #f7e4bf;
 }
 
+.btn-success {
+  background: #2a6a36;
+  color: #f3ffe8;
+  border-color: #21542b;
+}
+
 .btn-outline {
   border-color: var(--gold);
   color: var(--gold-deep);
@@ -200,6 +206,11 @@ button:hover,
 .btn-primary:hover {
   background: #2f271d;
   color: #fff2d2;
+}
+
+.btn-success:hover {
+  background: #1f5a2c;
+  color: #ffffff;
 }
 
 .btn-outline:hover {

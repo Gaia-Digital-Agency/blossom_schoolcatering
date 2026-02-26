@@ -69,18 +69,18 @@ export default function DeliveryPage() {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
 
-  const onConfirm = async (assignmentId: string) => {
+  const onToggleComplete = async (assignmentId: string) => {
     setError(''); setMessage('');
     try {
-      await apiFetch(`/delivery/assignments/${assignmentId}/confirm`, {
-        method: 'POST',
+      const out = await apiFetch(`/delivery/assignments/${assignmentId}/toggle`, {
+        method: 'PATCH',
         body: JSON.stringify({ note: note || undefined }),
       });
-      setMessage('Delivery confirmed. Billing delivery status updated.');
+      setMessage(out?.completed ? 'Delivery marked complete.' : 'Delivery marked assigned again.');
       setNote('');
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed confirm');
+      setError(e instanceof Error ? e.message : 'Failed toggle');
     }
   };
 
@@ -135,8 +135,12 @@ export default function DeliveryPage() {
                 <small>Youngster: {row.child_name}</small>
                 <small>Parent: {row.parent_name}</small>
                 <small>Status: {row.delivery_status} | Confirmed: {row.confirmed_at || '-'}</small>
-                <button className="btn btn-primary" type="button" onClick={() => onConfirm(row.id)} disabled={Boolean(row.confirmed_at)}>
-                  {row.confirmed_at ? 'Completed' : 'Mark Complete'}
+                <button
+                  className={`btn ${row.confirmed_at ? 'btn-success' : 'btn-primary'}`}
+                  type="button"
+                  onClick={() => onToggleComplete(row.id)}
+                >
+                  {row.confirmed_at ? 'Completed (Click to Undo)' : 'Mark Complete'}
                 </button>
               </label>
             ))}
