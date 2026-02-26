@@ -234,3 +234,32 @@ Final status:
 Build validation after final migration:
 - `npm run build:api` -> pass
 - `npm run build:web` -> pass
+
+## 9) Authenticated Smoke Matrix (2026-02-26)
+
+Execution mode:
+- Server-side checks via `http://127.0.0.1/schoolcatering/api/v1` (SSH on staging VM)
+- Each role tested for:
+  - login endpoint
+  - one role-relevant authenticated API endpoint
+
+Results:
+- `ADMIN`
+  - login: `201`
+  - dashboard (`/admin/dashboard?date=2026-02-26`): `200`
+- `KITCHEN`
+  - login: `201`
+  - daily summary (`/kitchen/daily-summary?date=2026-02-26`): `200`
+- `DELIVERY`
+  - login: `201`
+  - assignments (`/delivery/assignments?date=2026-02-26`): `200`
+- `PARENT`
+  - login: `201`
+  - consolidated orders (`/parents/me/orders/consolidated`): `200`
+- `YOUNGSTER`
+  - login: `201`
+  - insights (`/youngsters/me/insights?date=2026-02-26`): `200`
+
+Outcome:
+- Smoke matrix status: **PASS**
+- Auth + role-relevant API access paths are green for all 5 roles.
