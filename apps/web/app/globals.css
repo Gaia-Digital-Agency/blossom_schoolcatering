@@ -411,6 +411,58 @@ button:hover,
   min-width: 0;
 }
 
+.delivery-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.7rem;
+  margin-bottom: 0.8rem;
+  align-items: end;
+}
+
+.delivery-control {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+  min-width: 0;
+}
+
+.delivery-control input {
+  min-height: 2.4rem;
+  border: 1px solid #ccbda2;
+  border-radius: 0.55rem;
+  padding: 0.45rem 0.65rem;
+  background: #fff;
+  min-width: 0;
+}
+
+.delivery-window {
+  border: 1px solid #ccbda2;
+  border-radius: 0.55rem;
+  padding: 0.5rem 0.65rem;
+  background: #fff;
+}
+
+.delivery-window small {
+  display: block;
+  color: #4f4b46;
+  margin-bottom: 0.45rem;
+}
+
+.delivery-window-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.delivery-window-actions .btn {
+  min-width: 90px;
+  flex: 1 1 110px;
+}
+
+.delivery-refresh {
+  width: 100%;
+}
+
 .ingredient-selected-box,
 .ingredient-picker-box {
   border: 1px solid #ccbda2;
@@ -533,6 +585,32 @@ button:hover,
   .page-auth-desktop .auth-form {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.8rem;
+  }
+
+  .delivery-controls {
+    grid-template-columns: minmax(180px, 260px) minmax(280px, 1fr) auto;
+    grid-template-areas:
+      "date window refresh"
+      "note note note";
+    gap: 0.8rem;
+  }
+
+  .delivery-date {
+    grid-area: date;
+  }
+
+  .delivery-window {
+    grid-area: window;
+  }
+
+  .delivery-refresh {
+    grid-area: refresh;
+    width: auto;
+    align-self: stretch;
+  }
+
+  .delivery-note {
+    grid-area: note;
   }
 
   .chef-message {

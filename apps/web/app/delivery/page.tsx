@@ -28,6 +28,7 @@ export default function DeliveryPage() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [note, setNote] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const apiFetch = async (path: string, init?: RequestInit) => {
     let token = localStorage.getItem(ACCESS_KEY);
@@ -54,11 +55,15 @@ export default function DeliveryPage() {
   };
 
   const load = async () => {
+    setLoading(true);
+    setError('');
     try {
       const data = await apiFetch(`/delivery/assignments?date=${date}`) as Assignment[];
       setRows(data || []);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed loading assignments');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -80,6 +85,17 @@ export default function DeliveryPage() {
   };
 
   const todaysRows = rows.filter((r) => r.service_date === date);
+  const d = new Date(`${date}T00:00:00`);
+  const prev = new Date(d); prev.setDate(d.getDate() - 1);
+  const next = new Date(d); next.setDate(d.getDate() + 1);
+  const toIso = (x: Date) => {
+    const yyyy = x.getFullYear();
+    const mm = String(x.getMonth() + 1).padStart(2, '0');
+    const dd = String(x.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+  const prevDate = toIso(prev);
+  const nextDate = toIso(next);
 
   return (
     <main className="page-auth page-auth-mobile">
@@ -88,15 +104,27 @@ export default function DeliveryPage() {
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
 
-        <label>
-          Date
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </label>
-        <button className="btn btn-outline" type="button" onClick={load}>Refresh Assignments</button>
-        <label>
-          Confirmation Note (optional)
-          <input value={note} onChange={(e) => setNote(e.target.value)} />
-        </label>
+        <div className="delivery-controls">
+          <label className="delivery-control delivery-date">
+            Date
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </label>
+          <div className="delivery-control delivery-window">
+            <small><strong>Date Window:</strong> {prevDate} to {nextDate}</small>
+            <div className="delivery-window-actions">
+              <button className="btn btn-outline" type="button" onClick={() => setDate(prevDate)}>Past</button>
+              <button className="btn btn-outline" type="button" onClick={() => setDate(todayIsoLocal())}>Today</button>
+              <button className="btn btn-outline" type="button" onClick={() => setDate(nextDate)}>Future</button>
+            </div>
+          </div>
+          <button className="btn btn-outline delivery-refresh" type="button" onClick={load} disabled={loading}>
+            {loading ? 'Refreshing...' : 'Refresh Assignments'}
+          </button>
+          <label className="delivery-control delivery-note">
+            Confirmation Note (optional)
+            <input value={note} onChange={(e) => setNote(e.target.value)} />
+          </label>
+        </div>
 
         {todaysRows.length === 0 ? <p className="auth-help">No assigned orders for this date.</p> : (
           <div className="auth-form">
