@@ -1,9 +1,8 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ACCESS_KEY, getApiBase, refreshAccessToken } from '../../lib/auth';
 
-type School = { id: string; name: string; city?: string | null };
 type Child = {
   id: string;
   first_name: string;
@@ -89,7 +88,6 @@ export default function ParentsPage() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
-  const [schools, setSchools] = useState<School[]>([]);
   const [children, setChildren] = useState<Child[]>([]);
   const [parentId, setParentId] = useState('');
 
@@ -131,16 +129,6 @@ export default function ParentsPage() {
   const [editMenuItems, setEditMenuItems] = useState<MenuItem[]>([]);
   const [editQty, setEditQty] = useState<Record<string, number>>({});
 
-  const [childFirstName, setChildFirstName] = useState('');
-  const [childLastName, setChildLastName] = useState('');
-  const [childPhone, setChildPhone] = useState('');
-  const [childEmail, setChildEmail] = useState('');
-  const [childDob, setChildDob] = useState('');
-  const [childGender, setChildGender] = useState('MALE');
-  const [childSchoolId, setChildSchoolId] = useState('');
-  const [childGrade, setChildGrade] = useState('');
-  const [childAllergies, setChildAllergies] = useState('');
-  const gradeOptions = Array.from({ length: 12 }, (_, i) => String(i + 1));
 
   const selectedCount = useMemo(() => Object.values(itemQty).filter((qty) => qty > 0).length, [itemQty]);
   const editSelectedCount = useMemo(() => Object.values(editQty).filter((qty) => qty > 0).length, [editQty]);
@@ -204,15 +192,10 @@ export default function ParentsPage() {
   };
 
   const loadBaseData = async () => {
-    const [schoolsData, childrenData] = await Promise.all([
-      apiFetch('/schools?active=true') as Promise<School[]>,
-      apiFetch('/parents/me/children/pages') as Promise<{ parentId: string; children: Child[] }>,
-    ]);
-    setSchools(schoolsData);
+    const childrenData = await apiFetch('/parents/me/children/pages') as { parentId: string; children: Child[] };
     setParentId(childrenData.parentId);
     setChildren(childrenData.children);
     if (childrenData.children.length > 0 && !selectedChildId) setSelectedChildId(childrenData.children[0].id);
-    if (schoolsData.length > 0 && !childSchoolId) setChildSchoolId(schoolsData[0].id);
     await Promise.all([loadOrders(), loadFavourites(), loadBilling(), loadSpending()]);
   };
 
@@ -282,33 +265,6 @@ export default function ParentsPage() {
     loadFavourites().catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedChildId, serviceDate, session]);
-
-  const onRegisterChild = async (e: FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setMessage('');
-    if (!childAllergies.trim()) {
-      setError('Allergies is required for youngster registration.');
-      return;
-    }
-    const data = await apiFetch('/children/register', {
-      method: 'POST',
-      body: JSON.stringify({
-        firstName: childFirstName,
-        lastName: childLastName,
-        phoneNumber: childPhone,
-        email: childEmail || undefined,
-        dateOfBirth: childDob,
-        gender: childGender,
-        schoolId: childSchoolId,
-        schoolGrade: childGrade,
-        allergies: childAllergies.trim(),
-      }),
-    }) as { username: string; generatedPassword: string };
-    setMessage(`Youngster created: username ${data.username}, password ${data.generatedPassword}. Save this credential for login.`);
-    setChildFirstName(''); setChildLastName(''); setChildPhone(''); setChildEmail(''); setChildDob(''); setChildGender('MALE'); setChildGrade(''); setChildAllergies('');
-    await loadBaseData();
-  };
 
   const onPlaceOrder = async () => {
     if (!selectedChildId) return setError('Please select a youngster first.');
@@ -480,23 +436,8 @@ export default function ParentsPage() {
 
         <div className="module-section">
           <h2>Linked Youngsters</h2>
+          <p className="auth-help">Youngster registration is done on `/register/youngsters`. Linked youngsters are auto-linked by matching parent and youngster last name.</p>
           <label>Select Youngster<select value={selectedChildId} onChange={(e) => setSelectedChildId(e.target.value)}><option value="">Select...</option>{children.map((child) => <option key={child.id} value={child.id}>{child.first_name} {child.last_name} ({child.school_grade})</option>)}</select></label>
-        </div>
-
-        <div className="module-section">
-          <h2>Register Youngster</h2>
-          <form className="auth-form" onSubmit={onRegisterChild}>
-            <label>First Name<input value={childFirstName} onChange={(e) => setChildFirstName(e.target.value)} required /></label>
-            <label>Last Name<input value={childLastName} onChange={(e) => setChildLastName(e.target.value)} required /></label>
-            <label>Phone Number<input value={childPhone} onChange={(e) => setChildPhone(e.target.value)} required /></label>
-            <label>Email (Optional)<input value={childEmail} onChange={(e) => setChildEmail(e.target.value)} /></label>
-            <label>Date of Birth<input type="date" value={childDob} onChange={(e) => setChildDob(e.target.value)} required /></label>
-            <label>Gender<select value={childGender} onChange={(e) => setChildGender(e.target.value)}><option value="MALE">MALE</option><option value="FEMALE">FEMALE</option><option value="OTHER">OTHER</option><option value="UNDISCLOSED">UNDISCLOSED</option></select></label>
-            <label>School<select value={childSchoolId} onChange={(e) => setChildSchoolId(e.target.value)} required><option value="">Select...</option>{schools.map((school) => <option key={school.id} value={school.id}>{school.name}{school.city ? ` (${school.city})` : ''}</option>)}</select></label>
-            <label>Grade<select value={childGrade} onChange={(e) => setChildGrade(e.target.value)} required><option value="">Select grade...</option>{gradeOptions.map((g) => <option key={g} value={`Grade ${g}`}>Grade {g}</option>)}</select></label>
-            <label>Allergies (max 9 words)<input value={childAllergies} onChange={(e) => setChildAllergies(e.target.value)} placeholder="e.g. peanut shrimp" required /></label>
-            <button className="btn btn-primary" type="submit">Create Youngster</button>
-          </form>
         </div>
 
         <div className="module-section">

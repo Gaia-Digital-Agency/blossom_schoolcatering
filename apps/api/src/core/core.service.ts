@@ -338,6 +338,43 @@ export class CoreService {
     return out || null;
   }
 
+  private async syncParentChildrenByLastName(parentId: string) {
+    const normalizedLastName = await runSql(
+      `SELECT trim(lower(u.last_name))
+       FROM parents p
+       JOIN users u ON u.id = p.user_id
+       WHERE p.id = $1
+         AND p.deleted_at IS NULL
+         AND u.deleted_at IS NULL
+       LIMIT 1;`,
+      [parentId],
+    );
+    if (!normalizedLastName) return 0;
+
+    const linkedCount = Number(await runSql(
+      `WITH target_children AS (
+         SELECT c.id
+         FROM children c
+         JOIN users u ON u.id = c.user_id
+         WHERE c.deleted_at IS NULL
+           AND c.is_active = true
+           AND u.deleted_at IS NULL
+           AND u.is_active = true
+           AND trim(lower(u.last_name)) = $1
+       ),
+       inserted AS (
+         INSERT INTO parent_children (parent_id, child_id)
+         SELECT $2, tc.id
+         FROM target_children tc
+         ON CONFLICT (parent_id, child_id) DO NOTHING
+         RETURNING 1
+       )
+       SELECT count(*)::int FROM inserted;`,
+      [normalizedLastName, parentId],
+    ) || 0);
+    return linkedCount;
+  }
+
   private async getChildIdByUserId(userId: string) {
     const out = await runSql(
       `SELECT id
@@ -417,7 +454,7 @@ export class CoreService {
   }
 
   private async validateOrderDayRules(serviceDate: string) {
-    const weekday = await runSql(`SELECT extract(isodow FROM DATE $1)::int;`, [serviceDate]);
+    const weekday = await runSql(`SELECT extract(isodow FROM $1::date)::int;`, [serviceDate]);
     if (!weekday || Number(weekday) > 5) {
       throw new BadRequestException('ORDER_WEEKEND_SERVICE_BLOCKED');
     }
@@ -426,7 +463,7 @@ export class CoreService {
       `SELECT EXISTS (
          SELECT 1
          FROM blackout_days
-         WHERE blackout_date = DATE $1
+         WHERE blackout_date = $1::date
            AND type IN ('ORDER_BLOCK', 'BOTH')
        );`,
       [serviceDate],
@@ -530,7 +567,7 @@ export class CoreService {
     const existing = await runSql(
       `SELECT id
        FROM menus
-       WHERE service_date = DATE $1
+       WHERE service_date = $1::date
          AND session = $2::session_type
        LIMIT 1;`,
       [serviceDate, session],
@@ -539,7 +576,7 @@ export class CoreService {
 
     return runSql(
       `INSERT INTO menus (session, service_date, is_published)
-       VALUES ($1::session_type, DATE $2, true)
+       VALUES ($1::session_type, $2::date, true)
        RETURNING id;`,
       [session, serviceDate],
     );
@@ -718,7 +755,7 @@ export class CoreService {
     const childOut = await runSql(
       `WITH inserted AS (
          INSERT INTO children (user_id, school_id, date_of_birth, gender, school_grade, photo_url)
-         VALUES ($1, $2, DATE $3, $4::gender_type, $5, NULL)
+         VALUES ($1, $2, $3::date, $4::gender_type, $5, NULL)
          RETURNING id, user_id
        )
        SELECT row_to_json(inserted)::text
@@ -803,7 +840,7 @@ export class CoreService {
 
   async getAdminDashboard(dateRaw?: string) {
     const date = dateRaw ? this.validateServiceDate(dateRaw) : await runSql(`SELECT (now() AT TIME ZONE 'Asia/Makassar')::date::text;`);
-    const yesterday = await runSql(`SELECT (DATE $1 - INTERVAL '1 day')::date::text;`, [date]);
+    const yesterday = await runSql(`SELECT ($1::date - INTERVAL '1 day')::date::text;`, [date]);
 
     const parentsCount = Number(await runSql(`
       SELECT count(*)::int
@@ -840,7 +877,7 @@ export class CoreService {
     const todayOrdersCount = Number(await runSql(
       `SELECT count(*)::int
        FROM orders
-       WHERE service_date = DATE $1
+       WHERE service_date = $1::date
          AND deleted_at IS NULL
          AND status <> 'CANCELLED';`,
       [date],
@@ -850,7 +887,7 @@ export class CoreService {
       `SELECT coalesce(sum(oi.quantity), 0)::int
        FROM orders o
        JOIN order_items oi ON oi.order_id = o.id
-       WHERE o.service_date = DATE $1
+       WHERE o.service_date = $1::date
          AND o.deleted_at IS NULL
          AND o.status <> 'CANCELLED';`,
       [date],
@@ -866,7 +903,7 @@ export class CoreService {
     const yesterdayFailedOrUncheckedDelivery = Number(await runSql(
       `SELECT count(*)::int
        FROM orders
-       WHERE service_date = DATE $1
+       WHERE service_date = $1::date
          AND deleted_at IS NULL
          AND status <> 'CANCELLED'
          AND delivery_status <> 'DELIVERED';`,
@@ -924,11 +961,11 @@ export class CoreService {
     const conditions: string[] = [];
     if (query.fromDate) {
       params.push(this.validateServiceDate(query.fromDate));
-      conditions.push(`b.blackout_date >= DATE $${params.length}`);
+      conditions.push(`b.blackout_date >= $${params.length}`);
     }
     if (query.toDate) {
       params.push(this.validateServiceDate(query.toDate));
-      conditions.push(`b.blackout_date <= DATE $${params.length}`);
+      conditions.push(`b.blackout_date <= $${params.length}`);
     }
     const whereSql = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const out = await runSql(
@@ -964,7 +1001,7 @@ export class CoreService {
     const out = await runSql(
       `WITH upserted AS (
          INSERT INTO blackout_days (blackout_date, type, reason, created_by)
-         VALUES (DATE $1, $2::blackout_type, $3, $4)
+         VALUES ($1::date, $2::blackout_type, $3, $4)
          ON CONFLICT (blackout_date)
          DO UPDATE SET type = EXCLUDED.type, reason = EXCLUDED.reason, updated_at = now()
          RETURNING id, blackout_date::text AS blackout_date, type::text AS type, reason
@@ -992,6 +1029,7 @@ export class CoreService {
     if (actor.role !== 'PARENT') throw new ForbiddenException('Role not allowed');
     const parentId = await this.getParentIdByUserId(actor.uid);
     if (!parentId) throw new BadRequestException('Parent profile not found');
+    await this.syncParentChildrenByLastName(parentId);
 
     const out = await runSql(
       `
@@ -1176,7 +1214,7 @@ export class CoreService {
         JOIN menu_items mi ON mi.menu_id = m.id
         LEFT JOIN menu_item_ingredients mii ON mii.menu_item_id = mi.id
         LEFT JOIN ingredients i ON i.id = mii.ingredient_id AND i.deleted_at IS NULL
-        WHERE m.service_date = DATE $1
+        WHERE m.service_date = $1::date
           AND m.is_published = true
           AND m.deleted_at IS NULL
           AND mi.is_available = true
@@ -1235,7 +1273,7 @@ export class CoreService {
         JOIN menu_items mi ON mi.menu_id = m.id
         LEFT JOIN menu_item_ingredients mii ON mii.menu_item_id = mi.id
         LEFT JOIN ingredients i ON i.id = mii.ingredient_id AND i.deleted_at IS NULL
-        WHERE m.service_date = DATE $1
+        WHERE m.service_date = $1::date
           AND m.session = $2::session_type
           AND m.deleted_at IS NULL
           AND mi.deleted_at IS NULL
@@ -1598,7 +1636,7 @@ export class CoreService {
          FROM order_carts
          WHERE child_id = $1
            AND session = $2::session_type
-           AND service_date = DATE $3
+           AND service_date = $3::date
            AND status = 'OPEN'
          LIMIT 1
        ) t;`,
@@ -1612,7 +1650,7 @@ export class CoreService {
     const createdOut = await runSql(
       `WITH inserted AS (
          INSERT INTO order_carts (child_id, created_by_user_id, session, service_date, status, expires_at)
-         VALUES ($1, $2, $3::session_type, DATE $4, 'OPEN', $5::timestamptz)
+         VALUES ($1, $2, $3::session_type, $4::date, 'OPEN', $5::timestamptz)
          RETURNING id, child_id, created_by_user_id, session::text AS session, service_date::text AS service_date,
                    status::text AS status, expires_at::text AS expires_at
        )
@@ -1636,7 +1674,7 @@ export class CoreService {
     }
     if (query.serviceDate) {
       params.push(this.validateServiceDate(query.serviceDate));
-      conditions.push(`oc.service_date = DATE $${params.length}`);
+      conditions.push(`oc.service_date = $${params.length}`);
     }
     if (query.session) {
       params.push(this.normalizeSession(query.session));
@@ -1745,7 +1783,7 @@ export class CoreService {
            AND mi.deleted_at IS NULL
            AND m.is_published = true
            AND m.deleted_at IS NULL
-           AND m.service_date = DATE $${ids.length + 1}
+           AND m.service_date = $${ids.length + 1}
            AND m.session = $${ids.length + 2}::session_type;`,
         [...ids, cart.service_date, cart.session],
       );
@@ -1822,7 +1860,7 @@ export class CoreService {
       orderOut = await runSql(
         `WITH inserted AS (
            INSERT INTO orders (cart_id, child_id, placed_by_user_id, session, service_date, status, total_price, dietary_snapshot)
-           VALUES ($1, $2, $3, $4::session_type, DATE $5, 'PLACED', $6, $7)
+           VALUES ($1, $2, $3, $4::session_type, $5::date, 'PLACED', $6, $7)
            RETURNING id, order_number::text, child_id, session::text AS session, service_date::text AS service_date,
                      status::text AS status, total_price, dietary_snapshot, placed_at::text AS placed_at
          )
@@ -2263,7 +2301,7 @@ export class CoreService {
             AND mi.deleted_at IS NULL
             AND m.is_published = true
             AND m.deleted_at IS NULL
-            AND m.service_date = DATE $${ids.length + 1}
+            AND m.service_date = $${ids.length + 1}
             AND m.session = $${ids.length + 2}::session_type
         ) t;
       `,
@@ -2426,7 +2464,7 @@ export class CoreService {
             AND mi.deleted_at IS NULL
             AND m.is_published = true
             AND m.deleted_at IS NULL
-            AND m.service_date = DATE $${ids.length + 1}
+            AND m.service_date = $${ids.length + 1}
             AND m.session = $${ids.length + 2}::session_type
         ) t;
       `,
@@ -2814,7 +2852,7 @@ export class CoreService {
         SELECT o.id AS order_id, c.school_id
         FROM orders o
         JOIN children c ON c.id = o.child_id
-        WHERE o.service_date = DATE $1
+        WHERE o.service_date = $1::date
           AND o.status IN ('PLACED', 'LOCKED')
           AND o.delivery_status <> 'DELIVERED'
       ) t;
@@ -2831,7 +2869,7 @@ export class CoreService {
         SELECT da.delivery_user_id, COUNT(*)::int AS assigned_count
         FROM delivery_assignments da
         JOIN orders o ON o.id = da.order_id
-        WHERE o.service_date = DATE $1
+        WHERE o.service_date = $1::date
         GROUP BY da.delivery_user_id
       ) t;
     `,
@@ -2953,7 +2991,7 @@ export class CoreService {
     const dateFilter = serviceDate
       ? (() => {
           params.push(serviceDate);
-          return `AND o.service_date = DATE $${params.length}`;
+          return `AND o.service_date = $${params.length}`;
         })()
       : '';
     const out = await runSql(
@@ -3198,7 +3236,7 @@ export class CoreService {
           AND mi.deleted_at IS NULL
           AND m.is_published = true
           AND m.deleted_at IS NULL
-          AND m.service_date = DATE $${ids.length + 1}
+          AND m.service_date = $${ids.length + 1}
           AND m.session = $${ids.length + 2}::session_type
       ) t;
     `,
@@ -3227,7 +3265,7 @@ export class CoreService {
 
     await runSql(
       `UPDATE orders
-       SET service_date = DATE $1,
+       SET service_date = $1::date,
            session = $2::session_type,
            total_price = $3,
            dietary_snapshot = $4,
@@ -3330,7 +3368,7 @@ export class CoreService {
 
   async getAdminRevenueDashboard(fromDateRaw?: string, toDateRaw?: string) {
     const toDate = toDateRaw ? this.validateServiceDate(toDateRaw) : await runSql(`SELECT (now() AT TIME ZONE 'Asia/Makassar')::date::text;`);
-    const fromDate = fromDateRaw ? this.validateServiceDate(fromDateRaw) : await runSql(`SELECT (DATE $1 - INTERVAL '30 day')::date::text;`, [toDate]);
+    const fromDate = fromDateRaw ? this.validateServiceDate(fromDateRaw) : await runSql(`SELECT ($1::date - INTERVAL '30 day')::date::text;`, [toDate]);
     const bySchoolOut = await runSql(
       `
       SELECT row_to_json(t)::text
@@ -3342,7 +3380,7 @@ export class CoreService {
         FROM orders o
         JOIN children c ON c.id = o.child_id
         JOIN schools s ON s.id = c.school_id
-        WHERE o.service_date BETWEEN DATE $1 AND DATE $2
+        WHERE o.service_date BETWEEN $1::date AND $2::date
           AND o.status <> 'CANCELLED'
           AND o.deleted_at IS NULL
         GROUP BY s.id, s.name
@@ -3359,7 +3397,7 @@ export class CoreService {
                COUNT(o.id)::int AS orders_count,
                COALESCE(SUM(o.total_price), 0)::numeric AS total_revenue
         FROM orders o
-        WHERE o.service_date BETWEEN DATE $1 AND DATE $2
+        WHERE o.service_date BETWEEN $1::date AND $2::date
           AND o.status <> 'CANCELLED'
           AND o.deleted_at IS NULL
         GROUP BY o.session
@@ -3372,7 +3410,7 @@ export class CoreService {
       `
       SELECT COALESCE(SUM(total_price), 0)::numeric
       FROM orders
-      WHERE service_date BETWEEN DATE $1 AND DATE $2
+      WHERE service_date BETWEEN $1::date AND $2::date
         AND status <> 'CANCELLED'
         AND deleted_at IS NULL;
     `,
@@ -3416,7 +3454,7 @@ export class CoreService {
         LEFT JOIN parents p ON p.id = pc.parent_id
         LEFT JOIN users up ON up.id = p.user_id
         LEFT JOIN billing_records br ON br.order_id = o.id
-        WHERE o.service_date = DATE $1
+        WHERE o.service_date = $1::date
           AND o.status <> 'CANCELLED'
           AND o.deleted_at IS NULL
         ORDER BY o.session ASC, school_name ASC, child_name ASC
@@ -3442,7 +3480,7 @@ export class CoreService {
     if (!parentId) throw new BadRequestException('Parent profile not found');
     const month = monthRaw && /^\d{4}-\d{2}$/.test(monthRaw) ? monthRaw : await runSql(`SELECT to_char((now() AT TIME ZONE 'Asia/Makassar')::date, 'YYYY-MM');`);
     const monthStart = `${month}-01`;
-    const monthEnd = await runSql(`SELECT (DATE $1 + INTERVAL '1 month - 1 day')::date::text;`, [monthStart]);
+    const monthEnd = await runSql(`SELECT ($1::date + INTERVAL '1 month - 1 day')::date::text;`, [monthStart]);
 
     const byChildOut = await runSql(
       `
@@ -3457,7 +3495,7 @@ export class CoreService {
         JOIN users u ON u.id = c.user_id
         JOIN parent_children pc ON pc.child_id = c.id
         WHERE pc.parent_id = $1
-          AND o.service_date BETWEEN DATE $2 AND DATE $3
+          AND o.service_date BETWEEN $2::date AND $3::date
           AND o.status <> 'CANCELLED'
           AND o.deleted_at IS NULL
         GROUP BY c.id, u.first_name, u.last_name
@@ -3472,7 +3510,7 @@ export class CoreService {
       FROM orders o
       JOIN parent_children pc ON pc.child_id = o.child_id
       WHERE pc.parent_id = $1
-        AND o.service_date BETWEEN DATE $2 AND DATE $3
+        AND o.service_date BETWEEN $2::date AND $3::date
         AND o.status <> 'CANCELLED'
         AND o.deleted_at IS NULL;
     `,
@@ -3523,10 +3561,10 @@ export class CoreService {
     if (!childId) throw new NotFoundException('Youngster profile not found');
     const refDate = dateRaw ? this.validateServiceDate(dateRaw) : await runSql(`SELECT (now() AT TIME ZONE 'Asia/Makassar')::date::text;`);
     const weekStart = await runSql(
-      `SELECT (DATE $1 - ((extract(isodow FROM DATE $1)::int - 1) * INTERVAL '1 day'))::date::text;`,
+      `SELECT ($1::date - ((extract(isodow FROM $1::date)::int - 1) * INTERVAL '1 day'))::date::text;`,
       [refDate],
     );
-    const weekEnd = await runSql(`SELECT (DATE $1 + INTERVAL '6 day')::date::text;`, [weekStart]);
+    const weekEnd = await runSql(`SELECT ($1::date + INTERVAL '6 day')::date::text;`, [weekStart]);
 
     const nutritionOut = await runSql(
       `
@@ -3539,7 +3577,7 @@ export class CoreService {
         JOIN order_items oi ON oi.order_id = o.id
         LEFT JOIN menu_items mi ON mi.id = oi.menu_item_id
         WHERE o.child_id = $1
-          AND o.service_date BETWEEN DATE $2 AND DATE $3
+          AND o.service_date BETWEEN $2::date AND $3::date
           AND o.status <> 'CANCELLED'
           AND o.deleted_at IS NULL
         GROUP BY o.service_date
@@ -3552,7 +3590,7 @@ export class CoreService {
     const byDate = new Map(nutritionRows.map((r) => [r.service_date, r]));
     const days: Array<{ service_date: string; calories_display: string; tba_items: number }> = [];
     for (let i = 0; i < 7; i += 1) {
-      const d = await runSql(`SELECT (DATE $1 + ($2::text || ' day')::interval)::date::text;`, [weekStart, i]);
+      const d = await runSql(`SELECT ($1::date + ($2::text || ' day')::interval)::date::text;`, [weekStart, i]);
       const row = byDate.get(d);
       days.push({
         service_date: d,
@@ -3567,7 +3605,7 @@ export class CoreService {
       SELECT to_char(o.service_date, 'YYYY-MM-DD')
       FROM orders o
       WHERE o.child_id = $1
-        AND o.service_date >= (DATE $2 - INTERVAL '70 day')
+        AND o.service_date >= ($2::date - INTERVAL '70 day')
         AND o.status <> 'CANCELLED'
         AND o.deleted_at IS NULL
       GROUP BY o.service_date
@@ -3590,7 +3628,7 @@ export class CoreService {
       prev = now;
     }
     const currentMonth = refDate.slice(0, 7);
-    const previousMonth = await runSql(`SELECT to_char((DATE $1 - INTERVAL '1 month')::date, 'YYYY-MM');`, [refDate]);
+    const previousMonth = await runSql(`SELECT to_char(($1::date - INTERVAL '1 month')::date, 'YYYY-MM');`, [refDate]);
     const monthRowsOut = await runSql(
       `
       SELECT to_char(service_date, 'YYYY-MM-DD')
@@ -3663,7 +3701,7 @@ export class CoreService {
                COUNT(*) FILTER (WHERE o.session = 'LUNCH')::int AS lunch_orders
         FROM orders o
         LEFT JOIN order_items oi ON oi.order_id = o.id
-        WHERE o.service_date = DATE $1
+        WHERE o.service_date = $1::date
           AND o.status IN ('PLACED', 'LOCKED')
       ) t;
     `,
@@ -3700,7 +3738,7 @@ export class CoreService {
         LEFT JOIN order_items oi ON oi.order_id = o.id
         LEFT JOIN menu_item_ingredients mii ON mii.menu_item_id = oi.menu_item_id
         LEFT JOIN ingredients i ON i.id = mii.ingredient_id AND i.deleted_at IS NULL
-        WHERE o.service_date = DATE $1
+        WHERE o.service_date = $1::date
           AND o.status IN ('PLACED', 'LOCKED')
         GROUP BY o.id, uc.first_name, uc.last_name, up.first_name, up.last_name
         ORDER BY o.session ASC, child_name ASC
