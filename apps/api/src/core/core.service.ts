@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { readFile } from 'fs/promises';
 import { createSign, randomUUID, scryptSync } from 'crypto';
-import { runSql, sqlLiteral } from '../auth/db.util';
+import { runSql } from '../auth/db.util';
 import { AccessUser, CartItemInput, SessionType } from './core.types';
 
 type DbUserRow = {
@@ -546,7 +546,8 @@ export class CoreService {
   }
 
   async getSchools(active = true) {
-    const out = await runSql(`
+    const out = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT id, name, city, address, is_active
@@ -584,7 +585,8 @@ export class CoreService {
 
   async getSessionSettings() {
     await this.ensureSessionSettingsTable();
-    const out = await runSql(`
+    const out = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT session::text AS session, is_active
@@ -1093,6 +1095,7 @@ export class CoreService {
       .filter(Boolean);
 
     const filters: string[] = [];
+    const params: unknown[] = [serviceDate];
     if (['PARENT', 'YOUNGSTER'].includes(actor.role)) {
       await this.ensureSessionSettingsTable();
       if (session) {
@@ -1109,35 +1112,51 @@ export class CoreService {
         )`);
       }
     }
-    if (session) filters.push(`m.session = ${sqlLiteral(session)}::session_type`);
-    if (search) {
-      filters.push(`(lower(mi.name) LIKE ${sqlLiteral(`%${search}%`)} OR lower(mi.description) LIKE ${sqlLiteral(`%${search}%`)})`);
+    if (session) {
+      params.push(session);
+      filters.push(`m.session = $${params.length}::session_type`);
     }
-    if (priceMin !== null && Number.isFinite(priceMin)) filters.push(`mi.price >= ${priceMin.toFixed(2)}`);
-    if (priceMax !== null && Number.isFinite(priceMax)) filters.push(`mi.price <= ${priceMax.toFixed(2)}`);
+    if (search) {
+      params.push(`%${search}%`, `%${search}%`);
+      filters.push(`(lower(mi.name) LIKE $${params.length - 1} OR lower(mi.description) LIKE $${params.length})`);
+    }
+    if (priceMin !== null && Number.isFinite(priceMin)) {
+      params.push(Number(priceMin.toFixed(2)));
+      filters.push(`mi.price >= $${params.length}`);
+    }
+    if (priceMax !== null && Number.isFinite(priceMax)) {
+      params.push(Number(priceMax.toFixed(2)));
+      filters.push(`mi.price <= $${params.length}`);
+    }
     if (favouritesOnly) {
+      params.push(actor.uid);
       filters.push(`EXISTS (
         SELECT 1
         FROM favourite_meal_items fmi
         JOIN favourite_meals fm ON fm.id = fmi.favourite_meal_id
         WHERE fmi.menu_item_id = mi.id
-          AND fm.created_by_user_id = ${sqlLiteral(actor.uid)}
+          AND fm.created_by_user_id = $${params.length}
           AND fm.is_active = true
           AND fm.deleted_at IS NULL
       )`);
     }
     if (allergenExcludeIds.length > 0) {
-      const idList = allergenExcludeIds.map((id) => sqlLiteral(id)).join(', ');
+      const ph = allergenExcludeIds.map(() => {
+        params.push('');
+        return `$${params.length}`;
+      });
+      for (let i = 0; i < allergenExcludeIds.length; i += 1) params[params.length - allergenExcludeIds.length + i] = allergenExcludeIds[i];
       filters.push(`NOT EXISTS (
         SELECT 1
         FROM menu_item_ingredients mii2
         WHERE mii2.menu_item_id = mi.id
-          AND mii2.ingredient_id IN (${idList})
+          AND mii2.ingredient_id IN (${ph.join(', ')})
       )`);
     }
     const filterSql = filters.length ? `AND ${filters.join('\n          AND ')}` : '';
 
-    const out = await runSql(`
+    const out = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT mi.id,
@@ -1157,7 +1176,7 @@ export class CoreService {
         JOIN menu_items mi ON mi.menu_id = m.id
         LEFT JOIN menu_item_ingredients mii ON mii.menu_item_id = mi.id
         LEFT JOIN ingredients i ON i.id = mii.ingredient_id AND i.deleted_at IS NULL
-        WHERE m.service_date = DATE ${sqlLiteral(serviceDate)}
+        WHERE m.service_date = DATE $1
           AND m.is_published = true
           AND m.deleted_at IS NULL
           AND mi.is_available = true
@@ -1166,7 +1185,9 @@ export class CoreService {
         GROUP BY mi.id, m.session
         ORDER BY m.session ASC, mi.display_order ASC, mi.name ASC
       ) t;
-    `);
+    `,
+      params,
+    );
 
     return {
       serviceDate,
@@ -1455,60 +1476,63 @@ export class CoreService {
     const createdIds: string[] = [];
     for (const sample of samples) {
       const menuId = await this.ensureMenuForDateSession(serviceDate, sample.session);
-      const existing = await runSql(`
-        SELECT id
-        FROM menu_items
-        WHERE menu_id = ${sqlLiteral(menuId)}
-          AND lower(name) = ${sqlLiteral(sample.name.toLowerCase())}
-          AND deleted_at IS NULL
-        LIMIT 1;
-      `);
+      const existing = await runSql(
+        `SELECT id
+         FROM menu_items
+         WHERE menu_id = $1
+           AND lower(name) = $2
+           AND deleted_at IS NULL
+         LIMIT 1;`,
+        [menuId, sample.name.toLowerCase()],
+      );
       let itemId = existing;
       if (!itemId) {
-        itemId = await runSql(`
-          INSERT INTO menu_items (
-            menu_id, name, description, nutrition_facts_text, calories_kcal, price, image_url, is_available, display_order, cutlery_required, packing_requirement
-          )
-          VALUES (
-            ${sqlLiteral(menuId)},
-            ${sqlLiteral(sample.name)},
-            ${sqlLiteral(sample.description)},
-            ${sqlLiteral(sample.nutritionFactsText)},
-            ${sample.caloriesKcal},
-            ${sample.price.toFixed(2)},
-            ${sqlLiteral(sample.imageUrl)},
-            true,
-            1,
-            ${sample.cutleryRequired ? 'true' : 'false'},
-            ${sqlLiteral(sample.packingRequirement)}
-          )
-          RETURNING id;
-        `);
+        itemId = await runSql(
+          `INSERT INTO menu_items (
+             menu_id, name, description, nutrition_facts_text, calories_kcal, price, image_url, is_available, display_order, cutlery_required, packing_requirement
+           )
+           VALUES ($1, $2, $3, $4, $5, $6, $7, true, 1, $8, $9)
+           RETURNING id;`,
+          [
+            menuId,
+            sample.name,
+            sample.description,
+            sample.nutritionFactsText,
+            sample.caloriesKcal,
+            Number(sample.price.toFixed(2)),
+            sample.imageUrl,
+            sample.cutleryRequired,
+            sample.packingRequirement,
+          ],
+        );
       }
       createdIds.push(itemId);
-      await runSql(`DELETE FROM menu_item_ingredients WHERE menu_item_id = ${sqlLiteral(itemId)};`);
+      await runSql(`DELETE FROM menu_item_ingredients WHERE menu_item_id = $1;`, [itemId]);
       const names = sample.session === 'SNACK' ? ['milk', 'tomato'] : ['chicken', 'rice', 'egg'];
       for (const nm of names) {
         const ingredientId = byName.get(nm);
         if (!ingredientId) continue;
-        await runSql(`
-          INSERT INTO menu_item_ingredients (menu_item_id, ingredient_id)
-          VALUES (${sqlLiteral(itemId)}, ${sqlLiteral(ingredientId)})
-          ON CONFLICT (menu_item_id, ingredient_id) DO NOTHING;
-        `);
+        await runSql(
+          `INSERT INTO menu_item_ingredients (menu_item_id, ingredient_id)
+           VALUES ($1, $2)
+           ON CONFLICT (menu_item_id, ingredient_id) DO NOTHING;`,
+          [itemId, ingredientId],
+        );
       }
-      await runSql(`
-        UPDATE menus
-        SET is_published = true, updated_at = now()
-        WHERE id = ${sqlLiteral(menuId)};
-      `);
+      await runSql(
+        `UPDATE menus
+         SET is_published = true, updated_at = now()
+         WHERE id = $1;`,
+        [menuId],
+      );
     }
     return { ok: true, serviceDate, createdItemIds: createdIds };
   }
 
   async getYoungsterMe(actor: AccessUser) {
     if (actor.role !== 'YOUNGSTER') throw new ForbiddenException('Role not allowed');
-    const out = await runSql(`
+    const out = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT c.id, c.user_id, u.first_name, u.last_name, c.school_id, s.name AS school_name,
@@ -1526,12 +1550,14 @@ export class CoreService {
         FROM children c
         JOIN users u ON u.id = c.user_id
         JOIN schools s ON s.id = c.school_id
-        WHERE c.user_id = ${sqlLiteral(actor.uid)}
+        WHERE c.user_id = $1
           AND c.is_active = true
           AND c.deleted_at IS NULL
         LIMIT 1
       ) t;
-    `);
+    `,
+      [actor.uid],
+    );
     if (!out) throw new NotFoundException('Youngster profile not found');
     return this.parseJsonLine<ChildRow>(out);
   }
@@ -1597,24 +1623,37 @@ export class CoreService {
     }
 
     const conditions: string[] = [];
-    if (query.childId) conditions.push(`oc.child_id = ${sqlLiteral(query.childId)}`);
-    if (query.serviceDate) conditions.push(`oc.service_date = DATE ${sqlLiteral(this.validateServiceDate(query.serviceDate))}`);
-    if (query.session) conditions.push(`oc.session = ${sqlLiteral(this.normalizeSession(query.session))}::session_type`);
+    const params: unknown[] = [];
+    if (query.childId) {
+      params.push(query.childId);
+      conditions.push(`oc.child_id = $${params.length}`);
+    }
+    if (query.serviceDate) {
+      params.push(this.validateServiceDate(query.serviceDate));
+      conditions.push(`oc.service_date = DATE $${params.length}`);
+    }
+    if (query.session) {
+      params.push(this.normalizeSession(query.session));
+      conditions.push(`oc.session = $${params.length}::session_type`);
+    }
 
     if (actor.role === 'YOUNGSTER') {
       const childId = await this.getChildIdByUserId(actor.uid);
       if (!childId) return [];
-      conditions.push(`oc.child_id = ${sqlLiteral(childId)}`);
+      params.push(childId);
+      conditions.push(`oc.child_id = $${params.length}`);
     }
 
     if (actor.role === 'PARENT') {
       const parentId = await this.getParentIdByUserId(actor.uid);
       if (!parentId) return [];
-      conditions.push(`EXISTS (SELECT 1 FROM parent_children pc WHERE pc.parent_id = ${sqlLiteral(parentId)} AND pc.child_id = oc.child_id)`);
+      params.push(parentId);
+      conditions.push(`EXISTS (SELECT 1 FROM parent_children pc WHERE pc.parent_id = $${params.length} AND pc.child_id = oc.child_id)`);
     }
 
     const whereSql = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-    const out = await runSql(`
+    const out = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT oc.id, oc.child_id, oc.session::text AS session, oc.service_date::text AS service_date,
@@ -1624,7 +1663,9 @@ export class CoreService {
         ORDER BY oc.created_at DESC
         LIMIT 100
       ) t;
-    `);
+    `,
+      params,
+    );
     return this.parseJsonLines(out);
   }
 
@@ -1881,11 +1922,13 @@ export class CoreService {
         FROM orders o
         JOIN children c ON c.id = o.child_id
         JOIN users u ON u.id = c.user_id
-        WHERE o.id = ${sqlLiteral(orderId)}
+        WHERE o.id = $1
           AND o.deleted_at IS NULL
         LIMIT 1
       ) t;
-    `);
+    `,
+      [orderId],
+    );
     if (!out) throw new NotFoundException('Order not found');
     const order = this.parseJsonLine<{
       id: string;
@@ -1911,15 +1954,18 @@ export class CoreService {
       throw new ForbiddenException('Role not allowed');
     }
 
-    const itemsOut = await runSql(`
+    const itemsOut = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT oi.menu_item_id, oi.item_name_snapshot, oi.price_snapshot, oi.quantity
         FROM order_items oi
-        WHERE oi.order_id = ${sqlLiteral(order.id)}
+        WHERE oi.order_id = $1
         ORDER BY oi.created_at ASC
       ) t;
-    `);
+    `,
+      [order.id],
+    );
     const items = this.parseJsonLines(itemsOut);
 
     return {
@@ -1935,7 +1981,8 @@ export class CoreService {
     const parentId = await this.getParentIdByUserId(actor.uid);
     if (!parentId) throw new BadRequestException('Parent profile not found');
 
-    const out = await runSql(`
+    const out = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT o.id,
@@ -1955,12 +2002,14 @@ export class CoreService {
         JOIN users u ON u.id = c.user_id
         JOIN parent_children pc ON pc.child_id = c.id
         LEFT JOIN billing_records br ON br.order_id = o.id
-        WHERE pc.parent_id = ${sqlLiteral(parentId)}
+        WHERE pc.parent_id = $1
           AND o.deleted_at IS NULL
         ORDER BY o.service_date DESC, o.created_at DESC
         LIMIT 200
       ) t;
-    `);
+    `,
+      [parentId],
+    );
 
     const orders = this.parseJsonLines<{
       id: string;
@@ -1979,15 +2028,18 @@ export class CoreService {
 
     const result: Array<Record<string, unknown>> = [];
     for (const order of orders) {
-      const itemsOut = await runSql(`
+      const itemsOut = await runSql(
+        `
         SELECT row_to_json(t)::text
         FROM (
           SELECT oi.menu_item_id, oi.item_name_snapshot, oi.price_snapshot, oi.quantity
           FROM order_items oi
-          WHERE oi.order_id = ${sqlLiteral(order.id)}
+          WHERE oi.order_id = $1
           ORDER BY oi.created_at ASC
         ) t;
-      `);
+      `,
+        [order.id],
+      );
       const items = this.parseJsonLines(itemsOut);
       result.push({
         ...order,
@@ -2006,13 +2058,21 @@ export class CoreService {
   async getFavourites(actor: AccessUser, query: { childId?: string; session?: string }) {
     if (!['PARENT', 'YOUNGSTER'].includes(actor.role)) throw new ForbiddenException('Role not allowed');
     const filters: string[] = [
-      `fm.created_by_user_id = ${sqlLiteral(actor.uid)}`,
+      `fm.created_by_user_id = $1`,
       `fm.is_active = true`,
       `fm.deleted_at IS NULL`,
     ];
-    if (query.childId) filters.push(`fm.child_id = ${sqlLiteral(query.childId)}`);
-    if (query.session) filters.push(`fm.session = ${sqlLiteral(this.normalizeSession(query.session))}::session_type`);
-    const out = await runSql(`
+    const params: unknown[] = [actor.uid];
+    if (query.childId) {
+      params.push(query.childId);
+      filters.push(`fm.child_id = $${params.length}`);
+    }
+    if (query.session) {
+      params.push(this.normalizeSession(query.session));
+      filters.push(`fm.session = $${params.length}::session_type`);
+    }
+    const out = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT fm.id, fm.label, fm.session::text AS session, fm.child_id, fm.created_at::text AS created_at,
@@ -2031,7 +2091,9 @@ export class CoreService {
         GROUP BY fm.id
         ORDER BY fm.created_at DESC
       ) t;
-    `);
+    `,
+      params,
+    );
     return this.parseJsonLines(out);
   }
 
@@ -2059,39 +2121,36 @@ export class CoreService {
       await this.ensureParentOwnsChild(parentId, childId);
     }
 
-    const activeCount = Number(await runSql(`
-      SELECT count(*)::int
-      FROM favourite_meals
-      WHERE created_by_user_id = ${sqlLiteral(actor.uid)}
-        AND is_active = true
-        AND deleted_at IS NULL;
-    `) || 0);
+    const activeCount = Number(await runSql(
+      `SELECT count(*)::int
+       FROM favourite_meals
+       WHERE created_by_user_id = $1
+         AND is_active = true
+         AND deleted_at IS NULL;`,
+      [actor.uid],
+    ) || 0);
     if (activeCount >= 20) throw new BadRequestException('FAVOURITES_LIMIT_EXCEEDED');
 
-    const favOut = await runSql(`
-      WITH inserted AS (
-        INSERT INTO favourite_meals (created_by_user_id, child_id, label, session, is_active)
-        VALUES (
-          ${sqlLiteral(actor.uid)},
-          ${childId ? sqlLiteral(childId) : 'NULL'},
-          ${sqlLiteral(label)},
-          ${sqlLiteral(session)}::session_type,
-          true
-        )
-        RETURNING id, label
-      )
-      SELECT row_to_json(inserted)::text
-      FROM inserted;
-    `);
+    const favOut = await runSql(
+      `WITH inserted AS (
+         INSERT INTO favourite_meals (created_by_user_id, child_id, label, session, is_active)
+         VALUES ($1, $2, $3, $4::session_type, true)
+         RETURNING id, label
+       )
+       SELECT row_to_json(inserted)::text
+       FROM inserted;`,
+      [actor.uid, childId || null, label, session],
+    );
     const fav = this.parseJsonLine<{ id: string; label: string }>(favOut);
     for (const item of items) {
       if (!item.menuItemId || !Number.isInteger(item.quantity) || item.quantity <= 0) {
         throw new BadRequestException('Invalid favourite item');
       }
-      await runSql(`
-        INSERT INTO favourite_meal_items (favourite_meal_id, menu_item_id, quantity)
-        VALUES (${sqlLiteral(fav.id)}, ${sqlLiteral(item.menuItemId)}, ${Number(item.quantity)});
-      `);
+      await runSql(
+        `INSERT INTO favourite_meal_items (favourite_meal_id, menu_item_id, quantity)
+         VALUES ($1, $2, $3);`,
+        [fav.id, item.menuItemId, Number(item.quantity)],
+      );
     }
     return { ok: true, favouriteId: fav.id, label: fav.label };
   }
@@ -2102,16 +2161,19 @@ export class CoreService {
     const serviceDate = this.validateServiceDate(input.serviceDate);
     if (!sourceOrderId) throw new BadRequestException('sourceOrderId is required');
 
-    const srcOut = await runSql(`
+    const srcOut = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT id, child_id, session::text AS session, status::text AS status
         FROM orders
-        WHERE id = ${sqlLiteral(sourceOrderId)}
+        WHERE id = $1
           AND deleted_at IS NULL
         LIMIT 1
       ) t;
-    `);
+    `,
+      [sourceOrderId],
+    );
     if (!srcOut) throw new NotFoundException('Source order not found');
     const source = this.parseJsonLine<{ id: string; child_id: string; session: SessionType; status: string }>(srcOut);
     if (!['PLACED', 'LOCKED'].includes(source.status)) {
@@ -2133,35 +2195,41 @@ export class CoreService {
       session: source.session,
     });
 
-    const srcItemsOut = await runSql(`
+    const srcItemsOut = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT oi.menu_item_id, oi.quantity
         FROM order_items oi
-        WHERE oi.order_id = ${sqlLiteral(source.id)}
+        WHERE oi.order_id = $1
       ) t;
-    `);
+    `,
+      [source.id],
+    );
     const srcItems = this.parseJsonLines<{ menu_item_id: string; quantity: number }>(srcItemsOut);
     const ids = [...new Set(srcItems.map((x) => x.menu_item_id))];
     const excludedItemIds: string[] = [];
     const validIds = new Set<string>();
     if (ids.length > 0) {
-      const idList = ids.map((id) => sqlLiteral(id)).join(', ');
-      const validOut = await runSql(`
+      const ph = ids.map((_, i) => `$${i + 1}`).join(', ');
+      const validOut = await runSql(
+        `
         SELECT row_to_json(t)::text
         FROM (
           SELECT mi.id
           FROM menu_items mi
           JOIN menus m ON m.id = mi.menu_id
-          WHERE mi.id IN (${idList})
+          WHERE mi.id IN (${ph})
             AND mi.is_available = true
             AND mi.deleted_at IS NULL
             AND m.is_published = true
             AND m.deleted_at IS NULL
-            AND m.service_date = DATE ${sqlLiteral(serviceDate)}
-            AND m.session = ${sqlLiteral(source.session)}::session_type
+            AND m.service_date = DATE $${ids.length + 1}
+            AND m.session = $${ids.length + 2}::session_type
         ) t;
-      `);
+      `,
+        [...ids, serviceDate, source.session],
+      );
       for (const row of this.parseJsonLines<{ id: string }>(validOut)) validIds.add(row.id);
       for (const id of ids) if (!validIds.has(id)) excludedItemIds.push(id);
     }
@@ -2200,28 +2268,34 @@ export class CoreService {
       await this.ensureParentOwnsChild(parentId, childId);
     }
 
-    const sourceOut = await runSql(`
+    const sourceOut = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT id, child_id, session::text AS session
         FROM orders
-        WHERE id = ${sqlLiteral(sourceOrderId)}
+        WHERE id = $1
           AND deleted_at IS NULL
         LIMIT 1
       ) t;
-    `);
+    `,
+      [sourceOrderId],
+    );
     if (!sourceOut) throw new NotFoundException('Source order not found');
     const source = this.parseJsonLine<{ id: string; child_id: string; session: SessionType }>(sourceOut);
     if (source.child_id !== childId) throw new ForbiddenException('ORDER_OWNERSHIP_FORBIDDEN');
 
-    const srcItemsOut = await runSql(`
+    const srcItemsOut = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT oi.menu_item_id, oi.quantity
         FROM order_items oi
-        WHERE oi.order_id = ${sqlLiteral(source.id)}
+        WHERE oi.order_id = $1
       ) t;
-    `);
+    `,
+      [source.id],
+    );
     const srcItems = this.parseJsonLines<{ menu_item_id: string; quantity: number }>(srcItemsOut);
     const itemsPayload = srcItems.map((x) => ({ menuItemId: x.menu_item_id, quantity: Number(x.quantity) }));
 
@@ -2255,18 +2329,21 @@ export class CoreService {
     const serviceDate = this.validateServiceDate(input.serviceDate);
     if (!favouriteId) throw new BadRequestException('favouriteId is required');
 
-    const favOut = await runSql(`
+    const favOut = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT id, child_id, session::text AS session
         FROM favourite_meals
-        WHERE id = ${sqlLiteral(favouriteId)}
-          AND created_by_user_id = ${sqlLiteral(actor.uid)}
+        WHERE id = $1
+          AND created_by_user_id = $2
           AND is_active = true
           AND deleted_at IS NULL
         LIMIT 1
       ) t;
-    `);
+    `,
+      [favouriteId, actor.uid],
+    );
     if (!favOut) throw new NotFoundException('Favourite not found');
     const fav = this.parseJsonLine<{ id: string; child_id: string | null; session: SessionType }>(favOut);
     const childId = fav.child_id || (await this.getChildIdByUserId(actor.uid));
@@ -2280,36 +2357,42 @@ export class CoreService {
       if (!ownChildId || ownChildId !== childId) throw new ForbiddenException('ORDER_OWNERSHIP_FORBIDDEN');
     }
 
-    const favItemsOut = await runSql(`
+    const favItemsOut = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT menu_item_id, quantity
         FROM favourite_meal_items
-        WHERE favourite_meal_id = ${sqlLiteral(fav.id)}
+        WHERE favourite_meal_id = $1
       ) t;
-    `);
+    `,
+      [fav.id],
+    );
     const favItems = this.parseJsonLines<{ menu_item_id: string; quantity: number }>(favItemsOut);
     const cart = await this.createCart(actor, { childId, serviceDate, session: fav.session });
     const ids = [...new Set(favItems.map((x) => x.menu_item_id))];
     const excludedItemIds: string[] = [];
     const validIds = new Set<string>();
     if (ids.length > 0) {
-      const idList = ids.map((id) => sqlLiteral(id)).join(', ');
-      const validOut = await runSql(`
+      const ph = ids.map((_, i) => `$${i + 1}`).join(', ');
+      const validOut = await runSql(
+        `
         SELECT row_to_json(t)::text
         FROM (
           SELECT mi.id
           FROM menu_items mi
           JOIN menus m ON m.id = mi.menu_id
-          WHERE mi.id IN (${idList})
+          WHERE mi.id IN (${ph})
             AND mi.is_available = true
             AND mi.deleted_at IS NULL
             AND m.is_published = true
             AND m.deleted_at IS NULL
-            AND m.service_date = DATE ${sqlLiteral(serviceDate)}
-            AND m.session = ${sqlLiteral(fav.session)}::session_type
+            AND m.service_date = DATE $${ids.length + 1}
+            AND m.session = $${ids.length + 2}::session_type
         ) t;
-      `);
+      `,
+        [...ids, serviceDate, fav.session],
+      );
       for (const row of this.parseJsonLines<{ id: string }>(validOut)) validIds.add(row.id);
       for (const id of ids) if (!validIds.has(id)) excludedItemIds.push(id);
     }
@@ -2349,10 +2432,12 @@ export class CoreService {
         JOIN children c ON c.id = o.child_id
         JOIN users u ON u.id = c.user_id
         LEFT JOIN digital_receipts dr ON dr.billing_record_id = br.id
-        WHERE br.parent_id = ${sqlLiteral(parentId)}
+        WHERE br.parent_id = $1
         ORDER BY br.created_at DESC
       ) t;
-    `);
+    `,
+      [parentId],
+    );
     return this.parseJsonLines<Record<string, unknown> & { total_price?: string | number }>(out).map((row) => ({
       ...row,
       total_price: Number(row.total_price || 0),
@@ -2365,13 +2450,14 @@ export class CoreService {
     if (!parentId) throw new BadRequestException('Parent profile not found');
     const proof = (proofImageData || '').trim();
     if (!proof) throw new BadRequestException('proofImageData is required');
-    const exists = await runSql(`
-      SELECT EXISTS (
-        SELECT 1 FROM billing_records
-        WHERE id = ${sqlLiteral(billingId)}
-          AND parent_id = ${sqlLiteral(parentId)}
-      );
-    `);
+    const exists = await runSql(
+      `SELECT EXISTS (
+         SELECT 1 FROM billing_records
+         WHERE id = $1
+           AND parent_id = $2
+       );`,
+      [billingId, parentId],
+    );
     if (exists !== 't') throw new NotFoundException('Billing record not found');
     let proofUrl = proof;
     if (proof.startsWith('data:')) {
@@ -2395,23 +2481,25 @@ export class CoreService {
       throw new BadRequestException('proofImageData must be a data URL image or an http(s) URL');
     }
 
-    await runSql(`
-      UPDATE billing_records
-      SET proof_image_url = ${sqlLiteral(proofUrl)},
-          proof_uploaded_at = now(),
-          status = 'PENDING_VERIFICATION',
-          updated_at = now()
-      WHERE id = ${sqlLiteral(billingId)};
-    `);
+    await runSql(
+      `UPDATE billing_records
+       SET proof_image_url = $1,
+           proof_uploaded_at = now(),
+           status = 'PENDING_VERIFICATION',
+           updated_at = now()
+       WHERE id = $2;`,
+      [proofUrl, billingId],
+    );
     return { ok: true };
   }
 
   async getAdminBilling(status?: string) {
     const statusFilter = (status || '').toUpperCase();
     const whereStatus = ['UNPAID', 'PENDING_VERIFICATION', 'VERIFIED', 'REJECTED'].includes(statusFilter)
-      ? `AND br.status = ${sqlLiteral(statusFilter)}::payment_status`
+      ? 'AND br.status = $1::payment_status'
       : '';
-    const out = await runSql(`
+    const out = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT br.id,
@@ -2438,7 +2526,9 @@ export class CoreService {
           ${whereStatus}
         ORDER BY br.created_at DESC
       ) t;
-    `);
+    `,
+      whereStatus ? [statusFilter] : [],
+    );
     return this.parseJsonLines<Record<string, unknown> & { total_price?: string | number }>(out).map((row) => ({
       ...row,
       total_price: Number(row.total_price || 0),
@@ -2447,20 +2537,22 @@ export class CoreService {
 
   async verifyBilling(actor: AccessUser, billingId: string, decision: 'VERIFIED' | 'REJECTED') {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
-    await runSql(`
-      UPDATE billing_records
-      SET status = ${sqlLiteral(decision)}::payment_status,
-          verified_by = ${sqlLiteral(actor.uid)},
-          verified_at = now(),
-          updated_at = now()
-      WHERE id = ${sqlLiteral(billingId)};
-    `);
+    await runSql(
+      `UPDATE billing_records
+       SET status = $1::payment_status,
+           verified_by = $2,
+           verified_at = now(),
+           updated_at = now()
+       WHERE id = $3;`,
+      [decision, actor.uid, billingId],
+    );
     return { ok: true, status: decision };
   }
 
   async generateReceipt(actor: AccessUser, billingId: string) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
-    const billingOut = await runSql(`
+    const billingOut = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT br.id,
@@ -2479,10 +2571,12 @@ export class CoreService {
         JOIN users up ON up.id = p.user_id
         JOIN children c ON c.id = o.child_id
         JOIN users uc ON uc.id = c.user_id
-        WHERE br.id = ${sqlLiteral(billingId)}
+        WHERE br.id = $1
         LIMIT 1
       ) t;
-    `);
+    `,
+      [billingId],
+    );
     if (!billingOut) throw new NotFoundException('Billing record not found');
     const billing = this.parseJsonLine<{
       id: string;
@@ -2500,15 +2594,18 @@ export class CoreService {
     const seq = Number(await runSql(`SELECT nextval('receipt_number_seq');`) || 0);
     const nowYear = new Date().getUTCFullYear();
     const receiptNumber = `BLC-${nowYear}-${String(seq).padStart(5, '0')}`;
-    const itemsOut = await runSql(`
+    const itemsOut = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT oi.item_name_snapshot, oi.quantity, oi.price_snapshot
         FROM order_items oi
-        WHERE oi.order_id = ${sqlLiteral(billing.order_id)}
+        WHERE oi.order_id = $1
         ORDER BY oi.created_at ASC
       ) t;
-    `);
+    `,
+      [billing.order_id],
+    );
     const items = this.parseJsonLines<{
       item_name_snapshot: string;
       quantity: number | string;
@@ -2542,32 +2639,30 @@ export class CoreService {
     });
     const pdfUrl = uploadedReceipt.publicUrl;
 
-    await runSql(`
-      INSERT INTO digital_receipts (billing_record_id, receipt_number, pdf_url, generated_at, generated_by_user_id)
-      VALUES (
-        ${sqlLiteral(billing.id)},
-        ${sqlLiteral(receiptNumber)},
-        ${sqlLiteral(pdfUrl)},
-        now(),
-        ${sqlLiteral(actor.uid)}
-      )
-      ON CONFLICT (billing_record_id)
-      DO UPDATE SET receipt_number = EXCLUDED.receipt_number, pdf_url = EXCLUDED.pdf_url, generated_at = now(), generated_by_user_id = EXCLUDED.generated_by_user_id;
-    `);
+    await runSql(
+      `INSERT INTO digital_receipts (billing_record_id, receipt_number, pdf_url, generated_at, generated_by_user_id)
+       VALUES ($1, $2, $3, now(), $4)
+       ON CONFLICT (billing_record_id)
+       DO UPDATE SET receipt_number = EXCLUDED.receipt_number, pdf_url = EXCLUDED.pdf_url, generated_at = now(), generated_by_user_id = EXCLUDED.generated_by_user_id;`,
+      [billing.id, receiptNumber, pdfUrl, actor.uid],
+    );
     return { ok: true, receiptNumber, pdfUrl };
   }
 
   async getBillingReceipt(actor: AccessUser, billingId: string) {
-    const out = await runSql(`
+    const out = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT br.id, br.parent_id, dr.receipt_number, dr.pdf_url, dr.generated_at::text AS generated_at
         FROM billing_records br
         LEFT JOIN digital_receipts dr ON dr.billing_record_id = br.id
-        WHERE br.id = ${sqlLiteral(billingId)}
+        WHERE br.id = $1
         LIMIT 1
       ) t;
-    `);
+    `,
+      [billingId],
+    );
     if (!out) throw new NotFoundException('Billing record not found');
     const row = this.parseJsonLine<{ id: string; parent_id: string; receipt_number?: string; pdf_url?: string }>(out);
     if (actor.role === 'PARENT') {
@@ -2625,33 +2720,36 @@ export class CoreService {
     if (!deliveryUserId || !schoolId) throw new BadRequestException('deliveryUserId and schoolId are required');
     const isActive = input.isActive !== false;
 
-    const deliveryExists = await runSql(`
-      SELECT EXISTS (
-        SELECT 1
-        FROM users
-        WHERE id = ${sqlLiteral(deliveryUserId)}
-          AND role = 'DELIVERY'
-          AND is_active = true
-      );
-    `);
+    const deliveryExists = await runSql(
+      `SELECT EXISTS (
+         SELECT 1
+         FROM users
+         WHERE id = $1
+           AND role = 'DELIVERY'
+           AND is_active = true
+       );`,
+      [deliveryUserId],
+    );
     if (deliveryExists !== 't') throw new BadRequestException('Delivery user not found or inactive');
 
-    const schoolExists = await runSql(`
-      SELECT EXISTS (
-        SELECT 1
-        FROM schools
-        WHERE id = ${sqlLiteral(schoolId)}
-          AND deleted_at IS NULL
-      );
-    `);
+    const schoolExists = await runSql(
+      `SELECT EXISTS (
+         SELECT 1
+         FROM schools
+         WHERE id = $1
+           AND deleted_at IS NULL
+       );`,
+      [schoolId],
+    );
     if (schoolExists !== 't') throw new BadRequestException('School not found');
 
-    await runSql(`
-      INSERT INTO delivery_school_assignments (delivery_user_id, school_id, is_active, updated_at)
-      VALUES (${sqlLiteral(deliveryUserId)}, ${sqlLiteral(schoolId)}, ${isActive ? 'true' : 'false'}, now())
-      ON CONFLICT (delivery_user_id, school_id)
-      DO UPDATE SET is_active = EXCLUDED.is_active, updated_at = now();
-    `);
+    await runSql(
+      `INSERT INTO delivery_school_assignments (delivery_user_id, school_id, is_active, updated_at)
+       VALUES ($1, $2, $3, now())
+       ON CONFLICT (delivery_user_id, school_id)
+       DO UPDATE SET is_active = EXCLUDED.is_active, updated_at = now();`,
+      [deliveryUserId, schoolId, isActive],
+    );
     return { ok: true };
   }
 
@@ -2660,30 +2758,36 @@ export class CoreService {
     await this.ensureDeliverySchoolAssignmentsTable();
     const serviceDate = dateRaw ? this.validateServiceDate(dateRaw) : new Date().toISOString().slice(0, 10);
 
-    const ordersOut = await runSql(`
+    const ordersOut = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT o.id AS order_id, c.school_id
         FROM orders o
         JOIN children c ON c.id = o.child_id
-        WHERE o.service_date = DATE ${sqlLiteral(serviceDate)}
+        WHERE o.service_date = DATE $1
           AND o.status IN ('PLACED', 'LOCKED')
           AND o.delivery_status <> 'DELIVERED'
       ) t;
-    `);
+    `,
+      [serviceDate],
+    );
     const orders = this.parseJsonLines<{ order_id: string; school_id: string }>(ordersOut);
     if (orders.length === 0) return { ok: true, serviceDate, assignedCount: 0, skippedOrderIds: [] as string[] };
 
-    const loadOut = await runSql(`
+    const loadOut = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT da.delivery_user_id, COUNT(*)::int AS assigned_count
         FROM delivery_assignments da
         JOIN orders o ON o.id = da.order_id
-        WHERE o.service_date = DATE ${sqlLiteral(serviceDate)}
+        WHERE o.service_date = DATE $1
         GROUP BY da.delivery_user_id
       ) t;
-    `);
+    `,
+      [serviceDate],
+    );
     const loads = this.parseJsonLines<{ delivery_user_id: string; assigned_count: number }>(loadOut);
     const loadMap = new Map<string, number>(loads.map((x) => [x.delivery_user_id, Number(x.assigned_count || 0)]));
 
@@ -2718,22 +2822,25 @@ export class CoreService {
       const selected = [...candidates].sort((a, b) => (loadMap.get(a) || 0) - (loadMap.get(b) || 0))[0];
       loadMap.set(selected, (loadMap.get(selected) || 0) + 1);
 
-      await runSql(`
-        INSERT INTO delivery_assignments (order_id, delivery_user_id, assigned_at)
-        VALUES (${sqlLiteral(order.order_id)}, ${sqlLiteral(selected)}, now())
-        ON CONFLICT (order_id)
-        DO UPDATE SET delivery_user_id = EXCLUDED.delivery_user_id, assigned_at = now(), updated_at = now();
-      `);
-      await runSql(`
-        UPDATE orders
-        SET delivery_status = 'ASSIGNED', updated_at = now()
-        WHERE id = ${sqlLiteral(order.order_id)};
-      `);
-      await runSql(`
-        UPDATE billing_records
-        SET delivery_status = 'ASSIGNED', updated_at = now()
-        WHERE order_id = ${sqlLiteral(order.order_id)};
-      `);
+      await runSql(
+        `INSERT INTO delivery_assignments (order_id, delivery_user_id, assigned_at)
+         VALUES ($1, $2, now())
+         ON CONFLICT (order_id)
+         DO UPDATE SET delivery_user_id = EXCLUDED.delivery_user_id, assigned_at = now(), updated_at = now();`,
+        [order.order_id, selected],
+      );
+      await runSql(
+        `UPDATE orders
+         SET delivery_status = 'ASSIGNED', updated_at = now()
+         WHERE id = $1;`,
+        [order.order_id],
+      );
+      await runSql(
+        `UPDATE billing_records
+         SET delivery_status = 'ASSIGNED', updated_at = now()
+         WHERE order_id = $1;`,
+        [order.order_id],
+      );
       assignedCount += 1;
     }
 
@@ -2746,22 +2853,25 @@ export class CoreService {
     const deliveryUserId = (input.deliveryUserId || '').trim();
     if (!deliveryUserId || orderIds.length === 0) throw new BadRequestException('orderIds and deliveryUserId are required');
     for (const orderId of orderIds) {
-      await runSql(`
-        INSERT INTO delivery_assignments (order_id, delivery_user_id, assigned_at)
-        VALUES (${sqlLiteral(orderId)}, ${sqlLiteral(deliveryUserId)}, now())
-        ON CONFLICT (order_id)
-        DO UPDATE SET delivery_user_id = EXCLUDED.delivery_user_id, assigned_at = now(), updated_at = now();
-      `);
-      await runSql(`
-        UPDATE orders
-        SET delivery_status = 'ASSIGNED', updated_at = now()
-        WHERE id = ${sqlLiteral(orderId)};
-      `);
-      await runSql(`
-        UPDATE billing_records
-        SET delivery_status = 'ASSIGNED', updated_at = now()
-        WHERE order_id = ${sqlLiteral(orderId)};
-      `);
+      await runSql(
+        `INSERT INTO delivery_assignments (order_id, delivery_user_id, assigned_at)
+         VALUES ($1, $2, now())
+         ON CONFLICT (order_id)
+         DO UPDATE SET delivery_user_id = EXCLUDED.delivery_user_id, assigned_at = now(), updated_at = now();`,
+        [orderId, deliveryUserId],
+      );
+      await runSql(
+        `UPDATE orders
+         SET delivery_status = 'ASSIGNED', updated_at = now()
+         WHERE id = $1;`,
+        [orderId],
+      );
+      await runSql(
+        `UPDATE billing_records
+         SET delivery_status = 'ASSIGNED', updated_at = now()
+         WHERE order_id = $1;`,
+        [orderId],
+      );
     }
     return { ok: true, assignedCount: orderIds.length };
   }
@@ -2769,9 +2879,21 @@ export class CoreService {
   async getDeliveryAssignments(actor: AccessUser, dateRaw?: string) {
     if (!['DELIVERY', 'ADMIN'].includes(actor.role)) throw new ForbiddenException('Role not allowed');
     const serviceDate = dateRaw ? this.validateServiceDate(dateRaw) : null;
-    const roleFilter = actor.role === 'DELIVERY' ? `AND da.delivery_user_id = ${sqlLiteral(actor.uid)}` : '';
-    const dateFilter = serviceDate ? `AND o.service_date = DATE ${sqlLiteral(serviceDate)}` : '';
-    const out = await runSql(`
+    const params: unknown[] = [];
+    const roleFilter = actor.role === 'DELIVERY'
+      ? (() => {
+          params.push(actor.uid);
+          return `AND da.delivery_user_id = $${params.length}`;
+        })()
+      : '';
+    const dateFilter = serviceDate
+      ? (() => {
+          params.push(serviceDate);
+          return `AND o.service_date = DATE $${params.length}`;
+        })()
+      : '';
+    const out = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT da.id,
@@ -2798,48 +2920,56 @@ export class CoreService {
           ${dateFilter}
         ORDER BY o.service_date DESC, da.assigned_at DESC
       ) t;
-    `);
+    `,
+      params,
+    );
     return this.parseJsonLines(out);
   }
 
   async confirmDelivery(actor: AccessUser, assignmentId: string, note?: string) {
     if (actor.role !== 'DELIVERY') throw new ForbiddenException('Role not allowed');
-    const out = await runSql(`
+    const out = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT id, order_id, delivery_user_id, confirmed_at
         FROM delivery_assignments
-        WHERE id = ${sqlLiteral(assignmentId)}
+        WHERE id = $1
         LIMIT 1
       ) t;
-    `);
+    `,
+      [assignmentId],
+    );
     if (!out) throw new NotFoundException('Assignment not found');
     const assignment = this.parseJsonLine<{ id: string; order_id: string; delivery_user_id: string; confirmed_at?: string | null }>(out);
     if (assignment.delivery_user_id !== actor.uid) throw new ForbiddenException('DELIVERY_ASSIGNMENT_FORBIDDEN');
     if (assignment.confirmed_at) return { ok: true, alreadyConfirmed: true };
 
-    await runSql(`
-      UPDATE delivery_assignments
-      SET confirmed_at = now(),
-          confirmation_note = ${note ? sqlLiteral(note.trim().slice(0, 500)) : 'NULL'},
-          updated_at = now()
-      WHERE id = ${sqlLiteral(assignment.id)};
-    `);
-    await runSql(`
-      UPDATE orders
-      SET delivery_status = 'DELIVERED',
-          delivered_at = now(),
-          delivered_by_user_id = ${sqlLiteral(actor.uid)},
-          updated_at = now()
-      WHERE id = ${sqlLiteral(assignment.order_id)};
-    `);
-    await runSql(`
-      UPDATE billing_records
-      SET delivery_status = 'DELIVERED',
-          delivered_at = now(),
-          updated_at = now()
-      WHERE order_id = ${sqlLiteral(assignment.order_id)};
-    `);
+    await runSql(
+      `UPDATE delivery_assignments
+       SET confirmed_at = now(),
+           confirmation_note = $1,
+           updated_at = now()
+       WHERE id = $2;`,
+      [note ? note.trim().slice(0, 500) : null, assignment.id],
+    );
+    await runSql(
+      `UPDATE orders
+       SET delivery_status = 'DELIVERED',
+           delivered_at = now(),
+           delivered_by_user_id = $1,
+           updated_at = now()
+       WHERE id = $2;`,
+      [actor.uid, assignment.order_id],
+    );
+    await runSql(
+      `UPDATE billing_records
+       SET delivery_status = 'DELIVERED',
+           delivered_at = now(),
+           updated_at = now()
+       WHERE order_id = $1;`,
+      [assignment.order_id],
+    );
     return { ok: true };
   }
 
@@ -2848,17 +2978,20 @@ export class CoreService {
     orderId: string,
     input: { serviceDate?: string; session?: string; items?: CartItemInput[] },
   ) {
-    const out = await runSql(`
+    const out = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT o.id, o.child_id, o.service_date::text AS service_date, o.session::text AS session,
                o.status::text AS status, o.total_price, o.dietary_snapshot
         FROM orders o
-        WHERE o.id = ${sqlLiteral(orderId)}
+        WHERE o.id = $1
           AND o.deleted_at IS NULL
         LIMIT 1
       ) t;
-    `);
+    `,
+      [orderId],
+    );
     if (!out) throw new NotFoundException('Order not found');
     const order = this.parseJsonLine<{
       id: string;
@@ -2912,22 +3045,25 @@ export class CoreService {
     if (ids.length !== normalized.length) {
       throw new BadRequestException('Duplicate menu items are not allowed');
     }
-    const idList = ids.map((id) => sqlLiteral(id)).join(', ');
-    const validOut = await runSql(`
+    const idPh = ids.map((_, i) => `$${i + 1}`).join(', ');
+    const validOut = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT mi.id, mi.name, mi.price
         FROM menu_items mi
         JOIN menus m ON m.id = mi.menu_id
-        WHERE mi.id IN (${idList})
+        WHERE mi.id IN (${idPh})
           AND mi.is_available = true
           AND mi.deleted_at IS NULL
           AND m.is_published = true
           AND m.deleted_at IS NULL
-          AND m.service_date = DATE ${sqlLiteral(targetServiceDate)}
-          AND m.session = ${sqlLiteral(targetSession)}::session_type
+          AND m.service_date = DATE $${ids.length + 1}
+          AND m.session = $${ids.length + 2}::session_type
       ) t;
-    `);
+    `,
+      [...ids, targetServiceDate, targetSession],
+    );
     const validRows = this.parseJsonLines<{ id: string; name: string; price: string | number }>(validOut);
     if (validRows.length !== ids.length) {
       throw new BadRequestException('ORDER_MENU_UNAVAILABLE');
@@ -2939,59 +3075,56 @@ export class CoreService {
       return sum + price * item.quantity;
     }, 0);
 
-    const dietaryOut = await runSql(`
-      SELECT coalesce(string_agg(cdr.restriction_label || ': ' || coalesce(cdr.restriction_details, ''), '; '), '')
-      FROM child_dietary_restrictions cdr
-      WHERE cdr.child_id = ${sqlLiteral(order.child_id)}
-        AND cdr.is_active = true
-        AND cdr.deleted_at IS NULL;
-    `);
+    const dietaryOut = await runSql(
+      `SELECT coalesce(string_agg(cdr.restriction_label || ': ' || coalesce(cdr.restriction_details, ''), '; '), '')
+       FROM child_dietary_restrictions cdr
+       WHERE cdr.child_id = $1
+         AND cdr.is_active = true
+         AND cdr.deleted_at IS NULL;`,
+      [order.child_id],
+    );
     const dietarySnapshot = dietaryOut || '';
 
-    await runSql(`
-      UPDATE orders
-      SET service_date = DATE ${sqlLiteral(targetServiceDate)},
-          session = ${sqlLiteral(targetSession)}::session_type,
-          total_price = ${totalPrice.toFixed(2)},
-          dietary_snapshot = ${dietarySnapshot ? sqlLiteral(dietarySnapshot) : 'NULL'},
-          updated_at = now()
-      WHERE id = ${sqlLiteral(order.id)};
-    `);
+    await runSql(
+      `UPDATE orders
+       SET service_date = DATE $1,
+           session = $2::session_type,
+           total_price = $3,
+           dietary_snapshot = $4,
+           updated_at = now()
+       WHERE id = $5;`,
+      [targetServiceDate, targetSession, Number(totalPrice.toFixed(2)), dietarySnapshot || null, order.id],
+    );
 
-    await runSql(`DELETE FROM order_items WHERE order_id = ${sqlLiteral(order.id)};`);
+    await runSql(`DELETE FROM order_items WHERE order_id = $1;`, [order.id]);
     for (const item of normalized) {
       const row = byId.get(item.menuItemId);
-      await runSql(`
-        INSERT INTO order_items (order_id, menu_item_id, item_name_snapshot, price_snapshot, quantity)
-        VALUES (
-          ${sqlLiteral(order.id)},
-          ${sqlLiteral(item.menuItemId)},
-          ${sqlLiteral(row?.name || '')},
-          ${Number(row?.price || 0).toFixed(2)},
-          ${item.quantity}
-        );
-      `);
+      await runSql(
+        `INSERT INTO order_items (order_id, menu_item_id, item_name_snapshot, price_snapshot, quantity)
+         VALUES ($1, $2, $3, $4, $5);`,
+        [order.id, item.menuItemId, row?.name || '', Number(Number(row?.price || 0).toFixed(2)), item.quantity],
+      );
     }
 
-    await runSql(`
-      INSERT INTO order_mutations (order_id, action, actor_user_id, before_json, after_json)
-      VALUES (
-        ${sqlLiteral(order.id)},
-        'ORDER_UPDATED',
-        ${sqlLiteral(actor.uid)},
-        ${sqlLiteral(JSON.stringify({
+    await runSql(
+      `INSERT INTO order_mutations (order_id, action, actor_user_id, before_json, after_json)
+       VALUES ($1, 'ORDER_UPDATED', $2, $3::jsonb, $4::jsonb);`,
+      [
+        order.id,
+        actor.uid,
+        JSON.stringify({
           serviceDate: order.service_date,
           session: order.session,
           totalPrice: Number(order.total_price),
-        }))}::jsonb,
-        ${sqlLiteral(JSON.stringify({
+        }),
+        JSON.stringify({
           serviceDate: targetServiceDate,
           session: targetSession,
           totalPrice,
           itemCount: normalized.length,
-        }))}::jsonb
-      );
-    `);
+        }),
+      ],
+    );
 
     return {
       id: order.id,
@@ -3008,16 +3141,19 @@ export class CoreService {
   }
 
   async deleteOrder(actor: AccessUser, orderId: string) {
-    const out = await runSql(`
+    const out = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT o.id, o.child_id, o.service_date::text AS service_date, o.status::text AS status
         FROM orders o
-        WHERE o.id = ${sqlLiteral(orderId)}
+        WHERE o.id = $1
           AND o.deleted_at IS NULL
         LIMIT 1
       ) t;
-    `);
+    `,
+      [orderId],
+    );
     if (!out) throw new NotFoundException('Order not found');
     const order = this.parseJsonLine<{ id: string; child_id: string; service_date: string; status: string }>(out);
 
@@ -3036,30 +3172,27 @@ export class CoreService {
       throw new ForbiddenException('Role not allowed');
     }
 
-    await runSql(`
-      UPDATE orders
-      SET status = 'CANCELLED', deleted_at = now(), updated_at = now()
-      WHERE id = ${sqlLiteral(order.id)};
-    `);
+    await runSql(
+      `UPDATE orders
+       SET status = 'CANCELLED', deleted_at = now(), updated_at = now()
+       WHERE id = $1;`,
+      [order.id],
+    );
 
-    await runSql(`
-      INSERT INTO order_mutations (order_id, action, actor_user_id, before_json, after_json)
-      VALUES (
-        ${sqlLiteral(order.id)},
-        'ORDER_CANCELLED',
-        ${sqlLiteral(actor.uid)},
-        ${sqlLiteral(JSON.stringify({ status: order.status }))}::jsonb,
-        ${sqlLiteral(JSON.stringify({ status: 'CANCELLED' }))}::jsonb
-      );
-    `);
+    await runSql(
+      `INSERT INTO order_mutations (order_id, action, actor_user_id, before_json, after_json)
+       VALUES ($1, 'ORDER_CANCELLED', $2, $3::jsonb, $4::jsonb);`,
+      [order.id, actor.uid, JSON.stringify({ status: order.status }), JSON.stringify({ status: 'CANCELLED' })],
+    );
 
     return { ok: true };
   }
 
   async getAdminRevenueDashboard(fromDateRaw?: string, toDateRaw?: string) {
     const toDate = toDateRaw ? this.validateServiceDate(toDateRaw) : await runSql(`SELECT (now() AT TIME ZONE 'Asia/Makassar')::date::text;`);
-    const fromDate = fromDateRaw ? this.validateServiceDate(fromDateRaw) : await runSql(`SELECT (DATE ${sqlLiteral(toDate)} - INTERVAL '30 day')::date::text;`);
-    const bySchoolOut = await runSql(`
+    const fromDate = fromDateRaw ? this.validateServiceDate(fromDateRaw) : await runSql(`SELECT (DATE $1 - INTERVAL '30 day')::date::text;`, [toDate]);
+    const bySchoolOut = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT s.id AS school_id,
@@ -3069,34 +3202,42 @@ export class CoreService {
         FROM orders o
         JOIN children c ON c.id = o.child_id
         JOIN schools s ON s.id = c.school_id
-        WHERE o.service_date BETWEEN DATE ${sqlLiteral(fromDate)} AND DATE ${sqlLiteral(toDate)}
+        WHERE o.service_date BETWEEN DATE $1 AND DATE $2
           AND o.status <> 'CANCELLED'
           AND o.deleted_at IS NULL
         GROUP BY s.id, s.name
         ORDER BY total_revenue DESC, school_name ASC
       ) t;
-    `);
-    const bySessionOut = await runSql(`
+    `,
+      [fromDate, toDate],
+    );
+    const bySessionOut = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT o.session::text AS session,
                COUNT(o.id)::int AS orders_count,
                COALESCE(SUM(o.total_price), 0)::numeric AS total_revenue
         FROM orders o
-        WHERE o.service_date BETWEEN DATE ${sqlLiteral(fromDate)} AND DATE ${sqlLiteral(toDate)}
+        WHERE o.service_date BETWEEN DATE $1 AND DATE $2
           AND o.status <> 'CANCELLED'
           AND o.deleted_at IS NULL
         GROUP BY o.session
         ORDER BY o.session ASC
       ) t;
-    `);
-    const totalRevenue = Number(await runSql(`
+    `,
+      [fromDate, toDate],
+    );
+    const totalRevenue = Number(await runSql(
+      `
       SELECT COALESCE(SUM(total_price), 0)::numeric
       FROM orders
-      WHERE service_date BETWEEN DATE ${sqlLiteral(fromDate)} AND DATE ${sqlLiteral(toDate)}
+      WHERE service_date BETWEEN DATE $1 AND DATE $2
         AND status <> 'CANCELLED'
         AND deleted_at IS NULL;
-    `) || 0);
+    `,
+      [fromDate, toDate],
+    ) || 0);
     return {
       fromDate,
       toDate,
@@ -3114,7 +3255,8 @@ export class CoreService {
 
   async getAdminPrintReport(dateRaw?: string) {
     const date = dateRaw ? this.validateServiceDate(dateRaw) : await runSql(`SELECT (now() AT TIME ZONE 'Asia/Makassar')::date::text;`);
-    const out = await runSql(`
+    const out = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT o.id AS order_id,
@@ -3134,12 +3276,14 @@ export class CoreService {
         LEFT JOIN parents p ON p.id = pc.parent_id
         LEFT JOIN users up ON up.id = p.user_id
         LEFT JOIN billing_records br ON br.order_id = o.id
-        WHERE o.service_date = DATE ${sqlLiteral(date)}
+        WHERE o.service_date = DATE $1
           AND o.status <> 'CANCELLED'
           AND o.deleted_at IS NULL
         ORDER BY o.session ASC, school_name ASC, child_name ASC
       ) t;
-    `);
+    `,
+      [date],
+    );
     const rows = this.parseJsonLines<Record<string, unknown> & { total_price?: string | number }>(out).map((r) => ({
       ...r,
       total_price: Number(r.total_price || 0),
@@ -3158,9 +3302,10 @@ export class CoreService {
     if (!parentId) throw new BadRequestException('Parent profile not found');
     const month = monthRaw && /^\d{4}-\d{2}$/.test(monthRaw) ? monthRaw : await runSql(`SELECT to_char((now() AT TIME ZONE 'Asia/Makassar')::date, 'YYYY-MM');`);
     const monthStart = `${month}-01`;
-    const monthEnd = await runSql(`SELECT (DATE ${sqlLiteral(monthStart)} + INTERVAL '1 month - 1 day')::date::text;`);
+    const monthEnd = await runSql(`SELECT (DATE $1 + INTERVAL '1 month - 1 day')::date::text;`, [monthStart]);
 
-    const byChildOut = await runSql(`
+    const byChildOut = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT c.id AS child_id,
@@ -3171,25 +3316,31 @@ export class CoreService {
         JOIN children c ON c.id = o.child_id
         JOIN users u ON u.id = c.user_id
         JOIN parent_children pc ON pc.child_id = c.id
-        WHERE pc.parent_id = ${sqlLiteral(parentId)}
-          AND o.service_date BETWEEN DATE ${sqlLiteral(monthStart)} AND DATE ${sqlLiteral(monthEnd)}
+        WHERE pc.parent_id = $1
+          AND o.service_date BETWEEN DATE $2 AND DATE $3
           AND o.status <> 'CANCELLED'
           AND o.deleted_at IS NULL
         GROUP BY c.id, u.first_name, u.last_name
         ORDER BY total_spend DESC, child_name ASC
       ) t;
-    `);
-    const totalMonthSpend = Number(await runSql(`
+    `,
+      [parentId, monthStart, monthEnd],
+    );
+    const totalMonthSpend = Number(await runSql(
+      `
       SELECT COALESCE(SUM(o.total_price), 0)::numeric
       FROM orders o
       JOIN parent_children pc ON pc.child_id = o.child_id
-      WHERE pc.parent_id = ${sqlLiteral(parentId)}
-        AND o.service_date BETWEEN DATE ${sqlLiteral(monthStart)} AND DATE ${sqlLiteral(monthEnd)}
+      WHERE pc.parent_id = $1
+        AND o.service_date BETWEEN DATE $2 AND DATE $3
         AND o.status <> 'CANCELLED'
         AND o.deleted_at IS NULL;
-    `) || 0);
+    `,
+      [parentId, monthStart, monthEnd],
+    ) || 0);
 
-    const birthdayOut = await runSql(`
+    const birthdayOut = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT c.id AS child_id,
@@ -3198,12 +3349,14 @@ export class CoreService {
         FROM children c
         JOIN users u ON u.id = c.user_id
         JOIN parent_children pc ON pc.child_id = c.id
-        WHERE pc.parent_id = ${sqlLiteral(parentId)}
+        WHERE pc.parent_id = $1
           AND c.is_active = true
           AND c.deleted_at IS NULL
         ORDER BY u.first_name, u.last_name
       ) t;
-    `);
+    `,
+      [parentId],
+    );
     const today = new Date();
     const birthdayHighlights = this.parseJsonLines<{ child_id: string; child_name: string; date_of_birth: string }>(birthdayOut).map((row) => {
       const dob = new Date(row.date_of_birth);
@@ -3229,12 +3382,14 @@ export class CoreService {
     const childId = await this.getChildIdByUserId(actor.uid);
     if (!childId) throw new NotFoundException('Youngster profile not found');
     const refDate = dateRaw ? this.validateServiceDate(dateRaw) : await runSql(`SELECT (now() AT TIME ZONE 'Asia/Makassar')::date::text;`);
-    const weekStart = await runSql(`
-      SELECT (DATE ${sqlLiteral(refDate)} - ((extract(isodow FROM DATE ${sqlLiteral(refDate)})::int - 1) * INTERVAL '1 day'))::date::text;
-    `);
-    const weekEnd = await runSql(`SELECT (DATE ${sqlLiteral(weekStart)} + INTERVAL '6 day')::date::text;`);
+    const weekStart = await runSql(
+      `SELECT (DATE $1 - ((extract(isodow FROM DATE $1)::int - 1) * INTERVAL '1 day'))::date::text;`,
+      [refDate],
+    );
+    const weekEnd = await runSql(`SELECT (DATE $1 + INTERVAL '6 day')::date::text;`, [weekStart]);
 
-    const nutritionOut = await runSql(`
+    const nutritionOut = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT o.service_date::text AS service_date,
@@ -3243,19 +3398,21 @@ export class CoreService {
         FROM orders o
         JOIN order_items oi ON oi.order_id = o.id
         LEFT JOIN menu_items mi ON mi.id = oi.menu_item_id
-        WHERE o.child_id = ${sqlLiteral(childId)}
-          AND o.service_date BETWEEN DATE ${sqlLiteral(weekStart)} AND DATE ${sqlLiteral(weekEnd)}
+        WHERE o.child_id = $1
+          AND o.service_date BETWEEN DATE $2 AND DATE $3
           AND o.status <> 'CANCELLED'
           AND o.deleted_at IS NULL
         GROUP BY o.service_date
         ORDER BY o.service_date ASC
       ) t;
-    `);
+    `,
+      [childId, weekStart, weekEnd],
+    );
     const nutritionRows = this.parseJsonLines<{ service_date: string; calories_total: number; tba_items: number }>(nutritionOut);
     const byDate = new Map(nutritionRows.map((r) => [r.service_date, r]));
     const days: Array<{ service_date: string; calories_display: string; tba_items: number }> = [];
     for (let i = 0; i < 7; i += 1) {
-      const d = await runSql(`SELECT (DATE ${sqlLiteral(weekStart)} + INTERVAL '${i} day')::date::text;`);
+      const d = await runSql(`SELECT (DATE $1 + ($2::text || ' day')::interval)::date::text;`, [weekStart, i]);
       const row = byDate.get(d);
       days.push({
         service_date: d,
@@ -3265,16 +3422,19 @@ export class CoreService {
     }
     const weekCalories = nutritionRows.reduce((sum, r) => sum + Number(r.calories_total || 0), 0);
 
-    const orderDatesOut = await runSql(`
+    const orderDatesOut = await runSql(
+      `
       SELECT to_char(o.service_date, 'YYYY-MM-DD')
       FROM orders o
-      WHERE o.child_id = ${sqlLiteral(childId)}
-        AND o.service_date >= (DATE ${sqlLiteral(refDate)} - INTERVAL '70 day')
+      WHERE o.child_id = $1
+        AND o.service_date >= (DATE $2 - INTERVAL '70 day')
         AND o.status <> 'CANCELLED'
         AND o.deleted_at IS NULL
       GROUP BY o.service_date
       ORDER BY o.service_date ASC;
-    `);
+    `,
+      [childId, refDate],
+    );
     const orderDates = orderDatesOut ? orderDatesOut.split('\n').map((x) => x.trim()).filter(Boolean) : [];
     let maxStreak = 0;
     let currentStreak = 0;
@@ -3290,17 +3450,20 @@ export class CoreService {
       prev = now;
     }
     const currentMonth = refDate.slice(0, 7);
-    const previousMonth = await runSql(`SELECT to_char((DATE ${sqlLiteral(refDate)} - INTERVAL '1 month')::date, 'YYYY-MM');`);
-    const monthRowsOut = await runSql(`
+    const previousMonth = await runSql(`SELECT to_char((DATE $1 - INTERVAL '1 month')::date, 'YYYY-MM');`, [refDate]);
+    const monthRowsOut = await runSql(
+      `
       SELECT to_char(service_date, 'YYYY-MM-DD')
       FROM orders
-      WHERE child_id = ${sqlLiteral(childId)}
-        AND to_char(service_date, 'YYYY-MM') IN (${sqlLiteral(currentMonth)}, ${sqlLiteral(previousMonth)})
+      WHERE child_id = $1
+        AND to_char(service_date, 'YYYY-MM') IN ($2, $3)
         AND status <> 'CANCELLED'
         AND deleted_at IS NULL
       GROUP BY service_date
       ORDER BY service_date ASC;
-    `);
+    `,
+      [childId, currentMonth, previousMonth],
+    );
     const monthDates = monthRowsOut ? monthRowsOut.split('\n').map((x) => x.trim()).filter(Boolean) : [];
     const isoWeek = (d: string) => {
       const dt = new Date(`${d}T00:00:00.000Z`);
@@ -3349,7 +3512,8 @@ export class CoreService {
     if (!['KITCHEN', 'ADMIN'].includes(actor.role)) throw new ForbiddenException('Role not allowed');
     const serviceDate = dateRaw ? this.validateServiceDate(dateRaw) : new Date().toISOString().slice(0, 10);
 
-    const totalsOut = await runSql(`
+    const totalsOut = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT COUNT(*)::int AS total_orders,
@@ -3359,10 +3523,12 @@ export class CoreService {
                COUNT(*) FILTER (WHERE o.session = 'LUNCH')::int AS lunch_orders
         FROM orders o
         LEFT JOIN order_items oi ON oi.order_id = o.id
-        WHERE o.service_date = DATE ${sqlLiteral(serviceDate)}
+        WHERE o.service_date = DATE $1
           AND o.status IN ('PLACED', 'LOCKED')
       ) t;
-    `);
+    `,
+      [serviceDate],
+    );
     const totals = this.parseJsonLine<{
       total_orders: number;
       total_dishes: number;
@@ -3371,7 +3537,8 @@ export class CoreService {
       lunch_orders: number;
     }>(totalsOut || '{"total_orders":0,"total_dishes":0,"breakfast_orders":0,"snack_orders":0,"lunch_orders":0}');
 
-    const ordersOut = await runSql(`
+    const ordersOut = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
         SELECT o.id,
@@ -3393,12 +3560,14 @@ export class CoreService {
         LEFT JOIN order_items oi ON oi.order_id = o.id
         LEFT JOIN menu_item_ingredients mii ON mii.menu_item_id = oi.menu_item_id
         LEFT JOIN ingredients i ON i.id = mii.ingredient_id AND i.deleted_at IS NULL
-        WHERE o.service_date = DATE ${sqlLiteral(serviceDate)}
+        WHERE o.service_date = DATE $1
           AND o.status IN ('PLACED', 'LOCKED')
         GROUP BY o.id, uc.first_name, uc.last_name, up.first_name, up.last_name
         ORDER BY o.session ASC, child_name ASC
       ) t;
-    `);
+    `,
+      [serviceDate],
+    );
     const orders = this.parseJsonLines<{
       id: string;
       service_date: string;
@@ -3435,20 +3604,17 @@ export class CoreService {
     const address = (input.address || '').trim();
     const city = (input.city || '').trim();
     const contactEmail = (input.contactEmail || '').trim().toLowerCase();
-    const out = await runSql(`
+    const out = await runSql(
+      `
       WITH inserted AS (
         INSERT INTO schools (name, address, city, contact_email, is_active)
-        VALUES (
-          ${sqlLiteral(name)},
-          ${address ? sqlLiteral(address) : 'NULL'},
-          ${city ? sqlLiteral(city) : 'NULL'},
-          ${contactEmail ? sqlLiteral(contactEmail) : 'NULL'},
-          true
-        )
+        VALUES ($1, $2, $3, $4, true)
         RETURNING id, name, city, address, is_active
       )
       SELECT row_to_json(inserted)::text FROM inserted;
-    `);
+    `,
+      [name, address || null, city || null, contactEmail || null],
+    );
     if (!out) throw new BadRequestException('Failed to create school');
     return this.parseJsonLine(out);
   }
@@ -3456,21 +3622,23 @@ export class CoreService {
   async deleteSchool(actor: AccessUser, schoolId: string) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     this.assertValidUuid(schoolId, 'schoolId');
-    const active = await runSql(`
-      SELECT EXISTS (
-        SELECT 1 FROM children c
-        JOIN orders o ON o.child_id = c.id
-        WHERE c.school_id = ${sqlLiteral(schoolId)}
-          AND o.status = 'PLACED'
-          AND o.deleted_at IS NULL
-      );
-    `);
+    const active = await runSql(
+      `SELECT EXISTS (
+         SELECT 1 FROM children c
+         JOIN orders o ON o.child_id = c.id
+         WHERE c.school_id = $1
+           AND o.status = 'PLACED'
+           AND o.deleted_at IS NULL
+       );`,
+      [schoolId],
+    );
     if (active === 't') throw new BadRequestException('Cannot delete school with active orders');
-    const out = await runSql(`
-      UPDATE schools SET deleted_at = now(), updated_at = now(), is_active = false
-      WHERE id = ${sqlLiteral(schoolId)} AND deleted_at IS NULL
-      RETURNING id;
-    `);
+    const out = await runSql(
+      `UPDATE schools SET deleted_at = now(), updated_at = now(), is_active = false
+       WHERE id = $1 AND deleted_at IS NULL
+       RETURNING id;`,
+      [schoolId],
+    );
     if (!out) throw new NotFoundException('School not found');
     return { ok: true };
   }
@@ -3480,25 +3648,28 @@ export class CoreService {
   async updateParentProfile(actor: AccessUser, targetParentId: string, input: { firstName?: string; lastName?: string; phoneNumber?: string; email?: string; address?: string }) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     this.assertValidUuid(targetParentId, 'parentId');
-    const out = await runSql(`
-      SELECT row_to_json(t)::text FROM (
-        SELECT p.id, p.user_id FROM parents p
-        WHERE p.id = ${sqlLiteral(targetParentId)} AND p.deleted_at IS NULL
-      ) t;
-    `);
+    const out = await runSql(
+      `SELECT row_to_json(t)::text FROM (
+         SELECT p.id, p.user_id FROM parents p
+         WHERE p.id = $1 AND p.deleted_at IS NULL
+       ) t;`,
+      [targetParentId],
+    );
     if (!out) throw new NotFoundException('Parent not found');
     const parent = this.parseJsonLine<{ id: string; user_id: string }>(out);
     const updates: string[] = [];
-    if (input.firstName) updates.push(`first_name = ${sqlLiteral(input.firstName.trim())}`);
-    if (input.lastName) updates.push(`last_name = ${sqlLiteral(input.lastName.trim())}`);
-    if (input.phoneNumber) updates.push(`phone_number = ${sqlLiteral(input.phoneNumber.trim())}`);
-    if (input.email) updates.push(`email = ${sqlLiteral(input.email.trim().toLowerCase())}`);
+    const params: unknown[] = [];
+    if (input.firstName) { params.push(input.firstName.trim()); updates.push(`first_name = $${params.length}`); }
+    if (input.lastName) { params.push(input.lastName.trim()); updates.push(`last_name = $${params.length}`); }
+    if (input.phoneNumber) { params.push(input.phoneNumber.trim()); updates.push(`phone_number = $${params.length}`); }
+    if (input.email) { params.push(input.email.trim().toLowerCase()); updates.push(`email = $${params.length}`); }
     if (updates.length > 0) {
       updates.push('updated_at = now()');
-      await runSql(`UPDATE users SET ${updates.join(', ')} WHERE id = ${sqlLiteral(parent.user_id)};`);
+      params.push(parent.user_id);
+      await runSql(`UPDATE users SET ${updates.join(', ')} WHERE id = $${params.length};`, params);
     }
     if (input.address) {
-      await runSql(`UPDATE parents SET address = ${sqlLiteral(input.address.trim())}, updated_at = now() WHERE id = ${sqlLiteral(targetParentId)};`);
+      await runSql(`UPDATE parents SET address = $1, updated_at = now() WHERE id = $2;`, [input.address.trim(), targetParentId]);
     }
     return { ok: true };
   }
@@ -3506,16 +3677,17 @@ export class CoreService {
   async deleteParent(actor: AccessUser, targetParentId: string) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     this.assertValidUuid(targetParentId, 'parentId');
-    const out = await runSql(`
-      SELECT row_to_json(t)::text FROM (
-        SELECT p.id, p.user_id FROM parents p
-        WHERE p.id = ${sqlLiteral(targetParentId)} AND p.deleted_at IS NULL
-      ) t;
-    `);
+    const out = await runSql(
+      `SELECT row_to_json(t)::text FROM (
+         SELECT p.id, p.user_id FROM parents p
+         WHERE p.id = $1 AND p.deleted_at IS NULL
+       ) t;`,
+      [targetParentId],
+    );
     if (!out) throw new NotFoundException('Parent not found');
     const parent = this.parseJsonLine<{ id: string; user_id: string }>(out);
-    await runSql(`UPDATE parents SET deleted_at = now(), updated_at = now() WHERE id = ${sqlLiteral(targetParentId)};`);
-    await runSql(`UPDATE users SET is_active = false, deleted_at = now(), updated_at = now() WHERE id = ${sqlLiteral(parent.user_id)};`);
+    await runSql(`UPDATE parents SET deleted_at = now(), updated_at = now() WHERE id = $1;`, [targetParentId]);
+    await runSql(`UPDATE users SET is_active = false, deleted_at = now(), updated_at = now() WHERE id = $1;`, [parent.user_id]);
     return { ok: true };
   }
 
@@ -3524,28 +3696,33 @@ export class CoreService {
   async updateYoungsterProfile(actor: AccessUser, youngsterId: string, input: { firstName?: string; lastName?: string; schoolGrade?: string; schoolId?: string; gender?: string }) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     this.assertValidUuid(youngsterId, 'youngsterId');
-    const out = await runSql(`
-      SELECT row_to_json(t)::text FROM (
-        SELECT c.id, c.user_id FROM children c
-        WHERE c.id = ${sqlLiteral(youngsterId)} AND c.deleted_at IS NULL
-      ) t;
-    `);
+    const out = await runSql(
+      `SELECT row_to_json(t)::text FROM (
+         SELECT c.id, c.user_id FROM children c
+         WHERE c.id = $1 AND c.deleted_at IS NULL
+       ) t;`,
+      [youngsterId],
+    );
     if (!out) throw new NotFoundException('Youngster not found');
     const child = this.parseJsonLine<{ id: string; user_id: string }>(out);
     const userUpdates: string[] = [];
-    if (input.firstName) userUpdates.push(`first_name = ${sqlLiteral(input.firstName.trim())}`);
-    if (input.lastName) userUpdates.push(`last_name = ${sqlLiteral(input.lastName.trim())}`);
+    const userParams: unknown[] = [];
+    if (input.firstName) { userParams.push(input.firstName.trim()); userUpdates.push(`first_name = $${userParams.length}`); }
+    if (input.lastName) { userParams.push(input.lastName.trim()); userUpdates.push(`last_name = $${userParams.length}`); }
     if (userUpdates.length > 0) {
       userUpdates.push('updated_at = now()');
-      await runSql(`UPDATE users SET ${userUpdates.join(', ')} WHERE id = ${sqlLiteral(child.user_id)};`);
+      userParams.push(child.user_id);
+      await runSql(`UPDATE users SET ${userUpdates.join(', ')} WHERE id = $${userParams.length};`, userParams);
     }
     const childUpdates: string[] = [];
-    if (input.schoolGrade) childUpdates.push(`school_grade = ${sqlLiteral(input.schoolGrade.trim())}`);
-    if (input.schoolId) { this.assertValidUuid(input.schoolId, 'schoolId'); childUpdates.push(`school_id = ${sqlLiteral(input.schoolId)}`); }
-    if (input.gender) childUpdates.push(`gender = ${sqlLiteral(input.gender.toUpperCase())}::gender_type`);
+    const childParams: unknown[] = [];
+    if (input.schoolGrade) { childParams.push(input.schoolGrade.trim()); childUpdates.push(`school_grade = $${childParams.length}`); }
+    if (input.schoolId) { this.assertValidUuid(input.schoolId, 'schoolId'); childParams.push(input.schoolId); childUpdates.push(`school_id = $${childParams.length}`); }
+    if (input.gender) { childParams.push(input.gender.toUpperCase()); childUpdates.push(`gender = $${childParams.length}::gender_type`); }
     if (childUpdates.length > 0) {
       childUpdates.push('updated_at = now()');
-      await runSql(`UPDATE children SET ${childUpdates.join(', ')} WHERE id = ${sqlLiteral(youngsterId)};`);
+      childParams.push(youngsterId);
+      await runSql(`UPDATE children SET ${childUpdates.join(', ')} WHERE id = $${childParams.length};`, childParams);
     }
     return { ok: true };
   }
@@ -3553,16 +3730,17 @@ export class CoreService {
   async deleteYoungster(actor: AccessUser, youngsterId: string) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     this.assertValidUuid(youngsterId, 'youngsterId');
-    const out = await runSql(`
-      SELECT row_to_json(t)::text FROM (
-        SELECT c.id, c.user_id FROM children c
-        WHERE c.id = ${sqlLiteral(youngsterId)} AND c.deleted_at IS NULL
-      ) t;
-    `);
+    const out = await runSql(
+      `SELECT row_to_json(t)::text FROM (
+         SELECT c.id, c.user_id FROM children c
+         WHERE c.id = $1 AND c.deleted_at IS NULL
+       ) t;`,
+      [youngsterId],
+    );
     if (!out) throw new NotFoundException('Youngster not found');
     const child = this.parseJsonLine<{ id: string; user_id: string }>(out);
-    await runSql(`UPDATE children SET deleted_at = now(), is_active = false, updated_at = now() WHERE id = ${sqlLiteral(youngsterId)};`);
-    await runSql(`UPDATE users SET is_active = false, deleted_at = now(), updated_at = now() WHERE id = ${sqlLiteral(child.user_id)};`);
+    await runSql(`UPDATE children SET deleted_at = now(), is_active = false, updated_at = now() WHERE id = $1;`, [youngsterId]);
+    await runSql(`UPDATE users SET is_active = false, deleted_at = now(), updated_at = now() WHERE id = $1;`, [child.user_id]);
     return { ok: true };
   }
 
@@ -3573,15 +3751,16 @@ export class CoreService {
     const name = (input.name || '').trim();
     if (!name) throw new BadRequestException('name is required');
     const allergenFlag = input.allergenFlag === true;
-    const out = await runSql(`
-      WITH inserted AS (
-        INSERT INTO ingredients (name, allergen_flag, is_active)
-        VALUES (${sqlLiteral(name)}, ${allergenFlag ? 'true' : 'false'}, true)
-        ON CONFLICT (name) DO NOTHING
-        RETURNING id, name, allergen_flag, is_active
-      )
-      SELECT row_to_json(inserted)::text FROM inserted;
-    `);
+    const out = await runSql(
+      `WITH inserted AS (
+         INSERT INTO ingredients (name, allergen_flag, is_active)
+         VALUES ($1, $2, true)
+         ON CONFLICT (name) DO NOTHING
+         RETURNING id, name, allergen_flag, is_active
+       )
+       SELECT row_to_json(inserted)::text FROM inserted;`,
+      [name, allergenFlag],
+    );
     if (!out) throw new BadRequestException('Ingredient already exists or failed to create');
     return this.parseJsonLine(out);
   }
@@ -3590,19 +3769,22 @@ export class CoreService {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     this.assertValidUuid(ingredientId, 'ingredientId');
     const updates: string[] = [];
-    if (input.name) updates.push(`name = ${sqlLiteral(input.name.trim())}`);
-    if (typeof input.allergenFlag === 'boolean') updates.push(`allergen_flag = ${input.allergenFlag ? 'true' : 'false'}`);
-    if (typeof input.isActive === 'boolean') updates.push(`is_active = ${input.isActive ? 'true' : 'false'}`);
+    const params: unknown[] = [];
+    if (input.name) { params.push(input.name.trim()); updates.push(`name = $${params.length}`); }
+    if (typeof input.allergenFlag === 'boolean') { params.push(input.allergenFlag); updates.push(`allergen_flag = $${params.length}`); }
+    if (typeof input.isActive === 'boolean') { params.push(input.isActive); updates.push(`is_active = $${params.length}`); }
     if (updates.length === 0) throw new BadRequestException('No fields to update');
     updates.push('updated_at = now()');
-    const out = await runSql(`
-      WITH updated AS (
-        UPDATE ingredients SET ${updates.join(', ')}
-        WHERE id = ${sqlLiteral(ingredientId)} AND deleted_at IS NULL
-        RETURNING id, name, allergen_flag, is_active
-      )
-      SELECT row_to_json(updated)::text FROM updated;
-    `);
+    params.push(ingredientId);
+    const out = await runSql(
+      `WITH updated AS (
+         UPDATE ingredients SET ${updates.join(', ')}
+         WHERE id = $${params.length} AND deleted_at IS NULL
+         RETURNING id, name, allergen_flag, is_active
+       )
+       SELECT row_to_json(updated)::text FROM updated;`,
+      params,
+    );
     if (!out) throw new NotFoundException('Ingredient not found');
     return this.parseJsonLine(out);
   }
@@ -3610,11 +3792,12 @@ export class CoreService {
   async deleteIngredient(actor: AccessUser, ingredientId: string) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     this.assertValidUuid(ingredientId, 'ingredientId');
-    const out = await runSql(`
-      UPDATE ingredients SET deleted_at = now(), is_active = false, updated_at = now()
-      WHERE id = ${sqlLiteral(ingredientId)} AND deleted_at IS NULL
-      RETURNING id;
-    `);
+    const out = await runSql(
+      `UPDATE ingredients SET deleted_at = now(), is_active = false, updated_at = now()
+       WHERE id = $1 AND deleted_at IS NULL
+       RETURNING id;`,
+      [ingredientId],
+    );
     if (!out) throw new NotFoundException('Ingredient not found');
     return { ok: true };
   }
@@ -3624,11 +3807,12 @@ export class CoreService {
   async deleteMenuItem(actor: AccessUser, itemId: string) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     this.assertValidUuid(itemId, 'itemId');
-    const out = await runSql(`
-      UPDATE menu_items SET deleted_at = now(), is_available = false, updated_at = now()
-      WHERE id = ${sqlLiteral(itemId)} AND deleted_at IS NULL
-      RETURNING id;
-    `);
+    const out = await runSql(
+      `UPDATE menu_items SET deleted_at = now(), is_available = false, updated_at = now()
+       WHERE id = $1 AND deleted_at IS NULL
+       RETURNING id;`,
+      [itemId],
+    );
     if (!out) throw new NotFoundException('Menu item not found');
     return { ok: true };
   }
@@ -3638,14 +3822,15 @@ export class CoreService {
   async deactivateDeliveryUser(actor: AccessUser, targetUserId: string) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     this.assertValidUuid(targetUserId, 'userId');
-    const out = await runSql(`
-      WITH updated AS (
-        UPDATE users SET is_active = false, updated_at = now()
-        WHERE id = ${sqlLiteral(targetUserId)} AND role = 'DELIVERY' AND deleted_at IS NULL
-        RETURNING id, username, first_name, last_name
-      )
-      SELECT row_to_json(updated)::text FROM updated;
-    `);
+    const out = await runSql(
+      `WITH updated AS (
+         UPDATE users SET is_active = false, updated_at = now()
+         WHERE id = $1 AND role = 'DELIVERY' AND deleted_at IS NULL
+         RETURNING id, username, first_name, last_name
+       )
+       SELECT row_to_json(updated)::text FROM updated;`,
+      [targetUserId],
+    );
     if (!out) throw new NotFoundException('Delivery user not found');
     return { ok: true, user: this.parseJsonLine(out) };
   }
