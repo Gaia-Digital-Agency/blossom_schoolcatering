@@ -8,6 +8,7 @@ type Assignment = {
   order_id: string;
   service_date: string;
   session: string;
+  school_name?: string;
   child_name: string;
   parent_name: string;
   delivery_status: string;
@@ -85,6 +86,12 @@ export default function DeliveryPage() {
   };
 
   const todaysRows = rows.filter((r) => r.service_date === date);
+  const rowsBySchool = todaysRows.reduce<Record<string, Assignment[]>>((acc, row) => {
+    const key = row.school_name || 'Unassigned School';
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(row);
+    return acc;
+  }, {});
   const d = new Date(`${date}T00:00:00`);
   const prev = new Date(d); prev.setDate(d.getDate() - 1);
   const next = new Date(d); next.setDate(d.getDate() + 1);
@@ -128,21 +135,26 @@ export default function DeliveryPage() {
 
         {todaysRows.length === 0 ? <p className="auth-help">No assigned orders for this date.</p> : (
           <div className="auth-form">
-            {todaysRows.map((row) => (
-              <label key={row.id}>
-                <strong>{row.service_date} {row.session}</strong>
-                <small>Order: {row.order_id}</small>
-                <small>Youngster: {row.child_name}</small>
-                <small>Parent: {row.parent_name}</small>
-                <small>Status: {row.delivery_status} | Confirmed: {row.confirmed_at || '-'}</small>
-                <button
-                  className={`btn ${row.confirmed_at ? 'btn-success' : 'btn-primary'}`}
-                  type="button"
-                  onClick={() => onToggleComplete(row.id)}
-                >
-                  {row.confirmed_at ? 'Completed (Click to Undo)' : 'Mark Complete'}
-                </button>
-              </label>
+            {Object.entries(rowsBySchool).map(([schoolName, group]) => (
+              <div key={schoolName} className="delivery-school-group">
+                <h3 className="delivery-school-title">{schoolName}</h3>
+                {group.map((row) => (
+                  <label key={row.id}>
+                    <strong>{row.service_date} {row.session}</strong>
+                    <small>Order: {row.order_id}</small>
+                    <small>Youngster: {row.child_name}</small>
+                    <small>Parent: {row.parent_name}</small>
+                    <small>Status: {row.delivery_status} | Confirmed: {row.confirmed_at || '-'}</small>
+                    <button
+                      className={`btn ${row.confirmed_at ? 'btn-success' : 'btn-primary'}`}
+                      type="button"
+                      onClick={() => onToggleComplete(row.id)}
+                    >
+                      {row.confirmed_at ? 'Completed (Click to Undo)' : 'Mark Complete'}
+                    </button>
+                  </label>
+                ))}
+              </div>
             ))}
           </div>
         )}

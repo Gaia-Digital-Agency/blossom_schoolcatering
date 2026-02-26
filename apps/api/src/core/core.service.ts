@@ -2937,11 +2937,13 @@ export class CoreService {
                o.session::text AS session,
                o.delivery_status::text AS delivery_status,
                o.total_price,
+               s.name AS school_name,
                (uc.first_name || ' ' || uc.last_name) AS child_name,
                (up.first_name || ' ' || up.last_name) AS parent_name
         FROM delivery_assignments da
         JOIN orders o ON o.id = da.order_id
         JOIN children c ON c.id = o.child_id
+        JOIN schools s ON s.id = c.school_id
         JOIN users uc ON uc.id = c.user_id
         LEFT JOIN users up ON up.id = o.placed_by_user_id
         WHERE 1=1

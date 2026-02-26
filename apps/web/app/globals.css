@@ -368,6 +368,8 @@ button:hover,
 
 .page-auth-mobile .auth-panel {
   width: min(680px, 100%);
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .page-auth-desktop .auth-panel {
@@ -404,6 +406,12 @@ button:hover,
   gap: 0.25rem;
   font-size: 0.9rem;
   min-width: 0;
+}
+
+.auth-form label small,
+.auth-form label strong {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .auth-form input,
@@ -444,6 +452,8 @@ button:hover,
   padding: 0.45rem 0.65rem;
   background: #fff;
   min-width: 0;
+  width: 100%;
+  max-width: 100%;
 }
 
 .delivery-window {
@@ -466,12 +476,29 @@ button:hover,
 }
 
 .delivery-window-actions .btn {
-  min-width: 90px;
-  flex: 1 1 110px;
+  min-width: 0;
+  flex: 1 1 100px;
+  max-width: 100%;
 }
 
 .delivery-refresh {
   width: 100%;
+  max-width: 100%;
+}
+
+.delivery-school-group {
+  border: 1px solid #ccbda2;
+  border-radius: 0.55rem;
+  background: #fff;
+  padding: 0.6rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.delivery-school-title {
+  margin: 0;
+  font-size: 1rem;
+  color: #3b342b;
 }
 
 .ingredient-selected-box,
