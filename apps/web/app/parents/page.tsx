@@ -354,6 +354,18 @@ export default function ParentsPage() {
     } catch (err) { setError(err instanceof Error ? err.message : 'Apply favourite failed'); }
   };
 
+  const onDeleteFavourite = async (favouriteId: string) => {
+    if (!window.confirm('Delete this saved favourite combo?')) return;
+    setError(''); setMessage('');
+    try {
+      await apiFetch(`/favourites/${favouriteId}`, { method: 'DELETE' });
+      setMessage('Favourite combo deleted.');
+      await loadFavourites();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Delete favourite failed');
+    }
+  };
+
   const onQuickReorder = async (sourceOrderId: string) => {
     setError(''); setMessage('');
     try {
@@ -517,7 +529,7 @@ export default function ParentsPage() {
               <p className="auth-help">Selected items: {selectedCount} / 5</p>
               <label>Favourite Label<input value={favLabel} onChange={(e) => setFavLabel(e.target.value)} placeholder="My combo" /></label>
               <button className="btn btn-primary" type="button" disabled={submitting || placementExpired} onClick={onPlaceOrder}>{submitting ? 'Placing Order...' : 'Place Order'}</button>
-              <button className="btn btn-outline" type="button" onClick={onSaveFavourite}>Save Favourite Combo</button>
+              <button className="btn btn-outline" type="button" onClick={onSaveFavourite}>Save Favourite Combo (OPTIONAL)</button>
             </div>
           ) : <p className="auth-help">Load menu to start cart drafting.</p>}
         </div>
@@ -533,6 +545,7 @@ export default function ParentsPage() {
                   <small>Session: {fav.session}</small>
                   <small>Items: {fav.items.map((i) => `${i.name || i.menu_item_id} x${i.quantity}`).join(', ')}</small>
                   <button className="btn btn-outline" type="button" onClick={() => onApplyFavourite(fav.id)}>Apply Favourite</button>
+                  <button className="btn btn-outline" type="button" onClick={() => onDeleteFavourite(fav.id)}>Delete Favourite</button>
                 </label>
               ))}
             </div>

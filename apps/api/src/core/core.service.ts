@@ -2161,6 +2161,39 @@ export class CoreService {
     return { ok: true, favouriteId: fav.id, label: fav.label };
   }
 
+  async deleteFavourite(actor: AccessUser, favouriteId: string) {
+    if (!['PARENT', 'YOUNGSTER'].includes(actor.role)) throw new ForbiddenException('Role not allowed');
+    const favId = (favouriteId || '').trim();
+    if (!favId) throw new BadRequestException('favouriteId is required');
+
+    const out = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT id, created_by_user_id, is_active, deleted_at
+        FROM favourite_meals
+        WHERE id = $1
+        LIMIT 1
+      ) t;
+    `,
+      [favId],
+    );
+    if (!out) throw new NotFoundException('Favourite not found');
+    const fav = this.parseJsonLine<{ id: string; created_by_user_id: string; is_active: boolean; deleted_at?: string | null }>(out);
+    if (fav.created_by_user_id !== actor.uid) throw new ForbiddenException('ORDER_OWNERSHIP_FORBIDDEN');
+    if (fav.deleted_at) return { ok: true, alreadyDeleted: true };
+
+    await runSql(
+      `UPDATE favourite_meals
+       SET is_active = false,
+           deleted_at = now(),
+           updated_at = now()
+       WHERE id = $1;`,
+      [fav.id],
+    );
+    return { ok: true };
+  }
+
   async quickReorder(actor: AccessUser, input: { sourceOrderId?: string; serviceDate?: string }) {
     if (!['PARENT', 'YOUNGSTER'].includes(actor.role)) throw new ForbiddenException('Role not allowed');
     const sourceOrderId = (input.sourceOrderId || '').trim();

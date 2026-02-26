@@ -314,6 +314,12 @@ export class CoreController {
     return this.coreService.createFavourite(req.user, body);
   }
 
+  @Delete('favourites/:favouriteId')
+  @Roles('PARENT', 'YOUNGSTER')
+  deleteFavourite(@Req() req: AuthRequest, @Param('favouriteId', ParseUUIDPipe) favouriteId: string) {
+    return this.coreService.deleteFavourite(req.user, favouriteId);
+  }
+
   @Post('carts/quick-reorder')
   @Roles('PARENT', 'YOUNGSTER')
   quickReorder(@Req() req: AuthRequest, @Body() body: { sourceOrderId?: string; serviceDate?: string }) {
