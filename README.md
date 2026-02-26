@@ -81,6 +81,28 @@ Located in `docs/master_data`:
 - `sample_dataset_v1.json`
 - `maste_list_note.md`
 
+### 5) Core Module Delivery (Steps 6-9)
+- Parent + Youngster + Menu pages are implemented.
+- Ordering module implemented (cart, quick reorder, meal plan wizard, favourites, consolidated views).
+- Billing module implemented (proof upload, verify/reject, receipt generation, receipt download).
+- Delivery module implemented (school mapping, auto-assign, delivery confirmation).
+- Kitchen module implemented (`/kitchen/yesterday`, `/kitchen/today`, `/kitchen/tomorrow` with hourly refresh window).
+- Admin CMS split into pages:
+  - `/admin` dashboard
+  - `/admin/menu`
+  - `/admin/parents`
+  - `/admin/youngsters`
+  - `/admin/schools`
+  - `/admin/blackout-dates`
+  - `/admin/billing`
+  - `/admin/delivery`
+  - `/admin/kitchen`
+  - `/admin/reports`
+- Admin school/session controls:
+  - Activate/deactivate school
+  - Activate/deactivate session (Snack/Breakfast)
+  - Lunch forced active by rule
+
 ## Docs Folder Guide
 ### `docs/app_run`
 - What: runbooks and operational notes
@@ -154,9 +176,11 @@ pm2 restart schoolcatering-web
 ## Key Project Files
 - `plan.md`: section-by-section implementation checklist
 - `progress.md`: dated implementation log
+- `test.md`: latest staging deploy + sweep result
 - `docs/app_run/start.md`: operational run/start guidance
 - `docs/app_run/access.md`: access rules and role paths
 - `docs/app_run/auth_info.md`: auth implementation details
 - `docs/app_run/db_infor.md`: database/environment records
 - `docs/versioning/CHANGELOG.md`: release changes
 - `docs/versioning/CONTRIBUTING.md`: contribution and deployment process
+- `parents.md`, `youngsters.md`, `delivery.md`, `kitchen.md`: role user guides

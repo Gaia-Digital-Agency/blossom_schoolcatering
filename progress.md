@@ -1,5 +1,34 @@
 # Progress Update
 
+## 2026-02-26 (Step 6-9 completion hardening + deploy + QA sweep)
+- Implemented admin school activation controls:
+  - API: `PATCH /api/v1/admin/schools/:schoolId`
+  - UI: `/schoolcatering/admin/schools`
+- Implemented admin session activation controls:
+  - API: `GET /api/v1/admin/session-settings`
+  - API: `PATCH /api/v1/admin/session-settings/:session`
+  - Rule: `LUNCH` cannot be deactivated (default ON)
+- Enforced session activation in ordering paths:
+  - `createCart`, `submitCart`, `updateOrder`
+  - Parent/youngster menu visibility respects active sessions
+- Added `/schoolcatering/home` page route.
+- Fixed API SQL errors found during staging sweep:
+  - `createBlackoutDay` upsert SQL
+  - school/session update SQL wrappers
+  - menu query grouping in `getMenus`
+  - delivery-school assignment validation to return clean `400` instead of `500` on invalid IDs
+- Updated:
+  - `apps/web/public/robots.txt`
+  - `apps/web/public/sitemap.url`
+- Generated staging test report:
+  - `test.md`
+- Added user guides:
+  - `parents.md`
+  - `youngsters.md`
+  - `delivery.md`
+  - `kitchen.md`
+- Deployed to staging VM and restarted PM2 services.
+
 ## 2026-02-25 (Checkpoint for tomorrow)
 - Confirmed Steps 1-5 are complete in `plan.md`.
 - Next implementation window (2026-02-26): Steps 6-10.
