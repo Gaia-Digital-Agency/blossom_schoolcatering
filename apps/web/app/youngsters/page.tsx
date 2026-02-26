@@ -62,6 +62,7 @@ export default function YoungstersPage() {
   const [youngster, setYoungster] = useState<Youngster | null>(null);
   const [serviceDate, setServiceDate] = useState(nextWeekdayIsoDate());
   const [session, setSession] = useState<'LUNCH' | 'SNACK' | 'BREAKFAST'>('LUNCH');
+  const [searchText, setSearchText] = useState('');
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [itemQty, setItemQty] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -75,6 +76,20 @@ export default function YoungstersPage() {
     () => Object.values(itemQty).filter((qty) => qty > 0).length,
     [itemQty],
   );
+  const searchResults = useMemo(() => {
+    const needle = searchText.trim().toLowerCase();
+    return (menuItems || []).filter((item) => {
+      if (!needle) return true;
+      return item.name.toLowerCase().includes(needle) || item.description.toLowerCase().includes(needle);
+    });
+  }, [menuItems, searchText]);
+  const draftItems = useMemo(() => {
+    const index = new Map(menuItems.map((m) => [m.id, m]));
+    return Object.entries(itemQty)
+      .filter(([, qty]) => qty > 0)
+      .map(([id, qty]) => ({ menuItem: index.get(id), id, qty }))
+      .filter((x) => Boolean(x.menuItem));
+  }, [itemQty, menuItems]);
   const cutoffRemainingMs = getCutoffTimestamp(serviceDate) - nowMs;
   const draftRemainingMs = draftExpiresAt ? new Date(draftExpiresAt).getTime() - nowMs : 0;
   const placementExpired = cutoffRemainingMs <= 0;
@@ -139,6 +154,20 @@ export default function YoungstersPage() {
     setMenuItems(data.items);
     setItemQty({});
     apiFetch('/youngsters/me/insights').then((x) => setInsights(x as YoungsterInsights)).catch(() => undefined);
+  };
+
+  const onAddDraftItem = (menuItemId: string) => {
+    const alreadySelected = Object.values(itemQty).filter((qty) => qty > 0).length;
+    if (!itemQty[menuItemId] && alreadySelected >= 5) {
+      setError('Maximum 5 items per cart/order.');
+      return;
+    }
+    setError('');
+    setItemQty((prev) => ({ ...prev, [menuItemId]: Math.max(1, prev[menuItemId] || 0) }));
+  };
+
+  const onRemoveDraftItem = (menuItemId: string) => {
+    setItemQty((prev) => ({ ...prev, [menuItemId]: 0 }));
   };
 
   const loadDraftItems = async (cartId: string) => {
@@ -292,6 +321,9 @@ export default function YoungstersPage() {
             {youngster.first_name} {youngster.last_name} - {youngster.school_name} ({youngster.school_grade})
           </p>
         ) : null}
+        <button className="btn btn-outline" type="button" onClick={() => { window.location.href = '/register/youngsters'; }}>
+          Update Registration Details
+        </button>
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
 
@@ -348,7 +380,11 @@ export default function YoungstersPage() {
             Allergies
             <input value={youngster?.dietary_allergies || 'No Allergies'} readOnly />
           </label>
-          <button className="btn btn-outline" type="button" onClick={onLoadMenu}>Load Menu</button>
+          <label>
+            Search Name Of Dish
+            <input value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="Type dish name..." />
+          </label>
+          <button className="btn btn-outline" type="button" onClick={onLoadMenu}>Refresh Menu</button>
           <button className="btn btn-outline" type="button" onClick={onResumeDraft} disabled={!draftCartId || loadingDraft}>
             {loadingDraft ? 'Loading Draft...' : 'Resume Draft'}
           </button>
@@ -357,32 +393,54 @@ export default function YoungstersPage() {
           </button>
 
           {menuItems.length > 0 ? (
-            <div className="auth-form">
-              {menuItems.map((item) => (
-                <label key={item.id}>
-                  <span>
-                    <strong>{item.name}</strong> - Rp {Number(item.price).toLocaleString('id-ID')}
-                    {item.has_allergen ? ' (Contains allergen)' : ''}
-                  </span>
-                  <small>{item.description}</small>
-                  <small>{item.nutrition_facts_text}</small>
-                  <small>Ingredients: {item.ingredients.join(', ') || '-'}</small>
-                  <input
-                    type="number"
-                    min={0}
-                    max={5}
-                    value={itemQty[item.id] || 0}
-                    onChange={(e) => setItemQty((prev) => ({ ...prev, [item.id]: Number(e.target.value || 0) }))}
-                  />
-                </label>
-              ))}
-              <p className="auth-help">Selected items: {selectedCount} / 5</p>
-              <button className="btn btn-primary" type="button" disabled={submitting || placementExpired} onClick={onPlaceOrder}>
-                {submitting ? 'Placing Order...' : 'Place Order'}
-              </button>
+            <div className="menu-flow-grid">
+              <div className="menu-search-section">
+                <h3>Search Results</h3>
+                {searchResults.length === 0 ? <p className="auth-help">No dishes found.</p> : (
+                  <div className="auth-form">
+                    {searchResults.map((item) => (
+                      <label key={item.id}>
+                        <span>
+                          <strong>{item.name}</strong> - Rp {Number(item.price).toLocaleString('id-ID')}
+                          {item.has_allergen ? ' (Contains allergen)' : ''}
+                        </span>
+                        <small>{item.description}</small>
+                        <small>{item.nutrition_facts_text}</small>
+                        <small>Ingredients: {item.ingredients.join(', ') || '-'}</small>
+                        <button className="btn btn-outline" type="button" onClick={() => onAddDraftItem(item.id)}>Add</button>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="menu-draft-section">
+                <h3>Draft Section</h3>
+                {draftItems.length === 0 ? <p className="auth-help">No dishes in draft. Use Add from search results.</p> : (
+                  <div className="auth-form">
+                    {draftItems.map((d) => (
+                      <label key={d.id}>
+                        <span><strong>{d.menuItem?.name}</strong> - Rp {Number(d.menuItem?.price || 0).toLocaleString('id-ID')}</span>
+                        <small>{d.menuItem?.description}</small>
+                        <input
+                          type="number"
+                          min={0}
+                          max={5}
+                          value={d.qty}
+                          onChange={(e) => setItemQty((prev) => ({ ...prev, [d.id]: Number(e.target.value || 0) }))}
+                        />
+                        <button className="btn btn-outline" type="button" onClick={() => onRemoveDraftItem(d.id)}>Remove</button>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                <p className="auth-help">Selected items: {selectedCount} / 5</p>
+                <button className="btn btn-primary" type="button" disabled={submitting || placementExpired} onClick={onPlaceOrder}>
+                  {submitting ? 'Placing Order...' : 'Place Order'}
+                </button>
+              </div>
             </div>
           ) : (
-            <p className="auth-help">Load menu to start cart drafting.</p>
+            <p className="auth-help">Loading menu for selected date/session...</p>
           )}
         </div>
       </section>
