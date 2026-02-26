@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Headers, Post, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { ROLES, Role } from './auth.types';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -54,6 +55,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
   login(@Body() body: LoginBody) {
     const username = body.username ?? body.identifier;
     const password = body.password;
@@ -65,6 +67,7 @@ export class AuthController {
   }
 
   @Post('register')
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   register(@Body() body: RegisterBody) {
     const role = body.role;
     const username = body.username;

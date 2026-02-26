@@ -16,16 +16,27 @@ function loadDotEnv(path: string) {
   }
 }
 
+function validateRequiredEnv() {
+  const required = ['DATABASE_URL', 'AUTH_JWT_SECRET', 'AUTH_JWT_REFRESH_SECRET'];
+  const missing = required.filter((key) => !process.env[key]);
+  if (missing.length > 0) {
+    console.error(`[STARTUP] Missing required environment variables: ${missing.join(', ')}`);
+    process.exit(1);
+  }
+}
+
 async function bootstrap() {
   loadDotEnv(join(process.cwd(), '.env'));
   loadDotEnv('/var/www/schoolcatering/.env');
+  validateRequiredEnv();
   const app = await NestFactory.create(AppModule);
   app.enableCors({
     origin: [
       'http://localhost:5173',
       'http://127.0.0.1:5173',
       'http://34.124.244.233',
-    ],
+      process.env.CORS_ORIGIN,
+    ].filter(Boolean) as string[],
     credentials: true,
   });
   await app.listen(process.env.PORT ?? 3000);

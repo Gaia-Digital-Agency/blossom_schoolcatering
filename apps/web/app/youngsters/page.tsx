@@ -212,17 +212,20 @@ export default function YoungstersPage() {
     setError('');
     setMessage('');
     try {
-      const cart = await apiFetch('/carts', {
+      const cartRes = await apiFetch('/carts', {
         method: 'POST',
         body: JSON.stringify({ childId: youngster.id, serviceDate, session }),
-      }) as { id: string };
+      }) as { id?: string };
 
-      await apiFetch(`/carts/${cart.id}/items`, {
+      if (!cartRes?.id) throw new Error('Cart creation failed — no cart ID returned.');
+      const cartId = cartRes.id;
+
+      await apiFetch(`/carts/${cartId}/items`, {
         method: 'PATCH',
         body: JSON.stringify({ items }),
       });
 
-      const order = await apiFetch(`/carts/${cart.id}/submit`, {
+      const order = await apiFetch(`/carts/${cartId}/submit`, {
         method: 'POST',
       }) as { id: string; total_price: number };
 

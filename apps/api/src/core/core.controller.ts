@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -30,10 +31,22 @@ export class CoreController {
     return this.coreService.getSchools(active !== 'false');
   }
 
+  @Post('admin/schools')
+  @Roles('ADMIN')
+  createSchool(@Req() req: AuthRequest, @Body() body: { name?: string; address?: string; city?: string; contactEmail?: string }) {
+    return this.coreService.createSchool(req.user, body);
+  }
+
   @Patch('admin/schools/:schoolId')
   @Roles('ADMIN')
-  updateSchoolActive(@Req() req: AuthRequest, @Param('schoolId') schoolId: string, @Body() body: { isActive?: boolean }) {
+  updateSchoolActive(@Req() req: AuthRequest, @Param('schoolId', ParseUUIDPipe) schoolId: string, @Body() body: { isActive?: boolean }) {
     return this.coreService.updateSchoolActive(req.user, schoolId, body.isActive);
+  }
+
+  @Delete('admin/schools/:schoolId')
+  @Roles('ADMIN')
+  deleteSchool(@Req() req: AuthRequest, @Param('schoolId', ParseUUIDPipe) schoolId: string) {
+    return this.coreService.deleteSchool(req.user, schoolId);
   }
 
   @Get('admin/session-settings')
@@ -75,10 +88,42 @@ export class CoreController {
     return this.coreService.getAdminParents();
   }
 
+  @Patch('admin/parents/:parentId')
+  @Roles('ADMIN')
+  updateParentProfile(
+    @Req() req: AuthRequest,
+    @Param('parentId', ParseUUIDPipe) parentId: string,
+    @Body() body: { firstName?: string; lastName?: string; phoneNumber?: string; email?: string; address?: string },
+  ) {
+    return this.coreService.updateParentProfile(req.user, parentId, body);
+  }
+
+  @Delete('admin/parents/:parentId')
+  @Roles('ADMIN')
+  deleteParent(@Req() req: AuthRequest, @Param('parentId', ParseUUIDPipe) parentId: string) {
+    return this.coreService.deleteParent(req.user, parentId);
+  }
+
   @Get('admin/children')
   @Roles('ADMIN')
   getAdminChildren() {
     return this.coreService.getAdminChildren();
+  }
+
+  @Patch('admin/youngsters/:youngsterId')
+  @Roles('ADMIN')
+  updateYoungsterProfile(
+    @Req() req: AuthRequest,
+    @Param('youngsterId', ParseUUIDPipe) youngsterId: string,
+    @Body() body: { firstName?: string; lastName?: string; schoolGrade?: string; schoolId?: string; gender?: string },
+  ) {
+    return this.coreService.updateYoungsterProfile(req.user, youngsterId, body);
+  }
+
+  @Delete('admin/youngsters/:youngsterId')
+  @Roles('ADMIN')
+  deleteYoungster(@Req() req: AuthRequest, @Param('youngsterId', ParseUUIDPipe) youngsterId: string) {
+    return this.coreService.deleteYoungster(req.user, youngsterId);
   }
 
   @Get('admin/dashboard')
@@ -120,7 +165,7 @@ export class CoreController {
 
   @Delete('blackout-days/:id')
   @Roles('ADMIN')
-  deleteBlackoutDay(@Req() req: AuthRequest, @Param('id') id: string) {
+  deleteBlackoutDay(@Req() req: AuthRequest, @Param('id', ParseUUIDPipe) id: string) {
     return this.coreService.deleteBlackoutDay(req.user, id);
   }
 
@@ -128,6 +173,28 @@ export class CoreController {
   @Roles('ADMIN')
   getAdminIngredients() {
     return this.coreService.getAdminIngredients();
+  }
+
+  @Post('admin/ingredients')
+  @Roles('ADMIN')
+  createIngredient(@Req() req: AuthRequest, @Body() body: { name?: string; allergenFlag?: boolean }) {
+    return this.coreService.createIngredient(req.user, body);
+  }
+
+  @Patch('admin/ingredients/:ingredientId')
+  @Roles('ADMIN')
+  updateIngredient(
+    @Req() req: AuthRequest,
+    @Param('ingredientId', ParseUUIDPipe) ingredientId: string,
+    @Body() body: { name?: string; allergenFlag?: boolean; isActive?: boolean },
+  ) {
+    return this.coreService.updateIngredient(req.user, ingredientId, body);
+  }
+
+  @Delete('admin/ingredients/:ingredientId')
+  @Roles('ADMIN')
+  deleteIngredient(@Req() req: AuthRequest, @Param('ingredientId', ParseUUIDPipe) ingredientId: string) {
+    return this.coreService.deleteIngredient(req.user, ingredientId);
   }
 
   @Get('admin/menus')
@@ -165,7 +232,7 @@ export class CoreController {
   @Patch('admin/menu-items/:itemId')
   @Roles('ADMIN')
   updateAdminMenuItem(
-    @Param('itemId') itemId: string,
+    @Param('itemId', ParseUUIDPipe) itemId: string,
     @Body() body: {
       serviceDate?: string;
       session?: string;
@@ -205,7 +272,7 @@ export class CoreController {
 
   @Post('parents/:parentId/children/:childId/link')
   @Roles('PARENT', 'ADMIN')
-  linkParentChild(@Req() req: AuthRequest, @Param('parentId') parentId: string, @Param('childId') childId: string) {
+  linkParentChild(@Req() req: AuthRequest, @Param('parentId', ParseUUIDPipe) parentId: string, @Param('childId', ParseUUIDPipe) childId: string) {
     return this.coreService.linkParentChild(req.user, parentId, childId);
   }
 
@@ -266,7 +333,7 @@ export class CoreController {
   @Roles('PARENT', 'YOUNGSTER')
   applyFavouriteToCart(
     @Req() req: AuthRequest,
-    @Param('favouriteId') favouriteId: string,
+    @Param('favouriteId', ParseUUIDPipe) favouriteId: string,
     @Body() body: { serviceDate?: string },
   ) {
     return this.coreService.applyFavouriteToCart(req.user, { favouriteId, serviceDate: body.serviceDate });
@@ -282,7 +349,7 @@ export class CoreController {
   @Roles('PARENT')
   uploadBillingProof(
     @Req() req: AuthRequest,
-    @Param('billingId') billingId: string,
+    @Param('billingId', ParseUUIDPipe) billingId: string,
     @Body() body: { proofImageData?: string },
   ) {
     return this.coreService.uploadBillingProof(req.user, billingId, body.proofImageData);
@@ -290,7 +357,7 @@ export class CoreController {
 
   @Get('billing/:billingId/receipt')
   @Roles('PARENT', 'ADMIN')
-  getBillingReceipt(@Req() req: AuthRequest, @Param('billingId') billingId: string) {
+  getBillingReceipt(@Req() req: AuthRequest, @Param('billingId', ParseUUIDPipe) billingId: string) {
     return this.coreService.getBillingReceipt(req.user, billingId);
   }
 
@@ -304,15 +371,21 @@ export class CoreController {
   @Roles('ADMIN')
   verifyBilling(
     @Req() req: AuthRequest,
-    @Param('billingId') billingId: string,
+    @Param('billingId', ParseUUIDPipe) billingId: string,
     @Body() body: { decision?: 'VERIFIED' | 'REJECTED' },
   ) {
     return this.coreService.verifyBilling(req.user, billingId, body.decision || 'VERIFIED');
   }
 
+  @Delete('admin/menu-items/:itemId')
+  @Roles('ADMIN')
+  deleteAdminMenuItem(@Req() req: AuthRequest, @Param('itemId', ParseUUIDPipe) itemId: string) {
+    return this.coreService.deleteMenuItem(req.user, itemId);
+  }
+
   @Post('admin/billing/:billingId/receipt')
   @Roles('ADMIN')
-  generateBillingReceipt(@Req() req: AuthRequest, @Param('billingId') billingId: string) {
+  generateBillingReceipt(@Req() req: AuthRequest, @Param('billingId', ParseUUIDPipe) billingId: string) {
     return this.coreService.generateReceipt(req.user, billingId);
   }
 
@@ -320,6 +393,12 @@ export class CoreController {
   @Roles('ADMIN')
   getDeliveryUsers() {
     return this.coreService.getDeliveryUsers();
+  }
+
+  @Patch('admin/delivery/users/:userId/deactivate')
+  @Roles('ADMIN')
+  deactivateDeliveryUser(@Req() req: AuthRequest, @Param('userId', ParseUUIDPipe) userId: string) {
+    return this.coreService.deactivateDeliveryUser(req.user, userId);
   }
 
   @Get('delivery/school-assignments')
@@ -362,7 +441,7 @@ export class CoreController {
   @Roles('DELIVERY')
   confirmDelivery(
     @Req() req: AuthRequest,
-    @Param('assignmentId') assignmentId: string,
+    @Param('assignmentId', ParseUUIDPipe) assignmentId: string,
     @Body() body: { note?: string },
   ) {
     return this.coreService.confirmDelivery(req.user, assignmentId, body.note);
@@ -391,31 +470,31 @@ export class CoreController {
 
   @Get('carts/:cartId')
   @Roles('PARENT', 'YOUNGSTER', 'ADMIN')
-  getCartById(@Req() req: AuthRequest, @Param('cartId') cartId: string) {
+  getCartById(@Req() req: AuthRequest, @Param('cartId', ParseUUIDPipe) cartId: string) {
     return this.coreService.getCartById(req.user, cartId);
   }
 
   @Patch('carts/:cartId/items')
   @Roles('PARENT', 'YOUNGSTER', 'ADMIN')
-  replaceCartItems(@Req() req: AuthRequest, @Param('cartId') cartId: string, @Body() body: { items?: CartItemInput[] }) {
+  replaceCartItems(@Req() req: AuthRequest, @Param('cartId', ParseUUIDPipe) cartId: string, @Body() body: { items?: CartItemInput[] }) {
     return this.coreService.replaceCartItems(req.user, cartId, body.items || []);
   }
 
   @Delete('carts/:cartId')
   @Roles('PARENT', 'YOUNGSTER', 'ADMIN')
-  discardCart(@Req() req: AuthRequest, @Param('cartId') cartId: string) {
+  discardCart(@Req() req: AuthRequest, @Param('cartId', ParseUUIDPipe) cartId: string) {
     return this.coreService.discardCart(req.user, cartId);
   }
 
   @Post('carts/:cartId/submit')
   @Roles('PARENT', 'YOUNGSTER', 'ADMIN')
-  submitCart(@Req() req: AuthRequest, @Param('cartId') cartId: string) {
+  submitCart(@Req() req: AuthRequest, @Param('cartId', ParseUUIDPipe) cartId: string) {
     return this.coreService.submitCart(req.user, cartId);
   }
 
   @Get('orders/:orderId')
   @Roles('PARENT', 'YOUNGSTER', 'ADMIN')
-  getOrderDetail(@Req() req: AuthRequest, @Param('orderId') orderId: string) {
+  getOrderDetail(@Req() req: AuthRequest, @Param('orderId', ParseUUIDPipe) orderId: string) {
     return this.coreService.getOrderDetail(req.user, orderId);
   }
 
@@ -435,7 +514,7 @@ export class CoreController {
   @Roles('PARENT', 'YOUNGSTER', 'ADMIN')
   updateOrder(
     @Req() req: AuthRequest,
-    @Param('orderId') orderId: string,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
     @Body() body: { serviceDate?: string; session?: string; items?: CartItemInput[] },
   ) {
     return this.coreService.updateOrder(req.user, orderId, body);
@@ -443,7 +522,7 @@ export class CoreController {
 
   @Delete('orders/:orderId')
   @Roles('PARENT', 'YOUNGSTER', 'ADMIN')
-  deleteOrder(@Req() req: AuthRequest, @Param('orderId') orderId: string) {
+  deleteOrder(@Req() req: AuthRequest, @Param('orderId', ParseUUIDPipe) orderId: string) {
     return this.coreService.deleteOrder(req.user, orderId);
   }
 
@@ -452,4 +531,5 @@ export class CoreController {
   getKitchenDailySummary(@Req() req: AuthRequest, @Query('date') date?: string) {
     return this.coreService.getKitchenDailySummary(req.user, date);
   }
+
 }

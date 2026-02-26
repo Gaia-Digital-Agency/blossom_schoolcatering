@@ -304,9 +304,11 @@ export default function ParentsPage() {
 
     setSubmitting(true); setError(''); setMessage('');
     try {
-      const cart = await apiFetch('/carts', { method: 'POST', body: JSON.stringify({ childId: selectedChildId, serviceDate, session }) }) as { id: string };
-      await apiFetch(`/carts/${cart.id}/items`, { method: 'PATCH', body: JSON.stringify({ items }) });
-      const order = await apiFetch(`/carts/${cart.id}/submit`, { method: 'POST' }) as { id: string; total_price: number };
+      const cartRes = await apiFetch('/carts', { method: 'POST', body: JSON.stringify({ childId: selectedChildId, serviceDate, session }) }) as { id?: string };
+      if (!cartRes?.id) throw new Error('Cart creation failed — no cart ID returned.');
+      const cartId = cartRes.id;
+      await apiFetch(`/carts/${cartId}/items`, { method: 'PATCH', body: JSON.stringify({ items }) });
+      const order = await apiFetch(`/carts/${cartId}/submit`, { method: 'POST' }) as { id: string; total_price: number };
       setMessage(`Order placed successfully. Order ID: ${order.id}, total: Rp ${order.total_price.toLocaleString('id-ID')}.`);
       setItemQty({}); setDraftCartId(''); setDraftExpiresAt('');
       await Promise.all([loadOrders(), loadFavourites()]);

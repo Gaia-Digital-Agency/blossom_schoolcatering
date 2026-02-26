@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -362,7 +363,15 @@ export class CoreService {
     }
   }
 
+  private assertValidUuid(value: string | undefined, label: string) {
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!value || !UUID_RE.test(value)) {
+      throw new BadRequestException(`Invalid ${label}: must be a valid UUID`);
+    }
+  }
+
   private async ensureCartIsOpenAndOwned(cartId: string, actor: AccessUser): Promise<CartRow> {
+    this.assertValidUuid(cartId, 'cartId');
     const out = await runSql(`
       SELECT row_to_json(t)::text
       FROM (
@@ -1722,25 +1731,34 @@ export class CoreService {
 
     const totalPrice = items.reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0);
 
-    const orderOut = await runSql(`
-      WITH inserted AS (
-        INSERT INTO orders (cart_id, child_id, placed_by_user_id, session, service_date, status, total_price, dietary_snapshot)
-        VALUES (
-          ${sqlLiteral(cart.id)},
-          ${sqlLiteral(cart.child_id)},
-          ${sqlLiteral(actor.uid)},
-          ${sqlLiteral(cart.session)}::session_type,
-          DATE ${sqlLiteral(cart.service_date)},
-          'PLACED',
-          ${totalPrice.toFixed(2)},
-          ${dietarySnapshot ? sqlLiteral(dietarySnapshot) : 'NULL'}
+    let orderOut: string;
+    try {
+      orderOut = await runSql(`
+        WITH inserted AS (
+          INSERT INTO orders (cart_id, child_id, placed_by_user_id, session, service_date, status, total_price, dietary_snapshot)
+          VALUES (
+            ${sqlLiteral(cart.id)},
+            ${sqlLiteral(cart.child_id)},
+            ${sqlLiteral(actor.uid)},
+            ${sqlLiteral(cart.session)}::session_type,
+            DATE ${sqlLiteral(cart.service_date)},
+            'PLACED',
+            ${totalPrice.toFixed(2)},
+            ${dietarySnapshot ? sqlLiteral(dietarySnapshot) : 'NULL'}
+          )
+          RETURNING id, order_number::text, child_id, session::text AS session, service_date::text AS service_date,
+                    status::text AS status, total_price, dietary_snapshot, placed_at::text AS placed_at
         )
-        RETURNING id, order_number::text, child_id, session::text AS session, service_date::text AS service_date,
-                  status::text AS status, total_price, dietary_snapshot, placed_at::text AS placed_at
-      )
-      SELECT row_to_json(inserted)::text
-      FROM inserted;
-    `);
+        SELECT row_to_json(inserted)::text
+        FROM inserted;
+      `);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('orders_child_session_date_active_uq') || msg.includes('23505')) {
+        throw new ConflictException('ORDER_ALREADY_EXISTS_FOR_DATE');
+      }
+      throw err;
+    }
     const order = this.parseJsonLine<{
       id: string;
       order_number: string;
@@ -3373,6 +3391,242 @@ export class CoreService {
       },
       allergenAlerts: orders.filter((o) => o.has_allergen),
       orders,
+    };
+  }
+
+  // ─── Missing CRUD: Schools ───────────────────────────────────────────────
+
+  async createSchool(actor: AccessUser, input: { name?: string; address?: string; city?: string; contactEmail?: string }) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    const name = (input.name || '').trim();
+    if (!name) throw new BadRequestException('name is required');
+    const address = (input.address || '').trim();
+    const city = (input.city || '').trim();
+    const contactEmail = (input.contactEmail || '').trim().toLowerCase();
+    const out = await runSql(`
+      WITH inserted AS (
+        INSERT INTO schools (name, address, city, contact_email, is_active)
+        VALUES (
+          ${sqlLiteral(name)},
+          ${address ? sqlLiteral(address) : 'NULL'},
+          ${city ? sqlLiteral(city) : 'NULL'},
+          ${contactEmail ? sqlLiteral(contactEmail) : 'NULL'},
+          true
+        )
+        RETURNING id, name, city, address, is_active
+      )
+      SELECT row_to_json(inserted)::text FROM inserted;
+    `);
+    if (!out) throw new BadRequestException('Failed to create school');
+    return this.parseJsonLine(out);
+  }
+
+  async deleteSchool(actor: AccessUser, schoolId: string) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    this.assertValidUuid(schoolId, 'schoolId');
+    const active = await runSql(`
+      SELECT EXISTS (
+        SELECT 1 FROM children c
+        JOIN orders o ON o.child_id = c.id
+        WHERE c.school_id = ${sqlLiteral(schoolId)}
+          AND o.status = 'PLACED'
+          AND o.deleted_at IS NULL
+      );
+    `);
+    if (active === 't') throw new BadRequestException('Cannot delete school with active orders');
+    const out = await runSql(`
+      UPDATE schools SET deleted_at = now(), updated_at = now(), is_active = false
+      WHERE id = ${sqlLiteral(schoolId)} AND deleted_at IS NULL
+      RETURNING id;
+    `);
+    if (!out) throw new NotFoundException('School not found');
+    return { ok: true };
+  }
+
+  // ─── Missing CRUD: Parent ────────────────────────────────────────────────
+
+  async updateParentProfile(actor: AccessUser, targetParentId: string, input: { firstName?: string; lastName?: string; phoneNumber?: string; email?: string; address?: string }) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    this.assertValidUuid(targetParentId, 'parentId');
+    const out = await runSql(`
+      SELECT row_to_json(t)::text FROM (
+        SELECT p.id, p.user_id FROM parents p
+        WHERE p.id = ${sqlLiteral(targetParentId)} AND p.deleted_at IS NULL
+      ) t;
+    `);
+    if (!out) throw new NotFoundException('Parent not found');
+    const parent = this.parseJsonLine<{ id: string; user_id: string }>(out);
+    const updates: string[] = [];
+    if (input.firstName) updates.push(`first_name = ${sqlLiteral(input.firstName.trim())}`);
+    if (input.lastName) updates.push(`last_name = ${sqlLiteral(input.lastName.trim())}`);
+    if (input.phoneNumber) updates.push(`phone_number = ${sqlLiteral(input.phoneNumber.trim())}`);
+    if (input.email) updates.push(`email = ${sqlLiteral(input.email.trim().toLowerCase())}`);
+    if (updates.length > 0) {
+      updates.push('updated_at = now()');
+      await runSql(`UPDATE users SET ${updates.join(', ')} WHERE id = ${sqlLiteral(parent.user_id)};`);
+    }
+    if (input.address) {
+      await runSql(`UPDATE parents SET address = ${sqlLiteral(input.address.trim())}, updated_at = now() WHERE id = ${sqlLiteral(targetParentId)};`);
+    }
+    return { ok: true };
+  }
+
+  async deleteParent(actor: AccessUser, targetParentId: string) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    this.assertValidUuid(targetParentId, 'parentId');
+    const out = await runSql(`
+      SELECT row_to_json(t)::text FROM (
+        SELECT p.id, p.user_id FROM parents p
+        WHERE p.id = ${sqlLiteral(targetParentId)} AND p.deleted_at IS NULL
+      ) t;
+    `);
+    if (!out) throw new NotFoundException('Parent not found');
+    const parent = this.parseJsonLine<{ id: string; user_id: string }>(out);
+    await runSql(`UPDATE parents SET deleted_at = now(), updated_at = now() WHERE id = ${sqlLiteral(targetParentId)};`);
+    await runSql(`UPDATE users SET is_active = false, deleted_at = now(), updated_at = now() WHERE id = ${sqlLiteral(parent.user_id)};`);
+    return { ok: true };
+  }
+
+  // ─── Missing CRUD: Youngster ─────────────────────────────────────────────
+
+  async updateYoungsterProfile(actor: AccessUser, youngsterId: string, input: { firstName?: string; lastName?: string; schoolGrade?: string; schoolId?: string; gender?: string }) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    this.assertValidUuid(youngsterId, 'youngsterId');
+    const out = await runSql(`
+      SELECT row_to_json(t)::text FROM (
+        SELECT c.id, c.user_id FROM children c
+        WHERE c.id = ${sqlLiteral(youngsterId)} AND c.deleted_at IS NULL
+      ) t;
+    `);
+    if (!out) throw new NotFoundException('Youngster not found');
+    const child = this.parseJsonLine<{ id: string; user_id: string }>(out);
+    const userUpdates: string[] = [];
+    if (input.firstName) userUpdates.push(`first_name = ${sqlLiteral(input.firstName.trim())}`);
+    if (input.lastName) userUpdates.push(`last_name = ${sqlLiteral(input.lastName.trim())}`);
+    if (userUpdates.length > 0) {
+      userUpdates.push('updated_at = now()');
+      await runSql(`UPDATE users SET ${userUpdates.join(', ')} WHERE id = ${sqlLiteral(child.user_id)};`);
+    }
+    const childUpdates: string[] = [];
+    if (input.schoolGrade) childUpdates.push(`school_grade = ${sqlLiteral(input.schoolGrade.trim())}`);
+    if (input.schoolId) { this.assertValidUuid(input.schoolId, 'schoolId'); childUpdates.push(`school_id = ${sqlLiteral(input.schoolId)}`); }
+    if (input.gender) childUpdates.push(`gender = ${sqlLiteral(input.gender.toUpperCase())}::gender_type`);
+    if (childUpdates.length > 0) {
+      childUpdates.push('updated_at = now()');
+      await runSql(`UPDATE children SET ${childUpdates.join(', ')} WHERE id = ${sqlLiteral(youngsterId)};`);
+    }
+    return { ok: true };
+  }
+
+  async deleteYoungster(actor: AccessUser, youngsterId: string) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    this.assertValidUuid(youngsterId, 'youngsterId');
+    const out = await runSql(`
+      SELECT row_to_json(t)::text FROM (
+        SELECT c.id, c.user_id FROM children c
+        WHERE c.id = ${sqlLiteral(youngsterId)} AND c.deleted_at IS NULL
+      ) t;
+    `);
+    if (!out) throw new NotFoundException('Youngster not found');
+    const child = this.parseJsonLine<{ id: string; user_id: string }>(out);
+    await runSql(`UPDATE children SET deleted_at = now(), is_active = false, updated_at = now() WHERE id = ${sqlLiteral(youngsterId)};`);
+    await runSql(`UPDATE users SET is_active = false, deleted_at = now(), updated_at = now() WHERE id = ${sqlLiteral(child.user_id)};`);
+    return { ok: true };
+  }
+
+  // ─── Missing CRUD: Ingredients ───────────────────────────────────────────
+
+  async createIngredient(actor: AccessUser, input: { name?: string; allergenFlag?: boolean }) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    const name = (input.name || '').trim();
+    if (!name) throw new BadRequestException('name is required');
+    const allergenFlag = input.allergenFlag === true;
+    const out = await runSql(`
+      WITH inserted AS (
+        INSERT INTO ingredients (name, allergen_flag, is_active)
+        VALUES (${sqlLiteral(name)}, ${allergenFlag ? 'true' : 'false'}, true)
+        ON CONFLICT (name) DO NOTHING
+        RETURNING id, name, allergen_flag, is_active
+      )
+      SELECT row_to_json(inserted)::text FROM inserted;
+    `);
+    if (!out) throw new BadRequestException('Ingredient already exists or failed to create');
+    return this.parseJsonLine(out);
+  }
+
+  async updateIngredient(actor: AccessUser, ingredientId: string, input: { name?: string; allergenFlag?: boolean; isActive?: boolean }) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    this.assertValidUuid(ingredientId, 'ingredientId');
+    const updates: string[] = [];
+    if (input.name) updates.push(`name = ${sqlLiteral(input.name.trim())}`);
+    if (typeof input.allergenFlag === 'boolean') updates.push(`allergen_flag = ${input.allergenFlag ? 'true' : 'false'}`);
+    if (typeof input.isActive === 'boolean') updates.push(`is_active = ${input.isActive ? 'true' : 'false'}`);
+    if (updates.length === 0) throw new BadRequestException('No fields to update');
+    updates.push('updated_at = now()');
+    const out = await runSql(`
+      WITH updated AS (
+        UPDATE ingredients SET ${updates.join(', ')}
+        WHERE id = ${sqlLiteral(ingredientId)} AND deleted_at IS NULL
+        RETURNING id, name, allergen_flag, is_active
+      )
+      SELECT row_to_json(updated)::text FROM updated;
+    `);
+    if (!out) throw new NotFoundException('Ingredient not found');
+    return this.parseJsonLine(out);
+  }
+
+  async deleteIngredient(actor: AccessUser, ingredientId: string) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    this.assertValidUuid(ingredientId, 'ingredientId');
+    const out = await runSql(`
+      UPDATE ingredients SET deleted_at = now(), is_active = false, updated_at = now()
+      WHERE id = ${sqlLiteral(ingredientId)} AND deleted_at IS NULL
+      RETURNING id;
+    `);
+    if (!out) throw new NotFoundException('Ingredient not found');
+    return { ok: true };
+  }
+
+  // ─── Missing CRUD: Menu Items ────────────────────────────────────────────
+
+  async deleteMenuItem(actor: AccessUser, itemId: string) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    this.assertValidUuid(itemId, 'itemId');
+    const out = await runSql(`
+      UPDATE menu_items SET deleted_at = now(), is_available = false, updated_at = now()
+      WHERE id = ${sqlLiteral(itemId)} AND deleted_at IS NULL
+      RETURNING id;
+    `);
+    if (!out) throw new NotFoundException('Menu item not found');
+    return { ok: true };
+  }
+
+  // ─── Missing CRUD: Delivery user deactivate ──────────────────────────────
+
+  async deactivateDeliveryUser(actor: AccessUser, targetUserId: string) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    this.assertValidUuid(targetUserId, 'userId');
+    const out = await runSql(`
+      WITH updated AS (
+        UPDATE users SET is_active = false, updated_at = now()
+        WHERE id = ${sqlLiteral(targetUserId)} AND role = 'DELIVERY' AND deleted_at IS NULL
+        RETURNING id, username, first_name, last_name
+      )
+      SELECT row_to_json(updated)::text FROM updated;
+    `);
+    if (!out) throw new NotFoundException('Delivery user not found');
+    return { ok: true, user: this.parseJsonLine(out) };
+  }
+
+  // ─── Health check ─────────────────────────────────────────────────────────
+
+  async healthCheck() {
+    const dbCheck = await runSql('SELECT 1;').then(() => 'ok').catch(() => 'error');
+    return {
+      status: dbCheck === 'ok' ? 'healthy' : 'degraded',
+      db: dbCheck,
+      uptime: Math.floor(process.uptime()),
+      timestamp: new Date().toISOString(),
     };
   }
 }
