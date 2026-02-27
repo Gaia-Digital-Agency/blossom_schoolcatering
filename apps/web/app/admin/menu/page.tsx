@@ -370,11 +370,11 @@ export default function AdminMenuPage() {
           <label>Calories (kcal)<input type="number" min={0} step={1} value={itemCaloriesKcal} onChange={(e) => setItemCaloriesKcal(e.target.value)} placeholder="leave empty for TBA" /></label>
           <label>Display Order<input type="number" min={0} value={itemDisplayOrder} onChange={(e) => setItemDisplayOrder(e.target.value)} required /></label>
 
-          <label>Upload Image (WebP auto-convert, upload only)
+          <label className="menu-full-row">Upload Image (WebP auto-convert, upload only)
             <input type="file" accept="image/*" onChange={(e) => onImageUpload(e.target.files?.[0])} />
           </label>
 
-          <div className="menu-selection-columns">
+          <div className="menu-selection-columns menu-full-row">
             <div className="ingredient-selected-box">
               <label>Dish Name<input value={itemName} onChange={(e) => setItemName(e.target.value)} required /></label>
               <strong>Dishes</strong>
@@ -532,6 +532,9 @@ export default function AdminMenuPage() {
           grid-template-columns: 1fr;
           gap: 0.7rem;
         }
+        .menu-full-row {
+          grid-column: 1 / -1;
+        }
         .menu-right-stack {
           display: grid;
           gap: 0.7rem;
@@ -609,9 +612,6 @@ export default function AdminMenuPage() {
           }
           .menu-item-columns {
             grid-template-columns: 1fr 1fr;
-          }
-          .menu-check-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
           }
         }
       `}</style>
