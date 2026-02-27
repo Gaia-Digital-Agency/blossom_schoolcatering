@@ -19,18 +19,28 @@ const links = [
 export default function AdminNav() {
   const pathname = usePathname();
   return (
-    <div className="dev-links admin-nav-links">
-      {links.map((link) => (
-        <Link
-          key={link.href}
-          href={link.href}
-          aria-current={pathname === link.href ? 'page' : undefined}
-          className={pathname === link.href ? 'admin-nav-item admin-nav-item-active' : 'admin-nav-item'}
-        >
-          {link.label}
-        </Link>
-      ))}
+    <div className="admin-nav-shell">
+      <div className="dev-links admin-nav-links">
+        {links.map((link) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            aria-current={pathname === link.href ? 'page' : undefined}
+            className={pathname === link.href ? 'admin-nav-item admin-nav-item-active' : 'admin-nav-item'}
+          >
+            {link.label}
+          </Link>
+        ))}
+      </div>
       <style jsx>{`
+        .admin-nav-shell {
+          margin: 0.45rem 0 1rem;
+          padding: 0.65rem;
+          border: 1px solid #d7c8ae;
+          border-radius: 0.75rem;
+          background: #fffdf8;
+          box-shadow: 0 2px 8px rgba(47, 39, 29, 0.06);
+        }
         .admin-nav-links :global(.admin-nav-item) {
           border: 1px solid #ccbda2;
           background: #fff;

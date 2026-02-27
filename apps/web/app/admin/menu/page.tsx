@@ -70,6 +70,14 @@ function buildPackingRequirement(packingCareRequired: boolean, wetDish: boolean)
   return flags.join('; ');
 }
 
+function inferAllergenFlagFromName(raw: string) {
+  const v = raw.toLowerCase();
+  return [
+    'milk', 'dairy', 'egg', 'peanut', 'almond', 'cashew', 'walnut',
+    'prawn', 'shrimp', 'crab', 'fish', 'wheat', 'soy', 'sesame',
+  ].some((k) => v.includes(k));
+}
+
 const masterIngredients = ((ingredientMaster as MasterIngredientFile).ingredients || []).map((x) => ({
   key: x.name,
   label: toLabel(x.name),
@@ -120,6 +128,11 @@ export default function AdminMenuPage() {
     if (!q) return masterIngredients;
     return masterIngredients.filter((i) => i.label.toLowerCase().includes(q));
   }, [ingredientSearch]);
+  const filteredMasterDishes = useMemo(() => {
+    const q = itemName.trim().toLowerCase();
+    if (!q) return masterDishes;
+    return masterDishes.filter((d) => d.toLowerCase().includes(q));
+  }, [itemName]);
 
   const loadMenuData = async () => {
     const [ings, menu] = await Promise.all([
@@ -214,14 +227,62 @@ export default function AdminMenuPage() {
     });
   };
 
-  const onToggleMasterIngredient = (masterName: string) => {
-    const mappedId = ingredientIdByNormalizedName.get(normalize(masterName));
+  const onToggleMasterIngredient = async (masterName: string) => {
+    let mappedId = ingredientIdByNormalizedName.get(normalize(masterName));
     if (!mappedId) {
-      setError('Ingredient exists in master-data/ingredient.json but not in system ingredients yet.');
-      return;
+      try {
+        await apiFetch('/admin/ingredients', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: masterName,
+            allergenFlag: inferAllergenFlagFromName(masterName),
+          }),
+        });
+      } catch {
+        // Ignore conflict or transient create errors and fallback to reload.
+      }
+      const refreshed = await apiFetch('/admin/ingredients') as Ingredient[];
+      setIngredients(refreshed || []);
+      mappedId = (refreshed || []).find((x) => normalize(x.name) === normalize(masterName))?.id;
+      if (!mappedId) {
+        setError('Failed to auto-create ingredient from master data.');
+        return;
+      }
+      setMessage(`Ingredient auto-created: ${toLabel(masterName)}`);
     }
     setError('');
     onToggleIngredient(mappedId);
+  };
+
+  const onAutoCreateDishFromMaster = async (dish: string) => {
+    setError('');
+    setMessage('');
+    const exists = menuItems.find((x) => x.name.trim().toLowerCase() === dish.trim().toLowerCase());
+    if (exists) {
+      onEditItem(exists);
+      setMessage('Dish already exists for selected date/session. Loaded into form.');
+      return;
+    }
+    const payload = {
+      serviceDate: menuServiceDate,
+      session: menuSession,
+      name: dish,
+      description: dish,
+      nutritionFactsText: 'TBA',
+      caloriesKcal: null,
+      price: Number(itemPrice || 0),
+      imageUrl: itemImageUrl || '/schoolcatering/assets/hero-meal.jpg',
+      ingredientIds: itemIngredientIds,
+      isAvailable: true,
+      displayOrder: Math.max(0, ...menuItems.map((x) => Number(x.display_order || 0))) + 1,
+      cutleryRequired: itemCutleryRequired,
+      packingRequirement: buildPackingRequirement(itemPackingCareRequired, itemWetDish),
+    };
+    await apiFetch('/admin/menu-items', { method: 'POST', body: JSON.stringify(payload) });
+    setItemName(dish);
+    if (!itemDescription.trim()) setItemDescription(dish);
+    setMessage(`Dish auto-created: ${dish}`);
+    await loadMenuData();
   };
 
   const onSeed = async () => {
@@ -251,6 +312,8 @@ export default function AdminMenuPage() {
   const onSetDishActive = async (item: AdminMenuItem, isAvailable: boolean) => {
     setError('');
     setMessage('');
+    const previous = menuItems;
+    setMenuItems((prev) => prev.map((x) => (x.id === item.id ? { ...x, is_available: isAvailable } : x)));
     const payload = {
       serviceDate: menuServiceDate,
       session: menuSession,
@@ -266,9 +329,14 @@ export default function AdminMenuPage() {
       cutleryRequired: Boolean(item.cutlery_required),
       packingRequirement: item.packing_requirement || '',
     };
-    await apiFetch(`/admin/menu-items/${item.id}`, { method: 'PATCH', body: JSON.stringify(payload) });
-    setMessage(isAvailable ? 'Dish activated.' : 'Dish deactivated.');
-    await loadMenuData();
+    try {
+      await apiFetch(`/admin/menu-items/${item.id}`, { method: 'PATCH', body: JSON.stringify(payload) });
+      setMessage(isAvailable ? 'Dish activated.' : 'Dish deactivated.');
+      await loadMenuData();
+    } catch (e) {
+      setMenuItems(previous);
+      setError(e instanceof Error ? e.message : 'Failed updating dish availability');
+    }
   };
 
   const activeMenuItems = useMemo(() => menuItems.filter((x) => x.is_available), [menuItems]);
@@ -326,8 +394,9 @@ export default function AdminMenuPage() {
 
           <div className="ingredient-selected-box">
             <strong>Dishes</strong>
+            <small>Dish Name: {itemName || '-'}</small>
             <div className="ingredient-chip-wrap">
-              {masterDishes.slice(0, 160).map((dish) => (
+              {filteredMasterDishes.slice(0, 160).map((dish) => (
                 <button
                   key={dish}
                   className="btn btn-outline ingredient-chip"
@@ -336,11 +405,13 @@ export default function AdminMenuPage() {
                     setItemName(dish);
                     if (!itemDescription.trim()) setItemDescription(dish);
                   }}
+                  onDoubleClick={() => void onAutoCreateDishFromMaster(dish)}
+                  title="Click to fill Dish Name. Double-click to auto-create dish item."
                 >
                   {dish}
                 </button>
               ))}
-              {masterDishes.length === 0 ? <small>No dishes found.</small> : null}
+              {filteredMasterDishes.length === 0 ? <small>No dishes found.</small> : null}
             </div>
           </div>
 
@@ -374,7 +445,8 @@ export default function AdminMenuPage() {
                   key={i.key}
                   type="button"
                   className={`btn ${active ? 'btn-primary' : 'btn-outline'}`}
-                  onDoubleClick={() => onToggleMasterIngredient(i.key)}
+                  onDoubleClick={() => void onToggleMasterIngredient(i.key)}
+                  onClick={(e) => e.preventDefault()}
                   title={mappedId ? 'Double-click to add/remove ingredient' : 'Not yet in system ingredient master'}
                 >
                   {i.label}{mappedId ? '' : ' (not linked)'}
@@ -384,7 +456,6 @@ export default function AdminMenuPage() {
             {filteredMasterIngredients.length === 0 ? <small>No ingredients found.</small> : null}
           </div>
 
-          <small>Selected: {selectedIngredientNames.map(toLabel).join(', ') || '-'}</small>
           <div className="menu-actions-row">
             <button className="btn btn-primary" type="submit">{editingItemId ? 'Update Dish' : 'Create Dish'}</button>
             {editingItemId ? <button className="btn btn-outline" type="button" onClick={resetForm}>Cancel Edit</button> : null}
