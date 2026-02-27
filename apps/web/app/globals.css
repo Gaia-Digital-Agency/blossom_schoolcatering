@@ -744,6 +744,47 @@ button:hover,
   color: #3b342b;
 }
 
+.draft-actions {
+  margin-top: 0.75rem;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.draft-actions label {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.draft-actions input {
+  width: 100%;
+  min-height: 2.4rem;
+  border: 1px solid #ccbda2;
+  border-radius: 0.55rem;
+  padding: 0.45rem 0.65rem;
+  background: #fff;
+}
+
+.draft-actions .btn {
+  width: 100%;
+}
+
+.billing-action-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.45rem;
+  align-items: center;
+  width: 100%;
+}
+
+.billing-action-row input[type='file'] {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.billing-action-row .btn {
+  white-space: nowrap;
+}
+
 @media (min-width: 860px) {
   .menu-flow-grid {
     grid-template-columns: 1fr 1fr;
