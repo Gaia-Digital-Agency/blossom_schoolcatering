@@ -374,21 +374,6 @@ export default function AdminMenuPage() {
             <input type="file" accept="image/*" onChange={(e) => onImageUpload(e.target.files?.[0])} />
           </label>
 
-          <div className="menu-check-grid">
-            <label className="menu-check-row">
-              <input type="checkbox" checked={itemCutleryRequired} onChange={(e) => setItemCutleryRequired(e.target.checked)} />
-              <span>Cutlery Required</span>
-            </label>
-            <label className="menu-check-row">
-              <input type="checkbox" checked={itemPackingCareRequired} onChange={(e) => setItemPackingCareRequired(e.target.checked)} />
-              <span>Packing Care Required</span>
-            </label>
-            <label className="menu-check-row">
-              <input type="checkbox" checked={itemWetDish} onChange={(e) => setItemWetDish(e.target.checked)} />
-              <span>Wet Dish</span>
-            </label>
-          </div>
-
           <div className="menu-selection-columns">
             <div className="ingredient-selected-box">
               <label>Dish Name<input value={itemName} onChange={(e) => setItemName(e.target.value)} required /></label>
@@ -413,43 +398,60 @@ export default function AdminMenuPage() {
               </div>
             </div>
 
-            <div className="ingredient-selected-box">
-              <strong>Ingredient - Selected ({itemIngredientIds.length}/{ingredientLimit})</strong>
-              <input
-                value={ingredientSearch}
-                onChange={(e) => setIngredientSearch(e.target.value)}
-                placeholder="Search ingredient..."
-              />
-              <div className="ingredient-chip-wrap ingredient-list-scroll">
-                {itemIngredientIds.length === 0 ? <small>-</small> : null}
-                {itemIngredientIds.map((id) => {
-                  const ing = ingredients.find((x) => x.id === id);
-                  if (!ing) return null;
-                  return (
-                    <button key={id} className="btn btn-outline ingredient-chip" type="button" onClick={() => onToggleIngredient(id)}>
-                      {toLabel(ing.name)}{ing.allergen_flag ? ' (allergen)' : ''} x
-                    </button>
-                  );
-                })}
+            <div className="menu-right-stack">
+              <div className="menu-check-grid">
+                <label className="menu-check-row">
+                  <input type="checkbox" checked={itemCutleryRequired} onChange={(e) => setItemCutleryRequired(e.target.checked)} />
+                  <span>Cutlery Required</span>
+                </label>
+                <label className="menu-check-row">
+                  <input type="checkbox" checked={itemPackingCareRequired} onChange={(e) => setItemPackingCareRequired(e.target.checked)} />
+                  <span>Packing Care Required</span>
+                </label>
+                <label className="menu-check-row">
+                  <input type="checkbox" checked={itemWetDish} onChange={(e) => setItemWetDish(e.target.checked)} />
+                  <span>Wet Dish</span>
+                </label>
               </div>
-              <div className="ingredient-chip-wrap ingredient-list-scroll">
-                {filteredMasterIngredients.map((i) => {
-                  const mappedId = ingredientIdByNormalizedName.get(normalize(i.key));
-                  const active = mappedId ? itemIngredientIds.includes(mappedId) : false;
-                  if (active) return null;
-                  return (
-                    <button
-                      key={i.key}
-                      type="button"
-                      className="btn btn-outline ingredient-chip"
-                      onClick={() => void onPickMasterIngredient(i.key)}
-                      title={mappedId ? 'Click to add ingredient' : 'Click to auto-create and add ingredient'}
-                    >
-                      {i.label}
-                    </button>
-                  );
-                })}
-                {filteredMasterIngredients.length === 0 ? <small>No ingredients found.</small> : null}
+
+              <div className="ingredient-selected-box">
+                <strong>Ingredient - Selected ({itemIngredientIds.length}/{ingredientLimit})</strong>
+                <input
+                  value={ingredientSearch}
+                  onChange={(e) => setIngredientSearch(e.target.value)}
+                  placeholder="Search ingredient..."
+                />
+                <div className="ingredient-chip-wrap ingredient-list-scroll">
+                  {itemIngredientIds.length === 0 ? <small>-</small> : null}
+                  {itemIngredientIds.map((id) => {
+                    const ing = ingredients.find((x) => x.id === id);
+                    if (!ing) return null;
+                    return (
+                      <button key={id} className="btn btn-outline ingredient-chip" type="button" onClick={() => onToggleIngredient(id)}>
+                        {toLabel(ing.name)}{ing.allergen_flag ? ' (allergen)' : ''} x
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="ingredient-chip-wrap ingredient-list-scroll">
+                  {filteredMasterIngredients.map((i) => {
+                    const mappedId = ingredientIdByNormalizedName.get(normalize(i.key));
+                    const active = mappedId ? itemIngredientIds.includes(mappedId) : false;
+                    if (active) return null;
+                    return (
+                      <button
+                        key={i.key}
+                        type="button"
+                        className="btn btn-outline ingredient-chip"
+                        onClick={() => void onPickMasterIngredient(i.key)}
+                        title={mappedId ? 'Click to add ingredient' : 'Click to auto-create and add ingredient'}
+                      >
+                        {i.label}
+                      </button>
+                    );
+                  })}
+                  {filteredMasterIngredients.length === 0 ? <small>No ingredients found.</small> : null}
+                </div>
               </div>
             </div>
           </div>
@@ -528,6 +530,10 @@ export default function AdminMenuPage() {
         .menu-selection-columns {
           display: grid;
           grid-template-columns: 1fr;
+          gap: 0.7rem;
+        }
+        .menu-right-stack {
+          display: grid;
           gap: 0.7rem;
         }
         .menu-check-row {

@@ -3,15 +3,18 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-const links = [
+const leftLinks = [
   { href: '/admin', label: 'Dashboard' },
   { href: '/admin/parents', label: 'Parents' },
   { href: '/admin/youngsters', label: 'Youngsters' },
   { href: '/admin/schools', label: 'Schools' },
   { href: '/admin/delivery', label: 'Delivery' },
+];
+
+const rightLinks = [
   { href: '/admin/menu', label: 'Menu' },
   { href: '/admin/kitchen', label: 'Kitchen' },
-  { href: '/admin/blackout-dates', label: 'Backout' },
+  { href: '/admin/blackout-dates', label: 'Blackout' },
   { href: '/admin/reports', label: 'Reports' },
   { href: '/admin/billing', label: 'Billing' },
 ];
@@ -20,17 +23,31 @@ export default function AdminNav() {
   const pathname = usePathname();
   return (
     <div className="admin-nav-shell">
-      <div className="dev-links admin-nav-links">
-        {links.map((link) => (
-          <Link
-            key={link.href}
-            href={link.href}
-            aria-current={pathname === link.href ? 'page' : undefined}
-            className={pathname === link.href ? 'admin-nav-item admin-nav-item-active' : 'admin-nav-item'}
-          >
-            {link.label}
-          </Link>
-        ))}
+      <div className="admin-nav-columns">
+        <div className="dev-links admin-nav-links">
+          {leftLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              aria-current={pathname === link.href ? 'page' : undefined}
+              className={pathname === link.href ? 'admin-nav-item admin-nav-item-active' : 'admin-nav-item'}
+            >
+              {link.label}
+            </Link>
+          ))}
+        </div>
+        <div className="dev-links admin-nav-links">
+          {rightLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              aria-current={pathname === link.href ? 'page' : undefined}
+              className={pathname === link.href ? 'admin-nav-item admin-nav-item-active' : 'admin-nav-item'}
+            >
+              {link.label}
+            </Link>
+          ))}
+        </div>
       </div>
       <style jsx>{`
         .admin-nav-shell {
@@ -40,6 +57,17 @@ export default function AdminNav() {
           border-radius: 0.75rem;
           background: #fffdf8;
           box-shadow: 0 2px 8px rgba(47, 39, 29, 0.06);
+        }
+        .admin-nav-columns {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 0.6rem;
+        }
+        @media (min-width: 860px) {
+          .admin-nav-columns {
+            grid-template-columns: 1fr 1fr;
+            gap: 0.9rem;
+          }
         }
         .admin-nav-links :global(.admin-nav-item) {
           border: 1px solid #ccbda2;
