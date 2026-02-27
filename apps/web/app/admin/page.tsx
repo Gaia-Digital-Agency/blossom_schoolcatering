@@ -91,14 +91,16 @@ export default function AdminPage() {
         <p className="auth-help">Overview and key operational metrics.</p>
         <AdminNav />
 
-        <div className="admin-dashboard-controls">
-          <label>
-            Dashboard Date
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          </label>
-          <button className="btn btn-outline" type="button" onClick={load} disabled={loading}>
-            {loading ? 'Refreshing...' : 'Refresh Dashboard'}
-          </button>
+        <div className="auth-form admin-controls-card">
+          <div className="admin-dashboard-controls">
+            <label>
+              Dashboard Date
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </label>
+            <button className="btn btn-outline" type="button" onClick={load} disabled={loading}>
+              {loading ? 'Refreshing...' : 'Refresh Dashboard'}
+            </button>
+          </div>
         </div>
 
         {error ? <p className="auth-error">{error}</p> : null}
@@ -119,11 +121,51 @@ export default function AdminPage() {
                   <tr><th>Birthday Highlight (Today)</th><td>{(data.birthdayHighlights || []).map((b) => b.child_name).join(', ') || '-'}</td></tr>
                   <tr className="section-row"><th colSpan={2}>DELIVERY</th></tr>
                   <tr><th>Number of Delivery Person</th><td>{data.deliveryPersonnelCount}</td></tr>
-                  <tr><th>Today</th><td>Total Orders: {data.delivery.today.totalOrders}, Total Dishes: {data.delivery.today.totalDishes}</td></tr>
-                  <tr><th>Yesterday</th><td>Total Orders: {data.delivery.yesterday.totalOrders}, Total Dishes: {data.delivery.yesterday.totalDishes}</td></tr>
-                  <tr><th>Tomorrow</th><td>Total Orders: {data.delivery.tomorrow.totalOrders}, Total Dishes: {data.delivery.tomorrow.totalDishes}</td></tr>
-                  <tr><th>Past Week</th><td>Total Orders: {data.delivery.pastWeek.totalOrders}, Total Dishes: {data.delivery.pastWeek.totalDishes}</td></tr>
-                  <tr><th>Past Month</th><td>Total Orders: {data.delivery.pastMonth.totalOrders}, Total Dishes: {data.delivery.pastMonth.totalDishes}</td></tr>
+                  <tr>
+                    <th>Today</th>
+                    <td>
+                      <div className="metric-chip-row">
+                        <span className="metric-chip">Total Orders: {data.delivery.today.totalOrders}</span>
+                        <span className="metric-chip">Total Dishes: {data.delivery.today.totalDishes}</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th>Yesterday</th>
+                    <td>
+                      <div className="metric-chip-row">
+                        <span className="metric-chip">Total Orders: {data.delivery.yesterday.totalOrders}</span>
+                        <span className="metric-chip">Total Dishes: {data.delivery.yesterday.totalDishes}</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th>Tomorrow</th>
+                    <td>
+                      <div className="metric-chip-row">
+                        <span className="metric-chip">Total Orders: {data.delivery.tomorrow.totalOrders}</span>
+                        <span className="metric-chip">Total Dishes: {data.delivery.tomorrow.totalDishes}</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th>Past Week</th>
+                    <td>
+                      <div className="metric-chip-row">
+                        <span className="metric-chip">Total Orders: {data.delivery.pastWeek.totalOrders}</span>
+                        <span className="metric-chip">Total Dishes: {data.delivery.pastWeek.totalDishes}</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th>Past Month</th>
+                    <td>
+                      <div className="metric-chip-row">
+                        <span className="metric-chip">Total Orders: {data.delivery.pastMonth.totalOrders}</span>
+                        <span className="metric-chip">Total Dishes: {data.delivery.pastMonth.totalDishes}</span>
+                      </div>
+                    </td>
+                  </tr>
                   <tr>
                     <th>Yesterday Failed/Unchecked Delivery</th>
                     <td>
@@ -137,24 +179,64 @@ export default function AdminPage() {
                   <tr><th>Dishes Total Active</th><td>{data.menu.dishesTotalActive}</td></tr>
                   <tr className="section-row"><th colSpan={2}>KITCHEN</th></tr>
                   <tr><th>Next Back Out Day</th><td>{data.kitchen.nextBlackoutDay || '-'}</td></tr>
-                  <tr><th>Orders Not Fulfilled From Kitchen</th><td>Yesterday: {data.kitchen.yesterday.ordersNotFulfilled}, Past Week: {data.kitchen.pastWeek.ordersNotFulfilled}</td></tr>
-                  <tr><th>Dishes Not Fulfilled From Kitchen</th><td>Yesterday: {data.kitchen.yesterday.dishesNotFulfilled}, Past Week: {data.kitchen.pastWeek.dishesNotFulfilled}</td></tr>
+                  <tr>
+                    <th>Orders Not Fulfilled From Kitchen</th>
+                    <td>
+                      <div className="metric-chip-row">
+                        <span className="metric-chip">Yesterday: {data.kitchen.yesterday.ordersNotFulfilled}</span>
+                        <span className="metric-chip">Past Week: {data.kitchen.pastWeek.ordersNotFulfilled}</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th>Dishes Not Fulfilled From Kitchen</th>
+                    <td>
+                      <div className="metric-chip-row">
+                        <span className="metric-chip">Yesterday: {data.kitchen.yesterday.dishesNotFulfilled}</span>
+                        <span className="metric-chip">Past Week: {data.kitchen.pastWeek.dishesNotFulfilled}</span>
+                      </div>
+                    </td>
+                  </tr>
                   <tr className="section-row"><th colSpan={2}>BILLING</th></tr>
                   <tr>
                     <th>Total Number Billing</th>
-                    <td>Yesterday: {data.billing.yesterday.totalNumberBilling}, Past Week: {data.billing.pastWeek.totalNumberBilling}, Past Month: {data.billing.pastMonth.totalNumberBilling}</td>
+                    <td>
+                      <div className="metric-chip-row">
+                        <span className="metric-chip">Yesterday: {data.billing.yesterday.totalNumberBilling}</span>
+                        <span className="metric-chip">Past Week: {data.billing.pastWeek.totalNumberBilling}</span>
+                        <span className="metric-chip">Past Month: {data.billing.pastMonth.totalNumberBilling}</span>
+                      </div>
+                    </td>
                   </tr>
                   <tr>
                     <th>Total Value Billing</th>
-                    <td>Yesterday: {asCurrency(data.billing.yesterday.totalValueBilling)}, Past Week: {asCurrency(data.billing.pastWeek.totalValueBilling)}, Past Month: {asCurrency(data.billing.pastMonth.totalValueBilling)}</td>
+                    <td>
+                      <div className="metric-chip-row">
+                        <span className="metric-chip">Yesterday: {asCurrency(data.billing.yesterday.totalValueBilling)}</span>
+                        <span className="metric-chip">Past Week: {asCurrency(data.billing.pastWeek.totalValueBilling)}</span>
+                        <span className="metric-chip">Past Month: {asCurrency(data.billing.pastMonth.totalValueBilling)}</span>
+                      </div>
+                    </td>
                   </tr>
                   <tr>
                     <th>Total Number Unpaid (Proof Not Provided)</th>
-                    <td>Yesterday: {data.billing.yesterday.totalNumberUnpaidNoProof}, Past Week: {data.billing.pastWeek.totalNumberUnpaidNoProof}, Past Month: {data.billing.pastMonth.totalNumberUnpaidNoProof}</td>
+                    <td>
+                      <div className="metric-chip-row">
+                        <span className="metric-chip">Yesterday: {data.billing.yesterday.totalNumberUnpaidNoProof}</span>
+                        <span className="metric-chip">Past Week: {data.billing.pastWeek.totalNumberUnpaidNoProof}</span>
+                        <span className="metric-chip">Past Month: {data.billing.pastMonth.totalNumberUnpaidNoProof}</span>
+                      </div>
+                    </td>
                   </tr>
                   <tr>
                     <th>Total Value Unpaid (Proof Not Provided)</th>
-                    <td>Yesterday: {asCurrency(data.billing.yesterday.totalValueUnpaidNoProof)}, Past Week: {asCurrency(data.billing.pastWeek.totalValueUnpaidNoProof)}, Past Month: {asCurrency(data.billing.pastMonth.totalValueUnpaidNoProof)}</td>
+                    <td>
+                      <div className="metric-chip-row">
+                        <span className="metric-chip">Yesterday: {asCurrency(data.billing.yesterday.totalValueUnpaidNoProof)}</span>
+                        <span className="metric-chip">Past Week: {asCurrency(data.billing.pastWeek.totalValueUnpaidNoProof)}</span>
+                        <span className="metric-chip">Past Month: {asCurrency(data.billing.pastMonth.totalValueUnpaidNoProof)}</span>
+                      </div>
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -169,6 +251,8 @@ export default function AdminPage() {
           display: grid;
           grid-template-columns: minmax(0, 1fr);
           gap: 0.6rem;
+        }
+        .admin-controls-card {
           margin-bottom: 0.9rem;
         }
         .admin-dashboard-controls label {
@@ -184,11 +268,30 @@ export default function AdminPage() {
         .admin-overview-wrap {
           margin-top: 0.1rem;
         }
+        .admin-overview-table th,
+        .admin-overview-table td {
+          text-align: center;
+          font-size: 0.92rem;
+        }
         .admin-overview-table .section-row th {
-          text-align: left;
+          text-align: center;
           font-size: 0.82rem;
           letter-spacing: 0.06em;
           background: rgba(15, 23, 42, 0.08);
+        }
+        .metric-chip-row {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
+          gap: 0.35rem;
+        }
+        .metric-chip {
+          display: inline-block;
+          padding: 0.18rem 0.5rem;
+          border: 1px solid rgba(15, 23, 42, 0.16);
+          border-radius: 999px;
+          background: rgba(148, 163, 184, 0.1);
+          white-space: nowrap;
         }
         @media (min-width: 860px) {
           .admin-dashboard-controls {
