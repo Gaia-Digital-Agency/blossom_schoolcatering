@@ -445,9 +445,8 @@ export default function AdminMenuPage() {
                   key={i.key}
                   type="button"
                   className={`btn ${active ? 'btn-primary' : 'btn-outline'}`}
-                  onDoubleClick={() => void onToggleMasterIngredient(i.key)}
-                  onClick={(e) => e.preventDefault()}
-                  title={mappedId ? 'Double-click to add/remove ingredient' : 'Not yet in system ingredient master'}
+                  onClick={() => void onToggleMasterIngredient(i.key)}
+                  title={mappedId ? 'Click to add/remove ingredient' : 'Click to auto-create and add ingredient'}
                 >
                   {i.label}{mappedId ? '' : ' (not linked)'}
                 </button>

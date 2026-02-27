@@ -1562,24 +1562,82 @@ export class CoreService {
     },
   ) {
     await this.ensureMenuItemExtendedColumns();
-    const serviceDate = this.validateServiceDate(input.serviceDate);
-    const session = this.normalizeSession(input.session);
-    const name = (input.name || '').trim();
-    const description = (input.description || '').trim();
-    const nutritionFactsText = (input.nutritionFactsText || '').trim();
-    const caloriesKcal = input.caloriesKcal === undefined || input.caloriesKcal === null ? null : Number(input.caloriesKcal);
-    const price = Number(input.price || 0);
-    const rawImageUrl = (input.imageUrl || '').trim();
-    const ingredientIds = Array.isArray(input.ingredientIds) ? input.ingredientIds.filter(Boolean) : [];
-    const isAvailable = input.isAvailable !== false;
-    const displayOrder = Number.isInteger(input.displayOrder) ? Number(input.displayOrder) : 0;
-    const cutleryRequired = Boolean(input.cutleryRequired);
-    const packingRequirement = this.sanitizePackingRequirement(input.packingRequirement);
+    const currentOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT mi.id,
+               m.service_date::text AS service_date,
+               m.session::text AS session,
+               mi.name,
+               mi.description,
+               mi.nutrition_facts_text,
+               mi.calories_kcal,
+               mi.price,
+               mi.image_url,
+               mi.is_available,
+               mi.display_order,
+               mi.cutlery_required,
+               mi.packing_requirement,
+               COALESCE(array_agg(DISTINCT i.id::text) FILTER (WHERE i.id IS NOT NULL), '{}') AS ingredient_ids
+        FROM menu_items mi
+        JOIN menus m ON m.id = mi.menu_id
+        LEFT JOIN menu_item_ingredients mii ON mii.menu_item_id = mi.id
+        LEFT JOIN ingredients i ON i.id = mii.ingredient_id AND i.deleted_at IS NULL
+        WHERE mi.id = $1
+          AND mi.deleted_at IS NULL
+        GROUP BY mi.id, m.service_date, m.session
+        LIMIT 1
+      ) t;
+    `,
+      [itemId],
+    );
+    if (!currentOut) throw new NotFoundException('Menu item not found');
+    const current = this.parseJsonLine<{
+      id: string;
+      service_date: string;
+      session: SessionType;
+      name: string;
+      description: string;
+      nutrition_facts_text?: string | null;
+      calories_kcal?: number | null;
+      price: string | number;
+      image_url?: string | null;
+      is_available: boolean;
+      display_order: number;
+      cutlery_required: boolean;
+      packing_requirement?: string | null;
+      ingredient_ids: string[];
+    }>(currentOut);
 
-    if (!name || !description || !nutritionFactsText || !rawImageUrl) {
+    const serviceDate = input.serviceDate ? this.validateServiceDate(input.serviceDate) : current.service_date;
+    const session = input.session ? this.normalizeSession(input.session) : current.session;
+    const name = input.name !== undefined ? input.name.trim() : current.name;
+    const description = input.description !== undefined ? input.description.trim() : current.description;
+    const nutritionFactsText = input.nutritionFactsText !== undefined
+      ? input.nutritionFactsText.trim() || 'TBA'
+      : (String(current.nutrition_facts_text || '').trim() || 'TBA');
+    const caloriesKcal = input.caloriesKcal === undefined
+      ? (current.calories_kcal ?? null)
+      : (input.caloriesKcal === null ? null : Number(input.caloriesKcal));
+    const price = input.price === undefined ? Number(current.price || 0) : Number(input.price || 0);
+    const rawImageUrl = input.imageUrl !== undefined
+      ? input.imageUrl.trim()
+      : (String(current.image_url || '').trim() || '/schoolcatering/assets/hero-meal.jpg');
+    const ingredientIds = Array.isArray(input.ingredientIds)
+      ? input.ingredientIds.filter(Boolean)
+      : Array.isArray(current.ingredient_ids) ? current.ingredient_ids : [];
+    const isAvailable = input.isAvailable === undefined ? Boolean(current.is_available) : Boolean(input.isAvailable);
+    const displayOrder = Number.isInteger(input.displayOrder) ? Number(input.displayOrder) : Number(current.display_order || 0);
+    const cutleryRequired = input.cutleryRequired === undefined ? Boolean(current.cutlery_required) : Boolean(input.cutleryRequired);
+    const packingRequirement = this.sanitizePackingRequirement(
+      input.packingRequirement === undefined ? (current.packing_requirement || '') : input.packingRequirement,
+    );
+
+    if (!name || !description || !nutritionFactsText || !rawImageUrl.trim()) {
       throw new BadRequestException('Missing required menu item fields');
     }
-    if (price < 0) {
+    if (price < 0 || Number.isNaN(price)) {
       throw new BadRequestException('Invalid price');
     }
     if (caloriesKcal !== null && (!Number.isInteger(caloriesKcal) || caloriesKcal < 0)) {
