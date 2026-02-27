@@ -374,47 +374,6 @@ export default function AdminMenuPage() {
             <input type="file" accept="image/*" onChange={(e) => onImageUpload(e.target.files?.[0])} />
           </label>
 
-          <div className="ingredient-selected-box">
-            <strong>Ingredient - Selected ({itemIngredientIds.length}/{ingredientLimit})</strong>
-            <input
-              value={ingredientSearch}
-              onChange={(e) => setIngredientSearch(e.target.value)}
-              placeholder="Search ingredient..."
-            />
-            <div className="ingredient-chip-wrap">
-              {itemIngredientIds.length === 0 ? <small>-</small> : null}
-              {itemIngredientIds.map((id) => {
-                const ing = ingredients.find((x) => x.id === id);
-                if (!ing) return null;
-                return (
-                  <button key={id} className="btn btn-outline ingredient-chip" type="button" onClick={() => onToggleIngredient(id)}>
-                    {toLabel(ing.name)}{ing.allergen_flag ? ' (allergen)' : ''} x
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="ingredient-picker-box">
-            {filteredMasterIngredients.map((i) => {
-              const mappedId = ingredientIdByNormalizedName.get(normalize(i.key));
-              const active = mappedId ? itemIngredientIds.includes(mappedId) : false;
-              if (active) return null;
-              return (
-                <button
-                  key={i.key}
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => void onPickMasterIngredient(i.key)}
-                  title={mappedId ? 'Click to add ingredient' : 'Click to auto-create and add ingredient'}
-                >
-                  {i.label}
-                </button>
-              );
-            })}
-            {filteredMasterIngredients.length === 0 ? <small>No ingredients found.</small> : null}
-          </div>
-
           <div className="menu-check-grid">
             <label className="menu-check-row">
               <input type="checkbox" checked={itemCutleryRequired} onChange={(e) => setItemCutleryRequired(e.target.checked)} />
@@ -428,6 +387,45 @@ export default function AdminMenuPage() {
               <input type="checkbox" checked={itemWetDish} onChange={(e) => setItemWetDish(e.target.checked)} />
               <span>Wet Dish</span>
             </label>
+            <div className="ingredient-selected-box ingredient-in-check-grid">
+              <strong>Ingredient - Selected ({itemIngredientIds.length}/{ingredientLimit})</strong>
+              <input
+                value={ingredientSearch}
+                onChange={(e) => setIngredientSearch(e.target.value)}
+                placeholder="Search ingredient..."
+              />
+              <div className="ingredient-chip-wrap">
+                {itemIngredientIds.length === 0 ? <small>-</small> : null}
+                {itemIngredientIds.map((id) => {
+                  const ing = ingredients.find((x) => x.id === id);
+                  if (!ing) return null;
+                  return (
+                    <button key={id} className="btn btn-outline ingredient-chip" type="button" onClick={() => onToggleIngredient(id)}>
+                      {toLabel(ing.name)}{ing.allergen_flag ? ' (allergen)' : ''} x
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="ingredient-chip-wrap">
+                {filteredMasterIngredients.map((i) => {
+                  const mappedId = ingredientIdByNormalizedName.get(normalize(i.key));
+                  const active = mappedId ? itemIngredientIds.includes(mappedId) : false;
+                  if (active) return null;
+                  return (
+                    <button
+                      key={i.key}
+                      type="button"
+                      className="btn btn-outline ingredient-chip"
+                      onClick={() => void onPickMasterIngredient(i.key)}
+                      title={mappedId ? 'Click to add ingredient' : 'Click to auto-create and add ingredient'}
+                    >
+                      {i.label}
+                    </button>
+                  );
+                })}
+                {filteredMasterIngredients.length === 0 ? <small>No ingredients found.</small> : null}
+              </div>
+            </div>
           </div>
 
           <div className="ingredient-selected-box">
@@ -456,8 +454,8 @@ export default function AdminMenuPage() {
 
         <h2>Menu Items</h2>
         <div className="menu-item-columns">
-          <div className="auth-form">
-            <h3>Active Dishes</h3>
+          <div className="auth-form menu-list-card menu-list-card-active">
+            <h3 className="menu-list-title">Active Dishes</h3>
             {activeMenuItems.map((item) => (
               <label key={item.id}>
                 <strong>{item.name}</strong>
@@ -475,8 +473,8 @@ export default function AdminMenuPage() {
             ))}
             {activeMenuItems.length === 0 ? <p className="auth-help">No active dishes.</p> : null}
           </div>
-          <div className="auth-form">
-            <h3>Non Active Dishes</h3>
+          <div className="auth-form menu-list-card menu-list-card-inactive">
+            <h3 className="menu-list-title">Non Active Dishes</h3>
             {inactiveMenuItems.map((item) => (
               <label key={item.id}>
                 <strong>{item.name}</strong>
@@ -539,27 +537,40 @@ export default function AdminMenuPage() {
           display: grid;
           gap: 0.45rem;
         }
-        .ingredient-picker-box {
-          border: 1px solid #ccbda2;
-          border-radius: 0.55rem;
-          background: #fff;
-          padding: 0.55rem;
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 0.45rem;
-          max-height: 16rem;
-          overflow: auto;
-        }
         .ingredient-chip-wrap {
           display: flex;
           flex-wrap: wrap;
           gap: 0.4rem;
           align-items: center;
         }
+        .ingredient-in-check-grid {
+          grid-column: 1 / -1;
+          margin-top: 0.2rem;
+        }
         .menu-item-columns {
           display: grid;
           grid-template-columns: 1fr;
-          gap: 0.7rem;
+          gap: 1rem;
+        }
+        .menu-list-card {
+          border: 2px solid #ccbda2;
+          border-radius: 0.75rem;
+          background: #fffdfa;
+          padding-top: 0.8rem;
+        }
+        .menu-list-card-active {
+          border-color: #7a9f67;
+          background: #f7fff3;
+        }
+        .menu-list-card-inactive {
+          border-color: #b78d8d;
+          background: #fff7f7;
+        }
+        .menu-list-title {
+          text-align: center;
+          margin: 0 0 0.55rem 0;
+          font-size: 1rem;
+          font-weight: 700;
         }
         @media (min-width: 980px) {
           .menu-item-columns {
@@ -567,9 +578,6 @@ export default function AdminMenuPage() {
           }
           .menu-check-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
-          }
-          .ingredient-picker-box {
-            grid-template-columns: repeat(3, minmax(0, 1fr));
           }
         }
       `}</style>
