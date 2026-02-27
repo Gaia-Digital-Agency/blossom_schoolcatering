@@ -9,7 +9,7 @@ const links = [
   { href: '/admin/parents', label: 'Parents' },
   { href: '/admin/youngsters', label: 'Youngsters' },
   { href: '/admin/schools', label: 'Schools' },
-  { href: '/admin/blackout-dates', label: 'Blackout Dates' },
+  { href: '/admin/blackout-dates', label: 'Blackout' },
   { href: '/admin/billing', label: 'Billing' },
   { href: '/admin/delivery', label: 'Delivery' },
   { href: '/admin/reports', label: 'Reports' },
