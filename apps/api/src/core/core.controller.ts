@@ -397,8 +397,8 @@ export class CoreController {
 
   @Get('delivery/users')
   @Roles('ADMIN')
-  getDeliveryUsers() {
-    return this.coreService.getDeliveryUsers();
+  getDeliveryUsers(@Query('include_inactive') includeInactive?: string) {
+    return this.coreService.getDeliveryUsers(includeInactive === 'true');
   }
 
   @Post('admin/delivery/users')
@@ -414,6 +414,23 @@ export class CoreController {
   @Roles('ADMIN')
   deactivateDeliveryUser(@Req() req: AuthRequest, @Param('userId', ParseUUIDPipe) userId: string) {
     return this.coreService.deactivateDeliveryUser(req.user, userId);
+  }
+
+  @Patch('admin/delivery/users/:userId')
+  @Roles('ADMIN')
+  updateDeliveryUser(
+    @Req() req: AuthRequest,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Body() body: {
+      firstName?: string;
+      lastName?: string;
+      phoneNumber?: string;
+      email?: string;
+      username?: string;
+      isActive?: boolean;
+    },
+  ) {
+    return this.coreService.updateDeliveryUser(req.user, userId, body);
   }
 
   @Get('delivery/school-assignments')

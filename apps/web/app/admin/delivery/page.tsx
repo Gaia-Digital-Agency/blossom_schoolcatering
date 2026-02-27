@@ -1,11 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { apiFetch, SessionExpiredError } from '../../../lib/auth';
+import { useEffect, useMemo, useState } from 'react';
+import { apiFetch } from '../../../lib/auth';
 import AdminNav from '../_components/admin-nav';
 import PasswordInput from '../../_components/password-input';
 
-type DeliveryUser = { id: string; username: string; first_name: string; last_name: string };
+type DeliveryUser = {
+  id: string;
+  username: string;
+  first_name: string;
+  last_name: string;
+  phone_number?: string | null;
+  email?: string | null;
+  is_active: boolean;
+};
 type School = { id: string; name: string };
 type Mapping = {
   delivery_user_id: string;
@@ -18,8 +26,10 @@ type Mapping = {
 type Assignment = {
   id: string;
   order_id: string;
+  delivery_user_id: string;
   service_date: string;
   session: string;
+  school_name: string;
   child_name: string;
   parent_name: string;
   delivery_status: string;
@@ -51,11 +61,17 @@ export default function AdminDeliveryPage() {
   const [newPhoneNumber, setNewPhoneNumber] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [creatingUser, setCreatingUser] = useState(false);
-  const [deactivatingUserId, setDeactivatingUserId] = useState('');
+  const [editingUserId, setEditingUserId] = useState('');
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editLastName, setEditLastName] = useState('');
+  const [editPhoneNumber, setEditPhoneNumber] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [savingUserId, setSavingUserId] = useState('');
+  const [togglingUserId, setTogglingUserId] = useState('');
 
   const load = async () => {
     const [u, s, m, a] = await Promise.all([
-      apiFetch('/delivery/users') as Promise<DeliveryUser[]>,
+      apiFetch('/delivery/users?include_inactive=true') as Promise<DeliveryUser[]>,
       apiFetch('/schools?active=true') as Promise<School[]>,
       apiFetch('/delivery/school-assignments') as Promise<Mapping[]>,
       apiFetch(`/delivery/assignments?date=${encodeURIComponent(assignDate)}`) as Promise<Assignment[]>,
@@ -68,11 +84,12 @@ export default function AdminDeliveryPage() {
     if (!selectedSchoolId && s.length) setSelectedSchoolId(s[0].id);
   };
 
-  useEffect(() => { load().catch((e) => setError(e instanceof Error ? e.message : 'Failed')); /* eslint-disable-next-line */ }, []);
+  useEffect(() => { load().catch((e) => setError(e instanceof Error ? e.message : 'Failed')); /* eslint-disable-next-line */ }, [assignDate]);
 
   const onSaveMapping = async () => {
     if (!selectedDeliveryUserId || !selectedSchoolId) return;
-    setError(''); setMessage('');
+    setError('');
+    setMessage('');
     try {
       await apiFetch('/delivery/school-assignments', {
         method: 'POST',
@@ -80,11 +97,14 @@ export default function AdminDeliveryPage() {
       });
       setMessage('School assignment saved.');
       await load();
-    } catch (e) { setError(e instanceof Error ? e.message : 'Failed saving mapping'); }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed saving mapping');
+    }
   };
 
   const onToggleMapping = async (row: Mapping, isActive: boolean) => {
-    setError(''); setMessage('');
+    setError('');
+    setMessage('');
     try {
       await apiFetch('/delivery/school-assignments', {
         method: 'POST',
@@ -92,11 +112,14 @@ export default function AdminDeliveryPage() {
       });
       setMessage(isActive ? 'Mapping activated.' : 'Mapping deactivated.');
       await load();
-    } catch (e) { setError(e instanceof Error ? e.message : 'Failed updating mapping'); }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed updating mapping');
+    }
   };
 
   const onAutoAssign = async () => {
-    setError(''); setMessage('');
+    setError('');
+    setMessage('');
     try {
       const out = await apiFetch('/delivery/auto-assign', {
         method: 'POST',
@@ -108,7 +131,9 @@ export default function AdminDeliveryPage() {
           : `Auto-assigned ${out.assignedCount} orders.`,
       );
       await load();
-    } catch (e) { setError(e instanceof Error ? e.message : 'Failed auto-assignment'); }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed auto-assignment');
+    }
   };
 
   const onCreateDeliveryUser = async () => {
@@ -146,20 +171,83 @@ export default function AdminDeliveryPage() {
     }
   };
 
-  const onDeactivateDeliveryUser = async (user: DeliveryUser) => {
+  const beginEditUser = (user: DeliveryUser) => {
+    setEditingUserId(user.id);
+    setEditFirstName(user.first_name || '');
+    setEditLastName(user.last_name || '');
+    setEditPhoneNumber(user.phone_number || '');
+    setEditEmail(user.email || '');
+  };
+
+  const onSaveUserEdit = async (userId: string) => {
+    setSavingUserId(userId);
     setError('');
     setMessage('');
-    setDeactivatingUserId(user.id);
     try {
-      await apiFetch(`/admin/delivery/users/${user.id}/deactivate`, { method: 'PATCH' });
-      setMessage(`Delivery user deactivated: ${user.username}`);
+      await apiFetch(`/admin/delivery/users/${userId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          firstName: editFirstName,
+          lastName: editLastName,
+          phoneNumber: editPhoneNumber,
+          email: editEmail,
+        }),
+      });
+      setEditingUserId('');
+      setMessage('Delivery user updated.');
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed deactivating delivery user');
+      setError(e instanceof Error ? e.message : 'Failed updating delivery user');
     } finally {
-      setDeactivatingUserId('');
+      setSavingUserId('');
     }
   };
+
+  const onToggleUserActive = async (user: DeliveryUser) => {
+    setTogglingUserId(user.id);
+    setError('');
+    setMessage('');
+    try {
+      await apiFetch(`/admin/delivery/users/${user.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ isActive: !user.is_active }),
+      });
+      setMessage(!user.is_active ? `Delivery user activated: ${user.username}` : `Delivery user deactivated: ${user.username}`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed updating delivery user status');
+    } finally {
+      setTogglingUserId('');
+    }
+  };
+
+  const usersById = useMemo(() => {
+    const map = new Map<string, DeliveryUser>();
+    for (const u of users) map.set(u.id, u);
+    return map;
+  }, [users]);
+
+  const autoAssignmentSummary = useMemo(() => {
+    const grouped = new Map<string, { schools: Set<string>; youngsters: Set<string>; orderCount: number }>();
+    for (const row of assignments) {
+      const key = row.delivery_user_id || 'UNASSIGNED';
+      if (!grouped.has(key)) grouped.set(key, { schools: new Set<string>(), youngsters: new Set<string>(), orderCount: 0 });
+      const target = grouped.get(key)!;
+      if (row.school_name) target.schools.add(row.school_name);
+      if (row.child_name) target.youngsters.add(row.child_name);
+      target.orderCount += 1;
+    }
+    return Array.from(grouped.entries()).map(([deliveryUserId, value]) => {
+      const u = usersById.get(deliveryUserId);
+      return {
+        deliveryUserId,
+        deliveryName: u ? `${u.first_name} ${u.last_name}` : 'Unassigned',
+        schools: Array.from(value.schools).sort(),
+        youngsterCount: value.youngsters.size,
+        orderCount: value.orderCount,
+      };
+    }).sort((a, b) => b.orderCount - a.orderCount || a.deliveryName.localeCompare(b.deliveryName));
+  }, [assignments, usersById]);
 
   return (
     <main className="page-auth page-auth-desktop">
@@ -182,78 +270,219 @@ export default function AdminDeliveryPage() {
           </button>
         </div>
 
-        <h2>School To Deliverer Mapping</h2>
-        <div className="auth-form">
-          {users.map((u) => (
-            <label key={u.id}>
-              <strong>{u.first_name} {u.last_name}</strong>
-              <small>{u.username}</small>
-              <button
-                className="btn btn-outline"
-                type="button"
-                onClick={() => onDeactivateDeliveryUser(u)}
-                disabled={deactivatingUserId === u.id}
-              >
-                {deactivatingUserId === u.id ? 'Deactivating...' : 'Deactivate User'}
-              </button>
-            </label>
-          ))}
+        <h2>List Delivery Users</h2>
+        <div className="kitchen-table-wrap">
+          <table className="kitchen-table admin-delivery-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Username</th>
+                <th>Phone</th>
+                <th>Email</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.length === 0 ? (
+                <tr><td colSpan={6}>No delivery users yet.</td></tr>
+              ) : users.map((u) => (
+                <tr key={u.id}>
+                  <td>
+                    {editingUserId === u.id ? (
+                      <div className="edit-grid">
+                        <input value={editFirstName} onChange={(e) => setEditFirstName(e.target.value)} placeholder="First" />
+                        <input value={editLastName} onChange={(e) => setEditLastName(e.target.value)} placeholder="Last" />
+                      </div>
+                    ) : `${u.first_name} ${u.last_name}`}
+                  </td>
+                  <td>{u.username}</td>
+                  <td>{editingUserId === u.id ? <input value={editPhoneNumber} onChange={(e) => setEditPhoneNumber(e.target.value)} /> : (u.phone_number || '-')}</td>
+                  <td>{editingUserId === u.id ? <input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} /> : (u.email || '-')}</td>
+                  <td>{u.is_active ? 'ACTIVE' : 'INACTIVE'}</td>
+                  <td>
+                    <div className="action-row">
+                      {editingUserId === u.id ? (
+                        <>
+                          <button className="btn btn-primary" type="button" onClick={() => onSaveUserEdit(u.id)} disabled={savingUserId === u.id}>
+                            {savingUserId === u.id ? 'Saving...' : 'Save'}
+                          </button>
+                          <button className="btn btn-outline" type="button" onClick={() => setEditingUserId('')}>Cancel</button>
+                        </>
+                      ) : (
+                        <button className="btn btn-outline" type="button" onClick={() => beginEditUser(u)}>Edit</button>
+                      )}
+                      <button
+                        className="btn btn-outline"
+                        type="button"
+                        onClick={() => onToggleUserActive(u)}
+                        disabled={togglingUserId === u.id}
+                      >
+                        {togglingUserId === u.id ? 'Updating...' : (u.is_active ? 'Deactivate' : 'Activate')}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
 
-        <label>
-          School
-          <select value={selectedSchoolId} onChange={(e) => setSelectedSchoolId(e.target.value)}>
-            <option value="">Select...</option>
-            {schools.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-        </label>
-        <label>
-          Delivery Personnel
-          <select value={selectedDeliveryUserId} onChange={(e) => setSelectedDeliveryUserId(e.target.value)}>
-            <option value="">Select...</option>
-            {users.map((u) => <option key={u.id} value={u.id}>{u.first_name} {u.last_name} ({u.username})</option>)}
-          </select>
-        </label>
-        <button className="btn btn-primary" type="button" onClick={onSaveMapping}>Save Mapping</button>
+        <h2>Delivery vs School Assignment</h2>
+        <div className="auth-form admin-mapping-controls">
+          <label>
+            School
+            <select value={selectedSchoolId} onChange={(e) => setSelectedSchoolId(e.target.value)}>
+              <option value="">Select...</option>
+              {schools.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </label>
+          <label>
+            Delivery Personnel
+            <select value={selectedDeliveryUserId} onChange={(e) => setSelectedDeliveryUserId(e.target.value)}>
+              <option value="">Select...</option>
+              {users.filter((u) => u.is_active).map((u) => <option key={u.id} value={u.id}>{u.first_name} {u.last_name} ({u.username})</option>)}
+            </select>
+          </label>
+          <button className="btn btn-primary" type="button" onClick={onSaveMapping}>Save Assignment</button>
+        </div>
 
-        <h2>Daily Auto Assignment</h2>
-        <label>
-          Service Date
-          <input type="date" value={assignDate} onChange={(e) => setAssignDate(e.target.value)} />
-        </label>
-        <button className="btn btn-primary" type="button" onClick={onAutoAssign}>Auto Assign by School</button>
-        <button className="btn btn-outline" type="button" onClick={load}>Refresh</button>
+        <div className="kitchen-table-wrap">
+          <table className="kitchen-table admin-delivery-table">
+            <thead>
+              <tr>
+                <th>School</th>
+                <th>Delivery User</th>
+                <th>Username</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {mappings.length === 0 ? (
+                <tr><td colSpan={5}>No delivery-school mappings yet.</td></tr>
+              ) : mappings.map((m) => (
+                <tr key={`${m.delivery_user_id}-${m.school_id}`}>
+                  <td>{m.school_name}</td>
+                  <td>{m.delivery_name}</td>
+                  <td>{m.delivery_username}</td>
+                  <td>{m.is_active ? 'ACTIVE' : 'INACTIVE'}</td>
+                  <td>
+                    <div className="action-row">
+                      <button
+                        className="btn btn-outline"
+                        type="button"
+                        onClick={() => {
+                          setSelectedSchoolId(m.school_id);
+                          setSelectedDeliveryUserId(m.delivery_user_id);
+                        }}
+                      >
+                        Edit
+                      </button>
+                      {m.is_active
+                        ? <button className="btn btn-outline" type="button" onClick={() => onToggleMapping(m, false)}>Deactivate</button>
+                        : <button className="btn btn-outline" type="button" onClick={() => onToggleMapping(m, true)}>Activate</button>}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-        <h2>Mappings</h2>
-        {mappings.length === 0 ? <p className="auth-help">No delivery-school mappings yet.</p> : (
-          <div className="auth-form">
-            {mappings.map((m) => (
-              <label key={`${m.delivery_user_id}-${m.school_id}`}>
-                <strong>{m.school_name}</strong>
-                <small>{m.delivery_name} ({m.delivery_username})</small>
-                <small>Status: {m.is_active ? 'ACTIVE' : 'INACTIVE'}</small>
-                {m.is_active
-                  ? <button className="btn btn-outline" type="button" onClick={() => onToggleMapping(m, false)}>Deactivate</button>
-                  : <button className="btn btn-outline" type="button" onClick={() => onToggleMapping(m, true)}>Activate</button>}
-              </label>
-            ))}
-          </div>
-        )}
+        <h2>Auto Assignment ({assignDate})</h2>
+        <div className="auth-form auto-assign-controls">
+          <label>
+            Service Date
+            <input type="date" value={assignDate} onChange={(e) => setAssignDate(e.target.value)} />
+          </label>
+          <button className="btn btn-outline" type="button" onClick={() => setAssignDate(todayIsoLocal())}>Show Today</button>
+          <button className="btn btn-primary" type="button" onClick={onAutoAssign}>Auto Assign by School</button>
+          <button className="btn btn-outline" type="button" onClick={load}>Refresh</button>
+        </div>
 
-        <h2>Assignments ({assignDate})</h2>
-        {assignments.length === 0 ? <p className="auth-help">No assignments.</p> : (
-          <div className="auth-form">
-            {assignments.map((a) => (
-              <label key={a.id}>
-                <strong>{a.service_date} {a.session}</strong>
-                <small>Order: {a.order_id}</small>
-                <small>Youngster: {a.child_name} | Parent: {a.parent_name}</small>
-                <small>Status: {a.delivery_status} | Confirmed: {a.confirmed_at || '-'}</small>
-              </label>
-            ))}
-          </div>
-        )}
+        <div className="kitchen-table-wrap">
+          <table className="kitchen-table admin-delivery-table">
+            <thead>
+              <tr>
+                <th>Delivery User</th>
+                <th>Schools</th>
+                <th>Number of Youngsters</th>
+                <th>Number of Orders</th>
+              </tr>
+            </thead>
+            <tbody>
+              {autoAssignmentSummary.length === 0 ? (
+                <tr><td colSpan={4}>No auto-assignment data for selected date.</td></tr>
+              ) : autoAssignmentSummary.map((row) => (
+                <tr key={row.deliveryUserId}>
+                  <td>{row.deliveryName}</td>
+                  <td>{row.schools.join(', ') || '-'}</td>
+                  <td>{row.youngsterCount}</td>
+                  <td>{row.orderCount}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <h2>Assigned Orders ({assignDate})</h2>
+        <div className="kitchen-table-wrap">
+          <table className="kitchen-table admin-delivery-table">
+            <thead>
+              <tr>
+                <th>Date/Session</th>
+                <th>School</th>
+                <th>Order</th>
+                <th>Youngster / Parent</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {assignments.length === 0 ? (
+                <tr><td colSpan={5}>No assignments.</td></tr>
+              ) : assignments.map((a) => (
+                <tr key={a.id}>
+                  <td>{a.service_date} {a.session}</td>
+                  <td>{a.school_name}</td>
+                  <td>{a.order_id}</td>
+                  <td>{a.child_name} / {a.parent_name}</td>
+                  <td>{a.delivery_status} {a.confirmed_at ? `(Confirmed ${a.confirmed_at})` : ''}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
+      <style jsx>{`
+        .admin-delivery-table th,
+        .admin-delivery-table td {
+          text-align: left;
+          vertical-align: middle;
+        }
+        .action-row {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.35rem;
+        }
+        .admin-mapping-controls,
+        .auto-assign-controls {
+          display: grid;
+          gap: 0.6rem;
+          margin-bottom: 0.6rem;
+        }
+        .edit-grid {
+          display: grid;
+          gap: 0.35rem;
+        }
+        @media (min-width: 900px) {
+          .admin-mapping-controls,
+          .auto-assign-controls {
+            grid-template-columns: 1fr auto auto auto;
+            align-items: end;
+          }
+        }
+      `}</style>
     </main>
   );
 }

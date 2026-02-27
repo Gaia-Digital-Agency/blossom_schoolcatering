@@ -2925,18 +2925,26 @@ export class CoreService {
     return row;
   }
 
-  async getDeliveryUsers() {
-    const out = await runSql(`
+  async getDeliveryUsers(includeInactive = false) {
+    const out = await runSql(
+      `
       SELECT row_to_json(t)::text
       FROM (
-        SELECT id, username, first_name, last_name
+        SELECT id,
+               username,
+               first_name,
+               last_name,
+               phone_number,
+               email,
+               is_active
         FROM users
         WHERE role = 'DELIVERY'
-          AND is_active = true
           AND deleted_at IS NULL
+          ${includeInactive ? '' : 'AND is_active = true'}
         ORDER BY first_name, last_name
       ) t;
-    `);
+    `,
+    );
     return this.parseJsonLines(out);
   }
 
@@ -4305,6 +4313,73 @@ export class CoreService {
        )
        SELECT row_to_json(updated)::text FROM updated;`,
       [targetUserId],
+    );
+    if (!out) throw new NotFoundException('Delivery user not found');
+    return { ok: true, user: this.parseJsonLine(out) };
+  }
+
+  async updateDeliveryUser(
+    actor: AccessUser,
+    targetUserId: string,
+    input: { firstName?: string; lastName?: string; phoneNumber?: string; email?: string; username?: string; isActive?: boolean },
+  ) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    this.assertValidUuid(targetUserId, 'userId');
+
+    const sets: string[] = [];
+    const params: unknown[] = [];
+
+    if (input.username !== undefined) {
+      const username = input.username.trim().toLowerCase();
+      if (!username) throw new BadRequestException('username cannot be empty');
+      if (username.length < 3) throw new BadRequestException('username too short');
+      params.push(username);
+      sets.push(`username = $${params.length}`);
+    }
+    if (input.firstName !== undefined) {
+      const firstName = input.firstName.trim();
+      if (!firstName) throw new BadRequestException('firstName cannot be empty');
+      params.push(firstName);
+      sets.push(`first_name = $${params.length}`);
+    }
+    if (input.lastName !== undefined) {
+      const lastName = input.lastName.trim();
+      if (!lastName) throw new BadRequestException('lastName cannot be empty');
+      params.push(lastName);
+      sets.push(`last_name = $${params.length}`);
+    }
+    if (input.phoneNumber !== undefined) {
+      const phone = input.phoneNumber.trim();
+      if (!phone) throw new BadRequestException('phoneNumber cannot be empty');
+      params.push(phone);
+      sets.push(`phone_number = $${params.length}`);
+    }
+    if (input.email !== undefined) {
+      const email = input.email.trim().toLowerCase();
+      params.push(email || null);
+      sets.push(`email = $${params.length}`);
+    }
+    if (input.isActive !== undefined) {
+      params.push(Boolean(input.isActive));
+      sets.push(`is_active = $${params.length}`);
+    }
+
+    if (sets.length === 0) throw new BadRequestException('No fields to update');
+
+    params.push(targetUserId);
+    const userIdParam = params.length;
+    const out = await runSql(
+      `WITH updated AS (
+         UPDATE users
+         SET ${sets.join(', ')},
+             updated_at = now()
+         WHERE id = $${userIdParam}
+           AND role = 'DELIVERY'
+           AND deleted_at IS NULL
+         RETURNING id, username, first_name, last_name, phone_number, email, is_active
+       )
+       SELECT row_to_json(updated)::text FROM updated;`,
+      params,
     );
     if (!out) throw new NotFoundException('Delivery user not found');
     return { ok: true, user: this.parseJsonLine(out) };
