@@ -50,7 +50,6 @@ export default async function GuidePage() {
         <div className="dev-links">
           <Link href="/">Back to Home</Link>
           <Link href="/login">Go to Login</Link>
-          <Link href="/register/youngsters">Go to Register</Link>
         </div>
       </section>
     </main>
