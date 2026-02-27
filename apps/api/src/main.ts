@@ -1,3 +1,4 @@
+import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { existsSync, readFileSync } from 'fs';
@@ -30,6 +31,11 @@ async function bootstrap() {
   loadDotEnv('/var/www/schoolcatering/.env');
   validateRequiredEnv();
   const app = await NestFactory.create(AppModule);
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist: true,
+    transform: true,
+    transformOptions: { enableImplicitConversion: true },
+  }));
   app.enableCors({
     origin: [
       'http://localhost:5173',

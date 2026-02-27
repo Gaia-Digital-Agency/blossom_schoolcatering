@@ -1,17 +1,21 @@
 # Billing & Payment User Guide
 
-## Parent
-- Open parent billing section in `/schoolcatering/parents`
-- Review paid and unpaid bill rows
-- Upload payment proof image
-- Track verification status
+## Parent Side
+- Route: `/schoolcatering/parents`
+- View consolidated billing records
+- Upload payment proof
+- Track statuses: `UNPAID`, `PENDING_VERIFICATION`, `VERIFIED`, `REJECTED`
+- Open receipt once generated
 
-## Admin
-- Open `/schoolcatering/admin/billing`
-- Review proof uploads
+## Admin Side
+- Route: `/schoolcatering/admin/billing`
+- Review all billing rows with status + delivery status
+- Quick filters:
+- `Unpaid / No Proof`
+- `Delivery Not Confirmed`
 - Verify or reject payment proof
-- Generate receipt after verification
+- Generate receipt and open receipt PDF
 
-## Notes
-- Billing status and delivery status are visible in billing rows
-- Receipt PDF is available only after receipt generation
+## Dashboard Signals
+- Billing totals appear in Admin Dashboard
+- Delivery status and payment status are both visible in billing records

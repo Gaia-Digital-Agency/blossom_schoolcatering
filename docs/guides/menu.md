@@ -1,18 +1,20 @@
 # Menu User Guide
 
 ## Admin Menu Management
-- Open `/schoolcatering/admin/menu`
-- Set service date and session context
-- Create, edit, and manage menu items
-- Search and select ingredients (max per dish applies)
-- Upload menu images (converted to WebP before store)
+- Route: `/schoolcatering/admin/menu`
+- Set date/session context
+- Create/edit/delete dishes
+- Toggle dish availability
+- Set display order and cutlery requirement
+- Set packing flags (`PACKING_CARE_REQUIRED`, `WET_DISH`)
+- Attach up to 20 ingredients per dish
 
-## Parent and Youngster Ordering
-- Use menu search by dish name
-- Add dishes to draft cart
-- Edit quantity or remove before placing order
-- Place order before cutoff
+## Image & Ingredient Workflow
+- Image upload is converted to WebP before submit
+- Master ingredient list can auto-create missing ingredients
+- Master dish suggestions can auto-create dish rows
+- Sample seed action is available per selected date
 
-## Notes
-- Session availability and blackout dates are enforced
-- Allergy and ingredient visibility are shown in ordering views
+## Ordering Side Effect
+- Parent/youngster menu pages read active dishes from this module
+- Availability/session/date context is enforced by API

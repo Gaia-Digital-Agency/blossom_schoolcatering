@@ -5,67 +5,17 @@ import { ROLES, Role } from './auth.types';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { Roles } from './roles.decorator';
 import { RolesGuard } from './roles.guard';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { GoogleDevDto } from './dto/google-dev.dto';
+import { GoogleVerifyDto } from './dto/google-verify.dto';
+import { LoginDto } from './dto/login.dto';
+import { OnboardingDto } from './dto/onboarding.dto';
+import { RefreshDto } from './dto/refresh.dto';
+import { RegisterDto } from './dto/register.dto';
+import { RegisterYoungsterWithParentDto } from './dto/register-youngster-with-parent.dto';
+import { RoleCheckDto } from './dto/role-check.dto';
+import { UsernameDto } from './dto/username.dto';
 import type { Request, Response } from 'express';
-
-type LoginBody = {
-  username?: string;
-  identifier?: string;
-  password?: string;
-  role?: string;
-};
-
-type RegisterBody = {
-  role?: string;
-  username?: string;
-  password?: string;
-  firstName?: string;
-  lastName?: string;
-  phoneNumber?: string;
-  email?: string;
-  address?: string;
-};
-
-type YoungsterRegistrationBody = {
-  youngsterFirstName?: string;
-  youngsterLastName?: string;
-  youngsterGender?: string;
-  youngsterDateOfBirth?: string;
-  youngsterSchoolId?: string;
-  youngsterGrade?: string;
-  youngsterPhone?: string;
-  youngsterEmail?: string;
-  parentFirstName?: string;
-  parentLastName?: string;
-  parentMobileNumber?: string;
-  parentEmail?: string;
-  parentAddress?: string;
-};
-
-type RefreshBody = {
-  refreshToken?: string;
-};
-
-type GoogleDevBody = {
-  googleEmail: string;
-  role: string;
-};
-
-type UsernameBody = {
-  base: string;
-};
-
-type OnboardingBody = {
-  completed: boolean;
-};
-
-type RoleCheckBody = {
-  allowedRoles: Role[];
-};
-
-type ChangePasswordBody = {
-  currentPassword?: string;
-  newPassword?: string;
-};
 
 @Controller('api/v1/auth')
 export class AuthController {
@@ -116,7 +66,7 @@ export class AuthController {
   async login(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-    @Body() body: LoginBody,
+    @Body() body: LoginDto,
   ) {
     const username = body.username ?? body.identifier;
     const password = body.password;
@@ -134,7 +84,7 @@ export class AuthController {
   async register(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-    @Body() body: RegisterBody,
+    @Body() body: RegisterDto,
   ) {
     const role = body.role;
     const username = body.username;
@@ -144,9 +94,6 @@ export class AuthController {
     const phoneNumber = body.phoneNumber;
     const email = body.email;
     const address = body.address;
-    if (!role || !username || !password || !firstName || !lastName || !phoneNumber || !email) {
-      throw new UnauthorizedException('Missing required fields');
-    }
     const result = await this.authService.register({
       role: role as Role,
       username,
@@ -168,20 +115,20 @@ export class AuthController {
 
   @Post('register/youngsters')
   @Throttle({ default: { ttl: 60000, limit: 5 } })
-  async registerYoungsterWithParent(@Body() body: YoungsterRegistrationBody) {
+  async registerYoungsterWithParent(@Body() body: RegisterYoungsterWithParentDto) {
     return this.authService.registerYoungsterWithParent({
-      youngsterFirstName: body.youngsterFirstName || '',
-      youngsterLastName: body.youngsterLastName || '',
-      youngsterGender: body.youngsterGender || '',
-      youngsterDateOfBirth: body.youngsterDateOfBirth || '',
-      youngsterSchoolId: body.youngsterSchoolId || '',
-      youngsterGrade: body.youngsterGrade || '',
+      youngsterFirstName: body.youngsterFirstName,
+      youngsterLastName: body.youngsterLastName,
+      youngsterGender: body.youngsterGender,
+      youngsterDateOfBirth: body.youngsterDateOfBirth,
+      youngsterSchoolId: body.youngsterSchoolId,
+      youngsterGrade: body.youngsterGrade,
       youngsterPhone: body.youngsterPhone || '',
       youngsterEmail: body.youngsterEmail || '',
-      parentFirstName: body.parentFirstName || '',
-      parentLastName: body.parentLastName || '',
-      parentMobileNumber: body.parentMobileNumber || '',
-      parentEmail: body.parentEmail || '',
+      parentFirstName: body.parentFirstName,
+      parentLastName: body.parentLastName,
+      parentMobileNumber: body.parentMobileNumber,
+      parentEmail: body.parentEmail,
       parentAddress: body.parentAddress || '',
     });
   }
@@ -190,7 +137,7 @@ export class AuthController {
   async loginWithGoogleDev(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-    @Body() body: GoogleDevBody,
+    @Body() body: GoogleDevDto,
   ) {
     const result = await this.authService.loginWithGoogleDev(body.googleEmail, body.role);
     this.setRefreshCookie(req, res, result.refreshToken);
@@ -205,7 +152,7 @@ export class AuthController {
   async loginWithGoogleVerified(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-    @Body() body: { idToken: string; role: string },
+    @Body() body: GoogleVerifyDto,
   ) {
     const result = await this.authService.loginWithGoogleVerified(body.idToken, body.role);
     this.setRefreshCookie(req, res, result.refreshToken);
@@ -227,7 +174,7 @@ export class AuthController {
   async refresh(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-    @Body() body: RefreshBody,
+    @Body() body: RefreshDto,
   ) {
     const refreshToken = this.getCookie(req, this.refreshCookieName) || body?.refreshToken;
     if (!refreshToken) throw new UnauthorizedException('Missing refresh token');
@@ -237,7 +184,7 @@ export class AuthController {
   }
 
   @Post('username/generate')
-  generateUsername(@Body() body: UsernameBody) {
+  generateUsername(@Body() body: UsernameDto) {
     return this.authService.generateUsername(body.base);
   }
 
@@ -251,7 +198,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   setOnboardingState(
     @Headers('authorization') authorization: string | undefined,
-    @Body() body: OnboardingBody,
+    @Body() body: OnboardingDto,
   ) {
     const token = this.extractBearerToken(authorization);
     return this.authService.setOnboardingState(token, body.completed);
@@ -262,7 +209,7 @@ export class AuthController {
   @Roles('PARENT', 'YOUNGSTER', 'ADMIN', 'KITCHEN', 'DELIVERY')
   roleCheck(
     @Headers('authorization') authorization: string | undefined,
-    @Body() body: RoleCheckBody,
+    @Body() body: RoleCheckDto,
   ) {
     const token = this.extractBearerToken(authorization);
     const allowed = body.allowedRoles?.length ? body.allowedRoles : ROLES;
@@ -273,7 +220,7 @@ export class AuthController {
   async logout(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-    @Body() body: RefreshBody,
+    @Body() body: RefreshDto,
   ) {
     const refreshToken = this.getCookie(req, this.refreshCookieName) || body?.refreshToken;
     const out = await this.authService.logout(refreshToken);
@@ -285,12 +232,9 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   changePassword(
     @Headers('authorization') authorization: string | undefined,
-    @Body() body: ChangePasswordBody,
+    @Body() body: ChangePasswordDto,
   ) {
     const token = this.extractBearerToken(authorization);
-    if (!body.currentPassword || !body.newPassword) {
-      throw new UnauthorizedException('Missing password fields');
-    }
     return this.authService.changePassword(token, body.currentPassword, body.newPassword);
   }
 

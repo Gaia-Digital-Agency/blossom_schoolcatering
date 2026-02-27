@@ -2,6 +2,10 @@
 
 Last updated: 2026-02-27
 System under test: Blossom School Catering (`/schoolcatering`)
+Environment: `http://34.124.244.233/schoolcatering`
+Seed sources:
+- `docs/db/006_runtime_manual_test_seed.sql`
+- `docs/db/007_runtime_manual_data_seed.sql`
 
 ## 1) UAT Objective
 - Validate end-to-end operational flow across registration, ordering, kitchen, delivery, and billing.
@@ -13,6 +17,53 @@ System under test: Blossom School Catering (`/schoolcatering`)
 - Menu for tomorrow exists for at least one active session (recommended: `LUNCH`).
 - Parent account(s), admin, kitchen, and delivery credentials are available.
 - No blackout date blocks tomorrow.
+
+## 2.1) SAT Login Matrix (merged)
+
+Use these default credentials first:
+
+| Role | Username | Password | Login URL | Landing Page |
+|---|---|---|---|---|
+| Parent | `parent` | `parent123` | `/schoolcatering/parent/login` | `/schoolcatering/parents` |
+| Youngster | `youngster` | `youngster123` | `/schoolcatering/youngster/login` | `/schoolcatering/youngsters` |
+| Admin | `admin` | `admin123` | `/schoolcatering/admin/login` | `/schoolcatering/admin` |
+| Kitchen | `kitchen` | `kitchen123` | `/schoolcatering/kitchen/login` | `/schoolcatering/kitchen` |
+| Delivery | `delivery` | `delivery123` | `/schoolcatering/delivery/login` | `/schoolcatering/delivery` |
+
+Extended seeded users:
+- Admin: `admin`, `admin2` (password: `admin123`)
+- Kitchen: `kitchen`, `kitchen2` (password: `kitchen123`)
+- Delivery: `delivery`, `delivery2`, `delivery3` (password: `delivery123`)
+- Parent: `parent`, `parent01` to `parent10` (password: `parent123`)
+- Youngster: `youngster`, `youngster01` to `youngster30` (password: `youngster123`)
+
+Role URLs:
+- Admin login: `/schoolcatering/admin/login`
+- Kitchen login: `/schoolcatering/kitchen/login`
+- Parent login: `/schoolcatering/parent/login`
+- Youngster login: `/schoolcatering/youngster/login`
+- Delivery login: `/schoolcatering/delivery/login`
+
+Main pages:
+- Admin: `/schoolcatering/admin`
+- Kitchen: `/schoolcatering/kitchen` and `/schoolcatering/kitchen/today`
+- Parent: `/schoolcatering/parents`
+- Youngster: `/schoolcatering/youngsters`
+- Delivery: `/schoolcatering/delivery`
+
+## 2.2) SAT Seed Coverage (merged)
+
+- Parents: minimum `10` seeded (`parent01..parent10`) plus base `parent`
+- Youngsters: minimum `30` seeded (`youngster01..youngster30`) plus base `youngster`
+- Delivery: minimum `3` seeded (`delivery`, `delivery2`, `delivery3`)
+- Kitchen: minimum `2` seeded (`kitchen`, `kitchen2`)
+- Admin: minimum `1` seeded plus `admin2`
+- Schools: minimum `3` active schools
+- Menus: weekday coverage from past `1` week to next `2` weeks
+- Dishes/menu items: seeded and available for ordering
+- Ingredients: active master list populated
+- Orders: seeded baseline available for operational checks
+- Billing: paid/verified baseline rows available for verification flows
 
 ## 3) Core UAT Flow (Requested)
 
@@ -149,6 +200,119 @@ System under test: Blossom School Catering (`/schoolcatering`)
 - Access role-restricted route without proper role/auth.
 - Expected: redirected/blocked according to auth rules.
 
+### UAT-19: Admin dashboard KPI refresh
+- Role: Admin
+- Steps:
+- Open `/schoolcatering/admin`
+- Change `Dashboard Date` and click `Refresh Dashboard`
+- Expected:
+- KPI cards/tables refresh for selected date
+- No role/permission error for admin
+
+### UAT-20: Admin report filters and totals
+- Role: Admin
+- Steps:
+- Open `/schoolcatering/admin/reports`
+- Apply filters (`from/to`, school, session, billing status) and click `Refresh`
+- Expected:
+- Total orders/revenue and breakdown by school/session update correctly
+- Filter options remain selectable without page crash
+
+### UAT-21: Admin billing filters and decision actions
+- Role: Admin
+- Steps:
+- Open `/schoolcatering/admin/billing`
+- Toggle `Unpaid / No Proof` and `Delivery Not Confirmed`
+- Click `Verify` then `Reject` on test rows
+- Expected:
+- Filtered row counts and totals match table rows
+- Billing status transitions are reflected after refresh
+
+### UAT-22: Admin receipt generation and open receipt
+- Role: Admin
+- Steps:
+- From `/schoolcatering/admin/billing`, generate receipt on verified row
+- Click `Open Receipt`
+- Expected:
+- Receipt number is generated and displayed
+- Receipt link opens downloadable/viewable file
+
+### UAT-23: Admin delivery user lifecycle
+- Role: Admin
+- Steps:
+- Open `/schoolcatering/admin/delivery`
+- Create delivery user, edit profile, toggle active/inactive
+- Expected:
+- User row is created/updated/toggled correctly
+- Inactive users are shown as `INACTIVE` and can be re-activated
+
+### UAT-24: Admin school-to-delivery mapping and auto-assign
+- Role: Admin
+- Steps:
+- In `/schoolcatering/admin/delivery`, map active delivery user to a school
+- Run `Auto Assign` for target date
+- Expected:
+- Assignments are created for mapped schools
+- Summary shows skipped orders only for unmapped schools
+
+### UAT-25: Admin menu CRUD and ingredient constraints
+- Role: Admin
+- Steps:
+- Open `/schoolcatering/admin/menu`
+- Create dish with image upload and ingredients, edit dish, toggle availability
+- Try adding more than 20 ingredients
+- Expected:
+- Create/update/toggle works and dish appears in menu list
+- Ingredient limit enforcement blocks >20
+
+### UAT-26: Kitchen today operational board
+- Role: Kitchen
+- Steps:
+- Open `/schoolcatering/kitchen/today`
+- Validate overview + summary + allergen alerts + order board
+- Move one order card between columns
+- Expected:
+- All today sections are visible
+- Card transition updates UI state correctly
+
+### UAT-27: Delivery date-window navigation and completion toggle
+- Role: Delivery
+- Steps:
+- Open `/schoolcatering/delivery`
+- Use `Past`, `Today`, `Future` buttons and refresh
+- Toggle one assignment complete and undo
+- Expected:
+- Date quick buttons update date selector
+- Completion and undo both persist after reload
+
+### UAT-28: Parent end-to-end order + favourites + wizard
+- Role: Parent
+- Steps:
+- Open `/schoolcatering/parents`
+- Create draft, save favourite, apply favourite, run meal plan wizard
+- Expected:
+- Draft/favourite/wizard flows complete without validation regressions
+- Orders list updates with new rows for wizard success dates
+
+### UAT-29: Parent billing proof upload and status reflection
+- Role: Parent
+- Steps:
+- Upload billing proof from parent billing section
+- Re-open billing section after admin verification
+- Expected:
+- Proof upload success message appears
+- Status changes from pending to verified/rejected reflect correctly
+
+### UAT-30: Youngster ordering and insights sanity
+- Role: Youngster
+- Steps:
+- Open `/schoolcatering/youngsters`
+- Place valid order and reload insights
+- Attempt >5 items and post-cutoff order
+- Expected:
+- Valid order succeeds and insight metrics remain available
+- Limit/cutoff validations are enforced with clear error messages
+
 ## 5) Execution Template
 
 Use this table during UAT run:
@@ -173,8 +337,26 @@ Use this table during UAT run:
 | UAT-16 | Kitchen yesterday/tomorrow layout |  |  |  |  |  |
 | UAT-17 | Billing verify + receipt |  |  |  |  |  |
 | UAT-18 | Role protection/redirect |  |  |  |  |  |
+| UAT-19 | Admin dashboard KPI refresh |  |  |  |  |  |
+| UAT-20 | Admin report filters + totals |  |  |  |  |  |
+| UAT-21 | Admin billing filters + decisions |  |  |  |  |  |
+| UAT-22 | Admin receipt generation + open |  |  |  |  |  |
+| UAT-23 | Admin delivery user lifecycle |  |  |  |  |  |
+| UAT-24 | Admin delivery mapping + auto-assign |  |  |  |  |  |
+| UAT-25 | Admin menu CRUD + ingredient constraints |  |  |  |  |  |
+| UAT-26 | Kitchen today operational board |  |  |  |  |  |
+| UAT-27 | Delivery date window + complete/undo |  |  |  |  |  |
+| UAT-28 | Parent order + favourites + wizard |  |  |  |  |  |
+| UAT-29 | Parent billing proof + status reflection |  |  |  |  |  |
+| UAT-30 | Youngster ordering + insights sanity |  |  |  |  |  |
 
 ## 6) Sign-off Guide
 - UAT is accepted when all critical paths (UAT-01 to UAT-11) pass.
 - Non-critical failures from UAT-12+ are logged with severity and fix target date.
 - Include evidence links and final sign-off owner.
+
+## 7) Runtime Notes (merged from SAT)
+- If a seeded test user has changed password, use another seeded user from the same role group.
+- Receipt generation requires runtime Google credentials:
+- `GOOGLE_CLIENT_EMAIL` + `GOOGLE_PRIVATE_KEY`, or
+- `GOOGLE_APPLICATION_CREDENTIALS`

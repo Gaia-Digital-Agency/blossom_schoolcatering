@@ -15,8 +15,38 @@ import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
+import {
+  ApplyFavouriteDto,
+  AssignDeliveryDto,
+  AutoAssignDto,
+  CreateBlackoutDayDto,
+  CreateCartDto,
+  CreateDeliveryUserDto,
+  CreateFavouriteDto,
+  CreateIngredientDto,
+  CreateMenuItemDto,
+  CreateSchoolDto,
+  MealPlanWizardDto,
+  NoteDto,
+  QuickReorderDto,
+  RegisterYoungsterDto,
+  ReplaceCartItemsDto,
+  ResetPasswordDto,
+  SeedMenuDto,
+  UpdateDeliveryUserDto,
+  UpdateIngredientDto,
+  UpdateMenuItemDto,
+  UpdateOrderDto,
+  UpdateParentDto,
+  UpdateSchoolDto,
+  UpdateSessionSettingDto,
+  UpdateYoungsterDto,
+  UploadBillingProofDto,
+  UpsertDeliveryAssignmentDto,
+  VerifyBillingDto,
+} from './dto';
 import { CoreService } from './core.service';
-import { AccessUser, CartItemInput } from './core.types';
+import { AccessUser } from './core.types';
 
 type AuthRequest = Request & { user: AccessUser };
 
@@ -33,13 +63,13 @@ export class CoreController {
 
   @Post('admin/schools')
   @Roles('ADMIN')
-  createSchool(@Req() req: AuthRequest, @Body() body: { name?: string; address?: string; city?: string; contactEmail?: string }) {
+  createSchool(@Req() req: AuthRequest, @Body() body: CreateSchoolDto) {
     return this.coreService.createSchool(req.user, body);
   }
 
   @Patch('admin/schools/:schoolId')
   @Roles('ADMIN')
-  updateSchoolActive(@Req() req: AuthRequest, @Param('schoolId', ParseUUIDPipe) schoolId: string, @Body() body: { isActive?: boolean }) {
+  updateSchoolActive(@Req() req: AuthRequest, @Param('schoolId', ParseUUIDPipe) schoolId: string, @Body() body: UpdateSchoolDto) {
     return this.coreService.updateSchoolActive(req.user, schoolId, body.isActive);
   }
 
@@ -60,26 +90,15 @@ export class CoreController {
   updateAdminSessionSetting(
     @Req() req: AuthRequest,
     @Param('session') session: string,
-    @Body() body: { isActive?: boolean },
+    @Body() body: UpdateSessionSettingDto,
   ) {
     return this.coreService.updateSessionSetting(req.user, session, body.isActive);
   }
 
   @Post('children/register')
   @Roles('PARENT', 'ADMIN')
-  registerYoungster(@Req() req: AuthRequest, @Body() body: Record<string, string>) {
-    return this.coreService.registerYoungster(req.user, {
-      firstName: body.firstName,
-      lastName: body.lastName,
-      phoneNumber: body.phoneNumber,
-      email: body.email,
-      dateOfBirth: body.dateOfBirth,
-      gender: body.gender,
-      schoolId: body.schoolId,
-      schoolGrade: body.schoolGrade,
-      parentId: body.parentId,
-      allergies: body.allergies,
-    });
+  registerYoungster(@Req() req: AuthRequest, @Body() body: RegisterYoungsterDto) {
+    return this.coreService.registerYoungster(req.user, body);
   }
 
   @Get('admin/parents')
@@ -93,7 +112,7 @@ export class CoreController {
   updateParentProfile(
     @Req() req: AuthRequest,
     @Param('parentId', ParseUUIDPipe) parentId: string,
-    @Body() body: { firstName?: string; lastName?: string; phoneNumber?: string; email?: string; address?: string },
+    @Body() body: UpdateParentDto,
   ) {
     return this.coreService.updateParentProfile(req.user, parentId, body);
   }
@@ -115,18 +134,7 @@ export class CoreController {
   updateYoungsterProfile(
     @Req() req: AuthRequest,
     @Param('youngsterId', ParseUUIDPipe) youngsterId: string,
-    @Body() body: {
-      firstName?: string;
-      lastName?: string;
-      phoneNumber?: string;
-      email?: string;
-      dateOfBirth?: string;
-      schoolGrade?: string;
-      schoolId?: string;
-      gender?: string;
-      parentId?: string;
-      allergies?: string;
-    },
+    @Body() body: UpdateYoungsterDto,
   ) {
     return this.coreService.updateYoungsterProfile(req.user, youngsterId, body);
   }
@@ -142,7 +150,7 @@ export class CoreController {
   adminResetUserPassword(
     @Req() req: AuthRequest,
     @Param('userId', ParseUUIDPipe) userId: string,
-    @Body() body: { newPassword?: string },
+    @Body() body: ResetPasswordDto,
   ) {
     return this.coreService.adminResetUserPassword(req.user, userId, body.newPassword);
   }
@@ -201,13 +209,9 @@ export class CoreController {
   @Roles('ADMIN')
   createBlackoutDay(
     @Req() req: AuthRequest,
-    @Body() body: { blackoutDate?: string; blackout_date?: string; type?: string; reason?: string },
+    @Body() body: CreateBlackoutDayDto,
   ) {
-    return this.coreService.createBlackoutDay(req.user, {
-      blackoutDate: body.blackoutDate ?? body.blackout_date,
-      type: body.type,
-      reason: body.reason,
-    });
+    return this.coreService.createBlackoutDay(req.user, body);
   }
 
   @Delete('blackout-days/:id')
@@ -224,7 +228,7 @@ export class CoreController {
 
   @Post('admin/ingredients')
   @Roles('ADMIN')
-  createIngredient(@Req() req: AuthRequest, @Body() body: { name?: string; allergenFlag?: boolean }) {
+  createIngredient(@Req() req: AuthRequest, @Body() body: CreateIngredientDto) {
     return this.coreService.createIngredient(req.user, body);
   }
 
@@ -233,7 +237,7 @@ export class CoreController {
   updateIngredient(
     @Req() req: AuthRequest,
     @Param('ingredientId', ParseUUIDPipe) ingredientId: string,
-    @Body() body: { name?: string; allergenFlag?: boolean; isActive?: boolean },
+    @Body() body: UpdateIngredientDto,
   ) {
     return this.coreService.updateIngredient(req.user, ingredientId, body);
   }
@@ -252,27 +256,13 @@ export class CoreController {
 
   @Post('admin/menus/sample-seed')
   @Roles('ADMIN')
-  seedAdminMenus(@Body() body: { serviceDate?: string }) {
+  seedAdminMenus(@Body() body: SeedMenuDto) {
     return this.coreService.seedAdminMenuSample(body.serviceDate);
   }
 
   @Post('admin/menu-items')
   @Roles('ADMIN')
-  createAdminMenuItem(@Body() body: {
-    serviceDate?: string;
-    session?: string;
-    name?: string;
-    description?: string;
-    nutritionFactsText?: string;
-    caloriesKcal?: number;
-    price?: number;
-    imageUrl?: string;
-    ingredientIds?: string[];
-    isAvailable?: boolean;
-    displayOrder?: number;
-    cutleryRequired?: boolean;
-    packingRequirement?: string;
-  }) {
+  createAdminMenuItem(@Body() body: CreateMenuItemDto) {
     return this.coreService.createAdminMenuItem(body);
   }
 
@@ -280,21 +270,7 @@ export class CoreController {
   @Roles('ADMIN')
   updateAdminMenuItem(
     @Param('itemId', ParseUUIDPipe) itemId: string,
-    @Body() body: {
-      serviceDate?: string;
-      session?: string;
-      name?: string;
-      description?: string;
-      nutritionFactsText?: string;
-      caloriesKcal?: number;
-      price?: number;
-      imageUrl?: string;
-      ingredientIds?: string[];
-      isAvailable?: boolean;
-      displayOrder?: number;
-      cutleryRequired?: boolean;
-      packingRequirement?: string;
-    },
+    @Body() body: UpdateMenuItemDto,
   ) {
     return this.coreService.updateAdminMenuItem(itemId, body);
   }
@@ -356,7 +332,7 @@ export class CoreController {
   @Roles('PARENT', 'YOUNGSTER')
   createFavourite(
     @Req() req: AuthRequest,
-    @Body() body: { childId?: string; label?: string; session?: string; items?: CartItemInput[] },
+    @Body() body: CreateFavouriteDto,
   ) {
     return this.coreService.createFavourite(req.user, body);
   }
@@ -369,7 +345,7 @@ export class CoreController {
 
   @Post('carts/quick-reorder')
   @Roles('PARENT', 'YOUNGSTER')
-  quickReorder(@Req() req: AuthRequest, @Body() body: { sourceOrderId?: string; serviceDate?: string }) {
+  quickReorder(@Req() req: AuthRequest, @Body() body: QuickReorderDto) {
     return this.coreService.quickReorder(req.user, body);
   }
 
@@ -377,7 +353,7 @@ export class CoreController {
   @Roles('PARENT', 'YOUNGSTER')
   mealPlanWizard(
     @Req() req: AuthRequest,
-    @Body() body: { childId?: string; sourceOrderId?: string; dates?: string[] },
+    @Body() body: MealPlanWizardDto,
   ) {
     return this.coreService.mealPlanWizard(req.user, body);
   }
@@ -387,7 +363,7 @@ export class CoreController {
   applyFavouriteToCart(
     @Req() req: AuthRequest,
     @Param('favouriteId', ParseUUIDPipe) favouriteId: string,
-    @Body() body: { serviceDate?: string },
+    @Body() body: ApplyFavouriteDto,
   ) {
     return this.coreService.applyFavouriteToCart(req.user, { favouriteId, serviceDate: body.serviceDate });
   }
@@ -403,7 +379,7 @@ export class CoreController {
   uploadBillingProof(
     @Req() req: AuthRequest,
     @Param('billingId', ParseUUIDPipe) billingId: string,
-    @Body() body: { proofImageData?: string },
+    @Body() body: UploadBillingProofDto,
   ) {
     return this.coreService.uploadBillingProof(req.user, billingId, body.proofImageData);
   }
@@ -425,7 +401,7 @@ export class CoreController {
   verifyBilling(
     @Req() req: AuthRequest,
     @Param('billingId', ParseUUIDPipe) billingId: string,
-    @Body() body: { decision?: 'VERIFIED' | 'REJECTED' },
+    @Body() body: VerifyBillingDto,
   ) {
     return this.coreService.verifyBilling(req.user, billingId, body.decision || 'VERIFIED');
   }
@@ -452,7 +428,7 @@ export class CoreController {
   @Roles('ADMIN')
   createDeliveryUser(
     @Req() req: AuthRequest,
-    @Body() body: { username?: string; password?: string; firstName?: string; lastName?: string; phoneNumber?: string; email?: string },
+    @Body() body: CreateDeliveryUserDto,
   ) {
     return this.coreService.createDeliveryUser(req.user, body);
   }
@@ -468,14 +444,7 @@ export class CoreController {
   updateDeliveryUser(
     @Req() req: AuthRequest,
     @Param('userId', ParseUUIDPipe) userId: string,
-    @Body() body: {
-      firstName?: string;
-      lastName?: string;
-      phoneNumber?: string;
-      email?: string;
-      username?: string;
-      isActive?: boolean;
-    },
+    @Body() body: UpdateDeliveryUserDto,
   ) {
     return this.coreService.updateDeliveryUser(req.user, userId, body);
   }
@@ -490,14 +459,14 @@ export class CoreController {
   @Roles('ADMIN')
   upsertDeliverySchoolAssignment(
     @Req() req: AuthRequest,
-    @Body() body: { deliveryUserId?: string; schoolId?: string; isActive?: boolean },
+    @Body() body: UpsertDeliveryAssignmentDto,
   ) {
     return this.coreService.upsertDeliverySchoolAssignment(req.user, body);
   }
 
   @Post('delivery/auto-assign')
   @Roles('ADMIN')
-  autoAssignDelivery(@Req() req: AuthRequest, @Body() body: { date?: string }) {
+  autoAssignDelivery(@Req() req: AuthRequest, @Body() body: AutoAssignDto) {
     return this.coreService.autoAssignDeliveries(req.user, body.date);
   }
 
@@ -505,7 +474,7 @@ export class CoreController {
   @Roles('ADMIN')
   assignDelivery(
     @Req() req: AuthRequest,
-    @Body() body: { orderIds?: string[]; deliveryUserId?: string },
+    @Body() body: AssignDeliveryDto,
   ) {
     return this.coreService.assignDelivery(req.user, body);
   }
@@ -521,7 +490,7 @@ export class CoreController {
   confirmDelivery(
     @Req() req: AuthRequest,
     @Param('assignmentId', ParseUUIDPipe) assignmentId: string,
-    @Body() body: { note?: string },
+    @Body() body: NoteDto,
   ) {
     return this.coreService.confirmDelivery(req.user, assignmentId, body.note);
   }
@@ -531,7 +500,7 @@ export class CoreController {
   toggleDeliveryCompletion(
     @Req() req: AuthRequest,
     @Param('assignmentId', ParseUUIDPipe) assignmentId: string,
-    @Body() body: { note?: string },
+    @Body() body: NoteDto,
   ) {
     return this.coreService.toggleDeliveryCompletion(req.user, assignmentId, body.note);
   }
@@ -549,12 +518,8 @@ export class CoreController {
 
   @Post('carts')
   @Roles('PARENT', 'YOUNGSTER', 'ADMIN')
-  createCart(@Req() req: AuthRequest, @Body() body: Record<string, string>) {
-    return this.coreService.createCart(req.user, {
-      childId: body.childId,
-      serviceDate: body.serviceDate,
-      session: body.session,
-    });
+  createCart(@Req() req: AuthRequest, @Body() body: CreateCartDto) {
+    return this.coreService.createCart(req.user, body);
   }
 
   @Get('carts/:cartId')
@@ -565,7 +530,7 @@ export class CoreController {
 
   @Patch('carts/:cartId/items')
   @Roles('PARENT', 'YOUNGSTER', 'ADMIN')
-  replaceCartItems(@Req() req: AuthRequest, @Param('cartId', ParseUUIDPipe) cartId: string, @Body() body: { items?: CartItemInput[] }) {
+  replaceCartItems(@Req() req: AuthRequest, @Param('cartId', ParseUUIDPipe) cartId: string, @Body() body: ReplaceCartItemsDto) {
     return this.coreService.replaceCartItems(req.user, cartId, body.items || []);
   }
 
@@ -604,7 +569,7 @@ export class CoreController {
   updateOrder(
     @Req() req: AuthRequest,
     @Param('orderId', ParseUUIDPipe) orderId: string,
-    @Body() body: { serviceDate?: string; session?: string; items?: CartItemInput[] },
+    @Body() body: UpdateOrderDto,
   ) {
     return this.coreService.updateOrder(req.user, orderId, body);
   }

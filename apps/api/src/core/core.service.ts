@@ -605,9 +605,7 @@ export class CoreService {
 
   async updateSchoolActive(actor: AccessUser, schoolId: string, isActive?: boolean) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
-    const id = (schoolId || '').trim();
-    if (!id) throw new BadRequestException('schoolId is required');
-    if (typeof isActive !== 'boolean') throw new BadRequestException('isActive must be boolean');
+    const id = schoolId.trim();
 
     const out = await runSql(
       `WITH updated AS (
@@ -642,7 +640,6 @@ export class CoreService {
 
   async updateSessionSetting(actor: AccessUser, sessionRaw: string, isActive?: boolean) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
-    if (typeof isActive !== 'boolean') throw new BadRequestException('isActive must be boolean');
     const session = this.normalizeSession(sessionRaw);
     if (session === 'LUNCH' && !isActive) {
       throw new BadRequestException('LUNCH session must remain active');
@@ -692,16 +689,6 @@ export class CoreService {
     const schoolId = (input.schoolId || '').trim();
     const schoolGrade = (input.schoolGrade || '').trim();
     const allergies = this.normalizeAllergies(input.allergies);
-
-    if (!firstName || !lastName || !phoneNumber || !dateOfBirth || !schoolId || !schoolGrade) {
-      throw new BadRequestException('Missing required youngster fields');
-    }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) {
-      throw new BadRequestException('dateOfBirth must be YYYY-MM-DD');
-    }
-    if (!['MALE', 'FEMALE', 'OTHER', 'UNDISCLOSED'].includes(gender)) {
-      throw new BadRequestException('Invalid gender');
-    }
 
     const schoolExists = await runSql(
       `SELECT EXISTS (
@@ -1520,9 +1507,6 @@ export class CoreService {
     const cutleryRequired = Boolean(input.cutleryRequired);
     const packingRequirement = this.sanitizePackingRequirement(input.packingRequirement);
 
-    if (!name || !description || !nutritionFactsText || !rawImageUrl) {
-      throw new BadRequestException('Missing required menu item fields');
-    }
     if (price < 0) {
       throw new BadRequestException('Invalid price');
     }
@@ -1666,9 +1650,6 @@ export class CoreService {
       input.packingRequirement === undefined ? (current.packing_requirement || '') : input.packingRequirement,
     );
 
-    if (!name || !description || !nutritionFactsText) {
-      throw new BadRequestException('Missing required menu item fields');
-    }
     if (price < 0 || Number.isNaN(price)) {
       throw new BadRequestException('Invalid price');
     }
@@ -1873,7 +1854,6 @@ export class CoreService {
     const serviceDate = this.validateServiceDate(input.serviceDate);
     const session = this.normalizeSession(input.session);
     const childId = (input.childId || '').trim();
-    if (!childId) throw new BadRequestException('youngsterId is required');
 
     await this.validateOrderDayRules(serviceDate);
     await this.assertSessionActiveForOrdering(session);
@@ -2015,7 +1995,6 @@ export class CoreService {
 
   async replaceCartItems(actor: AccessUser, cartId: string, items: CartItemInput[]) {
     const cart = await this.ensureCartIsOpenAndOwned(cartId, actor);
-    if (!Array.isArray(items)) throw new BadRequestException('items must be an array');
     if (items.length > 5) throw new BadRequestException('CART_ITEM_LIMIT_EXCEEDED');
 
     const normalized = items.map((item) => ({
@@ -2412,8 +2391,6 @@ export class CoreService {
     const session = this.normalizeSession(input.session);
     const childId = (input.childId || '').trim() || null;
     const items = Array.isArray(input.items) ? input.items : [];
-    if (!label) throw new BadRequestException('label is required');
-    if (items.length === 0) throw new BadRequestException('items is required');
     if (items.length > 5) throw new BadRequestException('ORDER_ITEM_LIMIT_EXCEEDED');
 
     if (actor.role === 'YOUNGSTER') {
@@ -2462,7 +2439,6 @@ export class CoreService {
   async deleteFavourite(actor: AccessUser, favouriteId: string) {
     if (!['PARENT', 'YOUNGSTER'].includes(actor.role)) throw new ForbiddenException('Role not allowed');
     const favId = (favouriteId || '').trim();
-    if (!favId) throw new BadRequestException('favouriteId is required');
 
     const out = await runSql(
       `
@@ -2496,7 +2472,6 @@ export class CoreService {
     if (!['PARENT', 'YOUNGSTER'].includes(actor.role)) throw new ForbiddenException('Role not allowed');
     const sourceOrderId = (input.sourceOrderId || '').trim();
     const serviceDate = this.validateServiceDate(input.serviceDate);
-    if (!sourceOrderId) throw new BadRequestException('sourceOrderId is required');
 
     const srcOut = await runSql(
       `
@@ -2593,9 +2568,6 @@ export class CoreService {
     const childId = (input.childId || '').trim();
     const sourceOrderId = (input.sourceOrderId || '').trim();
     const rawDates = Array.isArray(input.dates) ? input.dates : [];
-    if (!childId || !sourceOrderId || rawDates.length === 0) {
-      throw new BadRequestException('childId, sourceOrderId, dates are required');
-    }
     if (actor.role === 'YOUNGSTER') {
       const ownChildId = await this.getChildIdByUserId(actor.uid);
       if (!ownChildId || ownChildId !== childId) throw new ForbiddenException('ORDER_OWNERSHIP_FORBIDDEN');
@@ -2664,7 +2636,6 @@ export class CoreService {
     if (!['PARENT', 'YOUNGSTER'].includes(actor.role)) throw new ForbiddenException('Role not allowed');
     const favouriteId = (input.favouriteId || '').trim();
     const serviceDate = this.validateServiceDate(input.serviceDate);
-    if (!favouriteId) throw new BadRequestException('favouriteId is required');
 
     const favOut = await runSql(
       `
@@ -2787,7 +2758,6 @@ export class CoreService {
     const parentId = await this.getParentIdByUserId(actor.uid);
     if (!parentId) throw new BadRequestException('Parent profile not found');
     const proof = (proofImageData || '').trim();
-    if (!proof) throw new BadRequestException('proofImageData is required');
     const exists = await runSql(
       `SELECT EXISTS (
          SELECT 1 FROM billing_records
@@ -3068,7 +3038,6 @@ export class CoreService {
     await this.ensureDeliverySchoolAssignmentsTable();
     const deliveryUserId = (input.deliveryUserId || '').trim();
     const schoolId = (input.schoolId || '').trim();
-    if (!deliveryUserId || !schoolId) throw new BadRequestException('deliveryUserId and schoolId are required');
     const isActive = input.isActive !== false;
 
     const deliveryExists = await runSql(
@@ -3218,7 +3187,6 @@ export class CoreService {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     const orderIds = Array.isArray(input.orderIds) ? input.orderIds.filter(Boolean) : [];
     const deliveryUserId = (input.deliveryUserId || '').trim();
-    if (!deliveryUserId || orderIds.length === 0) throw new BadRequestException('orderIds and deliveryUserId are required');
     for (const orderId of orderIds) {
       await runSql(
         `INSERT INTO delivery_assignments (order_id, delivery_user_id, assigned_at)
@@ -3477,7 +3445,6 @@ export class CoreService {
     const targetServiceDate = input.serviceDate ? this.validateServiceDate(input.serviceDate) : order.service_date;
     const targetSession = input.session ? this.normalizeSession(input.session) : order.session;
     const items = Array.isArray(input.items) ? input.items : [];
-    if (items.length === 0) throw new BadRequestException('items is required');
     if (items.length > 5) throw new BadRequestException('ORDER_ITEM_LIMIT_EXCEEDED');
 
     const normalized = items.map((item) => ({
@@ -4281,7 +4248,6 @@ export class CoreService {
   async createSchool(actor: AccessUser, input: { name?: string; address?: string; city?: string; contactEmail?: string }) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     const name = (input.name || '').trim();
-    if (!name) throw new BadRequestException('name is required');
     const address = (input.address || '').trim();
     const city = (input.city || '').trim();
     const contactEmail = (input.contactEmail || '').trim().toLowerCase();
@@ -4517,7 +4483,6 @@ export class CoreService {
   async createIngredient(actor: AccessUser, input: { name?: string; allergenFlag?: boolean }) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     const name = (input.name || '').trim();
-    if (!name) throw new BadRequestException('name is required');
     const allergenFlag = input.allergenFlag === true;
     const existingOut = await runSql(
       `SELECT row_to_json(t)::text
@@ -4626,9 +4591,6 @@ export class CoreService {
     const lastName = (input.lastName || '').trim();
     const phoneNumber = (input.phoneNumber || '').trim();
     const email = (input.email || '').trim().toLowerCase();
-    if (!username || !password || !firstName || !lastName || !phoneNumber) {
-      throw new BadRequestException('username, password, firstName, lastName, phoneNumber are required');
-    }
     if (username.length < 3 || password.length < 6) {
       throw new BadRequestException('Username or password too short');
     }

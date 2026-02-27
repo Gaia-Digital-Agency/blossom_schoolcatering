@@ -1,34 +1,27 @@
 # Delivery User Guide
 
-## Login
-- Open `/schoolcatering/delivery/login`
-- Sign in with delivery credentials
+## Access
+- Login: `/schoolcatering/delivery/login`
+- Main page: `/schoolcatering/delivery`
 
-## Main Page
-- Open `/schoolcatering/delivery`
-- Pick a `Date` and use `Past / Today / Future` quick buttons
-- Click `Refresh Assignments` to reload the selected day
+## Assignment View
+- Select date and use `Past / Today / Future`
+- Click `Refresh Assignments` to reload
+- Assignments are grouped by school name
+- Delivery user only sees assignments for mapped active school(s)
 
-## Assignment Visibility
-- Delivery user can only see assignments mapped to their active school(s)
-- Assignments are grouped by `School Name` with visible school headers
-- Orders from schools not mapped to the logged-in delivery user are hidden
-
-## Delivery Card Details
+## Assignment Card Data
 - Service date + session
 - Order ID
-- Youngster name
-- Youngster mobile number
-- Fallback rule: if youngster mobile is empty, parent mobile is shown
+- Youngster name and mobile
 - Parent name
-- Current delivery/confirmation status
+- Delivery status + confirmed timestamp
 
-## Complete and Undo
-- `Mark Complete` sets the assignment as delivered
-- `Completed (Click to Undo)` reverts it back to assigned
-- Toggle updates order and billing delivery status together
-- Only your own assignments can be toggled
+## Completion Flow
+- Optional confirmation note supported
+- `Mark Complete` sets delivered
+- `Completed (Click to Undo)` reverts to assigned
+- Order + billing delivery statuses are updated together
 
-## Admin Dependency
-- Admin should map school-to-delivery in `/schoolcatering/admin/delivery`
-- After mapping, delivery assignments for that school become visible for the mapped delivery user
+## Dependency
+- Admin must map school-to-delivery in `/schoolcatering/admin/delivery`
