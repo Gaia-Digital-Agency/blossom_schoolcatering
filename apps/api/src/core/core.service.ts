@@ -977,8 +977,7 @@ export class CoreService {
       `
       SELECT blackout_date::text
       FROM blackout_days
-      WHERE deleted_at IS NULL
-        AND blackout_date >= $1::date
+      WHERE blackout_date >= $1::date
       ORDER BY blackout_date ASC
       LIMIT 1;
     `,
