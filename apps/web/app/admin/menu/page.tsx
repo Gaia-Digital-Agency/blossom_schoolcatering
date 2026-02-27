@@ -102,7 +102,6 @@ export default function AdminMenuPage() {
   const [itemWetDish, setItemWetDish] = useState(false);
   const [itemIngredientIds, setItemIngredientIds] = useState<string[]>([]);
   const [ingredientSearch, setIngredientSearch] = useState('');
-  const [dishSearch, setDishSearch] = useState('');
   const ingredientLimit = 20;
 
   const ingredientIdByNormalizedName = useMemo(() => {
@@ -121,12 +120,6 @@ export default function AdminMenuPage() {
     if (!q) return masterIngredients;
     return masterIngredients.filter((i) => i.label.toLowerCase().includes(q));
   }, [ingredientSearch]);
-
-  const filteredMasterDishes = useMemo(() => {
-    const q = dishSearch.trim().toLowerCase();
-    if (!q) return masterDishes;
-    return masterDishes.filter((d) => d.toLowerCase().includes(q));
-  }, [dishSearch]);
 
   const loadMenuData = async () => {
     const [ings, menu] = await Promise.all([
@@ -156,7 +149,6 @@ export default function AdminMenuPage() {
     setItemWetDish(false);
     setItemIngredientIds([]);
     setIngredientSearch('');
-    setDishSearch('');
   };
 
   const onImageUpload = async (file?: File | null) => {
@@ -256,6 +248,29 @@ export default function AdminMenuPage() {
     setItemIngredientIds(item.ingredient_ids || []);
   };
 
+  const onSetDishActive = async (item: AdminMenuItem, isAvailable: boolean) => {
+    setError('');
+    setMessage('');
+    const payload = {
+      serviceDate: menuServiceDate,
+      session: menuSession,
+      name: item.name,
+      description: item.description,
+      nutritionFactsText: item.nutrition_facts_text || 'TBA',
+      caloriesKcal: item.calories_kcal ?? null,
+      price: Number(item.price || 0),
+      imageUrl: item.image_url,
+      ingredientIds: item.ingredient_ids || [],
+      isAvailable,
+      displayOrder: Number(item.display_order || 0),
+      cutleryRequired: Boolean(item.cutlery_required),
+      packingRequirement: item.packing_requirement || '',
+    };
+    await apiFetch(`/admin/menu-items/${item.id}`, { method: 'PATCH', body: JSON.stringify(payload) });
+    setMessage(isAvailable ? 'Dish activated.' : 'Dish deactivated.');
+    await loadMenuData();
+  };
+
   const activeMenuItems = useMemo(() => menuItems.filter((x) => x.is_available), [menuItems]);
   const inactiveMenuItems = useMemo(() => menuItems.filter((x) => !x.is_available), [menuItems]);
 
@@ -293,17 +308,26 @@ export default function AdminMenuPage() {
           <label>Upload Image (WebP auto-convert, upload only)
             <input type="file" accept="image/*" onChange={(e) => onImageUpload(e.target.files?.[0])} />
           </label>
-          <small>Image URL field removed. Create requires uploaded image. Edit keeps existing image unless replaced.</small>
+
+          <div className="menu-check-grid">
+            <label className="menu-check-row">
+              <input type="checkbox" checked={itemCutleryRequired} onChange={(e) => setItemCutleryRequired(e.target.checked)} />
+              <span>Cutlery Required</span>
+            </label>
+            <label className="menu-check-row">
+              <input type="checkbox" checked={itemPackingCareRequired} onChange={(e) => setItemPackingCareRequired(e.target.checked)} />
+              <span>Packing Care Required</span>
+            </label>
+            <label className="menu-check-row">
+              <input type="checkbox" checked={itemWetDish} onChange={(e) => setItemWetDish(e.target.checked)} />
+              <span>Wet Dish</span>
+            </label>
+          </div>
 
           <div className="ingredient-selected-box">
-            <strong>Dishes (from `dish.json`)</strong>
-            <input
-              value={dishSearch}
-              onChange={(e) => setDishSearch(e.target.value)}
-              placeholder="Search dishes from master data..."
-            />
+            <strong>Dishes</strong>
             <div className="ingredient-chip-wrap">
-              {filteredMasterDishes.slice(0, 120).map((dish) => (
+              {masterDishes.slice(0, 160).map((dish) => (
                 <button
                   key={dish}
                   className="btn btn-outline ingredient-chip"
@@ -316,12 +340,12 @@ export default function AdminMenuPage() {
                   {dish}
                 </button>
               ))}
-              {filteredMasterDishes.length === 0 ? <small>No dishes found.</small> : null}
+              {masterDishes.length === 0 ? <small>No dishes found.</small> : null}
             </div>
           </div>
 
           <div className="ingredient-selected-box">
-            <strong>Ingredients (from `ingredient.json`) - Selected ({itemIngredientIds.length}/{ingredientLimit})</strong>
+            <strong>Ingredient - Selected ({itemIngredientIds.length}/{ingredientLimit})</strong>
             <input
               value={ingredientSearch}
               onChange={(e) => setIngredientSearch(e.target.value)}
@@ -350,8 +374,8 @@ export default function AdminMenuPage() {
                   key={i.key}
                   type="button"
                   className={`btn ${active ? 'btn-primary' : 'btn-outline'}`}
-                  onClick={() => onToggleMasterIngredient(i.key)}
-                  title={mappedId ? 'Add/remove ingredient' : 'Not yet in system ingredient master'}
+                  onDoubleClick={() => onToggleMasterIngredient(i.key)}
+                  title={mappedId ? 'Double-click to add/remove ingredient' : 'Not yet in system ingredient master'}
                 >
                   {i.label}{mappedId ? '' : ' (not linked)'}
                 </button>
@@ -361,24 +385,6 @@ export default function AdminMenuPage() {
           </div>
 
           <small>Selected: {selectedIngredientNames.map(toLabel).join(', ') || '-'}</small>
-          <div className="menu-check-grid">
-            <label className="menu-check-row">
-              <input type="checkbox" checked={itemCutleryRequired} onChange={(e) => setItemCutleryRequired(e.target.checked)} />
-              <span>Cutlery Required</span>
-            </label>
-            <label className="menu-check-row">
-              <input type="checkbox" checked={itemPackingCareRequired} onChange={(e) => setItemPackingCareRequired(e.target.checked)} />
-              <span>Packing Care Required</span>
-            </label>
-            <label className="menu-check-row">
-              <input type="checkbox" checked={itemWetDish} onChange={(e) => setItemWetDish(e.target.checked)} />
-              <span>Wet Dish</span>
-            </label>
-            <label className="menu-check-row">
-              <input type="checkbox" checked={itemAvailable} onChange={(e) => setItemAvailable(e.target.checked)} />
-              <span>Available (Active)</span>
-            </label>
-          </div>
           <div className="menu-actions-row">
             <button className="btn btn-primary" type="submit">{editingItemId ? 'Update Dish' : 'Create Dish'}</button>
             {editingItemId ? <button className="btn btn-outline" type="button" onClick={resetForm}>Cancel Edit</button> : null}
@@ -388,7 +394,7 @@ export default function AdminMenuPage() {
         <h2>Menu Items</h2>
         <div className="menu-item-columns">
           <div className="auth-form">
-            <h3>Left Active</h3>
+            <h3>Active Dishes</h3>
             {activeMenuItems.map((item) => (
               <label key={item.id}>
                 <strong>{item.name}</strong>
@@ -398,13 +404,16 @@ export default function AdminMenuPage() {
                 <small>Ingredients: {item.ingredients.map(toLabel).join(', ') || '-'}</small>
                 <small>Cutlery: {item.cutlery_required ? 'Required' : 'Not required'}</small>
                 <small>Packing: {item.packing_requirement || '-'}</small>
-                <button className="btn btn-outline" type="button" onClick={() => onEditItem(item)}>Edit Dish</button>
+                <div className="menu-actions-row">
+                  <button className="btn btn-outline" type="button" onClick={() => onEditItem(item)}>Edit Dish</button>
+                  <button className="btn btn-outline" type="button" onClick={() => onSetDishActive(item, false)}>Deactivate</button>
+                </div>
               </label>
             ))}
             {activeMenuItems.length === 0 ? <p className="auth-help">No active dishes.</p> : null}
           </div>
           <div className="auth-form">
-            <h3>Right Created But Deactivated</h3>
+            <h3>Non Active Dishes</h3>
             {inactiveMenuItems.map((item) => (
               <label key={item.id}>
                 <strong>{item.name}</strong>
@@ -414,7 +423,10 @@ export default function AdminMenuPage() {
                 <small>Ingredients: {item.ingredients.map(toLabel).join(', ') || '-'}</small>
                 <small>Cutlery: {item.cutlery_required ? 'Required' : 'Not required'}</small>
                 <small>Packing: {item.packing_requirement || '-'}</small>
-                <button className="btn btn-outline" type="button" onClick={() => onEditItem(item)}>Edit Dish</button>
+                <div className="menu-actions-row">
+                  <button className="btn btn-outline" type="button" onClick={() => onEditItem(item)}>Edit Dish</button>
+                  <button className="btn btn-outline" type="button" onClick={() => onSetDishActive(item, true)}>Activate</button>
+                </div>
               </label>
             ))}
             {inactiveMenuItems.length === 0 ? <p className="auth-help">No deactivated dishes.</p> : null}
