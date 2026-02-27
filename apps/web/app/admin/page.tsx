@@ -88,7 +88,7 @@ export default function AdminPage() {
     <main className="page-auth page-auth-desktop">
       <section className="auth-panel">
         <h1>Admin Dashboard</h1>
-        <p className="auth-help">CMS overview and key operational metrics.</p>
+        <p className="auth-help">Overview and key operational metrics.</p>
         <AdminNav />
 
         <div className="admin-dashboard-controls">
@@ -105,33 +105,19 @@ export default function AdminPage() {
 
         {data ? (
           <div className="auth-form admin-dashboard-block">
-            <div className="kitchen-table-wrap">
-              <table className="kitchen-table">
+            <div className="kitchen-table-wrap admin-overview-wrap">
+              <table className="kitchen-table admin-overview-table">
                 <tbody>
                   <tr>
                     <th>Date</th>
                     <td>{data.date}</td>
                   </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <h2>PARENTS/YOUNGSTER</h2>
-            <div className="kitchen-table-wrap">
-              <table className="kitchen-table">
-                <tbody>
+                  <tr className="section-row"><th colSpan={2}>PARENTS</th></tr>
                   <tr><th>Number of Youngsters</th><td>{data.youngstersCount}</td></tr>
                   <tr><th>Number of Parents</th><td>{data.parentsCount}</td></tr>
                   <tr><th>Number Of Schools</th><td>{data.schoolsCount}</td></tr>
                   <tr><th>Birthday Highlight (Today)</th><td>{(data.birthdayHighlights || []).map((b) => b.child_name).join(', ') || '-'}</td></tr>
-                </tbody>
-              </table>
-            </div>
-
-            <h2>DELIVERY</h2>
-            <div className="kitchen-table-wrap">
-              <table className="kitchen-table">
-                <tbody>
+                  <tr className="section-row"><th colSpan={2}>DELIVERY</th></tr>
                   <tr><th>Number of Delivery Person</th><td>{data.deliveryPersonnelCount}</td></tr>
                   <tr><th>Today</th><td>Total Orders: {data.delivery.today.totalOrders}, Total Dishes: {data.delivery.today.totalDishes}</td></tr>
                   <tr><th>Yesterday</th><td>Total Orders: {data.delivery.yesterday.totalOrders}, Total Dishes: {data.delivery.yesterday.totalDishes}</td></tr>
@@ -146,35 +132,14 @@ export default function AdminPage() {
                         : data.failedDeliveryByPerson.map((x) => `${x.delivery_person_name} (${x.orders_count})`).join(', ')}
                     </td>
                   </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <h2>MENU</h2>
-            <div className="kitchen-table-wrap">
-              <table className="kitchen-table">
-                <tbody>
+                  <tr className="section-row"><th colSpan={2}>MENU</th></tr>
                   <tr><th>Dishes Total Created</th><td>{data.menu.dishesTotalCreated}</td></tr>
                   <tr><th>Dishes Total Active</th><td>{data.menu.dishesTotalActive}</td></tr>
-                </tbody>
-              </table>
-            </div>
-
-            <h2>KITCHEN</h2>
-            <div className="kitchen-table-wrap">
-              <table className="kitchen-table">
-                <tbody>
+                  <tr className="section-row"><th colSpan={2}>KITCHEN</th></tr>
                   <tr><th>Next Back Out Day</th><td>{data.kitchen.nextBlackoutDay || '-'}</td></tr>
                   <tr><th>Orders Not Fulfilled From Kitchen</th><td>Yesterday: {data.kitchen.yesterday.ordersNotFulfilled}, Past Week: {data.kitchen.pastWeek.ordersNotFulfilled}</td></tr>
                   <tr><th>Dishes Not Fulfilled From Kitchen</th><td>Yesterday: {data.kitchen.yesterday.dishesNotFulfilled}, Past Week: {data.kitchen.pastWeek.dishesNotFulfilled}</td></tr>
-                </tbody>
-              </table>
-            </div>
-
-            <h2>BILLING</h2>
-            <div className="kitchen-table-wrap">
-              <table className="kitchen-table">
-                <tbody>
+                  <tr className="section-row"><th colSpan={2}>BILLING</th></tr>
                   <tr>
                     <th>Total Number Billing</th>
                     <td>Yesterday: {data.billing.yesterday.totalNumberBilling}, Past Week: {data.billing.pastWeek.totalNumberBilling}, Past Month: {data.billing.pastMonth.totalNumberBilling}</td>
@@ -215,6 +180,15 @@ export default function AdminPage() {
         }
         .admin-dashboard-block h2 {
           margin: 0.25rem 0;
+        }
+        .admin-overview-wrap {
+          margin-top: 0.1rem;
+        }
+        .admin-overview-table .section-row th {
+          text-align: left;
+          font-size: 0.82rem;
+          letter-spacing: 0.06em;
+          background: rgba(15, 23, 42, 0.08);
         }
         @media (min-width: 860px) {
           .admin-dashboard-controls {
