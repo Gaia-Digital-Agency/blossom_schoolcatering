@@ -41,6 +41,12 @@ export default function AdminBillingPage() {
 
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
+  const unpaidNoProofRows = rows.filter((r) => r.status === 'UNPAID' && !r.proof_image_url);
+  const deliveryPendingRows = rows.filter((r) => r.delivery_status !== 'DELIVERED');
+
+  const unpaidTotal = unpaidNoProofRows.reduce((s, r) => s + Number(r.total_price), 0);
+  const deliveryPendingTotal = deliveryPendingRows.reduce((s, r) => s + Number(r.total_price), 0);
+
   const filteredRows = rows.filter((row) => {
     if (filterUnpaidNoProof && !(row.status === 'UNPAID' && !row.proof_image_url)) return false;
     if (filterDeliveryPending && row.delivery_status === 'DELIVERED') return false;
@@ -93,6 +99,21 @@ export default function AdminBillingPage() {
             {loading ? 'Loading…' : 'Refresh'}
           </button>
         </div>
+
+        {!loading && rows.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '1rem' }}>
+            <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '0.75rem' }}>
+              <small style={{ opacity: 0.6 }}>Unpaid / No Proof</small>
+              <div><strong>{unpaidNoProofRows.length}</strong> orders</div>
+              <div><strong>Rp {unpaidTotal.toLocaleString('id-ID')}</strong></div>
+            </div>
+            <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '0.75rem' }}>
+              <small style={{ opacity: 0.6 }}>Delivery Not Confirmed</small>
+              <div><strong>{deliveryPendingRows.length}</strong> orders</div>
+              <div><strong>Rp {deliveryPendingTotal.toLocaleString('id-ID')}</strong></div>
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <p className="auth-help">Loading…</p>
