@@ -391,6 +391,29 @@ export default function AdminMenuPage() {
 
           <div className="menu-selection-columns">
             <div className="ingredient-selected-box">
+              <label>Dish Name<input value={itemName} onChange={(e) => setItemName(e.target.value)} required /></label>
+              <strong>Dishes</strong>
+              <div className="ingredient-chip-wrap ingredient-list-scroll">
+                {filteredMasterDishes.slice(0, 160).map((dish) => (
+                  <button
+                    key={dish}
+                    className="btn btn-outline ingredient-chip"
+                    type="button"
+                    onClick={() => {
+                      setItemName(dish);
+                      if (!itemDescription.trim()) setItemDescription(dish);
+                    }}
+                    onDoubleClick={() => void onAutoCreateDishFromMaster(dish)}
+                    title="Click to fill Dish Name. Double-click to auto-create dish item."
+                  >
+                    {dish}
+                  </button>
+                ))}
+                {filteredMasterDishes.length === 0 ? <small>No dishes found.</small> : null}
+              </div>
+            </div>
+
+            <div className="ingredient-selected-box">
               <strong>Ingredient - Selected ({itemIngredientIds.length}/{ingredientLimit})</strong>
               <input
                 value={ingredientSearch}
@@ -429,74 +452,53 @@ export default function AdminMenuPage() {
                 {filteredMasterIngredients.length === 0 ? <small>No ingredients found.</small> : null}
               </div>
             </div>
-
-            <div className="ingredient-selected-box">
-              <label>Dish Name<input value={itemName} onChange={(e) => setItemName(e.target.value)} required /></label>
-              <strong>Dishes</strong>
-              <div className="ingredient-chip-wrap ingredient-list-scroll">
-                {filteredMasterDishes.slice(0, 160).map((dish) => (
-                  <button
-                    key={dish}
-                    className="btn btn-outline ingredient-chip"
-                    type="button"
-                    onClick={() => {
-                      setItemName(dish);
-                      if (!itemDescription.trim()) setItemDescription(dish);
-                    }}
-                    onDoubleClick={() => void onAutoCreateDishFromMaster(dish)}
-                    title="Click to fill Dish Name. Double-click to auto-create dish item."
-                  >
-                    {dish}
-                  </button>
-                ))}
-                {filteredMasterDishes.length === 0 ? <small>No dishes found.</small> : null}
-              </div>
-            </div>
           </div>
         </form>
 
-        <h2>Menu Items</h2>
-        <div className="menu-item-columns">
-          <div className="menu-list-group">
-            <h3 className="menu-list-title">Active Dishes</h3>
-            <div className="auth-form menu-list-card menu-list-card-active">
-              {activeMenuItems.map((item) => (
-                <label key={item.id}>
-                  <strong>{item.name}</strong>
-                  <small>{item.description}</small>
-                  <small>Calories: {item.calories_kcal ?? 'TBA'}</small>
-                  <small>Price: Rp {Number(item.price).toLocaleString('id-ID')}</small>
-                  <small>Ingredients: {item.ingredients.map(toLabel).join(', ') || '-'}</small>
-                  <small>Cutlery: {item.cutlery_required ? 'Required' : 'Not required'}</small>
-                  <small>Packing: {item.packing_requirement || '-'}</small>
-                  <div className="menu-actions-row">
-                    <button className="btn btn-outline" type="button" onClick={() => onEditItem(item)}>Edit Dish</button>
-                    <button className="btn btn-outline" type="button" onClick={() => onSetDishActive(item, false)}>Deactivate</button>
-                  </div>
-                </label>
-              ))}
-              {activeMenuItems.length === 0 ? <p className="auth-help">No active dishes.</p> : null}
+        <div className="menu-items-shell">
+          <h2>Menu Items</h2>
+          <div className="menu-item-columns">
+            <div className="menu-list-group">
+              <h3 className="menu-list-title">Active Dishes</h3>
+              <div className="auth-form menu-list-card menu-list-card-active">
+                {activeMenuItems.map((item) => (
+                  <label key={item.id}>
+                    <strong>{item.name}</strong>
+                    <small>{item.description}</small>
+                    <small>Calories: {item.calories_kcal ?? 'TBA'}</small>
+                    <small>Price: Rp {Number(item.price).toLocaleString('id-ID')}</small>
+                    <small>Ingredients: {item.ingredients.map(toLabel).join(', ') || '-'}</small>
+                    <small>Cutlery: {item.cutlery_required ? 'Required' : 'Not required'}</small>
+                    <small>Packing: {item.packing_requirement || '-'}</small>
+                    <div className="menu-actions-row">
+                      <button className="btn btn-outline" type="button" onClick={() => onEditItem(item)}>Edit Dish</button>
+                      <button className="btn btn-outline" type="button" onClick={() => onSetDishActive(item, false)}>Deactivate</button>
+                    </div>
+                  </label>
+                ))}
+                {activeMenuItems.length === 0 ? <p className="auth-help">No active dishes.</p> : null}
+              </div>
             </div>
-          </div>
-          <div className="menu-list-group">
-            <h3 className="menu-list-title">Non Active Dishes</h3>
-            <div className="auth-form menu-list-card menu-list-card-inactive">
-              {inactiveMenuItems.map((item) => (
-                <label key={item.id}>
-                  <strong>{item.name}</strong>
-                  <small>{item.description}</small>
-                  <small>Calories: {item.calories_kcal ?? 'TBA'}</small>
-                  <small>Price: Rp {Number(item.price).toLocaleString('id-ID')}</small>
-                  <small>Ingredients: {item.ingredients.map(toLabel).join(', ') || '-'}</small>
-                  <small>Cutlery: {item.cutlery_required ? 'Required' : 'Not required'}</small>
-                  <small>Packing: {item.packing_requirement || '-'}</small>
-                  <div className="menu-actions-row">
-                    <button className="btn btn-outline" type="button" onClick={() => onEditItem(item)}>Edit Dish</button>
-                    <button className="btn btn-outline" type="button" onClick={() => onSetDishActive(item, true)}>Activate</button>
-                  </div>
-                </label>
-              ))}
-              {inactiveMenuItems.length === 0 ? <p className="auth-help">No deactivated dishes.</p> : null}
+            <div className="menu-list-group">
+              <h3 className="menu-list-title">Non Active Dishes</h3>
+              <div className="auth-form menu-list-card menu-list-card-inactive">
+                {inactiveMenuItems.map((item) => (
+                  <label key={item.id}>
+                    <strong>{item.name}</strong>
+                    <small>{item.description}</small>
+                    <small>Calories: {item.calories_kcal ?? 'TBA'}</small>
+                    <small>Price: Rp {Number(item.price).toLocaleString('id-ID')}</small>
+                    <small>Ingredients: {item.ingredients.map(toLabel).join(', ') || '-'}</small>
+                    <small>Cutlery: {item.cutlery_required ? 'Required' : 'Not required'}</small>
+                    <small>Packing: {item.packing_requirement || '-'}</small>
+                    <div className="menu-actions-row">
+                      <button className="btn btn-outline" type="button" onClick={() => onEditItem(item)}>Edit Dish</button>
+                      <button className="btn btn-outline" type="button" onClick={() => onSetDishActive(item, true)}>Activate</button>
+                    </div>
+                  </label>
+                ))}
+                {inactiveMenuItems.length === 0 ? <p className="auth-help">No deactivated dishes.</p> : null}
+              </div>
             </div>
           </div>
         </div>
@@ -564,6 +566,16 @@ export default function AdminMenuPage() {
           display: grid;
           grid-template-columns: 1fr;
           gap: 1rem;
+        }
+        .menu-items-shell {
+          margin-top: 0.9rem;
+          border: 1px solid #ccbda2;
+          border-radius: 0.75rem;
+          background: #fffaf3;
+          padding: 0.75rem;
+        }
+        .menu-items-shell h2 {
+          margin: 0 0 0.7rem 0;
         }
         .menu-list-card {
           border: 2px solid #ccbda2;

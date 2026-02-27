@@ -139,37 +139,51 @@ export default function AdminKitchenPage() {
               </table>
             </div>
 
-            <h2>Allergen Alerts</h2>
-            {data.allergenAlerts.length === 0 ? <p className="auth-help">No allergen-alert orders.</p> : (
-              <div className="kitchen-alert-grid">
-                {data.allergenAlerts.map((o) => (
-                  <article className="kitchen-alert-card" key={o.id}>
-                    <strong>{o.session} - {o.child_name}</strong>
-                    <small>Parent: {o.parent_name}</small>
-                    <small>Allergens: {o.allergen_items || '-'}</small>
-                    <small>Dishes: {o.dish_count}</small>
-                  </article>
-                ))}
-              </div>
-            )}
+            <div className="admin-kitchen-card">
+              <h2>Allergen Alerts</h2>
+              {data.allergenAlerts.length === 0 ? <p className="auth-help">No allergen-alert orders.</p> : (
+                <div className="kitchen-alert-grid">
+                  {data.allergenAlerts.map((o) => (
+                    <article className="kitchen-alert-card" key={o.id}>
+                      <strong>{o.session} - {o.child_name}</strong>
+                      <small>Parent: {o.parent_name}</small>
+                      <small>Allergens: {o.allergen_items || '-'}</small>
+                      <small>Dishes: {o.dish_count}</small>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
 
-            <h2>Orders</h2>
-            {orders.length === 0 ? <p className="auth-help">No orders for this day.</p> : (
-              <div className="kitchen-order-list">
-                {orders.map((o) => (
-                  <article className="kitchen-order-card" key={o.id}>
-                    <strong>{o.session} - {o.child_name}</strong>
-                    <small>Parent: {o.parent_name}</small>
-                    <small>Status: {o.status} | Delivery: {o.delivery_status}</small>
-                    <small>Dishes: {o.dishes.map((d) => `${d.item_name} x${d.quantity}`).join(', ') || '-'}</small>
-                  </article>
-                ))}
-              </div>
-            )}
+            <div className="admin-kitchen-card">
+              <h2>Orders</h2>
+              {orders.length === 0 ? <p className="auth-help">No orders for this day.</p> : (
+                <div className="kitchen-order-list">
+                  {orders.map((o) => (
+                    <article className="kitchen-order-card" key={o.id}>
+                      <strong>{o.session} - {o.child_name}</strong>
+                      <small>Parent: {o.parent_name}</small>
+                      <small>Status: {o.status} | Delivery: {o.delivery_status}</small>
+                      <small>Dishes: {o.dishes.map((d) => `${d.item_name} x${d.quantity}`).join(', ') || '-'}</small>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
           </>
         ) : null}
       </section>
       <style jsx>{`
+        .admin-kitchen-card {
+          border: 1px solid #d6c8b0;
+          border-radius: 0.7rem;
+          background: #fffaf3;
+          padding: 0.75rem;
+          margin-bottom: 0.85rem;
+        }
+        .admin-kitchen-card h2 {
+          margin-top: 0;
+        }
         .admin-kitchen-controls {
           display: grid;
           grid-template-columns: minmax(0, 1fr);

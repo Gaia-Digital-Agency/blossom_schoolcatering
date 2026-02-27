@@ -3640,60 +3640,203 @@ export class CoreService {
     return { ok: true };
   }
 
-  async getAdminRevenueDashboard(fromDateRaw?: string, toDateRaw?: string) {
-    const toDate = toDateRaw ? this.validateServiceDate(toDateRaw) : await runSql(`SELECT (now() AT TIME ZONE 'Asia/Makassar')::date::text;`);
-    const fromDate = fromDateRaw ? this.validateServiceDate(fromDateRaw) : await runSql(`SELECT ($1::date - INTERVAL '30 day')::date::text;`, [toDate]);
+  async getAdminRevenueDashboard(input: {
+    fromDateRaw?: string;
+    toDateRaw?: string;
+    day?: string;
+    month?: string;
+    year?: string;
+    schoolId?: string;
+    deliveryUserId?: string;
+    parentId?: string;
+    session?: string;
+    dish?: string;
+    orderStatus?: string;
+    billingStatus?: string;
+  }) {
+    const toDate = input.toDateRaw ? this.validateServiceDate(input.toDateRaw) : await runSql(`SELECT (now() AT TIME ZONE 'Asia/Makassar')::date::text;`);
+    const fromDate = input.fromDateRaw ? this.validateServiceDate(input.fromDateRaw) : await runSql(`SELECT ($1::date - INTERVAL '30 day')::date::text;`, [toDate]);
+
+    const day = (input.day || 'ALL').toUpperCase() === 'ALL' ? '' : (input.day || '').trim();
+    const month = (input.month || 'ALL').toUpperCase() === 'ALL' ? '' : (input.month || '').trim();
+    const year = (input.year || 'ALL').toUpperCase() === 'ALL' ? '' : (input.year || '').trim();
+    const schoolId = (input.schoolId || 'ALL').toUpperCase() === 'ALL' ? '' : (input.schoolId || '').trim();
+    const deliveryUserId = (input.deliveryUserId || 'ALL').toUpperCase() === 'ALL' ? '' : (input.deliveryUserId || '').trim();
+    const parentId = (input.parentId || 'ALL').toUpperCase() === 'ALL' ? '' : (input.parentId || '').trim();
+    const session = (input.session || 'ALL').toUpperCase() === 'ALL' ? '' : this.normalizeSession(input.session);
+    const dish = (input.dish || 'ALL').toUpperCase() === 'ALL' ? '' : (input.dish || '').trim();
+    const orderStatus = (input.orderStatus || 'ALL').toUpperCase() === 'ALL' ? '' : (input.orderStatus || '').trim().toUpperCase();
+    const billingStatus = (input.billingStatus || 'ALL').toUpperCase() === 'ALL' ? '' : (input.billingStatus || '').trim().toUpperCase();
+
+    const params: unknown[] = [fromDate, toDate];
+    const where: string[] = [
+      `o.service_date BETWEEN $1::date AND $2::date`,
+      `o.deleted_at IS NULL`,
+      `o.status <> 'CANCELLED'`,
+    ];
+    if (day) {
+      params.push(Number(day));
+      where.push(`EXTRACT(DAY FROM o.service_date)::int = $${params.length}`);
+    }
+    if (month) {
+      params.push(Number(month));
+      where.push(`EXTRACT(MONTH FROM o.service_date)::int = $${params.length}`);
+    }
+    if (year) {
+      params.push(Number(year));
+      where.push(`EXTRACT(YEAR FROM o.service_date)::int = $${params.length}`);
+    }
+    if (schoolId) {
+      this.assertValidUuid(schoolId, 'schoolId');
+      params.push(schoolId);
+      where.push(`s.id = $${params.length}`);
+    }
+    if (deliveryUserId) {
+      this.assertValidUuid(deliveryUserId, 'deliveryUserId');
+      params.push(deliveryUserId);
+      where.push(`da.delivery_user_id = $${params.length}`);
+    }
+    if (parentId) {
+      this.assertValidUuid(parentId, 'parentId');
+      params.push(parentId);
+      where.push(`p.id = $${params.length}`);
+    }
+    if (session) {
+      params.push(session);
+      where.push(`o.session = $${params.length}::session_type`);
+    }
+    if (dish) {
+      params.push(`%${dish}%`);
+      where.push(`EXISTS (
+        SELECT 1
+        FROM order_items oi2
+        WHERE oi2.order_id = o.id
+          AND oi2.item_name_snapshot ILIKE $${params.length}
+      )`);
+    }
+    if (orderStatus) {
+      params.push(orderStatus);
+      where.push(`o.status::text = $${params.length}`);
+    }
+    if (billingStatus) {
+      params.push(billingStatus);
+      where.push(`COALESCE(br.status::text, 'UNPAID') = $${params.length}`);
+    }
+    const whereSql = where.join(' AND ');
+
+    const totalsOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT COUNT(DISTINCT o.id)::int AS total_orders,
+               COALESCE(SUM(o.total_price), 0)::numeric AS total_revenue
+        FROM orders o
+        JOIN children c ON c.id = o.child_id
+        JOIN schools s ON s.id = c.school_id
+        LEFT JOIN delivery_assignments da ON da.order_id = o.id
+        LEFT JOIN parent_children pc ON pc.child_id = c.id
+        LEFT JOIN parents p ON p.id = pc.parent_id
+        LEFT JOIN billing_records br ON br.order_id = o.id
+        WHERE ${whereSql}
+      ) t;
+    `,
+      params,
+    );
+    const totals = this.parseJsonLine<{ total_orders: number; total_revenue: string | number }>(
+      totalsOut || '{"total_orders":0,"total_revenue":0}',
+    );
+
     const bySchoolOut = await runSql(
       `
       SELECT row_to_json(t)::text
       FROM (
         SELECT s.id AS school_id,
                s.name AS school_name,
-               COUNT(o.id)::int AS orders_count,
+               COUNT(DISTINCT o.id)::int AS orders_count,
                COALESCE(SUM(o.total_price), 0)::numeric AS total_revenue
         FROM orders o
         JOIN children c ON c.id = o.child_id
         JOIN schools s ON s.id = c.school_id
-        WHERE o.service_date BETWEEN $1::date AND $2::date
-          AND o.status <> 'CANCELLED'
-          AND o.deleted_at IS NULL
+        LEFT JOIN delivery_assignments da ON da.order_id = o.id
+        LEFT JOIN parent_children pc ON pc.child_id = c.id
+        LEFT JOIN parents p ON p.id = pc.parent_id
+        LEFT JOIN billing_records br ON br.order_id = o.id
+        WHERE ${whereSql}
         GROUP BY s.id, s.name
         ORDER BY total_revenue DESC, school_name ASC
       ) t;
     `,
-      [fromDate, toDate],
+      params,
     );
     const bySessionOut = await runSql(
       `
       SELECT row_to_json(t)::text
       FROM (
         SELECT o.session::text AS session,
-               COUNT(o.id)::int AS orders_count,
+               COUNT(DISTINCT o.id)::int AS orders_count,
                COALESCE(SUM(o.total_price), 0)::numeric AS total_revenue
         FROM orders o
-        WHERE o.service_date BETWEEN $1::date AND $2::date
-          AND o.status <> 'CANCELLED'
-          AND o.deleted_at IS NULL
+        JOIN children c ON c.id = o.child_id
+        JOIN schools s ON s.id = c.school_id
+        LEFT JOIN delivery_assignments da ON da.order_id = o.id
+        LEFT JOIN parent_children pc ON pc.child_id = c.id
+        LEFT JOIN parents p ON p.id = pc.parent_id
+        LEFT JOIN billing_records br ON br.order_id = o.id
+        WHERE ${whereSql}
         GROUP BY o.session
         ORDER BY o.session ASC
       ) t;
     `,
-      [fromDate, toDate],
+      params,
     );
-    const totalRevenue = Number(await runSql(
-      `
-      SELECT COALESCE(SUM(total_price), 0)::numeric
-      FROM orders
-      WHERE service_date BETWEEN $1::date AND $2::date
-        AND status <> 'CANCELLED'
-        AND deleted_at IS NULL;
-    `,
-      [fromDate, toDate],
-    ) || 0);
+
+    const filterSchoolsOut = await runSql(`
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT id, name
+        FROM schools
+        WHERE deleted_at IS NULL
+        ORDER BY name ASC
+      ) t;
+    `);
+    const filterDeliveryOut = await runSql(`
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT id AS user_id, (first_name || ' ' || last_name) AS name
+        FROM users
+        WHERE role = 'DELIVERY'
+          AND deleted_at IS NULL
+        ORDER BY first_name ASC, last_name ASC
+      ) t;
+    `);
+    const filterParentsOut = await runSql(`
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT p.id AS parent_id, (u.first_name || ' ' || u.last_name) AS name
+        FROM parents p
+        JOIN users u ON u.id = p.user_id
+        WHERE p.deleted_at IS NULL
+          AND u.deleted_at IS NULL
+        ORDER BY u.first_name ASC, u.last_name ASC
+      ) t;
+    `);
+    const filterDishesOut = await runSql(`
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT DISTINCT oi.item_name_snapshot AS dish_name
+        FROM order_items oi
+        JOIN orders o ON o.id = oi.order_id
+        WHERE o.deleted_at IS NULL
+          AND o.status <> 'CANCELLED'
+        ORDER BY oi.item_name_snapshot ASC
+      ) t;
+    `);
+
     return {
       fromDate,
       toDate,
-      totalRevenue,
+      totalOrders: Number(totals.total_orders || 0),
+      totalRevenue: Number(totals.total_revenue || 0),
       bySchool: this.parseJsonLines<Record<string, unknown> & { total_revenue?: number | string }>(bySchoolOut).map((r) => ({
         ...r,
         total_revenue: Number(r.total_revenue || 0),
@@ -3702,6 +3845,15 @@ export class CoreService {
         ...r,
         total_revenue: Number(r.total_revenue || 0),
       })),
+      filters: {
+        schools: this.parseJsonLines(filterSchoolsOut),
+        deliveryUsers: this.parseJsonLines(filterDeliveryOut),
+        parents: this.parseJsonLines(filterParentsOut),
+        sessions: ['ALL', 'BREAKFAST', 'SNACK', 'LUNCH'],
+        orderStatuses: ['ALL', 'PLACED', 'LOCKED', 'CANCELLED'],
+        billingStatuses: ['ALL', 'UNPAID', 'PENDING_VERIFICATION', 'VERIFIED', 'REJECTED'],
+        dishes: this.parseJsonLines(filterDishesOut),
+      },
     };
   }
 

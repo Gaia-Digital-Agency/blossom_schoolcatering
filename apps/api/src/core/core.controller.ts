@@ -155,8 +155,34 @@ export class CoreController {
 
   @Get('admin/revenue')
   @Roles('ADMIN')
-  getAdminRevenue(@Query('from') from?: string, @Query('to') to?: string) {
-    return this.coreService.getAdminRevenueDashboard(from, to);
+  getAdminRevenue(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('day') day?: string,
+    @Query('month') month?: string,
+    @Query('year') year?: string,
+    @Query('school_id') schoolId?: string,
+    @Query('delivery_user_id') deliveryUserId?: string,
+    @Query('parent_id') parentId?: string,
+    @Query('session') session?: string,
+    @Query('dish') dish?: string,
+    @Query('order_status') orderStatus?: string,
+    @Query('billing_status') billingStatus?: string,
+  ) {
+    return this.coreService.getAdminRevenueDashboard({
+      fromDateRaw: from,
+      toDateRaw: to,
+      day,
+      month,
+      year,
+      schoolId,
+      deliveryUserId,
+      parentId,
+      session,
+      dish,
+      orderStatus,
+      billingStatus,
+    });
   }
 
   @Get('admin/reports')

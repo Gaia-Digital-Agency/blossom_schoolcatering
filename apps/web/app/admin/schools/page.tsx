@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { apiFetch, SessionExpiredError } from '../../../lib/auth';
+import { apiFetch } from '../../../lib/auth';
 import AdminNav from '../_components/admin-nav';
 
 type School = { id: string; name: string; city?: string | null; address?: string | null; is_active?: boolean };
@@ -156,12 +156,12 @@ export default function AdminSchoolsPage() {
           ))}
         </div>
         <h2>Schools</h2>
-        <div className="auth-form">
+        <div className="auth-form school-create-form">
           <label>School Name<input value={newSchoolName} onChange={(e) => setNewSchoolName(e.target.value)} /></label>
           <label>City<input value={newSchoolCity} onChange={(e) => setNewSchoolCity(e.target.value)} /></label>
           <label>Address<input value={newSchoolAddress} onChange={(e) => setNewSchoolAddress(e.target.value)} /></label>
           <label>Contact Email<input value={newSchoolContactEmail} onChange={(e) => setNewSchoolContactEmail(e.target.value)} /></label>
-          <button className="btn btn-primary" type="button" onClick={onCreateSchool} disabled={creatingSchool}>
+          <button className="btn btn-primary create-school-btn" type="button" onClick={onCreateSchool} disabled={creatingSchool}>
             {creatingSchool ? 'Creating...' : 'Create School'}
           </button>
         </div>
@@ -204,6 +204,15 @@ export default function AdminSchoolsPage() {
           {schools.length === 0 ? <p className="auth-help">No schools found.</p> : null}
         </div>
       </section>
+      <style jsx>{`
+        .school-create-form {
+          margin-bottom: 0.75rem;
+        }
+        .create-school-btn {
+          grid-column: 1 / -1;
+          width: 100%;
+        }
+      `}</style>
     </main>
   );
 }

@@ -270,124 +270,128 @@ export default function AdminDeliveryPage() {
           </button>
         </div>
 
-        <h2>List Delivery Users</h2>
-        <div className="kitchen-table-wrap">
-          <table className="kitchen-table admin-delivery-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Username</th>
-                <th>Phone</th>
-                <th>Email</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.length === 0 ? (
-                <tr><td colSpan={6}>No delivery users yet.</td></tr>
-              ) : users.map((u) => (
-                <tr key={u.id}>
-                  <td>
-                    {editingUserId === u.id ? (
-                      <div className="edit-grid">
-                        <input value={editFirstName} onChange={(e) => setEditFirstName(e.target.value)} placeholder="First" />
-                        <input value={editLastName} onChange={(e) => setEditLastName(e.target.value)} placeholder="Last" />
-                      </div>
-                    ) : `${u.first_name} ${u.last_name}`}
-                  </td>
-                  <td>{u.username}</td>
-                  <td>{editingUserId === u.id ? <input value={editPhoneNumber} onChange={(e) => setEditPhoneNumber(e.target.value)} /> : (u.phone_number || '-')}</td>
-                  <td>{editingUserId === u.id ? <input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} /> : (u.email || '-')}</td>
-                  <td>{u.is_active ? 'ACTIVE' : 'INACTIVE'}</td>
-                  <td>
-                    <div className="action-row">
+        <div className="admin-section-card">
+          <h2>List Delivery Users</h2>
+          <div className="kitchen-table-wrap">
+            <table className="kitchen-table admin-delivery-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Username</th>
+                  <th>Phone</th>
+                  <th>Email</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.length === 0 ? (
+                  <tr><td colSpan={6}>No delivery users yet.</td></tr>
+                ) : users.map((u) => (
+                  <tr key={u.id}>
+                    <td>
                       {editingUserId === u.id ? (
-                        <>
-                          <button className="btn btn-primary" type="button" onClick={() => onSaveUserEdit(u.id)} disabled={savingUserId === u.id}>
-                            {savingUserId === u.id ? 'Saving...' : 'Save'}
-                          </button>
-                          <button className="btn btn-outline" type="button" onClick={() => setEditingUserId('')}>Cancel</button>
-                        </>
-                      ) : (
-                        <button className="btn btn-outline" type="button" onClick={() => beginEditUser(u)}>Edit</button>
-                      )}
-                      <button
-                        className="btn btn-outline"
-                        type="button"
-                        onClick={() => onToggleUserActive(u)}
-                        disabled={togglingUserId === u.id}
-                      >
-                        {togglingUserId === u.id ? 'Updating...' : (u.is_active ? 'Deactivate' : 'Activate')}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                        <div className="edit-grid">
+                          <input value={editFirstName} onChange={(e) => setEditFirstName(e.target.value)} placeholder="First" />
+                          <input value={editLastName} onChange={(e) => setEditLastName(e.target.value)} placeholder="Last" />
+                        </div>
+                      ) : `${u.first_name} ${u.last_name}`}
+                    </td>
+                    <td>{u.username}</td>
+                    <td>{editingUserId === u.id ? <input value={editPhoneNumber} onChange={(e) => setEditPhoneNumber(e.target.value)} /> : (u.phone_number || '-')}</td>
+                    <td>{editingUserId === u.id ? <input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} /> : (u.email || '-')}</td>
+                    <td>{u.is_active ? 'ACTIVE' : 'INACTIVE'}</td>
+                    <td>
+                      <div className="action-row">
+                        {editingUserId === u.id ? (
+                          <>
+                            <button className="btn btn-primary" type="button" onClick={() => onSaveUserEdit(u.id)} disabled={savingUserId === u.id}>
+                              {savingUserId === u.id ? 'Saving...' : 'Save'}
+                            </button>
+                            <button className="btn btn-outline" type="button" onClick={() => setEditingUserId('')}>Cancel</button>
+                          </>
+                        ) : (
+                          <button className="btn btn-outline" type="button" onClick={() => beginEditUser(u)}>Edit</button>
+                        )}
+                        <button
+                          className="btn btn-outline"
+                          type="button"
+                          onClick={() => onToggleUserActive(u)}
+                          disabled={togglingUserId === u.id}
+                        >
+                          {togglingUserId === u.id ? 'Updating...' : (u.is_active ? 'Deactivate' : 'Activate')}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        <h2>Delivery vs School Assignment</h2>
-        <div className="auth-form admin-mapping-controls">
-          <label>
-            School
-            <select value={selectedSchoolId} onChange={(e) => setSelectedSchoolId(e.target.value)}>
-              <option value="">Select...</option>
-              {schools.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </label>
-          <label>
-            Delivery Personnel
-            <select value={selectedDeliveryUserId} onChange={(e) => setSelectedDeliveryUserId(e.target.value)}>
-              <option value="">Select...</option>
-              {users.filter((u) => u.is_active).map((u) => <option key={u.id} value={u.id}>{u.first_name} {u.last_name} ({u.username})</option>)}
-            </select>
-          </label>
-          <button className="btn btn-primary" type="button" onClick={onSaveMapping}>Save Assignment</button>
-        </div>
+        <div className="admin-section-card">
+          <h2>Delivery vs School Assignment</h2>
+          <div className="auth-form admin-mapping-controls">
+            <label>
+              School
+              <select value={selectedSchoolId} onChange={(e) => setSelectedSchoolId(e.target.value)}>
+                <option value="">Select...</option>
+                {schools.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </label>
+            <label>
+              Delivery Personnel
+              <select value={selectedDeliveryUserId} onChange={(e) => setSelectedDeliveryUserId(e.target.value)}>
+                <option value="">Select...</option>
+                {users.filter((u) => u.is_active).map((u) => <option key={u.id} value={u.id}>{u.first_name} {u.last_name} ({u.username})</option>)}
+              </select>
+            </label>
+            <button className="btn btn-primary" type="button" onClick={onSaveMapping}>Save Assignment</button>
+          </div>
 
-        <div className="kitchen-table-wrap">
-          <table className="kitchen-table admin-delivery-table">
-            <thead>
-              <tr>
-                <th>School</th>
-                <th>Delivery User</th>
-                <th>Username</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {mappings.length === 0 ? (
-                <tr><td colSpan={5}>No delivery-school mappings yet.</td></tr>
-              ) : mappings.map((m) => (
-                <tr key={`${m.delivery_user_id}-${m.school_id}`}>
-                  <td>{m.school_name}</td>
-                  <td>{m.delivery_name}</td>
-                  <td>{m.delivery_username}</td>
-                  <td>{m.is_active ? 'ACTIVE' : 'INACTIVE'}</td>
-                  <td>
-                    <div className="action-row">
-                      <button
-                        className="btn btn-outline"
-                        type="button"
-                        onClick={() => {
-                          setSelectedSchoolId(m.school_id);
-                          setSelectedDeliveryUserId(m.delivery_user_id);
-                        }}
-                      >
-                        Edit
-                      </button>
-                      {m.is_active
-                        ? <button className="btn btn-outline" type="button" onClick={() => onToggleMapping(m, false)}>Deactivate</button>
-                        : <button className="btn btn-outline" type="button" onClick={() => onToggleMapping(m, true)}>Activate</button>}
-                    </div>
-                  </td>
+          <div className="kitchen-table-wrap">
+            <table className="kitchen-table admin-delivery-table">
+              <thead>
+                <tr>
+                  <th>School</th>
+                  <th>Delivery User</th>
+                  <th>Username</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {mappings.length === 0 ? (
+                  <tr><td colSpan={5}>No delivery-school mappings yet.</td></tr>
+                ) : mappings.map((m) => (
+                  <tr key={`${m.delivery_user_id}-${m.school_id}`}>
+                    <td>{m.school_name}</td>
+                    <td>{m.delivery_name}</td>
+                    <td>{m.delivery_username}</td>
+                    <td>{m.is_active ? 'ACTIVE' : 'INACTIVE'}</td>
+                    <td>
+                      <div className="action-row">
+                        <button
+                          className="btn btn-outline"
+                          type="button"
+                          onClick={() => {
+                            setSelectedSchoolId(m.school_id);
+                            setSelectedDeliveryUserId(m.delivery_user_id);
+                          }}
+                        >
+                          Edit
+                        </button>
+                        {m.is_active
+                          ? <button className="btn btn-outline" type="button" onClick={() => onToggleMapping(m, false)}>Deactivate</button>
+                          : <button className="btn btn-outline" type="button" onClick={() => onToggleMapping(m, true)}>Activate</button>}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <h2>Auto Assignment ({assignDate})</h2>
@@ -459,6 +463,16 @@ export default function AdminDeliveryPage() {
         .admin-delivery-table td {
           text-align: left;
           vertical-align: middle;
+        }
+        .admin-section-card {
+          border: 1px solid #ccbda2;
+          border-radius: 0.7rem;
+          background: #fffaf3;
+          padding: 0.75rem;
+          margin-bottom: 0.9rem;
+        }
+        .admin-section-card h2 {
+          margin: 0 0 0.65rem 0;
         }
         .admin-delivery-table .count-col {
           text-align: center;
