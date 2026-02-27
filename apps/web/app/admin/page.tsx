@@ -254,6 +254,7 @@ export default function AdminPage() {
         }
         .admin-controls-card {
           margin-bottom: 0.9rem;
+          grid-template-columns: minmax(0, 1fr);
         }
         .admin-dashboard-controls label {
           display: grid;
@@ -265,8 +266,12 @@ export default function AdminPage() {
         .admin-dashboard-block h2 {
           margin: 0.25rem 0;
         }
+        .admin-dashboard-block {
+          grid-template-columns: minmax(0, 1fr);
+        }
         .admin-overview-wrap {
           margin-top: 0.1rem;
+          width: 100%;
         }
         .admin-overview-table th,
         .admin-overview-table td {

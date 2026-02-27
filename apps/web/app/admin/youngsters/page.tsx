@@ -35,7 +35,7 @@ type ResetPasswordResponse = {
   username: string;
 };
 
-const GRADES = Array.from({ length: 12 }, (_v, i) => `Grade ${i + 1}`);
+const GRADES = Array.from({ length: 12 }, (_v, i) => String(i + 1));
 
 export default function AdminYoungstersPage() {
   const [schools, setSchools] = useState<School[]>([]);
@@ -260,12 +260,14 @@ export default function AdminYoungstersPage() {
                   <td><code>{c.user_id}</code></td>
                   <td>{(c.parent_ids || []).map((id) => parentLabelById.get(id) || id).join(', ') || '-'}</td>
                   <td>{c.school_name}</td>
-                  <td>{c.school_grade}</td>
+                  <td>{String(c.school_grade || '').replace(/^[Gg]rade\s*/,'')}</td>
                   <td>
-                    <div className="menu-actions-row">
-                      <button className="btn btn-outline" type="button" onClick={() => onEdit(c)}>Edit</button>
+                    <div className="action-col">
+                      <div className="action-row">
+                        <button className="btn btn-outline" type="button" onClick={() => onEdit(c)}>Edit</button>
+                        <button className="btn btn-outline" type="button" onClick={() => onDelete(c.id)}>Delete</button>
+                      </div>
                       <button className="btn btn-outline" type="button" onClick={() => onResetPassword(c.user_id)}>Reset Password</button>
-                      <button className="btn btn-outline" type="button" onClick={() => onDelete(c.id)}>Delete</button>
                     </div>
                   </td>
                 </tr>
@@ -283,6 +285,15 @@ export default function AdminYoungstersPage() {
           flex-wrap: wrap;
           gap: 0.45rem;
           align-items: center;
+        }
+        .action-col {
+          display: grid;
+          gap: 0.35rem;
+          min-width: 220px;
+        }
+        .action-row {
+          display: flex;
+          gap: 0.35rem;
         }
       `}</style>
     </main>
