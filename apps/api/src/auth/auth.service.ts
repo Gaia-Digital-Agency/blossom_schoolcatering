@@ -188,33 +188,6 @@ export class AuthService {
     return `${digits}123456`.slice(0, 6);
   }
 
-  private async generateUniqueYoungsterLastName(firstName: string, desiredLastName: string) {
-    const rowsOut = await runSql(
-      `SELECT row_to_json(t)::text
-       FROM (
-         SELECT u.last_name
-         FROM children c
-         JOIN users u ON u.id = c.user_id
-         WHERE lower(u.first_name) = lower($1)
-           AND lower(u.last_name) LIKE lower($2) || '%'
-           AND c.deleted_at IS NULL
-           AND u.is_active = true
-       ) t;`,
-      [firstName, desiredLastName],
-    );
-    const rows = this.parseJsonLines<{ last_name: string }>(rowsOut);
-    const existing = new Set(rows.map((r) => (r.last_name || '').toLowerCase()));
-    if (!existing.has(desiredLastName.toLowerCase())) return desiredLastName;
-
-    let suffix = 1;
-    while (suffix < 1000) {
-      const candidate = `${desiredLastName}_${suffix}`;
-      if (!existing.has(candidate.toLowerCase())) return candidate;
-      suffix += 1;
-    }
-    throw new BadRequestException('Unable to generate unique youngster last name');
-  }
-
   private async ensureSystemUsers() {
     const specs = [
       {
@@ -582,6 +555,7 @@ export class AuthService {
       !youngsterGrade ||
       !youngsterPhone ||
       !parentFirstName ||
+      !parentLastNameInput ||
       !parentMobileNumber ||
       !parentEmail
     ) {
@@ -613,11 +587,11 @@ export class AuthService {
       throw new BadRequestException('School not found or inactive');
     }
 
-    const youngsterLastName = await this.generateUniqueYoungsterLastName(
-      youngsterFirstName,
-      youngsterLastNameRaw,
-    );
-    const parentLastName = parentLastNameInput || youngsterLastNameRaw;
+    const youngsterLastName = youngsterLastNameRaw;
+    const parentLastName = parentLastNameInput;
+    if (parentLastName.toLowerCase() !== youngsterLastName.toLowerCase()) {
+      throw new BadRequestException('Parent last name must match youngster last name');
+    }
 
     const existingParentByEmail = await this.findUserByEmail(parentEmail);
     let parentUserId = '';
@@ -756,7 +730,6 @@ export class AuthService {
         username: youngsterCreated.username,
         generatedPassword: youngsterGeneratedPassword,
         firstName: youngsterFirstName,
-        requestedLastName: youngsterLastNameRaw,
         lastName: youngsterLastName,
         mobileNumber: youngsterPhone,
         email: youngsterEmail || null,

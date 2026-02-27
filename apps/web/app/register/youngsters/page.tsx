@@ -180,8 +180,8 @@ export default function YoungsterRegisterPage() {
             <input value={parentFirstName} onChange={(e) => setParentFirstName(e.target.value)} required />
           </label>
           <label>
-            Parent Last Name (Optional)
-            <input value={parentLastName} onChange={(e) => setParentLastName(e.target.value)} />
+            Parent Last Name (Must match Youngster Last Name)
+            <input value={parentLastName} onChange={(e) => setParentLastName(e.target.value)} required />
           </label>
           <label>
             Parent Mobile Number

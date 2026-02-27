@@ -14,18 +14,17 @@ It also creates or links the parent account in the same process.
 - Youngster Grade on Registration Date
 - Youngster Phone
 - Parent First Name
+- Parent Last Name (must match youngster last name)
 - Parent Mobile Number
 - Parent Email
 
 ## Optional Fields
 - Youngster Email
-- Parent Last Name
 - Parent Address
 
 ## Behavior
 - `Register As` is not used in this page.
-- If youngster last name already exists for the same youngster first name pattern, system auto-adjusts:
-  - `LastName` -> `LastName_1` -> `LastName_2` ...
+- Parent last name must match youngster last name.
 - If parent email already exists on a parent account:
   - existing parent account is reused
   - new youngster is linked to that parent

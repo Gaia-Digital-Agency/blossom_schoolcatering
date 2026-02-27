@@ -38,7 +38,7 @@ export default function HomePage() {
             <p className="eyebrow">School Catering by Blossom Kitchen</p>
             <h1>Meal Order App</h1>
             <p className="lead">
-              Lunch Mean For Youngsters, Up To Five Dishes Per Meal, Register or Log In.
+              Lunch Meal For Youngsters, Up To Five Dishes Per Meal, Register or Log In.
               Click Guides button for more details.
             </p>
             <div className="auth-grid">
