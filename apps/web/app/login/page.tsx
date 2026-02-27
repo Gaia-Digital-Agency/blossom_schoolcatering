@@ -28,7 +28,14 @@ export default function LoginPage() {
       }
       const data = await res.json();
       setAuthState(data.accessToken, data.user.role);
-      router.push('/dashboard');
+      const role = String(data?.user?.role || '').toUpperCase();
+      if (role === 'PARENT') {
+        router.push('/parents');
+      } else if (role === 'YOUNGSTER') {
+        router.push('/youngsters');
+      } else {
+        router.push('/dashboard');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
@@ -43,8 +50,8 @@ export default function LoginPage() {
         <p className="auth-help">Use this page for Parent and Youngster login.</p>
         <div className="quick-credentials" aria-label="Quick Credentials">
           <p><strong>Youngster Register:</strong> url: /register/youngsters (view only)</p>
-          <p><strong>Youngster Login:</strong> url: /login | user: youngster | pw: youngster123</p>
-          <p><strong>Parent Login:</strong> url: /login | user: parent | pw: parent123</p>
+          <p><strong>Youngster Login:</strong> url: /youngster/login | user: youngster | pw: youngster123</p>
+          <p><strong>Parent Login:</strong> url: /parent/login | user: parent | pw: parent123</p>
           <p><strong>Delivery Login:</strong> url: /delivery/login | user: delivery | pw: delivery123</p>
           <p><strong>Kitchen Login:</strong> url: /kitchen/login | user: kitchen | pw: kitchen123</p>
           <p><strong>Admin Login:</strong> url: /admin/login | user: admin | pw: admin123</p>
