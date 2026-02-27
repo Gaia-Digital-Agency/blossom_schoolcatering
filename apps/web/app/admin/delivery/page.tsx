@@ -407,8 +407,8 @@ export default function AdminDeliveryPage() {
               <tr>
                 <th>Delivery User</th>
                 <th>Schools</th>
-                <th>Number of Youngsters</th>
-                <th>Number of Orders</th>
+                <th className="count-col">Number of Youngsters</th>
+                <th className="count-col">Number of Orders</th>
               </tr>
             </thead>
             <tbody>
@@ -418,8 +418,8 @@ export default function AdminDeliveryPage() {
                 <tr key={row.deliveryUserId}>
                   <td>{row.deliveryName}</td>
                   <td>{row.schools.join(', ') || '-'}</td>
-                  <td>{row.youngsterCount}</td>
-                  <td>{row.orderCount}</td>
+                  <td className="count-col">{row.youngsterCount}</td>
+                  <td className="count-col">{row.orderCount}</td>
                 </tr>
               ))}
             </tbody>
@@ -459,6 +459,9 @@ export default function AdminDeliveryPage() {
         .admin-delivery-table td {
           text-align: left;
           vertical-align: middle;
+        }
+        .admin-delivery-table .count-col {
+          text-align: center;
         }
         .action-row {
           display: flex;
