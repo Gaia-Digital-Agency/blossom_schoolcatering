@@ -41,6 +41,8 @@ export function middleware(request: NextRequest) {
   const requiredRole = getRequiredRole(normalizedPath);
   const isPublic =
     normalizedPath === '/' ||
+    normalizedPath === '/guide' ||
+    normalizedPath.startsWith('/guide/') ||
     normalizedPath === '/login' ||
     normalizedPath === '/register' ||
     normalizedPath.startsWith('/register/') ||
