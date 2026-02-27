@@ -3738,18 +3738,43 @@ export class CoreService {
                o.delivery_status::text AS delivery_status,
                (uc.first_name || ' ' || uc.last_name) AS child_name,
                COALESCE((up.first_name || ' ' || up.last_name), '-') AS parent_name,
-               COALESCE(SUM(oi.quantity), 0)::int AS dish_count,
-               COALESCE(bool_or(i.allergen_flag), false) AS has_allergen,
-               COALESCE(string_agg(DISTINCT i.name, ', ') FILTER (WHERE i.allergen_flag), '') AS allergen_items
+               COALESCE((
+                 SELECT SUM(oi2.quantity)::int
+                 FROM order_items oi2
+                 WHERE oi2.order_id = o.id
+               ), 0) AS dish_count,
+               COALESCE((
+                 SELECT bool_or(i2.allergen_flag)
+                 FROM order_items oi2
+                 JOIN menu_item_ingredients mii2 ON mii2.menu_item_id = oi2.menu_item_id
+                 JOIN ingredients i2 ON i2.id = mii2.ingredient_id AND i2.deleted_at IS NULL
+                 WHERE oi2.order_id = o.id
+               ), false) AS has_allergen,
+               COALESCE((
+                 SELECT string_agg(DISTINCT i2.name, ', ')
+                 FROM order_items oi2
+                 JOIN menu_item_ingredients mii2 ON mii2.menu_item_id = oi2.menu_item_id
+                 JOIN ingredients i2 ON i2.id = mii2.ingredient_id AND i2.deleted_at IS NULL
+                 WHERE oi2.order_id = o.id
+                   AND i2.allergen_flag = true
+               ), '') AS allergen_items,
+               COALESCE((
+                 SELECT json_agg(row_to_json(d) ORDER BY d.item_name)
+                 FROM (
+                   SELECT oi2.menu_item_id,
+                          oi2.item_name_snapshot AS item_name,
+                          SUM(oi2.quantity)::int AS quantity
+                   FROM order_items oi2
+                   WHERE oi2.order_id = o.id
+                   GROUP BY oi2.menu_item_id, oi2.item_name_snapshot
+                 ) d
+               ), '[]'::json) AS dishes
         FROM orders o
         JOIN children c ON c.id = o.child_id
         JOIN users uc ON uc.id = c.user_id
         LEFT JOIN parent_children pc ON pc.child_id = c.id
         LEFT JOIN parents p ON p.id = pc.parent_id
         LEFT JOIN users up ON up.id = p.user_id
-        LEFT JOIN order_items oi ON oi.order_id = o.id
-        LEFT JOIN menu_item_ingredients mii ON mii.menu_item_id = oi.menu_item_id
-        LEFT JOIN ingredients i ON i.id = mii.ingredient_id AND i.deleted_at IS NULL
         WHERE o.service_date = $1::date
           AND o.status IN ('PLACED', 'LOCKED')
         GROUP BY o.id, uc.first_name, uc.last_name, up.first_name, up.last_name
@@ -3769,7 +3794,26 @@ export class CoreService {
       dish_count: number;
       has_allergen: boolean;
       allergen_items: string;
+      dishes: Array<{ menu_item_id: string; item_name: string; quantity: number }>;
     }>(ordersOut);
+
+    const dishSummaryOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT oi.item_name_snapshot AS name,
+               SUM(oi.quantity)::int AS quantity
+        FROM orders o
+        JOIN order_items oi ON oi.order_id = o.id
+        WHERE o.service_date = $1::date
+          AND o.status IN ('PLACED', 'LOCKED')
+        GROUP BY oi.item_name_snapshot
+        ORDER BY quantity DESC, name ASC
+      ) t;
+    `,
+      [serviceDate],
+    );
+    const dishSummary = this.parseJsonLines<{ name: string; quantity: number }>(dishSummaryOut);
 
     return {
       serviceDate,
@@ -3780,6 +3824,7 @@ export class CoreService {
         snackOrders: Number(totals.snack_orders || 0),
         lunchOrders: Number(totals.lunch_orders || 0),
       },
+      dishSummary,
       allergenAlerts: orders.filter((o) => o.has_allergen),
       orders,
     };
