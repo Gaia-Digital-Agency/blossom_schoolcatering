@@ -847,6 +847,9 @@ export class CoreService {
   async getAdminDashboard(dateRaw?: string) {
     const date = dateRaw ? this.validateServiceDate(dateRaw) : await runSql(`SELECT (now() AT TIME ZONE 'Asia/Makassar')::date::text;`);
     const yesterday = await runSql(`SELECT ($1::date - INTERVAL '1 day')::date::text;`, [date]);
+    const tomorrow = await runSql(`SELECT ($1::date + INTERVAL '1 day')::date::text;`, [date]);
+    const pastWeekStart = await runSql(`SELECT ($1::date - INTERVAL '6 day')::date::text;`, [date]);
+    const pastMonthStart = await runSql(`SELECT ($1::date - INTERVAL '29 day')::date::text;`, [date]);
 
     const parentsCount = Number(await runSql(`
       SELECT count(*)::int
@@ -880,24 +883,34 @@ export class CoreService {
         AND deleted_at IS NULL;
     `) || 0);
 
-    const todayOrdersCount = Number(await runSql(
-      `SELECT count(*)::int
-       FROM orders
-       WHERE service_date = $1::date
-         AND deleted_at IS NULL
-         AND status <> 'CANCELLED';`,
-      [date],
-    ) || 0);
+    const getOrdersAndDishes = async (from: string, to: string) => {
+      const out = await runSql(
+        `
+        SELECT row_to_json(t)::text
+        FROM (
+          SELECT COUNT(DISTINCT o.id)::int AS total_orders,
+                 COALESCE(SUM(oi.quantity), 0)::int AS total_dishes
+          FROM orders o
+          LEFT JOIN order_items oi ON oi.order_id = o.id
+          WHERE o.service_date BETWEEN $1::date AND $2::date
+            AND o.deleted_at IS NULL
+            AND o.status <> 'CANCELLED'
+        ) t;
+      `,
+        [from, to],
+      );
+      const row = this.parseJsonLine<{ total_orders: number; total_dishes: number }>(out || '{"total_orders":0,"total_dishes":0}');
+      return { totalOrders: Number(row.total_orders || 0), totalDishes: Number(row.total_dishes || 0) };
+    };
 
-    const todayTotalDishes = Number(await runSql(
-      `SELECT coalesce(sum(oi.quantity), 0)::int
-       FROM orders o
-       JOIN order_items oi ON oi.order_id = o.id
-       WHERE o.service_date = $1::date
-         AND o.deleted_at IS NULL
-         AND o.status <> 'CANCELLED';`,
-      [date],
-    ) || 0);
+    const todayDelivery = await getOrdersAndDishes(date, date);
+    const yesterdayDelivery = await getOrdersAndDishes(yesterday, yesterday);
+    const tomorrowDelivery = await getOrdersAndDishes(tomorrow, tomorrow);
+    const pastWeekDelivery = await getOrdersAndDishes(pastWeekStart, date);
+    const pastMonthDelivery = await getOrdersAndDishes(pastMonthStart, date);
+
+    const todayOrdersCount = todayDelivery.totalOrders;
+    const todayTotalDishes = todayDelivery.totalDishes;
 
     const totalSales = Number(await runSql(`
       SELECT coalesce(sum(total_price), 0)::numeric
@@ -915,6 +928,134 @@ export class CoreService {
          AND delivery_status <> 'DELIVERED';`,
       [yesterday],
     ) || 0);
+
+    const failedDeliveryByPersonOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT COALESCE(da.delivery_user_id::text, 'UNASSIGNED') AS delivery_user_id,
+               COALESCE((u.first_name || ' ' || u.last_name), 'Unassigned') AS delivery_person_name,
+               COUNT(DISTINCT o.id)::int AS orders_count
+        FROM orders o
+        LEFT JOIN delivery_assignments da ON da.order_id = o.id
+        LEFT JOIN users u ON u.id = da.delivery_user_id
+        WHERE o.service_date = $1::date
+          AND o.deleted_at IS NULL
+          AND o.status <> 'CANCELLED'
+          AND (
+            o.delivery_status <> 'DELIVERED'
+            OR da.confirmed_at IS NULL
+          )
+        GROUP BY da.delivery_user_id, u.first_name, u.last_name
+        ORDER BY orders_count DESC, delivery_person_name ASC
+      ) t;
+    `,
+      [yesterday],
+    );
+    const failedDeliveryByPerson = this.parseJsonLines<{
+      delivery_user_id: string;
+      delivery_person_name: string;
+      orders_count: number;
+    }>(failedDeliveryByPersonOut);
+
+    const menuTotalsOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT COUNT(*)::int AS dishes_total_created,
+               COUNT(*) FILTER (WHERE is_available = true)::int AS dishes_total_active
+        FROM menu_items
+        WHERE deleted_at IS NULL
+      ) t;
+    `,
+    );
+    const menuTotals = this.parseJsonLine<{ dishes_total_created: number; dishes_total_active: number }>(
+      menuTotalsOut || '{"dishes_total_created":0,"dishes_total_active":0}',
+    );
+
+    const nextBlackoutDayOut = await runSql(
+      `
+      SELECT blackout_date::text
+      FROM blackout_days
+      WHERE deleted_at IS NULL
+        AND blackout_date >= $1::date
+      ORDER BY blackout_date ASC
+      LIMIT 1;
+    `,
+      [date],
+    );
+    const nextBlackoutDay = (nextBlackoutDayOut || '').trim() || null;
+
+    const getKitchenUnfulfilled = async (from: string, to: string) => {
+      const out = await runSql(
+        `
+        SELECT row_to_json(t)::text
+        FROM (
+          SELECT COUNT(DISTINCT o.id)::int AS orders_not_fulfilled,
+                 COALESCE(SUM(oi.quantity), 0)::int AS dishes_not_fulfilled
+          FROM orders o
+          LEFT JOIN order_items oi ON oi.order_id = o.id
+          WHERE o.service_date BETWEEN $1::date AND $2::date
+            AND o.deleted_at IS NULL
+            AND o.status = 'PLACED'
+        ) t;
+      `,
+        [from, to],
+      );
+      const row = this.parseJsonLine<{ orders_not_fulfilled: number; dishes_not_fulfilled: number }>(
+        out || '{"orders_not_fulfilled":0,"dishes_not_fulfilled":0}',
+      );
+      return {
+        ordersNotFulfilled: Number(row.orders_not_fulfilled || 0),
+        dishesNotFulfilled: Number(row.dishes_not_fulfilled || 0),
+      };
+    };
+    const kitchenYesterday = await getKitchenUnfulfilled(yesterday, yesterday);
+    const kitchenPastWeek = await getKitchenUnfulfilled(pastWeekStart, date);
+
+    const getBillingPeriodMetrics = async (from: string, to: string) => {
+      const out = await runSql(
+        `
+        SELECT row_to_json(t)::text
+        FROM (
+          SELECT COUNT(br.id)::int AS total_number_billing,
+                 COALESCE(SUM(o.total_price), 0)::numeric AS total_value_billing,
+                 COUNT(br.id) FILTER (
+                   WHERE br.status = 'UNPAID'
+                     AND COALESCE(NULLIF(TRIM(br.proof_image_url), ''), '') = ''
+                 )::int AS total_number_unpaid_no_proof,
+                 COALESCE(SUM(o.total_price) FILTER (
+                   WHERE br.status = 'UNPAID'
+                     AND COALESCE(NULLIF(TRIM(br.proof_image_url), ''), '') = ''
+                 ), 0)::numeric AS total_value_unpaid_no_proof
+          FROM billing_records br
+          JOIN orders o ON o.id = br.order_id
+          WHERE o.service_date BETWEEN $1::date AND $2::date
+            AND o.deleted_at IS NULL
+            AND o.status <> 'CANCELLED'
+        ) t;
+      `,
+        [from, to],
+      );
+      const row = this.parseJsonLine<{
+        total_number_billing: number;
+        total_value_billing: string | number;
+        total_number_unpaid_no_proof: number;
+        total_value_unpaid_no_proof: string | number;
+      }>(
+        out ||
+          '{"total_number_billing":0,"total_value_billing":0,"total_number_unpaid_no_proof":0,"total_value_unpaid_no_proof":0}',
+      );
+      return {
+        totalNumberBilling: Number(row.total_number_billing || 0),
+        totalValueBilling: Number(row.total_value_billing || 0),
+        totalNumberUnpaidNoProof: Number(row.total_number_unpaid_no_proof || 0),
+        totalValueUnpaidNoProof: Number(row.total_value_unpaid_no_proof || 0),
+      };
+    };
+    const billingYesterday = await getBillingPeriodMetrics(yesterday, yesterday);
+    const billingPastWeek = await getBillingPeriodMetrics(pastWeekStart, date);
+    const billingPastMonth = await getBillingPeriodMetrics(pastMonthStart, date);
 
     const pendingBillingCount = Number(await runSql(`
       SELECT count(*)::int
@@ -935,7 +1076,7 @@ export class CoreService {
       ) t;
     `);
     const today = new Date(date);
-    const birthdayHighlights = this.parseJsonLines<{ child_id: string; child_name: string; date_of_birth: string }>(birthdaysOut)
+    const birthdayToday = this.parseJsonLines<{ child_id: string; child_name: string; date_of_birth: string }>(birthdaysOut)
       .map((row) => {
         const dob = new Date(row.date_of_birth);
         const next = new Date(today.getFullYear(), dob.getMonth(), dob.getDate());
@@ -943,9 +1084,9 @@ export class CoreService {
         const daysUntil = Math.ceil((next.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
         return { ...row, days_until: daysUntil };
       })
-      .filter((row) => row.days_until <= 30)
+      .filter((row) => row.days_until === 0)
       .sort((a, b) => a.days_until - b.days_until)
-      .slice(0, 10);
+      .slice(0, 30);
 
     return {
       date,
@@ -957,8 +1098,30 @@ export class CoreService {
       todayTotalDishes,
       totalSales,
       yesterdayFailedOrUncheckedDelivery,
+      failedDeliveryByPerson,
+      menu: {
+        dishesTotalCreated: Number(menuTotals.dishes_total_created || 0),
+        dishesTotalActive: Number(menuTotals.dishes_total_active || 0),
+      },
+      delivery: {
+        today: todayDelivery,
+        yesterday: yesterdayDelivery,
+        tomorrow: tomorrowDelivery,
+        pastWeek: pastWeekDelivery,
+        pastMonth: pastMonthDelivery,
+      },
+      kitchen: {
+        nextBlackoutDay,
+        yesterday: kitchenYesterday,
+        pastWeek: kitchenPastWeek,
+      },
+      billing: {
+        yesterday: billingYesterday,
+        pastWeek: billingPastWeek,
+        pastMonth: billingPastMonth,
+      },
       pendingBillingCount,
-      birthdayHighlights,
+      birthdayHighlights: birthdayToday,
     };
   }
 
