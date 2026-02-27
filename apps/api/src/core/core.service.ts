@@ -805,10 +805,27 @@ export class CoreService {
                u.first_name,
                u.last_name,
                u.email,
-               count(pc.child_id)::int AS linked_children_count
+               count(DISTINCT pc.child_id)::int AS linked_children_count,
+               COALESCE(
+                 json_agg(
+                   DISTINCT jsonb_build_object(
+                     'id', c.id,
+                     'name', (uc.first_name || ' ' || uc.last_name),
+                     'school_name', s.name
+                   )
+                 ) FILTER (WHERE c.id IS NOT NULL),
+                 '[]'::json
+               ) AS youngsters,
+               COALESCE(
+                 array_agg(DISTINCT s.name) FILTER (WHERE s.name IS NOT NULL),
+                 '{}'::text[]
+               ) AS schools
         FROM parents p
         JOIN users u ON u.id = p.user_id
         LEFT JOIN parent_children pc ON pc.parent_id = p.id
+        LEFT JOIN children c ON c.id = pc.child_id AND c.deleted_at IS NULL
+        LEFT JOIN users uc ON uc.id = c.user_id
+        LEFT JOIN schools s ON s.id = c.school_id
         WHERE p.deleted_at IS NULL
           AND u.is_active = true
         GROUP BY p.id, p.user_id, u.username, u.first_name, u.last_name, u.email
@@ -827,8 +844,23 @@ export class CoreService {
                u.username,
                u.first_name,
                u.last_name,
+               u.phone_number,
+               u.email,
+               c.date_of_birth::text AS date_of_birth,
+               c.gender::text AS gender,
+               c.school_id,
                c.school_grade,
                s.name AS school_name,
+               COALESCE((
+                 SELECT cdr.restriction_details
+                 FROM child_dietary_restrictions cdr
+                 WHERE cdr.child_id = c.id
+                   AND cdr.is_active = true
+                   AND cdr.deleted_at IS NULL
+                   AND upper(cdr.restriction_label) = 'ALLERGIES'
+                 ORDER BY cdr.updated_at DESC NULLS LAST, cdr.created_at DESC
+                 LIMIT 1
+               ), '') AS dietary_allergies,
                coalesce(array_agg(pc.parent_id) FILTER (WHERE pc.parent_id IS NOT NULL), '{}') AS parent_ids
         FROM children c
         JOIN users u ON u.id = c.user_id
@@ -1623,7 +1655,7 @@ export class CoreService {
     const price = input.price === undefined ? Number(current.price || 0) : Number(input.price || 0);
     const rawImageUrl = input.imageUrl !== undefined
       ? input.imageUrl.trim()
-      : (String(current.image_url || '').trim() || '/schoolcatering/assets/hero-meal.jpg');
+      : String(current.image_url || '').trim();
     const ingredientIds = Array.isArray(input.ingredientIds)
       ? input.ingredientIds.filter(Boolean)
       : Array.isArray(current.ingredient_ids) ? current.ingredient_ids : [];
@@ -1634,7 +1666,7 @@ export class CoreService {
       input.packingRequirement === undefined ? (current.packing_requirement || '') : input.packingRequirement,
     );
 
-    if (!name || !description || !nutritionFactsText || !rawImageUrl.trim()) {
+    if (!name || !description || !nutritionFactsText) {
       throw new BadRequestException('Missing required menu item fields');
     }
     if (price < 0 || Number.isNaN(price)) {
@@ -1646,7 +1678,9 @@ export class CoreService {
     if (ingredientIds.length > 20) {
       throw new BadRequestException('Maximum 20 ingredients per dish');
     }
-    const imageUrl = await this.resolveMenuImageUrl(rawImageUrl, name);
+    const imageUrl = input.imageUrl !== undefined
+      ? await this.resolveMenuImageUrl(rawImageUrl, name)
+      : (rawImageUrl || '/schoolcatering/assets/hero-meal.jpg');
 
     const menuId = await this.ensureMenuForDateSession(serviceDate, session);
     await runSql(
@@ -4188,7 +4222,22 @@ export class CoreService {
 
   // ─── Missing CRUD: Youngster ─────────────────────────────────────────────
 
-  async updateYoungsterProfile(actor: AccessUser, youngsterId: string, input: { firstName?: string; lastName?: string; schoolGrade?: string; schoolId?: string; gender?: string }) {
+  async updateYoungsterProfile(
+    actor: AccessUser,
+    youngsterId: string,
+    input: {
+      firstName?: string;
+      lastName?: string;
+      phoneNumber?: string;
+      email?: string;
+      dateOfBirth?: string;
+      schoolGrade?: string;
+      schoolId?: string;
+      gender?: string;
+      parentId?: string;
+      allergies?: string;
+    },
+  ) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     this.assertValidUuid(youngsterId, 'youngsterId');
     const out = await runSql(
@@ -4204,6 +4253,8 @@ export class CoreService {
     const userParams: unknown[] = [];
     if (input.firstName) { userParams.push(input.firstName.trim()); userUpdates.push(`first_name = $${userParams.length}`); }
     if (input.lastName) { userParams.push(input.lastName.trim()); userUpdates.push(`last_name = $${userParams.length}`); }
+    if (input.phoneNumber) { userParams.push(input.phoneNumber.trim()); userUpdates.push(`phone_number = $${userParams.length}`); }
+    if (input.email !== undefined) { userParams.push(input.email.trim().toLowerCase() || null); userUpdates.push(`email = $${userParams.length}`); }
     if (userUpdates.length > 0) {
       userUpdates.push('updated_at = now()');
       userParams.push(child.user_id);
@@ -4214,10 +4265,46 @@ export class CoreService {
     if (input.schoolGrade) { childParams.push(input.schoolGrade.trim()); childUpdates.push(`school_grade = $${childParams.length}`); }
     if (input.schoolId) { this.assertValidUuid(input.schoolId, 'schoolId'); childParams.push(input.schoolId); childUpdates.push(`school_id = $${childParams.length}`); }
     if (input.gender) { childParams.push(input.gender.toUpperCase()); childUpdates.push(`gender = $${childParams.length}::gender_type`); }
+    if (input.dateOfBirth) { childParams.push(this.validateServiceDate(input.dateOfBirth)); childUpdates.push(`date_of_birth = $${childParams.length}::date`); }
     if (childUpdates.length > 0) {
       childUpdates.push('updated_at = now()');
       childParams.push(youngsterId);
       await runSql(`UPDATE children SET ${childUpdates.join(', ')} WHERE id = $${childParams.length};`, childParams);
+    }
+    if (input.parentId) {
+      this.assertValidUuid(input.parentId, 'parentId');
+      await runSql(
+        `INSERT INTO parent_children (parent_id, child_id)
+         VALUES ($1, $2)
+         ON CONFLICT (parent_id, child_id) DO NOTHING;`,
+        [input.parentId, youngsterId],
+      );
+    }
+    if (input.allergies !== undefined) {
+      const details = input.allergies.trim();
+      if (!details) {
+        await runSql(
+          `UPDATE child_dietary_restrictions
+           SET is_active = false,
+               deleted_at = now(),
+               updated_at = now()
+           WHERE child_id = $1
+             AND upper(restriction_label) = 'ALLERGIES'
+             AND deleted_at IS NULL;`,
+          [youngsterId],
+        );
+      } else {
+        await runSql(
+          `INSERT INTO child_dietary_restrictions (child_id, restriction_label, restriction_details, is_active)
+           VALUES ($1, 'ALLERGIES', $2, true)
+           ON CONFLICT (child_id, restriction_label)
+           DO UPDATE SET restriction_details = EXCLUDED.restriction_details,
+                         is_active = true,
+                         deleted_at = NULL,
+                         updated_at = now();`,
+          [youngsterId, details],
+        );
+      }
     }
     return { ok: true };
   }
@@ -4239,6 +4326,40 @@ export class CoreService {
     return { ok: true };
   }
 
+  async adminResetUserPassword(actor: AccessUser, userId: string, newPasswordRaw?: string) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    this.assertValidUuid(userId, 'userId');
+    const out = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT id, username, role::text AS role
+        FROM users
+        WHERE id = $1
+          AND deleted_at IS NULL
+        LIMIT 1
+      ) t;
+    `,
+      [userId],
+    );
+    if (!out) throw new NotFoundException('User not found');
+    const target = this.parseJsonLine<{ id: string; username: string; role: string }>(out);
+    if (!['PARENT', 'YOUNGSTER'].includes(target.role)) {
+      throw new BadRequestException('Only PARENT and YOUNGSTER password reset is allowed here');
+    }
+    const newPassword = (newPasswordRaw || '').trim() || randomUUID().slice(0, 10);
+    if (newPassword.length < 6) throw new BadRequestException('Password too short');
+    const passwordHash = this.hashPassword(newPassword);
+    await runSql(
+      `UPDATE users
+       SET password_hash = $1,
+           updated_at = now()
+       WHERE id = $2;`,
+      [passwordHash, userId],
+    );
+    return { ok: true, userId, username: target.username, role: target.role, newPassword };
+  }
+
   // ─── Missing CRUD: Ingredients ───────────────────────────────────────────
 
   async createIngredient(actor: AccessUser, input: { name?: string; allergenFlag?: boolean }) {
@@ -4247,16 +4368,20 @@ export class CoreService {
     if (!name) throw new BadRequestException('name is required');
     const allergenFlag = input.allergenFlag === true;
     const out = await runSql(
-      `WITH inserted AS (
+      `WITH upserted AS (
          INSERT INTO ingredients (name, allergen_flag, is_active)
          VALUES ($1, $2, true)
-         ON CONFLICT (name) DO NOTHING
+         ON CONFLICT (name)
+         DO UPDATE SET allergen_flag = (ingredients.allergen_flag OR EXCLUDED.allergen_flag),
+                       is_active = true,
+                       deleted_at = NULL,
+                       updated_at = now()
          RETURNING id, name, allergen_flag, is_active
        )
-       SELECT row_to_json(inserted)::text FROM inserted;`,
+       SELECT row_to_json(upserted)::text FROM upserted;`,
       [name, allergenFlag],
     );
-    if (!out) throw new BadRequestException('Ingredient already exists or failed to create');
+    if (!out) throw new BadRequestException('Failed to create ingredient');
     return this.parseJsonLine(out);
   }
 

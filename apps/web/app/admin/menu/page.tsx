@@ -227,7 +227,7 @@ export default function AdminMenuPage() {
     });
   };
 
-  const onToggleMasterIngredient = async (masterName: string) => {
+  const onPickMasterIngredient = async (masterName: string) => {
     let mappedId = ingredientIdByNormalizedName.get(normalize(masterName));
     if (!mappedId) {
       try {
@@ -251,7 +251,15 @@ export default function AdminMenuPage() {
       setMessage(`Ingredient auto-created: ${toLabel(masterName)}`);
     }
     setError('');
-    onToggleIngredient(mappedId);
+    const ingredientId = mappedId;
+    setItemIngredientIds((prev) => {
+      if (prev.includes(ingredientId)) return prev;
+      if (prev.length >= ingredientLimit) {
+        setError(`Maximum ${ingredientLimit} ingredients per dish.`);
+        return prev;
+      }
+      return [...prev, ingredientId];
+    });
   };
 
   const onAutoCreateDishFromMaster = async (dish: string) => {
@@ -394,7 +402,6 @@ export default function AdminMenuPage() {
 
           <div className="ingredient-selected-box">
             <strong>Dishes</strong>
-            <small>Dish Name: {itemName || '-'}</small>
             <div className="ingredient-chip-wrap">
               {filteredMasterDishes.slice(0, 160).map((dish) => (
                 <button
@@ -445,10 +452,10 @@ export default function AdminMenuPage() {
                   key={i.key}
                   type="button"
                   className={`btn ${active ? 'btn-primary' : 'btn-outline'}`}
-                  onClick={() => void onToggleMasterIngredient(i.key)}
-                  title={mappedId ? 'Click to add/remove ingredient' : 'Click to auto-create and add ingredient'}
+                  onClick={() => void onPickMasterIngredient(i.key)}
+                  title={mappedId ? 'Click to add ingredient' : 'Click to auto-create and add ingredient'}
                 >
-                  {i.label}{mappedId ? '' : ' (not linked)'}
+                  {i.label}
                 </button>
               );
             })}

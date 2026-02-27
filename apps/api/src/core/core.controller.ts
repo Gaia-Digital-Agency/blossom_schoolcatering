@@ -115,7 +115,18 @@ export class CoreController {
   updateYoungsterProfile(
     @Req() req: AuthRequest,
     @Param('youngsterId', ParseUUIDPipe) youngsterId: string,
-    @Body() body: { firstName?: string; lastName?: string; schoolGrade?: string; schoolId?: string; gender?: string },
+    @Body() body: {
+      firstName?: string;
+      lastName?: string;
+      phoneNumber?: string;
+      email?: string;
+      dateOfBirth?: string;
+      schoolGrade?: string;
+      schoolId?: string;
+      gender?: string;
+      parentId?: string;
+      allergies?: string;
+    },
   ) {
     return this.coreService.updateYoungsterProfile(req.user, youngsterId, body);
   }
@@ -124,6 +135,16 @@ export class CoreController {
   @Roles('ADMIN')
   deleteYoungster(@Req() req: AuthRequest, @Param('youngsterId', ParseUUIDPipe) youngsterId: string) {
     return this.coreService.deleteYoungster(req.user, youngsterId);
+  }
+
+  @Patch('admin/users/:userId/reset-password')
+  @Roles('ADMIN')
+  adminResetUserPassword(
+    @Req() req: AuthRequest,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Body() body: { newPassword?: string },
+  ) {
+    return this.coreService.adminResetUserPassword(req.user, userId, body.newPassword);
   }
 
   @Get('admin/dashboard')
