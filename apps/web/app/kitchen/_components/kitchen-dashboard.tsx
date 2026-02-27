@@ -119,7 +119,7 @@ export default function KitchenDashboard({
   }, [serviceDate]);
 
   return (
-    <main className="page-auth page-auth-desktop">
+    <main className={`page-auth page-auth-desktop ${showOrderBoards ? '' : 'kitchen-compact-view'}`}>
       <section className="auth-panel">
         <h1>{title}</h1>
         <p className="auth-help">Auto refresh every 60 minutes during 05:00-21:00 (Asia/Makassar). Service date: {serviceDate}</p>
@@ -238,13 +238,21 @@ export default function KitchenDashboard({
       <style jsx>{`
         .kitchen-top-actions {
           display: flex;
-          gap: 0.5rem;
+          gap: 0.8rem;
           flex-wrap: nowrap;
           overflow-x: auto;
-          padding-bottom: 0.2rem;
+          padding-bottom: 0.35rem;
+          margin-bottom: 0.35rem;
         }
         .kitchen-top-actions :global(.btn) {
           white-space: nowrap;
+          min-height: 2.4rem;
+          padding-inline: 0.95rem;
+          border-radius: 0.65rem;
+        }
+        .kitchen-compact-view {
+          place-items: start center;
+          padding-top: 1.2rem;
         }
         .kitchen-table-wrap {
           overflow-x: auto;

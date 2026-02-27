@@ -1,12 +1,18 @@
 # Contact Us User Guide
 
-## Operations Contact
-- Contact school catering operations for day-to-day order and delivery support
+## Main Contact
+- Restaurant: Blossom Steakhouse Sanur
+- Phone: `+62 822-4746-2756`
+- Email: `blossomsteakhousebali@gmail.com`
 
-## Admin Contact
-- Contact admin support for account, mapping, menu, and billing administration issues
+## Address
+- Jl. Danau Tamblingan No. 196, Sanur, Denpasar Selatan, Bali
 
-## When Reporting Issues
-- Include route URL
-- Include user role used
-- Include date/session/order id when relevant
+## Operating Hours
+- Daily: `08:00` to `00:00`
+
+## What to Include When Contacting Support
+- Route URL (example: `/schoolcatering/kitchen/today`)
+- User role (`PARENT`, `YOUNGSTER`, `DELIVERY`, `KITCHEN`, `ADMIN`)
+- Service date/session and order ID (if available)
+- Short issue summary and screenshot

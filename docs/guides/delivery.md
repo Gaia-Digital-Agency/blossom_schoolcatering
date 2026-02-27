@@ -4,13 +4,12 @@
 - Open `/schoolcatering/delivery/login`
 - Sign in with delivery credentials
 
-## Main Delivery Page
+## Main Page
 - Open `/schoolcatering/delivery`
-- Mobile-first page with vertical scrolling only (no horizontal scroll)
 - Pick a `Date` and use `Past / Today / Future` quick buttons
 - Click `Refresh Assignments` to reload the selected day
 
-## Assignment Visibility Rules
+## Assignment Visibility
 - Delivery user can only see assignments mapped to their active school(s)
 - Assignments are grouped by `School Name` with visible school headers
 - Orders from schools not mapped to the logged-in delivery user are hidden
@@ -24,11 +23,10 @@
 - Parent name
 - Current delivery/confirmation status
 
-## Complete/Undo Flow
-- Button is a toggle:
+## Complete and Undo
 - `Mark Complete` sets the assignment as delivered
 - `Completed (Click to Undo)` reverts it back to assigned
-- Toggle updates order + billing delivery status in sync
+- Toggle updates order and billing delivery status together
 - Only your own assignments can be toggled
 
 ## Admin Dependency

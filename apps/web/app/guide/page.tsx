@@ -10,11 +10,10 @@ type GuideItem = {
 const GUIDE_ITEMS: GuideItem[] = [
   { title: 'User Guide: Parent', file: 'parents.md' },
   { title: 'User Guide: Youngster', file: 'youngsters.md' },
+  { title: 'User Guide: Register (Youngster + Parent)', file: 'register.md' },
   { title: 'User Guide: Delivery', file: 'delivery.md' },
   { title: 'User Guide: Kitchen', file: 'kitchen.md' },
-  { title: 'User Guide: Billing & Payment', file: 'billing-payment.md' },
-  { title: 'User Guide: Menu', file: 'menu.md' },
-  { title: 'User Guide: Terms & Condition', file: 'terms-and-condition.md' },
+  { title: 'Terms and Conditions', file: 'terms-and-condition.md' },
   { title: 'User Guide: Contact Us', file: 'contact-us.md' },
 ];
 
@@ -46,6 +45,16 @@ export default async function GuidePage() {
             </details>
           ))}
         </div>
+
+        <section className="module-section">
+          <h2>Guides In Progress</h2>
+          <p className="auth-help">Remaining guides to be finalized:</p>
+          <ul>
+            <li>Admin</li>
+            <li>Billing &amp; Payment</li>
+            <li>Menu</li>
+          </ul>
+        </section>
 
         <div className="dev-links">
           <Link href="/">Back to Home</Link>

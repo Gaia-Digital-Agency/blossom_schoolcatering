@@ -7,23 +7,22 @@
 ## Main Parent Page
 - Open `/schoolcatering/parents`
 - Select a youngster in `Linked Youngsters`
-- All key sections below are scoped by selected youngster (orders, billing, spending child rows)
+- All key sections are scoped to the selected youngster
 
 ## Linked Youngsters
-- Parent-side youngster registration is not required on this page
 - Youngster registration is done at `/schoolcatering/register/youngsters`
-- Youngster registration creates or links the parent account and links youngster + parent automatically
+- Registration creates or links the parent account and links youngster + parent automatically
 
 ## Ordering
 - Set `Service Date` and `Session`
 - Use `Search Name Of Dish`
-- Optional checkbox:
-- `Favourites Only (Optional)` shows only dishes that exist in saved favourite combos
+- Optional filter:
+- `Favourites Only (Optional)` shows dishes from saved favourite combos
 - Click `Add` on a dish in `Search Results`
 - Added dishes appear in `Draft Section`
-- In `Draft Section`, you can change quantity or `Remove` dish before confirmation
-- Place order from `Draft Section` (`Place Order`)
-- Max 5 items per cart/order
+- In `Draft Section`, change quantity or `Remove` before confirmation
+- Place order from `Draft Section` with `Place Order`
+- Max `5` dishes per cart/order
 - Edit or delete order before cutoff window closes
 
 ## Useful Features
@@ -36,11 +35,9 @@
 - Billing consolidated page
 - Upload proof of payment and download receipt after verification
 
-## Notes On Features
-- `Favourite Meal Combos`
-- Saves reusable item templates and can be applied to cart
-- `Meal Plan Wizard`
-- Copies one existing order to multiple target dates in one run
+## Key Notes
+- `Favourite Meal Combos` stores reusable dish templates for faster ordering
+- `Meal Plan Wizard` copies one order to multiple dates in one flow
 
 ## Rules
 - Weekend and blackout order blocks are enforced

@@ -9,7 +9,7 @@
 - View profile summary (name, school, grade)
 - View weekly nutrition and Clean Plate Club badge
 - Use `Session Menu and Cart` to order meals
-- Use `Update Registration Details` small button at bottom-left (above footer) to open registration update flow
+- Use `Update Registration Details` to open registration update flow
 
 ## Ordering
 - Set `Service Date`
@@ -22,6 +22,7 @@
 - Change quantity or `Remove` item before placing order
 - Place order with `Place Order`
 - Use `Resume Draft` / `Discard Draft` when draft cart exists
+- Max `5` dishes per cart/order
 
 ## Insights
 - Nutrition summary (weekly)
