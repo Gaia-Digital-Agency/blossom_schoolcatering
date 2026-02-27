@@ -5,31 +5,37 @@ import path from 'path';
 type GuideItem = {
   title: string;
   file: string;
+  content: string;
 };
 
-const GUIDE_ITEMS: GuideItem[] = [
-  { title: 'User Guide: Parent', file: 'parents.md' },
-  { title: 'User Guide: Youngster', file: 'youngsters.md' },
-  { title: 'User Guide: Register (Youngster + Parent)', file: 'register.md' },
-  { title: 'User Guide: Delivery', file: 'delivery.md' },
-  { title: 'User Guide: Kitchen', file: 'kitchen.md' },
-  { title: 'Terms and Conditions', file: 'terms-and-condition.md' },
-  { title: 'User Guide: Contact Us', file: 'contact-us.md' },
-];
+function titleFromContent(file: string, content: string) {
+  const match = content.match(/^#\s+(.+)$/m);
+  if (match?.[1]) return match[1].trim();
+  return file.replace(/\.md$/i, '').replace(/[-_]/g, ' ');
+}
 
-async function readGuide(file: string) {
-  const full = path.join(process.cwd(), 'docs', 'guides', file);
+async function loadGuides(): Promise<GuideItem[]> {
+  const guidesDir = path.join(process.cwd(), 'docs', 'guides');
+  let files: string[] = [];
   try {
-    return await fs.readFile(full, 'utf8');
+    files = (await fs.readdir(guidesDir)).filter((name) => name.toLowerCase().endsWith('.md'));
   } catch {
-    return 'Guide content is not available yet.';
+    return [];
   }
+
+  const guides = await Promise.all(
+    files.map(async (file) => {
+      const full = path.join(guidesDir, file);
+      const content = await fs.readFile(full, 'utf8');
+      return { file, title: titleFromContent(file, content), content };
+    }),
+  );
+
+  return guides.sort((a, b) => a.title.localeCompare(b.title));
 }
 
 export default async function GuidePage() {
-  const guides = await Promise.all(
-    GUIDE_ITEMS.map(async (item) => ({ ...item, content: await readGuide(item.file) })),
-  );
+  const guides = await loadGuides();
 
   return (
     <main className="page-auth page-auth-mobile">
@@ -38,23 +44,15 @@ export default async function GuidePage() {
         <p className="auth-help">Tap each section to expand guide content.</p>
 
         <div className="guide-list">
-          {guides.map((guide) => (
+          {guides.length === 0 ? (
+            <p className="auth-help">No guides available in `docs/guides`.</p>
+          ) : guides.map((guide) => (
             <details key={guide.file}>
               <summary>{guide.title}</summary>
               <pre className="guide-content">{guide.content}</pre>
             </details>
           ))}
         </div>
-
-        <section className="module-section">
-          <h2>Guides In Progress</h2>
-          <p className="auth-help">Remaining guides to be finalized:</p>
-          <ul>
-            <li>Admin</li>
-            <li>Billing &amp; Payment</li>
-            <li>Menu</li>
-          </ul>
-        </section>
 
         <div className="dev-links">
           <Link href="/">Back to Home</Link>
