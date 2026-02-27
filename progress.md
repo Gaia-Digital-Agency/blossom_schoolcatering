@@ -1,5 +1,23 @@
 # Progress Update
 
+## 2026-02-27 (Validation rollout + guides finalization + UAT expansion)
+- Completed API request validation migration:
+  - introduced DTO classes for auth/core body payloads
+  - enabled global NestJS `ValidationPipe` (`whitelist`, `transform`, implicit conversion)
+  - converted `CartItemInput` to decorated class-validator model
+  - cleaned duplicated request-shape checks from service layer while preserving business-rule checks
+- Updated and finalized role guides under `docs/guides`:
+  - Admin, Report, Parent, Youngster, Delivery, Kitchen, Billing, Menu
+  - synchronized guide wording with current routes and UI actions
+- Updated site guide page:
+  - `apps/web/app/guide/page.tsx` now loads markdown from `docs/guides/*`
+  - added per-guide `Last updated` label using markdown file timestamps
+- Expanded UAT scenario set:
+  - extended `user_test.md` from `UAT-18` to `UAT-30`
+  - added coverage for admin dashboard/reports/billing/menu, kitchen operations, delivery assignment/toggle, parent flows, and youngster flows
+- Local verification:
+  - `npm run build` passed (`apps/web` + `apps/api`)
+
 ## 2026-02-26 (Production fixes + exhaustive seed/testing + docs sync)
 - Applied and deployed real production fixes for SQL runtime issues:
   - `apps/api/src/auth/auth.service.ts`

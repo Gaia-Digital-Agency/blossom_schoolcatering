@@ -1,7 +1,7 @@
 # Blossom School Catering
 
 Creation date: 2026-02-24  
-Last updated: 2026-02-26  
+Last updated: 2026-02-27  
 Developed by Gaiada.com (C) 2026  
 Repository: `git@github.com-net1io:Gaia-Digital-Agency/blossom_schoolcatering.git`
 
@@ -57,6 +57,19 @@ Blossom School Catering is a mobile-first school meal ordering app for Bali scho
 - Known production gaps still open:
   - missing CRUD endpoints for some admin entities (parent, youngster, ingredient, school create/delete, delivery deactivate/delete, menu delete)
   - receipt generation requires Google credential env to be set on runtime host
+
+## Latest Verified State (2026-02-27)
+- API request validation hardening completed:
+  - DTO-based body validation added across auth/core controllers
+  - global `ValidationPipe` enabled (`whitelist`, `transform`, implicit conversion)
+  - request-shape guards reduced in services to keep business-rule checks focused
+- Guide system finalized:
+  - role guides updated for Admin, Billing, Report, Kitchen, Delivery, Parent, Youngster, Menu
+  - `/guide` page now reads markdown from `docs/guides/*` dynamically
+  - each guide section shows `Last updated` based on markdown file timestamp
+- UAT plan extended and aligned to runtime modules:
+  - `UAT-18` to `UAT-30` now cover admin, reports, billing, menu, kitchen, delivery, parent, and youngster critical flows
+  - execution template expanded with matching rows through `UAT-30`
 
 ## Implemented Status (Current)
 ### 1) Baseline + Infra
