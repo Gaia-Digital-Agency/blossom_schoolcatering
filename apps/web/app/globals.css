@@ -496,6 +496,12 @@ button:hover,
   overflow-x: hidden;
 }
 
+.page-auth-desktop {
+  align-items: start;
+  padding-top: 1.5rem;
+  padding-bottom: 1.5rem;
+}
+
 .parents-page .auth-panel,
 .youngsters-page .auth-panel,
 .page-auth-desktop .auth-panel {

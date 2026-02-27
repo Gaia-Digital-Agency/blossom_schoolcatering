@@ -69,6 +69,10 @@ export default function AdminNav() {
             gap: 0.9rem;
           }
         }
+        .admin-nav-links {
+          grid-template-columns: minmax(0, 1fr);
+          margin-bottom: 0;
+        }
         .admin-nav-links :global(.admin-nav-item) {
           border: 1px solid #ccbda2;
           background: #fff;

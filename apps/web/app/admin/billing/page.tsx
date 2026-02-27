@@ -60,7 +60,7 @@ export default function AdminBillingPage() {
   };
 
   return (
-    <main className="page-auth">
+    <main className="page-auth page-auth-desktop">
       <section className="auth-panel">
         <h1>Admin Billing</h1>
         <AdminNav />

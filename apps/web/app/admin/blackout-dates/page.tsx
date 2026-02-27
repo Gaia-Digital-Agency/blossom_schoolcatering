@@ -86,7 +86,7 @@ export default function AdminBlackoutDatesPage() {
   };
 
   return (
-    <main className="page-auth">
+    <main className="page-auth page-auth-desktop">
       <section className="auth-panel">
         <h1>Admin Blackout Dates</h1>
         <AdminNav />

@@ -121,7 +121,7 @@ export default function AdminSchoolsPage() {
   };
 
   return (
-    <main className="page-auth">
+    <main className="page-auth page-auth-desktop">
       <section className="auth-panel">
         <h1>Admin Schools</h1>
         <AdminNav />
