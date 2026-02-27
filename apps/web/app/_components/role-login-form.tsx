@@ -3,6 +3,7 @@
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Role, getApiBase, setAuthState } from '../../lib/auth';
+import PasswordInput from './password-input';
 
 type Props = {
   role: Role;
@@ -60,7 +61,7 @@ export default function RoleLoginForm({
           </label>
           <label>
             Password
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} />
           </label>
           {error ? <p className="auth-error">{error}</p> : null}
           <button className="btn btn-primary" disabled={loading} type="submit">

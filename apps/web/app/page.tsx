@@ -26,9 +26,7 @@ export default function HomePage() {
             Menu
           </button>
           <nav className={`nav ${open ? 'open' : ''}`}>
-            <Link href="/">Home</Link>
-            <Link href="/login">Login</Link>
-            <Link href="/register">Register</Link>
+            <Link href="/guide">Guides and T&amp;C</Link>
           </nav>
         </header>
 
@@ -42,7 +40,7 @@ export default function HomePage() {
             </p>
             <div className="auth-grid">
               <Link className="btn btn-primary" href="/login">Log In</Link>
-              <Link className="btn btn-outline" href="/register">Register</Link>
+              <Link className="btn btn-outline" href="/register/youngsters">Register</Link>
               <GoogleOAuthButton role="PARENT" redirectPath="/dashboard" className="google-oauth-wrap" />
             </div>
           </section>

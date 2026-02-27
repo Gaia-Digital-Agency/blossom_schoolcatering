@@ -3,6 +3,7 @@
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getApiBase, setAuthState } from '../../../lib/auth';
+import PasswordInput from '../../_components/password-input';
 
 type RegisterRole = 'PARENT' | 'YOUNGSTER' | 'DELIVERY';
 
@@ -90,13 +91,7 @@ export default function RegisterForm({ role, allowedRoles, title, subtitle }: Re
           </label>
           <label>
             Password
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              minLength={6}
-              required
-            />
+            <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} minLength={6} required />
           </label>
           <label>
             First Name

@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { apiFetch, SessionExpiredError } from '../../../lib/auth';
+import { fileToWebpDataUrl } from '../../../lib/image';
 import AdminNav from '../_components/admin-nav';
 
 type Ingredient = { id: string; name: string; allergen_flag: boolean; is_active: boolean };
@@ -93,13 +94,14 @@ export default function AdminMenuPage() {
 
   const onImageUpload = async (file?: File | null) => {
     if (!file) return;
-    const asDataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ''));
-      reader.onerror = () => reject(new Error('Failed reading image file'));
-      reader.readAsDataURL(file);
-    });
-    setItemImageUrl(asDataUrl);
+    setError('');
+    try {
+      const asWebpDataUrl = await fileToWebpDataUrl(file);
+      setItemImageUrl(asWebpDataUrl);
+      setMessage('Image converted to WebP.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed converting image to WebP');
+    }
   };
 
   const onSaveItem = async (e: FormEvent) => {
@@ -195,8 +197,8 @@ export default function AdminMenuPage() {
           <label>Price (IDR)<input type="number" min={0} step={100} value={itemPrice} onChange={(e) => setItemPrice(e.target.value)} required /></label>
           <label>Calories (kcal)<input type="number" min={0} step={1} value={itemCaloriesKcal} onChange={(e) => setItemCaloriesKcal(e.target.value)} placeholder="leave empty for TBA" /></label>
           <label>Display Order<input type="number" min={0} value={itemDisplayOrder} onChange={(e) => setItemDisplayOrder(e.target.value)} required /></label>
-          <label>Image URL / Data URL<input value={itemImageUrl} onChange={(e) => setItemImageUrl(e.target.value)} required /></label>
-          <label>Upload Image<input type="file" accept="image/*" onChange={(e) => onImageUpload(e.target.files?.[0])} /></label>
+          <label>Image URL / Data URL (WebP only)<input value={itemImageUrl} onChange={(e) => setItemImageUrl(e.target.value)} required /></label>
+          <label>Upload Image (auto WebP)<input type="file" accept="image/*" onChange={(e) => onImageUpload(e.target.files?.[0])} /></label>
           <label>Ingredient Search
             <input
               value={ingredientSearch}

@@ -236,6 +236,9 @@ export class CoreService {
       if (!parsed.contentType.startsWith('image/')) {
         throw new BadRequestException('Menu image must be an image');
       }
+      if (parsed.contentType.toLowerCase() !== 'image/webp') {
+        throw new BadRequestException('Menu image upload must be WebP');
+      }
       if (parsed.data.length > 5 * 1024 * 1024) {
         throw new BadRequestException('Menu image exceeds size limit (5MB)');
       }
@@ -248,6 +251,9 @@ export class CoreService {
         cacheControl: 'public, max-age=86400',
       });
       return uploaded.publicUrl;
+    }
+    if (/^https?:\/\//i.test(trimmed) && !/\.webp(\?|#|$)/i.test(trimmed)) {
+      throw new BadRequestException('Menu image URL must be WebP');
     }
     return trimmed;
   }
@@ -2543,6 +2549,9 @@ export class CoreService {
       if (!parsed.contentType.startsWith('image/')) {
         throw new BadRequestException('Proof upload must be an image');
       }
+      if (parsed.contentType.toLowerCase() !== 'image/webp') {
+        throw new BadRequestException('Proof upload must be WebP');
+      }
       if (parsed.data.length > 5 * 1024 * 1024) {
         throw new BadRequestException('Proof image exceeds size limit (5MB)');
       }
@@ -2557,6 +2566,8 @@ export class CoreService {
       proofUrl = uploaded.publicUrl;
     } else if (!/^https?:\/\//i.test(proof)) {
       throw new BadRequestException('proofImageData must be a data URL image or an http(s) URL');
+    } else if (!/\.webp(\?|#|$)/i.test(proof)) {
+      throw new BadRequestException('Proof image URL must be WebP');
     }
 
     await runSql(

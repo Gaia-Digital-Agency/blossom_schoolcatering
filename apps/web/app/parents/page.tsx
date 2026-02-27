@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch, SessionExpiredError } from '../../lib/auth';
+import { fileToWebpDataUrl } from '../../lib/image';
 
 type Child = {
   id: string;
@@ -352,7 +353,7 @@ export default function ParentsPage() {
 
   const onUploadProof = async (billingId: string) => {
     const proof = (billingProof[billingId] || '').trim();
-    if (!proof) return setError('Enter proof image URL or data URL first.');
+    if (!proof) return setError('Upload/select a proof image first.');
     setError(''); setMessage('');
     try {
       await apiFetch(`/billing/${billingId}/proof-upload`, {
@@ -363,6 +364,19 @@ export default function ParentsPage() {
       await loadBilling();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Proof upload failed');
+    }
+  };
+
+  const onProofImageUpload = async (billingId: string, file?: File | null) => {
+    if (!file) return;
+    setError('');
+    setMessage('');
+    try {
+      const webpDataUrl = await fileToWebpDataUrl(file);
+      setBillingProof((prev) => ({ ...prev, [billingId]: webpDataUrl }));
+      setMessage('Proof image converted to WebP.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed converting proof image to WebP');
     }
   };
 
@@ -586,8 +600,12 @@ export default function ParentsPage() {
                   <input
                     value={billingProof[b.id] || ''}
                     onChange={(e) => setBillingProof((prev) => ({ ...prev, [b.id]: e.target.value }))}
-                    placeholder="proof image URL or data URL"
+                    placeholder="proof image data URL (auto WebP when uploaded below)"
                   />
+                  <label>
+                    Upload Proof Image (auto WebP)
+                    <input type="file" accept="image/*" onChange={(e) => onProofImageUpload(b.id, e.target.files?.[0])} />
+                  </label>
                   <button className="btn btn-outline" type="button" onClick={() => onUploadProof(b.id)}>
                     Upload Proof
                   </button>

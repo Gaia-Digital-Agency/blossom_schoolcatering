@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
 import { ACCESS_KEY, getApiBase } from '../../lib/auth';
+import PasswordInput from './password-input';
 
 type DevPageProps = {
   title: string;
@@ -68,22 +69,11 @@ export default function DevPage({ title, description }: DevPageProps) {
         <form className="auth-form" onSubmit={onChangePassword}>
           <label>
             Current Password
-            <input
-              type="password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              required
-            />
+            <PasswordInput value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
           </label>
           <label>
             New Password
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              minLength={6}
-              required
-            />
+            <PasswordInput value={newPassword} onChange={(e) => setNewPassword(e.target.value)} minLength={6} required />
           </label>
           {message ? <p className="auth-help">{message}</p> : null}
           <button className="btn btn-primary" type="submit" disabled={saving}>

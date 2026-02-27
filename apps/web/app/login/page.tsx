@@ -3,13 +3,12 @@
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getApiBase, setAuthState } from '../../lib/auth';
-import GoogleOAuthButton from '../_components/google-oauth-button';
+import PasswordInput from '../_components/password-input';
 
 export default function LoginPage() {
   const router = useRouter();
   const [username, setUsername] = useState('parent');
   const [password, setPassword] = useState('parent123');
-  const [role, setRole] = useState('PARENT');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -22,10 +21,10 @@ export default function LoginPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ username, password, role }),
+        body: JSON.stringify({ username, password }),
       });
       if (!res.ok) {
-        throw new Error('Invalid username/password/role');
+        throw new Error('Invalid username/password');
       }
       const data = await res.json();
       setAuthState(data.accessToken, data.user.role);
@@ -43,11 +42,12 @@ export default function LoginPage() {
         <h1>Home Login</h1>
         <p className="auth-help">Use this page for Parent and Youngster login.</p>
         <div className="quick-credentials" aria-label="Quick Credentials">
-          <p><strong>Parent:</strong> parent / parent123</p>
-          <p><strong>Youngster:</strong> youngster / youngster123</p>
-          <p><strong>Admin:</strong> use /admin/login</p>
-          <p><strong>Kitchen:</strong> use /kitchen/login</p>
-          <p><strong>Delivery:</strong> use /delivery/login</p>
+          <p><strong>Youngster Register:</strong> url: /register/youngsters (view only)</p>
+          <p><strong>Youngster Login:</strong> url: /login | user: youngster | pw: youngster123</p>
+          <p><strong>Parent Login:</strong> url: /login | user: parent | pw: parent123</p>
+          <p><strong>Delivery Login:</strong> url: /delivery/login | user: delivery | pw: delivery123</p>
+          <p><strong>Kitchen Login:</strong> url: /kitchen/login | user: kitchen | pw: kitchen123</p>
+          <p><strong>Admin Login:</strong> url: /admin/login | user: admin | pw: admin123</p>
         </div>
         <form onSubmit={onSubmit} className="auth-form">
           <label>
@@ -56,23 +56,13 @@ export default function LoginPage() {
           </label>
           <label>
             Password
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-          </label>
-          <label>
-            Role
-            <select value={role} onChange={(e) => setRole(e.target.value)}>
-              <option value="PARENT">PARENT</option>
-              <option value="YOUNGSTER">YOUNGSTER</option>
-            </select>
+            <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} />
           </label>
           {error ? <p className="auth-error">{error}</p> : null}
           <button className="btn btn-primary" disabled={loading} type="submit">
             {loading ? 'Signing In...' : 'Sign In'}
           </button>
         </form>
-        <div className="auth-form" style={{ marginTop: '0.8rem' }}>
-          <GoogleOAuthButton role={role as 'PARENT' | 'YOUNGSTER'} redirectPath="/dashboard" />
-        </div>
       </section>
     </main>
   );

@@ -424,6 +424,61 @@ button:hover,
   min-width: 0;
 }
 
+.password-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.4rem;
+  align-items: center;
+  width: 100%;
+}
+
+.password-field input {
+  width: 100%;
+  min-width: 0;
+}
+
+.password-toggle {
+  min-height: 2.4rem;
+  white-space: nowrap;
+  padding: 0.35rem 0.65rem;
+}
+
+.guide-list {
+  display: grid;
+  gap: 0.55rem;
+  margin-bottom: 0.9rem;
+}
+
+.guide-list details {
+  border: 1px solid #d8cab1;
+  border-radius: 0.55rem;
+  background: #fff;
+  padding: 0.5rem 0.7rem;
+}
+
+.guide-list summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.guide-list p {
+  margin: 0.45rem 0 0;
+}
+
+.parents-page,
+.youngsters-page,
+.delivery-page,
+.page-auth-desktop {
+  width: 100%;
+  overflow-x: hidden;
+}
+
+.parents-page .auth-panel,
+.youngsters-page .auth-panel,
+.page-auth-desktop .auth-panel {
+  max-width: 100%;
+}
+
 .auth-form button,
 .auth-form .btn {
   max-width: 100%;

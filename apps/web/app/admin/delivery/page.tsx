@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { apiFetch, SessionExpiredError } from '../../../lib/auth';
 import AdminNav from '../_components/admin-nav';
+import PasswordInput from '../../_components/password-input';
 
 type DeliveryUser = { id: string; username: string; first_name: string; last_name: string };
 type School = { id: string; name: string };
@@ -168,10 +169,10 @@ export default function AdminDeliveryPage() {
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
 
-        <h2>School To Deliverer Mapping</h2>
+        <h2>Delivery Registration (Admin Only)</h2>
         <div className="auth-form">
           <label>Username<input value={newUsername} onChange={(e) => setNewUsername(e.target.value)} /></label>
-          <label>Password<input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} /></label>
+          <label>Password<PasswordInput value={newPassword} onChange={(e) => setNewPassword(e.target.value)} /></label>
           <label>First Name<input value={newFirstName} onChange={(e) => setNewFirstName(e.target.value)} /></label>
           <label>Last Name<input value={newLastName} onChange={(e) => setNewLastName(e.target.value)} /></label>
           <label>Phone Number<input value={newPhoneNumber} onChange={(e) => setNewPhoneNumber(e.target.value)} /></label>
@@ -180,6 +181,8 @@ export default function AdminDeliveryPage() {
             {creatingUser ? 'Creating...' : 'Create Delivery User'}
           </button>
         </div>
+
+        <h2>School To Deliverer Mapping</h2>
         <div className="auth-form">
           {users.map((u) => (
             <label key={u.id}>

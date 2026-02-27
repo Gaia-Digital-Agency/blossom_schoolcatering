@@ -82,7 +82,7 @@ export default function DeliveryPage() {
   const nextDate = toIso(next);
 
   return (
-    <main className="page-auth page-auth-mobile">
+    <main className="page-auth page-auth-mobile delivery-page">
       <section className="auth-panel">
         <h1>My Deliveries</h1>
         {message ? <p className="auth-help">{message}</p> : null}

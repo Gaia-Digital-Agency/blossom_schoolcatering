@@ -121,7 +121,7 @@ export class AuthController {
     const username = body.username ?? body.identifier;
     const password = body.password;
     const role = body.role;
-    if (!username || !password || !role) {
+    if (!username || !password) {
       throw new UnauthorizedException('Invalid credentials');
     }
     const result = await this.authService.login(username, password, role);

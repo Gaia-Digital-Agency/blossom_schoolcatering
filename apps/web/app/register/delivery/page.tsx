@@ -1,11 +1,5 @@
-import RegisterForm from '../_components/register-form';
+import { redirect } from 'next/navigation';
 
 export default function DeliveryRegisterPage() {
-  return (
-    <RegisterForm
-      role="DELIVERY"
-      title="Delivery Registration"
-      subtitle="Create a delivery account for dispatch and fulfillment testing."
-    />
-  );
+  redirect('/register');
 }

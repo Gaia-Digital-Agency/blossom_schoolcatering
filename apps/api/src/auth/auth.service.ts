@@ -454,15 +454,15 @@ export class AuthService {
     }
   }
 
-  async login(username: string, password: string, role: string) {
+  async login(username: string, password: string, role?: string) {
     await this.ensureSystemUsers();
     const userRow = await this.findUserByUsername(username);
     if (!userRow || !this.verifyPassword(password, userRow.password_hash)) {
       throw new UnauthorizedException('Invalid credentials');
     }
-    const normalizedRole = this.normalizeRole(role);
     const actualRole = this.appRoleFromDb(userRow.role);
-    if (actualRole !== normalizedRole) {
+    const normalizedRole = role ? this.normalizeRole(role) : actualRole;
+    if (role && actualRole !== normalizedRole) {
       throw new UnauthorizedException('Role mismatch');
     }
     const user = this.buildUser(userRow, normalizedRole);
