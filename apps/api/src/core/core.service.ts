@@ -869,7 +869,7 @@ export class CoreService {
         WHERE c.is_active = true
           AND c.deleted_at IS NULL
           AND u.is_active = true
-        GROUP BY c.id, c.user_id, u.username, u.first_name, u.last_name, c.school_grade, s.name
+        GROUP BY c.id, c.user_id, u.username, u.first_name, u.last_name, u.phone_number, u.email, c.date_of_birth, c.gender, c.school_id, c.school_grade, s.name
         ORDER BY u.first_name, u.last_name
       ) t;
     `);
@@ -4367,22 +4367,46 @@ export class CoreService {
     const name = (input.name || '').trim();
     if (!name) throw new BadRequestException('name is required');
     const allergenFlag = input.allergenFlag === true;
-    const out = await runSql(
-      `WITH upserted AS (
+    const existingOut = await runSql(
+      `SELECT row_to_json(t)::text
+       FROM (
+         SELECT id, name, allergen_flag, is_active
+         FROM ingredients
+         WHERE lower(name) = lower($1)
+         LIMIT 1
+       ) t;`,
+      [name],
+    );
+    if (existingOut) {
+      const existing = this.parseJsonLine<{ id: string; allergen_flag: boolean }>(existingOut);
+      const updateOut = await runSql(
+        `WITH updated AS (
+           UPDATE ingredients
+           SET name = $1,
+               allergen_flag = ($2 OR allergen_flag),
+               is_active = true,
+               deleted_at = NULL,
+               updated_at = now()
+           WHERE id = $3
+           RETURNING id, name, allergen_flag, is_active
+         )
+         SELECT row_to_json(updated)::text FROM updated;`,
+        [name, allergenFlag, existing.id],
+      );
+      if (!updateOut) throw new BadRequestException('Failed to update ingredient');
+      return this.parseJsonLine(updateOut);
+    }
+    const insertOut = await runSql(
+      `WITH inserted AS (
          INSERT INTO ingredients (name, allergen_flag, is_active)
          VALUES ($1, $2, true)
-         ON CONFLICT (name)
-         DO UPDATE SET allergen_flag = (ingredients.allergen_flag OR EXCLUDED.allergen_flag),
-                       is_active = true,
-                       deleted_at = NULL,
-                       updated_at = now()
          RETURNING id, name, allergen_flag, is_active
        )
-       SELECT row_to_json(upserted)::text FROM upserted;`,
+       SELECT row_to_json(inserted)::text FROM inserted;`,
       [name, allergenFlag],
     );
-    if (!out) throw new BadRequestException('Failed to create ingredient');
-    return this.parseJsonLine(out);
+    if (!insertOut) throw new BadRequestException('Failed to create ingredient');
+    return this.parseJsonLine(insertOut);
   }
 
   async updateIngredient(actor: AccessUser, ingredientId: string, input: { name?: string; allergenFlag?: boolean; isActive?: boolean }) {

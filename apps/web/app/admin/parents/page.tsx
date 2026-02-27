@@ -61,7 +61,7 @@ export default function AdminParentsPage() {
         {error ? <p className="auth-error">{error}</p> : null}
 
         <div className="kitchen-table-wrap">
-          <table className="kitchen-table">
+          <table className="kitchen-table admin-parents-table">
             <thead>
               <tr>
                 <th>Parent</th>
@@ -100,6 +100,25 @@ export default function AdminParentsPage() {
           </table>
         </div>
       </section>
+      <style jsx>{`
+        .admin-parents-table th,
+        .admin-parents-table td {
+          vertical-align: top;
+          text-align: left;
+          font-size: 0.92rem;
+          line-height: 1.35;
+        }
+        .admin-parents-table th {
+          white-space: nowrap;
+        }
+        .admin-parents-table code {
+          font-size: 0.78rem;
+          word-break: break-all;
+        }
+        .admin-parents-table :global(.btn) {
+          min-width: 140px;
+        }
+      `}</style>
     </main>
   );
 }

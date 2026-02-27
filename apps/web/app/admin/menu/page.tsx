@@ -322,23 +322,11 @@ export default function AdminMenuPage() {
     setMessage('');
     const previous = menuItems;
     setMenuItems((prev) => prev.map((x) => (x.id === item.id ? { ...x, is_available: isAvailable } : x)));
-    const payload = {
-      serviceDate: menuServiceDate,
-      session: menuSession,
-      name: item.name,
-      description: item.description,
-      nutritionFactsText: item.nutrition_facts_text || 'TBA',
-      caloriesKcal: item.calories_kcal ?? null,
-      price: Number(item.price || 0),
-      imageUrl: item.image_url,
-      ingredientIds: item.ingredient_ids || [],
-      isAvailable,
-      displayOrder: Number(item.display_order || 0),
-      cutleryRequired: Boolean(item.cutlery_required),
-      packingRequirement: item.packing_requirement || '',
-    };
     try {
-      await apiFetch(`/admin/menu-items/${item.id}`, { method: 'PATCH', body: JSON.stringify(payload) });
+      await apiFetch(`/admin/menu-items/${item.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ isAvailable }),
+      });
       setMessage(isAvailable ? 'Dish activated.' : 'Dish deactivated.');
       await loadMenuData();
     } catch (e) {
@@ -371,11 +359,12 @@ export default function AdminMenuPage() {
           <div className="menu-actions-row">
             <button className="btn btn-outline" type="button" onClick={loadMenuData}>Load Menu Context</button>
             <button className="btn btn-outline" type="button" onClick={onSeed}>Seed Sample Menus</button>
+            <button className="btn btn-primary" type="submit" form="menu-item-form">{editingItemId ? 'Update Dish' : 'Create Dish'}</button>
+            {editingItemId ? <button className="btn btn-outline" type="button" onClick={resetForm}>Cancel Edit</button> : null}
           </div>
         </div>
 
-        <form className="auth-form" onSubmit={onSaveItem}>
-          <label>Dish Name<input value={itemName} onChange={(e) => setItemName(e.target.value)} required /></label>
+        <form id="menu-item-form" className="auth-form" onSubmit={onSaveItem}>
           <label>Description<input value={itemDescription} onChange={(e) => setItemDescription(e.target.value)} required /></label>
           <label>Price (IDR)<input type="number" min={0} step={100} value={itemPrice} onChange={(e) => setItemPrice(e.target.value)} required /></label>
           <label>Calories (kcal)<input type="number" min={0} step={1} value={itemCaloriesKcal} onChange={(e) => setItemCaloriesKcal(e.target.value)} placeholder="leave empty for TBA" /></label>
@@ -385,49 +374,12 @@ export default function AdminMenuPage() {
             <input type="file" accept="image/*" onChange={(e) => onImageUpload(e.target.files?.[0])} />
           </label>
 
-          <div className="menu-check-grid">
-            <label className="menu-check-row">
-              <input type="checkbox" checked={itemCutleryRequired} onChange={(e) => setItemCutleryRequired(e.target.checked)} />
-              <span>Cutlery Required</span>
-            </label>
-            <label className="menu-check-row">
-              <input type="checkbox" checked={itemPackingCareRequired} onChange={(e) => setItemPackingCareRequired(e.target.checked)} />
-              <span>Packing Care Required</span>
-            </label>
-            <label className="menu-check-row">
-              <input type="checkbox" checked={itemWetDish} onChange={(e) => setItemWetDish(e.target.checked)} />
-              <span>Wet Dish</span>
-            </label>
-          </div>
-
-          <div className="ingredient-selected-box">
-            <strong>Dishes</strong>
-            <div className="ingredient-chip-wrap">
-              {filteredMasterDishes.slice(0, 160).map((dish) => (
-                <button
-                  key={dish}
-                  className="btn btn-outline ingredient-chip"
-                  type="button"
-                  onClick={() => {
-                    setItemName(dish);
-                    if (!itemDescription.trim()) setItemDescription(dish);
-                  }}
-                  onDoubleClick={() => void onAutoCreateDishFromMaster(dish)}
-                  title="Click to fill Dish Name. Double-click to auto-create dish item."
-                >
-                  {dish}
-                </button>
-              ))}
-              {filteredMasterDishes.length === 0 ? <small>No dishes found.</small> : null}
-            </div>
-          </div>
-
           <div className="ingredient-selected-box">
             <strong>Ingredient - Selected ({itemIngredientIds.length}/{ingredientLimit})</strong>
             <input
               value={ingredientSearch}
               onChange={(e) => setIngredientSearch(e.target.value)}
-              placeholder="Search ingredients from master data..."
+              placeholder="Search ingredient..."
             />
             <div className="ingredient-chip-wrap">
               {itemIngredientIds.length === 0 ? <small>-</small> : null}
@@ -447,11 +399,12 @@ export default function AdminMenuPage() {
             {filteredMasterIngredients.map((i) => {
               const mappedId = ingredientIdByNormalizedName.get(normalize(i.key));
               const active = mappedId ? itemIngredientIds.includes(mappedId) : false;
+              if (active) return null;
               return (
                 <button
                   key={i.key}
                   type="button"
-                  className={`btn ${active ? 'btn-primary' : 'btn-outline'}`}
+                  className="btn btn-outline"
                   onClick={() => void onPickMasterIngredient(i.key)}
                   title={mappedId ? 'Click to add ingredient' : 'Click to auto-create and add ingredient'}
                 >
@@ -462,9 +415,42 @@ export default function AdminMenuPage() {
             {filteredMasterIngredients.length === 0 ? <small>No ingredients found.</small> : null}
           </div>
 
-          <div className="menu-actions-row">
-            <button className="btn btn-primary" type="submit">{editingItemId ? 'Update Dish' : 'Create Dish'}</button>
-            {editingItemId ? <button className="btn btn-outline" type="button" onClick={resetForm}>Cancel Edit</button> : null}
+          <div className="menu-check-grid">
+            <label className="menu-check-row">
+              <input type="checkbox" checked={itemCutleryRequired} onChange={(e) => setItemCutleryRequired(e.target.checked)} />
+              <span>Cutlery Required</span>
+            </label>
+            <label className="menu-check-row">
+              <input type="checkbox" checked={itemPackingCareRequired} onChange={(e) => setItemPackingCareRequired(e.target.checked)} />
+              <span>Packing Care Required</span>
+            </label>
+            <label className="menu-check-row">
+              <input type="checkbox" checked={itemWetDish} onChange={(e) => setItemWetDish(e.target.checked)} />
+              <span>Wet Dish</span>
+            </label>
+          </div>
+
+          <div className="ingredient-selected-box">
+            <label>Dish Name<input value={itemName} onChange={(e) => setItemName(e.target.value)} required /></label>
+            <strong>Dishes</strong>
+            <div className="ingredient-chip-wrap">
+              {filteredMasterDishes.slice(0, 160).map((dish) => (
+                <button
+                  key={dish}
+                  className="btn btn-outline ingredient-chip"
+                  type="button"
+                  onClick={() => {
+                    setItemName(dish);
+                    if (!itemDescription.trim()) setItemDescription(dish);
+                  }}
+                  onDoubleClick={() => void onAutoCreateDishFromMaster(dish)}
+                  title="Click to fill Dish Name. Double-click to auto-create dish item."
+                >
+                  {dish}
+                </button>
+              ))}
+              {filteredMasterDishes.length === 0 ? <small>No dishes found.</small> : null}
+            </div>
           </div>
         </form>
 
@@ -545,6 +531,31 @@ export default function AdminMenuPage() {
           margin: 0;
           flex: 0 0 auto;
         }
+        .ingredient-selected-box {
+          border: 1px solid #ccbda2;
+          border-radius: 0.55rem;
+          background: #fff;
+          padding: 0.6rem;
+          display: grid;
+          gap: 0.45rem;
+        }
+        .ingredient-picker-box {
+          border: 1px solid #ccbda2;
+          border-radius: 0.55rem;
+          background: #fff;
+          padding: 0.55rem;
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 0.45rem;
+          max-height: 16rem;
+          overflow: auto;
+        }
+        .ingredient-chip-wrap {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.4rem;
+          align-items: center;
+        }
         .menu-item-columns {
           display: grid;
           grid-template-columns: 1fr;
@@ -556,6 +567,9 @@ export default function AdminMenuPage() {
           }
           .menu-check-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+          .ingredient-picker-box {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
           }
         }
       `}</style>
