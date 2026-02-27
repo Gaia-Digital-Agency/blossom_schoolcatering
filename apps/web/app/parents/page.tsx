@@ -293,7 +293,13 @@ export default function ParentsPage() {
       setItemQty({}); setDraftCartId(''); setDraftExpiresAt('');
       await Promise.all([loadOrders(), loadFavourites()]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Order placement failed');
+      const msg = err instanceof Error ? err.message : 'Order placement failed';
+      if (msg.includes('ORDER_SESSION_DISABLED') && session !== 'LUNCH') {
+        window.alert('Only Lunch Available');
+        setError('Only Lunch Available');
+      } else {
+        setError(msg);
+      }
     } finally { setSubmitting(false); }
   };
 

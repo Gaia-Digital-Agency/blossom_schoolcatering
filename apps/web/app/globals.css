@@ -228,11 +228,6 @@ button:hover,
   border-color: #9e6b20;
 }
 
-.btn-guide {
-  border-style: solid;
-  border-width: 2px;
-}
-
 .btn-google:hover {
   background: #f5f5f5;
   border-color: #b8b0a2;

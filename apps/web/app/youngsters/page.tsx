@@ -228,7 +228,13 @@ export default function YoungstersPage() {
       setDraftExpiresAt('');
       apiFetch('/youngsters/me/insights').then((x) => setInsights(x as YoungsterInsights)).catch(() => undefined);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Order placement failed');
+      const msg = err instanceof Error ? err.message : 'Order placement failed';
+      if (msg.includes('ORDER_SESSION_DISABLED') && session !== 'LUNCH') {
+        window.alert('Only Lunch Available');
+        setError('Only Lunch Available');
+      } else {
+        setError(msg);
+      }
     } finally {
       setSubmitting(false);
     }

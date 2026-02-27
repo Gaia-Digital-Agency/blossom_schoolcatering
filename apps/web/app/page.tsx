@@ -26,6 +26,9 @@ export default function HomePage() {
             Menu
           </button>
           <nav className={`nav ${open ? 'open' : ''}`}>
+            <a className="nav-guide-link" href="https://www.blossomsteakhouse.com/" target="_blank" rel="noopener noreferrer">
+              Steakhouse
+            </a>
             <Link className="nav-guide-link" href="/guide">Guides &amp; T&amp;C</Link>
           </nav>
         </header>
@@ -33,15 +36,14 @@ export default function HomePage() {
         <main className="hero">
           <section className="hero-card">
             <p className="eyebrow">School Catering by Blossom Kitchen</p>
-            <h1>Parent and Youngsters Meal Order App</h1>
+            <h1>Meal Order App</h1>
             <p className="lead">
-              One meal per session per youngster, up to 3 sessions daily: Lunch, Snack, Breakfast.
-              Clear calorie details for each menu option.
+              Lunch Mean For Youngsters, Up To Five Dishes Per Meal, Register or Log In.
+              Click Guides button for more details.
             </p>
             <div className="auth-grid">
               <Link className="btn btn-primary" href="/login">Log In</Link>
               <Link className="btn btn-outline" href="/register/youngsters">Register</Link>
-              <Link className="btn btn-outline btn-guide" href="/guide">Guides &amp; T&amp;C</Link>
               <GoogleOAuthButton role="PARENT" redirectPath="/dashboard" className="google-oauth-wrap" />
             </div>
           </section>
