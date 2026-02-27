@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { apiFetch, SessionExpiredError } from '../../lib/auth';
+import { apiFetch } from '../../lib/auth';
 
 type Youngster = {
   id: string;
@@ -27,8 +27,20 @@ type DraftCart = {
   expires_at: string;
 };
 type YoungsterInsights = {
-  week: { start: string; end: string; totalCalories: number; days: Array<{ service_date: string; calories_display: string; tba_items: number }> };
-  badge: { level: 'NONE' | 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM'; maxConsecutiveOrderDays: number; currentMonthOrders: number };
+  week: {
+    start: string;
+    end: string;
+    totalCalories: number;
+    totalOrders?: number;
+    totalDishes?: number;
+    days: Array<{ service_date: string; calories_display: string; tba_items: number }>;
+  };
+  badge: {
+    level: 'NONE' | 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM';
+    maxConsecutiveOrderDays: number;
+    maxConsecutiveOrderWeeks?: number;
+    currentMonthOrders: number;
+  };
   birthdayHighlight: { date_of_birth: string; days_until: number };
 };
 
@@ -62,27 +74,18 @@ export default function YoungstersPage() {
   const [youngster, setYoungster] = useState<Youngster | null>(null);
   const [serviceDate, setServiceDate] = useState(nextWeekdayIsoDate());
   const [session, setSession] = useState<'LUNCH' | 'SNACK' | 'BREAKFAST'>('LUNCH');
-  const [searchText, setSearchText] = useState('');
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [itemQty, setItemQty] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
   const [nowMs, setNowMs] = useState(Date.now());
   const [draftCartId, setDraftCartId] = useState('');
   const [draftExpiresAt, setDraftExpiresAt] = useState('');
-  const [loadingDraft, setLoadingDraft] = useState(false);
   const [insights, setInsights] = useState<YoungsterInsights | null>(null);
 
   const selectedCount = useMemo(
     () => Object.values(itemQty).filter((qty) => qty > 0).length,
     [itemQty],
   );
-  const searchResults = useMemo(() => {
-    const needle = searchText.trim().toLowerCase();
-    return (menuItems || []).filter((item) => {
-      if (!needle) return true;
-      return item.name.toLowerCase().includes(needle) || item.description.toLowerCase().includes(needle);
-    });
-  }, [menuItems, searchText]);
   const draftItems = useMemo(() => {
     const index = new Map(menuItems.map((m) => [m.id, m]));
     return Object.entries(itemQty)
@@ -110,15 +113,6 @@ export default function YoungstersPage() {
     const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
-
-  const onLoadMenu = async () => {
-    setError('');
-    setMessage('');
-    const data = await apiFetch(`/menus?service_date=${serviceDate}&session=${session}`) as { items: MenuItem[] };
-    setMenuItems(data.items);
-    setItemQty({});
-    apiFetch('/youngsters/me/insights').then((x) => setInsights(x as YoungsterInsights)).catch(() => undefined);
-  };
 
   const onAddDraftItem = (menuItemId: string) => {
     const alreadySelected = Object.values(itemQty).filter((qty) => qty > 0).length;
@@ -151,25 +145,19 @@ export default function YoungstersPage() {
   };
 
   const loadMenuAndDraft = async (childId: string) => {
-    setLoadingDraft(true);
-    try {
-      const [menuData, cartsData] = await Promise.all([
-        apiFetch(`/menus?service_date=${serviceDate}&session=${session}`) as Promise<{ items: MenuItem[] }>,
-        apiFetch(`/carts?child_id=${childId}&service_date=${serviceDate}&session=${session}`) as Promise<DraftCart[]>,
-      ]);
-      setMenuItems(menuData.items || []);
-      const openDraft = (cartsData || []).find((cart) => cart.status === 'OPEN');
-      if (!openDraft) {
-        setDraftCartId('');
-        setDraftExpiresAt('');
-        setItemQty({});
-        return;
-      }
-      await loadDraftItems(openDraft.id);
-      setMessage('Draft detected and loaded for selected date/session.');
-    } finally {
-      setLoadingDraft(false);
+    const [menuData, cartsData] = await Promise.all([
+      apiFetch(`/menus?service_date=${serviceDate}&session=${session}`) as Promise<{ items: MenuItem[] }>,
+      apiFetch(`/carts?child_id=${childId}&service_date=${serviceDate}&session=${session}`) as Promise<DraftCart[]>,
+    ]);
+    setMenuItems(menuData.items || []);
+    const openDraft = (cartsData || []).find((cart) => cart.status === 'OPEN');
+    if (!openDraft) {
+      setDraftCartId('');
+      setDraftExpiresAt('');
+      setItemQty({});
+      return;
     }
+    await loadDraftItems(openDraft.id);
   };
 
   useEffect(() => {
@@ -240,37 +228,6 @@ export default function YoungstersPage() {
     }
   };
 
-  const onResumeDraft = async () => {
-    if (!draftCartId) return;
-    setError('');
-    setMessage('');
-    setLoadingDraft(true);
-    try {
-      await loadDraftItems(draftCartId);
-      setMessage('Draft resumed.');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to resume draft');
-    } finally {
-      setLoadingDraft(false);
-    }
-  };
-
-  const onDiscardDraft = async () => {
-    if (!draftCartId) return;
-    if (!window.confirm('Discard this draft cart?')) return;
-    setError('');
-    setMessage('');
-    try {
-      await apiFetch(`/carts/${draftCartId}`, { method: 'DELETE' });
-      setDraftCartId('');
-      setDraftExpiresAt('');
-      setItemQty({});
-      setMessage('Draft discarded.');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to discard draft');
-    }
-  };
-
   if (loading) {
     return (
       <main className="page-auth">
@@ -285,7 +242,7 @@ export default function YoungstersPage() {
   return (
     <main className="page-auth page-auth-mobile youngsters-page">
       <section className="auth-panel">
-        <h1>Youngsters Module (Step 6)</h1>
+        <h1>Youngsters Module</h1>
         {youngster ? (
           <p className="auth-help">
             {youngster.first_name} {youngster.last_name} - {youngster.school_name} ({youngster.school_grade})
@@ -301,20 +258,15 @@ export default function YoungstersPage() {
               <label>
                 <strong>Clean Plate Club Badge: {insights.badge.level}</strong>
                 <small>Max consecutive order days: {insights.badge.maxConsecutiveOrderDays}</small>
+                <small>Max consecutive order weeks: {insights.badge.maxConsecutiveOrderWeeks ?? '-'}</small>
                 <small>Current month orders: {insights.badge.currentMonthOrders}</small>
               </label>
               <label>
                 <strong>Nutrition Week {insights.week.start} to {insights.week.end}</strong>
                 <small>Total Calories: {insights.week.totalCalories} kcal</small>
-                <small>Birthday in {insights.birthdayHighlight.days_until} day(s)</small>
+                <small>Number Of Orders: {insights.week.totalOrders ?? '-'}</small>
+                <small>Number of Dishes: {insights.week.totalDishes ?? '-'}</small>
               </label>
-              {insights.week.days.map((d) => (
-                <label key={d.service_date}>
-                  <strong>{d.service_date}</strong>
-                  <small>Calories: {d.calories_display}</small>
-                  <small>{d.tba_items > 0 ? `TBA items: ${d.tba_items}` : 'All calorie data available'}</small>
-                </label>
-              ))}
             </div>
           ) : (
             <p className="auth-help">Loading nutrition insights...</p>
@@ -322,50 +274,26 @@ export default function YoungstersPage() {
         </div>
 
         <div className="module-section">
-          <h2>Session Menu and Cart</h2>
+          <h2>Menu and Cart</h2>
           <label>
             Service Date
             <input type="date" value={serviceDate} onChange={(e) => setServiceDate(e.target.value)} />
           </label>
           <p className="auth-help">Place-order cutoff countdown: {formatRemaining(cutoffRemainingMs)} (08:00 Asia/Makassar)</p>
-          {draftCartId ? (
-            <p className="auth-help">
-              Draft status: {hasOpenDraft ? 'OPEN' : 'EXPIRED'} | Draft countdown: {formatRemaining(draftRemainingMs)}
-            </p>
-          ) : (
-            <p className="auth-help">Draft status: none</p>
-          )}
-          <label>
-            Session
-            <select value={session} onChange={(e) => setSession(e.target.value as 'LUNCH' | 'SNACK' | 'BREAKFAST')}>
-              <option value="LUNCH">LUNCH</option>
-              <option value="SNACK">SNACK</option>
-              <option value="BREAKFAST">BREAKFAST</option>
-            </select>
-          </label>
+          {draftCartId && hasOpenDraft ? <p className="auth-help">Open draft detected and loaded automatically.</p> : null}
           <label>
             Allergies
             <input value={youngster?.dietary_allergies || 'No Allergies'} readOnly />
           </label>
-          <label>
-            Search Name Of Dish
-            <input value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="Type dish name..." />
-          </label>
-          <button className="btn btn-outline" type="button" onClick={onLoadMenu}>Refresh Menu</button>
-          <button className="btn btn-outline" type="button" onClick={onResumeDraft} disabled={!draftCartId || loadingDraft}>
-            {loadingDraft ? 'Loading Draft...' : 'Resume Draft'}
-          </button>
-          <button className="btn btn-outline" type="button" onClick={onDiscardDraft} disabled={!draftCartId || loadingDraft}>
-            Discard Draft
-          </button>
+          <p className="auth-help">Menu is auto-populated from active dishes set by Admin.</p>
 
           {menuItems.length > 0 ? (
             <div className="menu-flow-grid">
               <div className="menu-search-section">
-                <h3>Search Results</h3>
-                {searchResults.length === 0 ? <p className="auth-help">No dishes found.</p> : (
+                <h3>Menu Section</h3>
+                {menuItems.length === 0 ? <p className="auth-help">No dishes found.</p> : (
                   <div className="auth-form">
-                    {searchResults.map((item) => (
+                    {menuItems.map((item) => (
                       <label key={item.id}>
                         <span>
                           <strong>{item.name}</strong> - Rp {Number(item.price).toLocaleString('id-ID')}
@@ -382,7 +310,7 @@ export default function YoungstersPage() {
               </div>
               <div className="menu-draft-section">
                 <h3>Draft Section</h3>
-                {draftItems.length === 0 ? <p className="auth-help">No dishes in draft. Use Add from search results.</p> : (
+                {draftItems.length === 0 ? <p className="auth-help">No dishes in draft. Use Add from Menu Section.</p> : (
                   <div className="auth-form">
                     {draftItems.map((d) => (
                       <label key={d.id}>

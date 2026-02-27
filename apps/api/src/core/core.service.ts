@@ -3691,9 +3691,41 @@ export class CoreService {
     if (next < today) next.setUTCFullYear(today.getUTCFullYear() + 1);
     const birthdayDaysUntil = Math.ceil((next.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
 
+    const weekOrderSummaryOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT COUNT(DISTINCT o.id)::int AS total_orders,
+               COALESCE(SUM(oi.quantity), 0)::int AS total_dishes
+        FROM orders o
+        LEFT JOIN order_items oi ON oi.order_id = o.id
+        WHERE o.child_id = $1
+          AND o.service_date BETWEEN $2::date AND $3::date
+          AND o.status <> 'CANCELLED'
+          AND o.deleted_at IS NULL
+      ) t;
+    `,
+      [childId, weekStart, weekEnd],
+    );
+    const weekOrderSummary = this.parseJsonLine<{ total_orders: number; total_dishes: number }>(
+      weekOrderSummaryOut || '{"total_orders":0,"total_dishes":0}',
+    );
+
     return {
-      week: { start: weekStart, end: weekEnd, totalCalories: weekCalories, days },
-      badge: { level: badge, maxConsecutiveOrderDays: maxStreak, currentMonthOrders: cm.orders },
+      week: {
+        start: weekStart,
+        end: weekEnd,
+        totalCalories: weekCalories,
+        totalOrders: Number(weekOrderSummary.total_orders || 0),
+        totalDishes: Number(weekOrderSummary.total_dishes || 0),
+        days,
+      },
+      badge: {
+        level: badge,
+        maxConsecutiveOrderDays: maxStreak,
+        maxConsecutiveOrderWeeks: Math.max(Number(cm.consecutiveWeeks || 0), Number(pm.consecutiveWeeks || 0)),
+        currentMonthOrders: cm.orders,
+      },
       birthdayHighlight: { date_of_birth: me.date_of_birth, days_until: birthdayDaysUntil },
     };
   }
