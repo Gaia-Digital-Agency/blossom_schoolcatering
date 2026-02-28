@@ -211,7 +211,7 @@ export class CoreController {
   }
 
   @Get('blackout-days')
-  @Roles('ADMIN', 'PARENT', 'KITCHEN')
+  @Roles('ADMIN', 'PARENT', 'YOUNGSTER', 'KITCHEN')
   getBlackoutDays(@Query('from_date') fromDate?: string, @Query('to_date') toDate?: string) {
     return this.coreService.getBlackoutDays({ fromDate, toDate });
   }

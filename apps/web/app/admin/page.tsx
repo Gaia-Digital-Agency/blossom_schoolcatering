@@ -29,6 +29,20 @@ type Dashboard = {
   };
   kitchen: {
     nextBlackoutDay: string | null;
+    nextBlackoutType: 'ORDER_BLOCK' | 'SERVICE_BLOCK' | 'BOTH' | null;
+    nextBlackoutReason: string | null;
+    upcomingBlackouts: Array<{
+      blackoutDate: string;
+      type: 'ORDER_BLOCK' | 'SERVICE_BLOCK' | 'BOTH';
+      reason: string | null;
+      affectedOrders: number;
+    }>;
+    serviceBlockedDatesWithOrders: Array<{
+      blackoutDate: string;
+      type: 'SERVICE_BLOCK' | 'BOTH';
+      reason: string | null;
+      affectedOrders: number;
+    }>;
     yesterday: { ordersNotFulfilled: number; dishesNotFulfilled: number };
     pastWeek: { ordersNotFulfilled: number; dishesNotFulfilled: number };
   };
@@ -178,7 +192,38 @@ export default function AdminPage() {
                   <tr><th>Dishes Total Created</th><td>{data.menu.dishesTotalCreated}</td></tr>
                   <tr><th>Dishes Total Active</th><td>{data.menu.dishesTotalActive}</td></tr>
                   <tr className="section-row"><th colSpan={2}>KITCHEN</th></tr>
-                  <tr><th>Next Back Out Day</th><td>{data.kitchen.nextBlackoutDay || '-'}</td></tr>
+                  <tr>
+                    <th>Next Blackout Day</th>
+                    <td>
+                      {data.kitchen.nextBlackoutDay
+                        ? `${data.kitchen.nextBlackoutDay} (${data.kitchen.nextBlackoutType || '-'})`
+                        : '-'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <th>Next Blackout Reason</th>
+                    <td>{data.kitchen.nextBlackoutReason || '-'}</td>
+                  </tr>
+                  <tr>
+                    <th>Upcoming Blocked Dates (10)</th>
+                    <td>
+                      {(data.kitchen.upcomingBlackouts || []).length === 0
+                        ? '-'
+                        : data.kitchen.upcomingBlackouts
+                          .map((row) => `${row.blackoutDate} ${row.type} affected=${row.affectedOrders}`)
+                          .join(', ')}
+                    </td>
+                  </tr>
+                  <tr>
+                    <th>Service-Blocked Dates With Existing Orders</th>
+                    <td>
+                      {(data.kitchen.serviceBlockedDatesWithOrders || []).length === 0
+                        ? 'No conflict'
+                        : data.kitchen.serviceBlockedDatesWithOrders
+                          .map((row) => `${row.blackoutDate} (${row.type}) orders=${row.affectedOrders}`)
+                          .join(', ')}
+                    </td>
+                  </tr>
                   <tr>
                     <th>Orders Not Fulfilled From Kitchen</th>
                     <td>

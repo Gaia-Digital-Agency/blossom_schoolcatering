@@ -65,6 +65,15 @@ type BillingRow = {
   receipt_number?: string | null;
   pdf_url?: string | null;
 };
+type BlackoutDay = {
+  blackout_date: string;
+  type: 'ORDER_BLOCK' | 'SERVICE_BLOCK' | 'BOTH';
+  reason?: string | null;
+};
+type ActiveBlackout = {
+  type: 'ORDER_BLOCK' | 'SERVICE_BLOCK' | 'BOTH';
+  reason: string | null;
+};
 type SpendingDashboard = {
   month: string;
   totalMonthSpend: number;
@@ -105,6 +114,18 @@ function todayMakassarIsoDate() {
   return d.toISOString().slice(0, 10);
 }
 
+function mapOrderRuleError(raw: string) {
+  if (raw.includes('ORDER_BLACKOUT_BLOCKED')) return 'Ordering is blocked for this date (ORDER_BLOCK/BOTH blackout).';
+  if (raw.includes('ORDER_SERVICE_BLOCKED')) return 'Service is blocked for this date (SERVICE_BLOCK/BOTH blackout).';
+  return raw;
+}
+
+function activeBlackoutMessage(blackout: ActiveBlackout | null) {
+  if (!blackout) return '';
+  if (blackout.type === 'SERVICE_BLOCK') return mapOrderRuleError('ORDER_SERVICE_BLOCKED');
+  return mapOrderRuleError('ORDER_BLACKOUT_BLOCKED');
+}
+
 export default function ParentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -134,6 +155,7 @@ export default function ParentsPage() {
   const [spending, setSpending] = useState<SpendingDashboard | null>(null);
   const [batchProofData, setBatchProofData] = useState('');
   const [selectedBillingIds, setSelectedBillingIds] = useState<string[]>([]);
+  const [activeBlackout, setActiveBlackout] = useState<ActiveBlackout | null>(null);
 
   const draftSectionRef = useRef<HTMLDivElement | null>(null);
 
@@ -142,6 +164,7 @@ export default function ParentsPage() {
   const draftRemainingMs = draftExpiresAt ? new Date(draftExpiresAt).getTime() - nowMs : 0;
   const placementExpired = placeCutoffMs <= 0;
   const hasOpenDraft = Boolean(draftCartId) && draftRemainingMs > 0;
+  const placementBlockedByBlackout = Boolean(activeBlackout);
   const visibleOrders = useMemo(
     () => (selectedChildId ? orders.filter((o) => o.child_id === selectedChildId) : orders),
     [orders, selectedChildId],
@@ -279,11 +302,21 @@ export default function ParentsPage() {
 
   const loadMenuAndDraft = async () => {
     if (!selectedChildId) return;
-    const [menuData, cartsData] = await Promise.all([
+    const [menuData, cartsData, blackoutRows] = await Promise.all([
       apiFetch(`/menus?service_date=${serviceDate}&session=${session}`) as Promise<{ items: MenuItem[] }>,
       apiFetch(`/carts?child_id=${selectedChildId}&service_date=${serviceDate}&session=${session}`) as Promise<DraftCart[]>,
+      apiFetch(`/blackout-days?from_date=${serviceDate}&to_date=${serviceDate}`) as Promise<BlackoutDay[]>,
     ]);
     setMenuItems(menuData.items || []);
+    const currentDay = (blackoutRows || []).find((row) => row.blackout_date === serviceDate);
+    if (currentDay && ['ORDER_BLOCK', 'SERVICE_BLOCK', 'BOTH'].includes(currentDay.type)) {
+      setActiveBlackout({
+        type: currentDay.type,
+        reason: (currentDay.reason || '').trim() || null,
+      });
+    } else {
+      setActiveBlackout(null);
+    }
     const openDraft = (cartsData || []).find((cart) => cart.status === 'OPEN');
     if (!openDraft) {
       setDraftCartId('');
@@ -303,6 +336,7 @@ export default function ParentsPage() {
     if (!selectedChildId) return setError('Please select a youngster first.');
     const items = Object.entries(itemQty).filter(([, qty]) => qty > 0).map(([menuItemId, quantity]) => ({ menuItemId, quantity }));
     if (items.length === 0) return setError('Select at least one menu item.');
+    if (placementBlockedByBlackout) return setError(activeBlackoutMessage(activeBlackout));
     if (placementExpired) return setError('ORDER_CUTOFF_EXCEEDED');
     if (items.length > 5) return setError('Maximum 5 items per cart/order.');
 
@@ -322,7 +356,7 @@ export default function ParentsPage() {
         window.alert('Only Lunch Available');
         setError('Only Lunch Available');
       } else {
-        setError(msg);
+        setError(mapOrderRuleError(msg));
       }
     } finally { setSubmitting(false); }
   };
@@ -345,7 +379,9 @@ export default function ParentsPage() {
         ? `Order reopened as draft with ${out.excludedItemIds.length} excluded dish(es).`
         : 'Order reopened as draft in Draft Section.');
       window.setTimeout(() => draftSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
-    } catch (err) { setError(err instanceof Error ? err.message : 'Failed to reopen order as draft'); }
+    } catch (err) {
+      setError(err instanceof Error ? mapOrderRuleError(err.message) : 'Failed to reopen order as draft');
+    }
   };
 
   const onProofImageUpload = async (file?: File | null) => {
@@ -457,6 +493,11 @@ export default function ParentsPage() {
             </select>
           </label>
           <p className="auth-help">Place-order cutoff countdown: {formatRemaining(placeCutoffMs)} (08:00 Asia/Makassar)</p>
+          {activeBlackout ? (
+            <p className="auth-error">
+              Blackout active on {serviceDate}: {activeBlackout.type}{activeBlackout.reason ? ` - ${activeBlackout.reason}` : ''}.
+            </p>
+          ) : null}
           {draftCartId && hasOpenDraft ? <p className="auth-help">Open draft detected and loaded automatically.</p> : null}
           {selectedDayOrder ? (
             <p className="auth-help">Confirmed order already exists for selected day/session: {selectedDayOrder.id}</p>
@@ -476,7 +517,7 @@ export default function ParentsPage() {
                       <small>{item.description}</small>
                       <small>{item.nutrition_facts_text}</small>
                       <small>Ingredients: {item.ingredients.join(', ') || '-'}</small>
-                      <button className="btn btn-outline" type="button" onClick={() => onAddDraftItem(item.id)}>Add</button>
+                      <button className="btn btn-outline" type="button" onClick={() => onAddDraftItem(item.id)} disabled={placementBlockedByBlackout}>Add</button>
                     </label>
                   ))}
                 </div>
@@ -499,7 +540,7 @@ export default function ParentsPage() {
                 )}
                 <div className="draft-actions">
                   <p className="auth-help">Selected items: {selectedCount} / 5</p>
-                  <button className="btn btn-primary" type="button" disabled={submitting || placementExpired} onClick={onPlaceOrder}>
+                  <button className="btn btn-primary" type="button" disabled={submitting || placementExpired || placementBlockedByBlackout} onClick={onPlaceOrder}>
                     {submitting ? 'Placing Order...' : 'Place Order'}
                   </button>
                 </div>

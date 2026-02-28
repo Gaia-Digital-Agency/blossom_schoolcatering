@@ -91,6 +91,7 @@ export default function AdminBlackoutDatesPage() {
         <h1>Admin Blackout Dates</h1>
         <AdminNav />
         <p className="auth-help">Manage blackout dates. Order placement checks these rules immediately.</p>
+        <p className="auth-help">Type guide: ORDER_BLOCK = block ordering only, SERVICE_BLOCK = block service date ordering, BOTH = block both order and service.</p>
 
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}

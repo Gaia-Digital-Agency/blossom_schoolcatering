@@ -71,6 +71,15 @@ type ConsolidatedOrder = {
     quantity: number;
   }>;
 };
+type BlackoutDay = {
+  blackout_date: string;
+  type: 'ORDER_BLOCK' | 'SERVICE_BLOCK' | 'BOTH';
+  reason?: string | null;
+};
+type ActiveBlackout = {
+  type: 'ORDER_BLOCK' | 'SERVICE_BLOCK' | 'BOTH';
+  reason: string | null;
+};
 
 function nextWeekdayIsoDate() {
   const d = new Date();
@@ -109,6 +118,18 @@ function todayMakassarIsoDate() {
   return d.toISOString().slice(0, 10);
 }
 
+function mapOrderRuleError(raw: string) {
+  if (raw.includes('ORDER_BLACKOUT_BLOCKED')) return 'Ordering is blocked for this date (ORDER_BLOCK/BOTH blackout).';
+  if (raw.includes('ORDER_SERVICE_BLOCKED')) return 'Service is blocked for this date (SERVICE_BLOCK/BOTH blackout).';
+  return raw;
+}
+
+function activeBlackoutMessage(blackout: ActiveBlackout | null) {
+  if (!blackout) return '';
+  if (blackout.type === 'SERVICE_BLOCK') return mapOrderRuleError('ORDER_SERVICE_BLOCKED');
+  return mapOrderRuleError('ORDER_BLACKOUT_BLOCKED');
+}
+
 export default function YoungstersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -126,6 +147,7 @@ export default function YoungstersPage() {
   const [draftExpiresAt, setDraftExpiresAt] = useState('');
   const [insights, setInsights] = useState<YoungsterInsights | null>(null);
   const [orders, setOrders] = useState<ConsolidatedOrder[]>([]);
+  const [activeBlackout, setActiveBlackout] = useState<ActiveBlackout | null>(null);
 
   const selectedCount = useMemo(
     () => Object.values(itemQty).filter((qty) => qty > 0).length,
@@ -142,6 +164,7 @@ export default function YoungstersPage() {
   const draftRemainingMs = draftExpiresAt ? new Date(draftExpiresAt).getTime() - nowMs : 0;
   const placementExpired = cutoffRemainingMs <= 0;
   const hasOpenDraft = Boolean(draftCartId) && draftRemainingMs > 0;
+  const placementBlockedByBlackout = Boolean(activeBlackout);
 
   const todayOrder = useMemo(() => {
     const today = todayMakassarIsoDate();
@@ -223,11 +246,21 @@ export default function YoungstersPage() {
   };
 
   const loadMenuAndDraft = async (childId: string) => {
-    const [menuData, cartsData] = await Promise.all([
+    const [menuData, cartsData, blackoutRows] = await Promise.all([
       apiFetch(`/menus?service_date=${serviceDate}&session=${session}`) as Promise<{ items: MenuItem[] }>,
       apiFetch(`/carts?child_id=${childId}&service_date=${serviceDate}&session=${session}`) as Promise<DraftCart[]>,
+      apiFetch(`/blackout-days?from_date=${serviceDate}&to_date=${serviceDate}`) as Promise<BlackoutDay[]>,
     ]);
     setMenuItems(menuData.items || []);
+    const currentDay = (blackoutRows || []).find((row) => row.blackout_date === serviceDate);
+    if (currentDay && ['ORDER_BLOCK', 'SERVICE_BLOCK', 'BOTH'].includes(currentDay.type)) {
+      setActiveBlackout({
+        type: currentDay.type,
+        reason: (currentDay.reason || '').trim() || null,
+      });
+    } else {
+      setActiveBlackout(null);
+    }
     const openDraft = (cartsData || []).find((cart) => cart.status === 'OPEN');
     if (!openDraft) {
       setDraftCartId('');
@@ -256,6 +289,10 @@ export default function YoungstersPage() {
 
     if (items.length === 0) {
       setError('Select at least one menu item.');
+      return;
+    }
+    if (placementBlockedByBlackout) {
+      setError(activeBlackoutMessage(activeBlackout));
       return;
     }
     if (placementExpired) {
@@ -300,7 +337,7 @@ export default function YoungstersPage() {
         window.alert('Only Lunch Available');
         setError('Only Lunch Available');
       } else {
-        setError(msg);
+        setError(mapOrderRuleError(msg));
       }
     } finally {
       setSubmitting(false);
@@ -379,6 +416,11 @@ export default function YoungstersPage() {
             </select>
           </label>
           <p className="auth-help">Place-order cutoff countdown: {formatRemaining(cutoffRemainingMs)} (08:00 Asia/Makassar)</p>
+          {activeBlackout ? (
+            <p className="auth-error">
+              Blackout active on {serviceDate}: {activeBlackout.type}{activeBlackout.reason ? ` - ${activeBlackout.reason}` : ''}.
+            </p>
+          ) : null}
           {draftCartId && hasOpenDraft ? <p className="auth-help">Open draft detected and loaded automatically.</p> : null}
           {selectedDayOrder ? <p className="auth-help">Confirmed order already exists for selected day/session: {selectedDayOrder.id}</p> : null}
           <p className="auth-help">Menu is auto-populated from active dishes set by Admin.</p>
@@ -397,7 +439,7 @@ export default function YoungstersPage() {
                         <small>{item.description}</small>
                         <small>{item.nutrition_facts_text}</small>
                         <small>Ingredients: {item.ingredients.join(', ') || '-'}</small>
-                        <button className="btn btn-outline" type="button" onClick={() => onAddDraftItem(item.id)}>Add</button>
+                        <button className="btn btn-outline" type="button" onClick={() => onAddDraftItem(item.id)} disabled={placementBlockedByBlackout}>Add</button>
                       </label>
                     ))}
                   </div>
@@ -421,7 +463,7 @@ export default function YoungstersPage() {
                 )}
                 <div className="draft-actions">
                   <p className="auth-help">Selected items: {selectedCount} / 5</p>
-                  <button className="btn btn-primary" type="button" disabled={submitting || placementExpired} onClick={onPlaceOrder}>
+                  <button className="btn btn-primary" type="button" disabled={submitting || placementExpired || placementBlockedByBlackout} onClick={onPlaceOrder}>
                     {submitting ? 'Placing Order...' : 'Place Order'}
                   </button>
                 </div>

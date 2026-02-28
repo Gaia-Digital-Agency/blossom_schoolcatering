@@ -42,6 +42,14 @@ type CartRow = {
   expires_at: string;
 };
 
+type BlackoutType = 'ORDER_BLOCK' | 'SERVICE_BLOCK' | 'BOTH';
+
+type BlackoutRule = {
+  blackout_date: string;
+  type: BlackoutType;
+  reason: string | null;
+};
+
 const SESSIONS: SessionType[] = ['LUNCH', 'SNACK', 'BREAKFAST'];
 const DISH_CATEGORIES = ['MAIN', 'APPETISER', 'COMPLEMENT', 'DESSERT', 'SIDES', 'GARNISH', 'DRINK'] as const;
 type DishCategory = (typeof DISH_CATEGORIES)[number];
@@ -527,18 +535,31 @@ export class CoreService {
       throw new BadRequestException('ORDER_WEEKEND_SERVICE_BLOCKED');
     }
 
-    const blocked = await runSql(
-      `SELECT EXISTS (
-         SELECT 1
-         FROM blackout_days
-         WHERE blackout_date = $1::date
-           AND type IN ('ORDER_BLOCK', 'BOTH')
-       );`,
-      [serviceDate],
-    );
-    if (blocked === 't') {
+    const blackout = await this.getBlackoutRuleForDate(serviceDate);
+    if (!blackout) return;
+    if (blackout.type === 'ORDER_BLOCK' || blackout.type === 'BOTH') {
       throw new BadRequestException('ORDER_BLACKOUT_BLOCKED');
     }
+    if (blackout.type === 'SERVICE_BLOCK') {
+      throw new BadRequestException('ORDER_SERVICE_BLOCKED');
+    }
+  }
+
+  private async getBlackoutRuleForDate(serviceDate: string): Promise<BlackoutRule | null> {
+    const out = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT blackout_date::text AS blackout_date, type::text AS type, reason
+        FROM blackout_days
+        WHERE blackout_date = $1::date
+        LIMIT 1
+      ) t;
+    `,
+      [serviceDate],
+    );
+    if (!out) return null;
+    return this.parseJsonLine<BlackoutRule>(out);
   }
 
   private async ensureMenuItemExtendedColumns() {
@@ -1172,17 +1193,38 @@ export class CoreService {
       menuTotalsOut || '{"dishes_total_created":0,"dishes_total_active":0}',
     );
 
-    const nextBlackoutDayOut = await runSql(
+    const upcomingBlackoutsOut = await runSql(
       `
-      SELECT blackout_date::text
-      FROM blackout_days
-      WHERE blackout_date >= $1::date
-      ORDER BY blackout_date ASC
-      LIMIT 1;
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT b.blackout_date::text AS blackout_date,
+               b.type::text AS type,
+               b.reason,
+               (
+                 SELECT COUNT(*)::int
+                 FROM orders o
+                 WHERE o.service_date = b.blackout_date
+                   AND o.deleted_at IS NULL
+                   AND o.status <> 'CANCELLED'
+               )::int AS affected_orders
+        FROM blackout_days b
+        WHERE b.blackout_date >= $1::date
+        ORDER BY b.blackout_date ASC
+        LIMIT 10
+      ) t;
     `,
       [date],
     );
-    const nextBlackoutDay = (nextBlackoutDayOut || '').trim() || null;
+    const upcomingBlackouts = this.parseJsonLines<{
+      blackout_date: string;
+      type: BlackoutType;
+      reason: string | null;
+      affected_orders: number;
+    }>(upcomingBlackoutsOut);
+    const nextBlackout = upcomingBlackouts[0] || null;
+    const serviceBlockedDatesWithOrders = upcomingBlackouts
+      .filter((row) => ['SERVICE_BLOCK', 'BOTH'].includes(row.type))
+      .filter((row) => Number(row.affected_orders || 0) > 0);
 
     const getKitchenUnfulfilled = async (from: string, to: string) => {
       const out = await runSql(
@@ -1309,7 +1351,21 @@ export class CoreService {
         pastMonth: pastMonthDelivery,
       },
       kitchen: {
-        nextBlackoutDay,
+        nextBlackoutDay: nextBlackout?.blackout_date || null,
+        nextBlackoutType: nextBlackout?.type || null,
+        nextBlackoutReason: nextBlackout?.reason || null,
+        upcomingBlackouts: upcomingBlackouts.map((row) => ({
+          blackoutDate: row.blackout_date,
+          type: row.type,
+          reason: row.reason,
+          affectedOrders: Number(row.affected_orders || 0),
+        })),
+        serviceBlockedDatesWithOrders: serviceBlockedDatesWithOrders.map((row) => ({
+          blackoutDate: row.blackout_date,
+          type: row.type,
+          reason: row.reason,
+          affectedOrders: Number(row.affected_orders || 0),
+        })),
         yesterday: kitchenYesterday,
         pastWeek: kitchenPastWeek,
       },
@@ -4651,6 +4707,8 @@ export class CoreService {
     if (!['KITCHEN', 'ADMIN'].includes(actor.role)) throw new ForbiddenException('Role not allowed');
     const serviceDate = dateRaw ? this.validateServiceDate(dateRaw) : this.makassarTodayIsoDate();
     await this.lockOrdersForServiceDateIfCutoffPassed(serviceDate);
+    const blackout = await this.getBlackoutRuleForDate(serviceDate);
+    const serviceBlocked = blackout?.type === 'SERVICE_BLOCK' || blackout?.type === 'BOTH';
 
     const totalsOut = await runSql(
       `
@@ -4765,6 +4823,9 @@ export class CoreService {
 
     return {
       serviceDate,
+      serviceBlocked,
+      blackoutType: blackout?.type || null,
+      blackoutReason: blackout?.reason || null,
       totals: {
         totalOrders: Number(totals.total_orders || 0),
         totalDishes: Number(totals.total_dishes || 0),

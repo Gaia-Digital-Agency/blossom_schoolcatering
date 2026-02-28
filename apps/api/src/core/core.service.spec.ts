@@ -1,5 +1,6 @@
 import { CoreService } from './core.service';
 import { runSql } from '../auth/db.util';
+import { BadRequestException } from '@nestjs/common';
 
 jest.mock('../auth/db.util', () => ({
   runSql: jest.fn(),
@@ -87,5 +88,115 @@ describe('CoreService ownership and cutoff rules', () => {
         },
       ),
     ).rejects.toThrow('ORDER_CHILD_UPDATE_FORBIDDEN');
+  });
+
+  it('returns ORDER_SERVICE_BLOCKED when service blackout type is SERVICE_BLOCK', async () => {
+    mockedRunSql
+      .mockResolvedValueOnce('2')
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          blackout_date: '2099-01-12',
+          type: 'SERVICE_BLOCK',
+          reason: 'Kitchen maintenance',
+        }),
+      );
+
+    await expect(
+      (service as any).validateOrderDayRules('2099-01-12'),
+    ).rejects.toThrow('ORDER_SERVICE_BLOCKED');
+  });
+
+  it('uses blackout guard in createCart flow', async () => {
+    jest
+      .spyOn(service as any, 'validateOrderDayRules')
+      .mockRejectedValue(new BadRequestException('ORDER_SERVICE_BLOCKED'));
+
+    await expect(
+      service.createCart(
+        { uid: 'admin-1', role: 'ADMIN', sub: 'admin_user' },
+        { childId: 'child-1', serviceDate: '2099-01-13', session: 'LUNCH' },
+      ),
+    ).rejects.toThrow('ORDER_SERVICE_BLOCKED');
+  });
+
+  it('uses blackout guard in submitCart flow', async () => {
+    jest.spyOn(service as any, 'ensureCartIsOpenAndOwned').mockResolvedValue({
+      id: 'cart-1',
+      child_id: 'child-1',
+      created_by_user_id: 'admin-1',
+      session: 'LUNCH',
+      service_date: '2099-01-13',
+      status: 'OPEN',
+      expires_at: '2099-01-13T00:00:00.000Z',
+    });
+    mockedRunSql.mockResolvedValueOnce(
+      JSON.stringify({
+        menu_item_id: 'menu-1',
+        quantity: 1,
+        name: 'Rice Bowl',
+        price: '15000',
+      }),
+    );
+    jest
+      .spyOn(service as any, 'validateOrderDayRules')
+      .mockRejectedValue(new BadRequestException('ORDER_SERVICE_BLOCKED'));
+
+    await expect(
+      service.submitCart({ uid: 'admin-1', role: 'ADMIN', sub: 'admin_user' }, 'cart-1'),
+    ).rejects.toThrow('ORDER_SERVICE_BLOCKED');
+  });
+
+  it('uses blackout guard in updateOrder flow', async () => {
+    mockedRunSql.mockResolvedValueOnce(
+      JSON.stringify({
+        id: 'order-4',
+        child_id: 'child-4',
+        service_date: '2099-01-15',
+        session: 'LUNCH',
+        status: 'PLACED',
+        total_price: '10000',
+        dietary_snapshot: '',
+      }),
+    );
+    jest.spyOn(service as any, 'getParentIdByUserId').mockResolvedValue('parent-1');
+    jest.spyOn(service as any, 'ensureParentOwnsChild').mockResolvedValue(undefined);
+    jest.spyOn(service as any, 'isAfterOrAtMakassarCutoff').mockReturnValue(false);
+    jest
+      .spyOn(service as any, 'validateOrderDayRules')
+      .mockRejectedValue(new BadRequestException('ORDER_SERVICE_BLOCKED'));
+
+    await expect(
+      service.updateOrder(
+        { uid: 'user-parent', role: 'PARENT', sub: 'parent_user' },
+        'order-4',
+        {
+          serviceDate: '2099-01-15',
+          session: 'LUNCH',
+          items: [{ menuItemId: 'menu-1', quantity: 1 }],
+        },
+      ),
+    ).rejects.toThrow('ORDER_SERVICE_BLOCKED');
+  });
+
+  it('uses blackout guard in quickReorder flow', async () => {
+    mockedRunSql.mockResolvedValueOnce(
+      JSON.stringify({
+        id: 'order-5',
+        child_id: 'child-5',
+        session: 'LUNCH',
+        status: 'PLACED',
+      }),
+    );
+    jest.spyOn(service as any, 'getChildIdByUserId').mockResolvedValue('child-5');
+    jest
+      .spyOn(service as any, 'createCart')
+      .mockRejectedValue(new BadRequestException('ORDER_SERVICE_BLOCKED'));
+
+    await expect(
+      service.quickReorder(
+        { uid: 'user-youngster', role: 'YOUNGSTER', sub: 'youngster_user' },
+        { sourceOrderId: 'order-5', serviceDate: '2099-01-20' },
+      ),
+    ).rejects.toThrow('ORDER_SERVICE_BLOCKED');
   });
 });
