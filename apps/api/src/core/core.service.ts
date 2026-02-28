@@ -49,6 +49,7 @@ export class CoreService {
   private menuItemExtendedColumnsReady = false;
   private menuRatingsTableReady = false;
   private parentDietaryRestrictionsReady = false;
+  private childRegistrationSourceColumnsReady = false;
   private deliverySchoolAssignmentsReady = false;
   private sessionSettingsReady = false;
 
@@ -957,7 +958,18 @@ export class CoreService {
     return this.parseJsonLines(out);
   }
 
+  private async ensureChildRegistrationSourceColumns() {
+    if (this.childRegistrationSourceColumnsReady) return;
+    await runSql(`
+      ALTER TABLE children
+      ADD COLUMN IF NOT EXISTS registration_actor_type varchar(20) NOT NULL DEFAULT 'PARENT',
+      ADD COLUMN IF NOT EXISTS registration_actor_teacher_name varchar(50);
+    `);
+    this.childRegistrationSourceColumnsReady = true;
+  }
+
   async getAdminChildren() {
+    await this.ensureChildRegistrationSourceColumns();
     const out = await runSql(`
       SELECT row_to_json(t)::text
       FROM (
