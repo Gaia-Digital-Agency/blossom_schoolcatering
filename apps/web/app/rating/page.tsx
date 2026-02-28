@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { apiFetch, clearAuthState, fetchWithTimeout, getApiBase, ROLE_KEY } from '../../lib/auth';
+import { apiFetch, clearAuthState, fetchWithTimeout, getApiBase } from '../../lib/auth';
 
 type PublicMenuItem = {
   id: string;
@@ -49,11 +49,6 @@ export default function RatingPage() {
   const [selectedStars, setSelectedStars] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    const role = localStorage.getItem(ROLE_KEY);
-    if (role !== 'PARENT' && role !== 'YOUNGSTER') {
-      router.replace('/login');
-      return;
-    }
     const load = async () => {
       try {
         const res = await fetchWithTimeout(`${getApiBase()}/public/menu`, {
@@ -69,7 +64,7 @@ export default function RatingPage() {
       }
     };
     load().catch(() => undefined);
-  }, [router]);
+  }, []);
 
   const starOptions = useMemo(() => [1, 2, 3, 4, 5], []);
 

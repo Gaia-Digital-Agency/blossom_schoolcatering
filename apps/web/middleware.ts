@@ -56,7 +56,7 @@ export function middleware(request: NextRequest) {
     normalizedPath === '/youngster/login';
 
   if (isRatingPath) {
-    if (!hasToken || (role !== 'PARENT' && role !== 'YOUNGSTER')) {
+    if (!hasToken) {
       return NextResponse.redirect(new URL(`${BASE_PATH}/login`, request.url));
     }
     return NextResponse.next();
