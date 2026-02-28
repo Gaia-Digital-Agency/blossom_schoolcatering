@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import ingredientMaster from '../../../../../docs/master_data/ingredient.json';
 import dishMaster from '../../../../../docs/master_data/dish.json';
 import { apiFetch } from '../../../lib/auth';
@@ -107,6 +107,8 @@ export default function AdminMenuPage() {
   const [itemImageUrl, setItemImageUrl] = useState('');
   const [itemImageFileName, setItemImageFileName] = useState('');
   const [uploadInputKey, setUploadInputKey] = useState(0);
+  const [imageConverting, setImageConverting] = useState(false);
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const [savingItem, setSavingItem] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [itemAvailable, setItemAvailable] = useState(true);
@@ -178,11 +180,16 @@ export default function AdminMenuPage() {
     setMenuItems(menu.items || []);
   };
 
+  const clearUploadSelection = () => {
+    setItemImageFileName('');
+    setUploadInputKey((k) => k + 1);
+    if (uploadInputRef.current) uploadInputRef.current.value = '';
+  };
+
   const onLoadMenuContext = async () => {
     setError('');
     setMessage('');
-    setItemImageFileName('');
-    setUploadInputKey((k) => k + 1);
+    clearUploadSelection();
     setActionLoading(true);
     try {
       await loadMenuData();
@@ -206,8 +213,7 @@ export default function AdminMenuPage() {
     setItemPrice('');
     setItemCaloriesKcal('');
     setItemImageUrl('');
-    setItemImageFileName('');
-    setUploadInputKey((k) => k + 1);
+    clearUploadSelection();
     setItemAvailable(true);
     setItemDisplayOrder('1');
     setItemCutleryRequired(true);
@@ -221,6 +227,7 @@ export default function AdminMenuPage() {
     if (!file) return;
     setError('');
     setMessage('');
+    setImageConverting(true);
     try {
       const asWebpDataUrl = await fileToWebpDataUrl(file);
       setItemImageUrl(asWebpDataUrl);
@@ -228,6 +235,8 @@ export default function AdminMenuPage() {
       setMessage(`Image converted to WebP and attached: ${file.name || 'uploaded-image.webp'}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed converting image to WebP');
+    } finally {
+      setImageConverting(false);
     }
   };
 
@@ -251,6 +260,10 @@ export default function AdminMenuPage() {
     setMessage('');
     if (itemIngredientIds.length > ingredientLimit) {
       setError(`Maximum ${ingredientLimit} ingredients per dish.`);
+      return;
+    }
+    if (imageConverting) {
+      setError('Image conversion in progress. Wait for conversion to finish before saving.');
       return;
     }
     if (!itemImageUrl.trim()) {
@@ -443,8 +456,7 @@ export default function AdminMenuPage() {
     setItemPrice(String(item.price));
     setItemCaloriesKcal(item.calories_kcal === null || item.calories_kcal === undefined ? '' : String(item.calories_kcal));
     setItemImageUrl(item.image_url || '');
-    setItemImageFileName('');
-    setUploadInputKey((k) => k + 1);
+    clearUploadSelection();
     setItemAvailable(Boolean(item.is_available));
     setItemDisplayOrder(String(item.display_order ?? 0));
     setItemCutleryRequired(Boolean(item.cutlery_required));
@@ -517,10 +529,10 @@ export default function AdminMenuPage() {
               {actionLoading ? 'Loading...' : 'Load Menu Context'}
             </button>
             <button className="btn btn-outline" type="button" onClick={onSeed} disabled={savingItem || actionLoading}>Seed Sample Menus</button>
-            <button className="btn btn-primary" type="submit" form="menu-item-form" disabled={savingItem || actionLoading}>
-              {savingItem ? 'Saving...' : (editingItemId ? 'Update Dish' : 'Create Dish')}
+            <button className="btn btn-primary" type="submit" form="menu-item-form" disabled={savingItem || actionLoading || imageConverting}>
+              {savingItem ? 'Saving...' : (imageConverting ? 'Converting Image...' : (editingItemId ? 'Update Dish' : 'Create Dish'))}
             </button>
-            {editingItemId ? <button className="btn btn-outline" type="button" onClick={resetForm} disabled={savingItem || actionLoading}>Cancel Edit</button> : null}
+            {editingItemId ? <button className="btn btn-outline" type="button" onClick={resetForm} disabled={savingItem || actionLoading || imageConverting}>Cancel Edit</button> : null}
           </div>
         </div>
 
@@ -532,13 +544,14 @@ export default function AdminMenuPage() {
 
           <label className="menu-full-row">Upload Image (WebP auto-convert, upload only)
             <input
+              ref={uploadInputRef}
               key={uploadInputKey}
               type="file"
               accept="image/*"
               onChange={(e) => onImageUpload(e.target.files?.[0])}
             />
           </label>
-          <p className="auth-help menu-full-row">Pending upload file: {itemImageFileName || '-'}</p>
+          <p className="auth-help menu-full-row">Pending upload file: {imageConverting ? 'Converting...' : (itemImageFileName || '-')}</p>
           {editingItemId ? <p className="auth-help menu-full-row">Current stored image: {getImageFileLabel(itemImageUrl)}</p> : null}
 
           <div className="menu-selection-columns menu-full-row">
