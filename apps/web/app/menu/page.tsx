@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { getApiBase } from '../../lib/auth';
+import { fetchWithTimeout, getApiBase } from '../../lib/auth';
 
 type PublicMenuItem = {
   id: string;
@@ -46,7 +46,7 @@ export default function MenuPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetch(`${getApiBase()}/public/menu`, {
+        const res = await fetchWithTimeout(`${getApiBase()}/public/menu`, {
           credentials: 'include',
           cache: 'no-store',
         });

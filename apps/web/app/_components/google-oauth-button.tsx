@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Script from 'next/script';
 import { useRouter } from 'next/navigation';
-import { Role, getApiBase, setAuthState } from '../../lib/auth';
+import { Role, fetchWithTimeout, getApiBase, setAuthState } from '../../lib/auth';
 
 declare global {
   interface Window {
@@ -46,7 +46,7 @@ export default function GoogleOAuthButton({ role, redirectPath, className }: Pro
         try {
           const idToken = response.credential;
           if (!idToken) throw new Error('Google token missing');
-          const res = await fetch(`${getApiBase()}/auth/google/verify`, {
+          const res = await fetchWithTimeout(`${getApiBase()}/auth/google/verify`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',

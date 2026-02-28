@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
-import { ACCESS_KEY, getApiBase } from '../../lib/auth';
+import { ACCESS_KEY, fetchWithTimeout, getApiBase } from '../../lib/auth';
 import PasswordInput from './password-input';
 
 type DevPageProps = {
@@ -26,7 +26,7 @@ export default function DevPage({ title, description }: DevPageProps) {
     }
     setSaving(true);
     try {
-      const res = await fetch(`${getApiBase()}/auth/change-password`, {
+      const res = await fetchWithTimeout(`${getApiBase()}/auth/change-password`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${accessToken}`,

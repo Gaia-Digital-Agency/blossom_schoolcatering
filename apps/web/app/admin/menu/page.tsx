@@ -105,6 +105,9 @@ export default function AdminMenuPage() {
   const [itemPrice, setItemPrice] = useState('');
   const [itemCaloriesKcal, setItemCaloriesKcal] = useState('');
   const [itemImageUrl, setItemImageUrl] = useState('');
+  const [itemImageFileName, setItemImageFileName] = useState('');
+  const [savingItem, setSavingItem] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
   const [itemAvailable, setItemAvailable] = useState(true);
   const [itemDisplayOrder, setItemDisplayOrder] = useState('1');
   const [itemCutleryRequired, setItemCutleryRequired] = useState(true);
@@ -174,6 +177,20 @@ export default function AdminMenuPage() {
     setMenuItems(menu.items || []);
   };
 
+  const onLoadMenuContext = async () => {
+    setError('');
+    setMessage('');
+    setActionLoading(true);
+    try {
+      await loadMenuData();
+      setMessage('Menu context loaded.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed loading menu context');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadMenuData().catch((e) => setError(e instanceof Error ? e.message : 'Failed'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -186,6 +203,7 @@ export default function AdminMenuPage() {
     setItemPrice('');
     setItemCaloriesKcal('');
     setItemImageUrl('');
+    setItemImageFileName('');
     setItemAvailable(true);
     setItemDisplayOrder('1');
     setItemCutleryRequired(true);
@@ -198,12 +216,28 @@ export default function AdminMenuPage() {
   const onImageUpload = async (file?: File | null) => {
     if (!file) return;
     setError('');
+    setMessage('');
     try {
       const asWebpDataUrl = await fileToWebpDataUrl(file);
       setItemImageUrl(asWebpDataUrl);
-      setMessage('Image converted to WebP and attached.');
+      setItemImageFileName(file.name || 'uploaded-image.webp');
+      setMessage(`Image converted to WebP and attached: ${file.name || 'uploaded-image.webp'}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed converting image to WebP');
+    }
+  };
+
+  const getImageFileLabel = (imageUrl?: string | null) => {
+    const raw = String(imageUrl || '').trim();
+    if (!raw) return '-';
+    if (raw.startsWith('data:image/')) return itemImageFileName || 'image.webp';
+    try {
+      const pathname = new URL(raw, 'http://localhost').pathname;
+      const fileName = pathname.split('/').pop() || raw;
+      return decodeURIComponent(fileName);
+    } catch {
+      const fileName = raw.split('/').pop() || raw;
+      return decodeURIComponent(fileName);
     }
   };
 
@@ -236,16 +270,23 @@ export default function AdminMenuPage() {
       packingRequirement: buildPackingRequirement(itemPackingCareRequired, itemWetDish),
     };
 
-    if (editingItemId) {
-      await apiFetch(`/admin/menu-items/${editingItemId}`, { method: 'PATCH', body: JSON.stringify(payload) });
-      setMessage('Dish updated.');
-    } else {
-      await apiFetch('/admin/menu-items', { method: 'POST', body: JSON.stringify(payload) });
-      setMessage('Dish created.');
+    setSavingItem(true);
+    try {
+      if (editingItemId) {
+        await apiFetch(`/admin/menu-items/${editingItemId}`, { method: 'PATCH', body: JSON.stringify(payload) });
+        setMessage('Dish updated.');
+      } else {
+        await apiFetch('/admin/menu-items', { method: 'POST', body: JSON.stringify(payload) });
+        setMessage('Dish created.');
+      }
+      resetForm();
+      await loadMenuData();
+      refreshPage();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed saving dish');
+    } finally {
+      setSavingItem(false);
     }
-    resetForm();
-    await loadMenuData();
-    refreshPage();
   };
 
   const onToggleIngredient = (ingredientId: string) => {
@@ -260,39 +301,47 @@ export default function AdminMenuPage() {
   };
 
   const onPickMasterIngredient = async (masterName: string) => {
-    let mappedId = ingredientIdByNormalizedName.get(normalize(masterName));
-    if (!mappedId) {
-      try {
-        await apiFetch('/admin/ingredients', {
-          method: 'POST',
-          body: JSON.stringify({
-            name: masterName,
-            allergenFlag: inferAllergenFlagFromName(masterName),
-          }),
-        });
-      } catch {
-        // Ignore conflict or transient create errors and fallback to reload.
-      }
-      const refreshed = await apiFetch('/admin/ingredients') as Ingredient[];
-      setIngredients(refreshed || []);
-      mappedId = (refreshed || []).find((x) => normalize(x.name) === normalize(masterName))?.id;
-      if (!mappedId) {
-        setError('Failed to auto-create ingredient from master data.');
-        return;
-      }
-      setMessage(`Ingredient auto-created: ${toLabel(masterName)}`);
-    }
     setError('');
-    const ingredientId = mappedId;
-    setItemIngredientIds((prev) => {
-      if (prev.includes(ingredientId)) return prev;
-      if (prev.length >= ingredientLimit) {
-        setError(`Maximum ${ingredientLimit} ingredients per dish.`);
-        return prev;
+    setMessage('');
+    setActionLoading(true);
+    try {
+      let mappedId = ingredientIdByNormalizedName.get(normalize(masterName));
+      if (!mappedId) {
+        try {
+          await apiFetch('/admin/ingredients', {
+            method: 'POST',
+            body: JSON.stringify({
+              name: masterName,
+              allergenFlag: inferAllergenFlagFromName(masterName),
+            }),
+          });
+        } catch {
+          // Ignore conflict or transient create errors and fallback to reload.
+        }
+        const refreshed = await apiFetch('/admin/ingredients') as Ingredient[];
+        setIngredients(refreshed || []);
+        mappedId = (refreshed || []).find((x) => normalize(x.name) === normalize(masterName))?.id;
+        if (!mappedId) {
+          setError('Failed to auto-create ingredient from master data.');
+          return;
+        }
+        setMessage(`Ingredient auto-created: ${toLabel(masterName)}`);
       }
-      return [...prev, ingredientId];
-    });
-    refreshPage();
+      const ingredientId = mappedId;
+      setItemIngredientIds((prev) => {
+        if (prev.includes(ingredientId)) return prev;
+        if (prev.length >= ingredientLimit) {
+          setError(`Maximum ${ingredientLimit} ingredients per dish.`);
+          return prev;
+        }
+        return [...prev, ingredientId];
+      });
+      refreshPage();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed adding ingredient');
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const onAddCustomDishOption = () => {
@@ -331,42 +380,56 @@ export default function AdminMenuPage() {
   const onAutoCreateDishFromMaster = async (dish: string) => {
     setError('');
     setMessage('');
-    const exists = menuItems.find((x) => x.name.trim().toLowerCase() === dish.trim().toLowerCase());
-    if (exists) {
-      onEditItem(exists);
-      setMessage('Dish already exists for selected date/session. Loaded into form.');
-      return;
+    setActionLoading(true);
+    try {
+      const exists = menuItems.find((x) => x.name.trim().toLowerCase() === dish.trim().toLowerCase());
+      if (exists) {
+        onEditItem(exists);
+        setMessage('Dish already exists for selected date/session. Loaded into form.');
+        return;
+      }
+      const payload = {
+        serviceDate: menuServiceDate,
+        session: menuSession,
+        name: dish,
+        description: dish,
+        nutritionFactsText: 'TBA',
+        caloriesKcal: null,
+        price: Number(itemPrice || 0),
+        imageUrl: itemImageUrl || '/schoolcatering/assets/hero-meal.jpg',
+        ingredientIds: itemIngredientIds,
+        isAvailable: true,
+        displayOrder: Math.max(0, ...menuItems.map((x) => Number(x.display_order || 0))) + 1,
+        cutleryRequired: itemCutleryRequired,
+        packingRequirement: buildPackingRequirement(itemPackingCareRequired, itemWetDish),
+      };
+      await apiFetch('/admin/menu-items', { method: 'POST', body: JSON.stringify(payload) });
+      setItemName(dish);
+      if (!itemDescription.trim()) setItemDescription(dish);
+      setMessage(`Dish auto-created: ${dish}`);
+      await loadMenuData();
+      refreshPage();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed auto-creating dish');
+    } finally {
+      setActionLoading(false);
     }
-    const payload = {
-      serviceDate: menuServiceDate,
-      session: menuSession,
-      name: dish,
-      description: dish,
-      nutritionFactsText: 'TBA',
-      caloriesKcal: null,
-      price: Number(itemPrice || 0),
-      imageUrl: itemImageUrl || '/schoolcatering/assets/hero-meal.jpg',
-      ingredientIds: itemIngredientIds,
-      isAvailable: true,
-      displayOrder: Math.max(0, ...menuItems.map((x) => Number(x.display_order || 0))) + 1,
-      cutleryRequired: itemCutleryRequired,
-      packingRequirement: buildPackingRequirement(itemPackingCareRequired, itemWetDish),
-    };
-    await apiFetch('/admin/menu-items', { method: 'POST', body: JSON.stringify(payload) });
-    setItemName(dish);
-    if (!itemDescription.trim()) setItemDescription(dish);
-    setMessage(`Dish auto-created: ${dish}`);
-    await loadMenuData();
-    refreshPage();
   };
 
   const onSeed = async () => {
     setError('');
     setMessage('');
-    await apiFetch('/admin/menus/sample-seed', { method: 'POST', body: JSON.stringify({ serviceDate: menuServiceDate }) });
-    setMessage('Sample menus seeded for selected date.');
-    await loadMenuData();
-    refreshPage();
+    setActionLoading(true);
+    try {
+      await apiFetch('/admin/menus/sample-seed', { method: 'POST', body: JSON.stringify({ serviceDate: menuServiceDate }) });
+      setMessage('Sample menus seeded for selected date.');
+      await loadMenuData();
+      refreshPage();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed seeding sample menus');
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const onEditItem = (item: AdminMenuItem) => {
@@ -376,6 +439,7 @@ export default function AdminMenuPage() {
     setItemPrice(String(item.price));
     setItemCaloriesKcal(item.calories_kcal === null || item.calories_kcal === undefined ? '' : String(item.calories_kcal));
     setItemImageUrl(item.image_url || '');
+    setItemImageFileName(getImageFileLabel(item.image_url));
     setItemAvailable(Boolean(item.is_available));
     setItemDisplayOrder(String(item.display_order ?? 0));
     setItemCutleryRequired(Boolean(item.cutlery_required));
@@ -388,6 +452,7 @@ export default function AdminMenuPage() {
   const onSetDishActive = async (item: AdminMenuItem, isAvailable: boolean) => {
     setError('');
     setMessage('');
+    setActionLoading(true);
     const previous = menuItems;
     setMenuItems((prev) => prev.map((x) => (x.id === item.id ? { ...x, is_available: isAvailable } : x)));
     try {
@@ -401,6 +466,8 @@ export default function AdminMenuPage() {
     } catch (e) {
       setMenuItems(previous);
       setError(e instanceof Error ? e.message : 'Failed updating dish availability');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -441,10 +508,14 @@ export default function AdminMenuPage() {
             </select>
           </label>
           <div className="menu-actions-row">
-            <button className="btn btn-outline" type="button" onClick={loadMenuData}>Load Menu Context</button>
-            <button className="btn btn-outline" type="button" onClick={onSeed}>Seed Sample Menus</button>
-            <button className="btn btn-primary" type="submit" form="menu-item-form">{editingItemId ? 'Update Dish' : 'Create Dish'}</button>
-            {editingItemId ? <button className="btn btn-outline" type="button" onClick={resetForm}>Cancel Edit</button> : null}
+            <button className="btn btn-outline" type="button" onClick={onLoadMenuContext} disabled={savingItem || actionLoading}>
+              {actionLoading ? 'Loading...' : 'Load Menu Context'}
+            </button>
+            <button className="btn btn-outline" type="button" onClick={onSeed} disabled={savingItem || actionLoading}>Seed Sample Menus</button>
+            <button className="btn btn-primary" type="submit" form="menu-item-form" disabled={savingItem || actionLoading}>
+              {savingItem ? 'Saving...' : (editingItemId ? 'Update Dish' : 'Create Dish')}
+            </button>
+            {editingItemId ? <button className="btn btn-outline" type="button" onClick={resetForm} disabled={savingItem || actionLoading}>Cancel Edit</button> : null}
           </div>
         </div>
 
@@ -457,6 +528,7 @@ export default function AdminMenuPage() {
           <label className="menu-full-row">Upload Image (WebP auto-convert, upload only)
             <input type="file" accept="image/*" onChange={(e) => onImageUpload(e.target.files?.[0])} />
           </label>
+          <p className="auth-help menu-full-row">Selected image file: {itemImageFileName || '-'}</p>
 
           <div className="menu-selection-columns menu-full-row">
             <div className="ingredient-selected-box">
@@ -548,6 +620,7 @@ export default function AdminMenuPage() {
                         type="button"
                         className="btn btn-outline ingredient-chip"
                         onClick={() => void onPickMasterIngredient(i.key)}
+                        disabled={savingItem || actionLoading}
                         title={mappedId ? 'Click to add ingredient' : 'Click to auto-create and add ingredient'}
                       >
                         {i.label}
@@ -572,14 +645,15 @@ export default function AdminMenuPage() {
                     <strong>{item.name}</strong>
                     <small>{item.description}</small>
                     <small>Image: {hasUploadedImage(item.image_url) ? 'Uploaded' : 'Default image'}</small>
+                    <small>Image File: {getImageFileLabel(item.image_url)}</small>
                     <small>Calories: {item.calories_kcal ?? 'TBA'}</small>
                     <small>Price: Rp {Number(item.price).toLocaleString('id-ID')}</small>
                     <small>Ingredients: {item.ingredients.map(toLabel).join(', ') || '-'}</small>
                     <small>Cutlery: {item.cutlery_required ? 'Required' : 'Not required'}</small>
                     <small>Packing: {item.packing_requirement || '-'}</small>
                     <div className="menu-actions-row">
-                      <button className="btn btn-outline" type="button" onClick={() => onEditItem(item)}>Edit Dish</button>
-                      <button className="btn btn-outline" type="button" onClick={() => onSetDishActive(item, false)}>Deactivate</button>
+                      <button className="btn btn-outline" type="button" onClick={() => onEditItem(item)} disabled={savingItem || actionLoading}>Edit Dish</button>
+                      <button className="btn btn-outline" type="button" onClick={() => onSetDishActive(item, false)} disabled={savingItem || actionLoading}>Deactivate</button>
                     </div>
                   </label>
                 ))}
@@ -594,14 +668,15 @@ export default function AdminMenuPage() {
                     <strong>{item.name}</strong>
                     <small>{item.description}</small>
                     <small>Image: {hasUploadedImage(item.image_url) ? 'Uploaded' : 'Default image'}</small>
+                    <small>Image File: {getImageFileLabel(item.image_url)}</small>
                     <small>Calories: {item.calories_kcal ?? 'TBA'}</small>
                     <small>Price: Rp {Number(item.price).toLocaleString('id-ID')}</small>
                     <small>Ingredients: {item.ingredients.map(toLabel).join(', ') || '-'}</small>
                     <small>Cutlery: {item.cutlery_required ? 'Required' : 'Not required'}</small>
                     <small>Packing: {item.packing_requirement || '-'}</small>
                     <div className="menu-actions-row">
-                      <button className="btn btn-outline" type="button" onClick={() => onEditItem(item)}>Edit Dish</button>
-                      <button className="btn btn-outline" type="button" onClick={() => onSetDishActive(item, true)}>Activate</button>
+                      <button className="btn btn-outline" type="button" onClick={() => onEditItem(item)} disabled={savingItem || actionLoading}>Edit Dish</button>
+                      <button className="btn btn-outline" type="button" onClick={() => onSetDishActive(item, true)} disabled={savingItem || actionLoading}>Activate</button>
                     </div>
                   </label>
                 ))}

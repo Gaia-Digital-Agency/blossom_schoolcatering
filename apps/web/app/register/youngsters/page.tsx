@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { getApiBase } from '../../../lib/auth';
+import { fetchWithTimeout, getApiBase } from '../../../lib/auth';
 
 type School = {
   id: string;
@@ -49,7 +49,7 @@ export default function YoungsterRegisterPage() {
     const run = async () => {
       try {
         setLoadingSchools(true);
-        const res = await fetch(`${getApiBase()}/auth/register/schools`, { credentials: 'include' });
+        const res = await fetchWithTimeout(`${getApiBase()}/auth/register/schools`, { credentials: 'include' });
         if (!res.ok) throw new Error('Failed to load schools');
         const data = (await res.json()) as School[];
         if (!active) return;
@@ -80,7 +80,7 @@ export default function YoungsterRegisterPage() {
     setSuccess(null);
     setSubmitting(true);
     try {
-      const res = await fetch(`${getApiBase()}/auth/register/youngsters`, {
+      const res = await fetchWithTimeout(`${getApiBase()}/auth/register/youngsters`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

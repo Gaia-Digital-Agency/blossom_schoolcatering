@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getApiBase, setAuthState } from '../../lib/auth';
+import { fetchWithTimeout, getApiBase, setAuthState } from '../../lib/auth';
 import PasswordInput from '../_components/password-input';
 
 export default function LoginPage() {
@@ -17,7 +17,7 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      const res = await fetch(`${getApiBase()}/auth/login`, {
+      const res = await fetchWithTimeout(`${getApiBase()}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

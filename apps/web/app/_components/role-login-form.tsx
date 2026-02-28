@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Role, getApiBase, setAuthState } from '../../lib/auth';
+import { Role, fetchWithTimeout, getApiBase, setAuthState } from '../../lib/auth';
 import PasswordInput from './password-input';
 
 type Props = {
@@ -31,7 +31,7 @@ export default function RoleLoginForm({
     setError('');
     setLoading(true);
     try {
-      const res = await fetch(`${getApiBase()}/auth/login`, {
+      const res = await fetchWithTimeout(`${getApiBase()}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

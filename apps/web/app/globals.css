@@ -35,6 +35,21 @@ body:not(.home-page) {
   overflow-y: auto;
 }
 
+.global-network-indicator {
+  position: fixed;
+  top: 0.6rem;
+  right: 0.6rem;
+  z-index: 9999;
+  background: rgba(20, 16, 11, 0.92);
+  color: #f7e4bf;
+  border: 1px solid #715a33;
+  border-radius: 999px;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  pointer-events: none;
+}
+
 .site-wrap {
   height: 100dvh;
   max-height: 100dvh;

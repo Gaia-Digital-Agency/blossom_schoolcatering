@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { clearAuthState, getApiBase, refreshAccessToken } from '../../lib/auth';
+import { clearAuthState, fetchWithTimeout, getApiBase, refreshAccessToken } from '../../lib/auth';
 
 type Profile = {
   username: string;
@@ -23,14 +23,14 @@ export default function DashboardPage() {
     }
     const loadProfile = async () => {
       let accessToken = token;
-      let res = await fetch(`${getApiBase()}/auth/me`, {
+      let res = await fetchWithTimeout(`${getApiBase()}/auth/me`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (res.status === 401) {
         const refreshed = await refreshAccessToken();
         if (!refreshed) throw new Error('Session expired. Please log in again.');
         accessToken = refreshed;
-        res = await fetch(`${getApiBase()}/auth/me`, {
+        res = await fetchWithTimeout(`${getApiBase()}/auth/me`, {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
       }
@@ -42,7 +42,7 @@ export default function DashboardPage() {
   }, [router]);
 
   const onLogout = async () => {
-    await fetch(`${getApiBase()}/auth/logout`, {
+    await fetchWithTimeout(`${getApiBase()}/auth/logout`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
