@@ -499,7 +499,9 @@ export default function AdminMenuPage() {
   const onEditItem = (item: AdminMenuItem) => {
     setEditingItemId(item.id);
     setItemName(item.name);
-    setItemDishCategory((String(item.dish_category || 'MAIN').toUpperCase() as 'MAIN' | 'APPETISER' | 'COMPLEMENT' | 'DESSERT' | 'SIDES' | 'GARNISH' | 'DRINK'));
+    const rawCategory = String(item.dish_category || 'MAIN').toUpperCase();
+    const normalizedCategory = rawCategory === 'SNACKS' ? 'SIDES' : rawCategory;
+    setItemDishCategory((normalizedCategory as 'MAIN' | 'APPETISER' | 'COMPLEMENT' | 'DESSERT' | 'SIDES' | 'GARNISH' | 'DRINK'));
     setItemDescription(item.description);
     setItemPrice(String(item.price));
     setItemCaloriesKcal(item.calories_kcal === null || item.calories_kcal === undefined ? '' : String(item.calories_kcal));
@@ -535,6 +537,26 @@ export default function AdminMenuPage() {
     } catch (e) {
       setMenuItems(previous);
       setError(e instanceof Error ? e.message : 'Failed updating dish availability');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const onDeleteDish = async (item: AdminMenuItem) => {
+    const ok = window.confirm(`Delete deactivated dish "${item.name}"? This action cannot be undone.`);
+    if (!ok) return;
+    setError('');
+    setMessage('');
+    setActionLoading(true);
+    try {
+      await apiFetch(`/admin/menu-items/${item.id}`, {
+        method: 'DELETE',
+      }, { skipAutoReload: true });
+      setMessage('Dish deleted.');
+      if (editingItemId === item.id) resetForm();
+      await loadMenuData();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed deleting dish');
     } finally {
       setActionLoading(false);
     }
@@ -593,12 +615,12 @@ export default function AdminMenuPage() {
             Dish Label
             <select value={itemDishCategory} onChange={(e) => setItemDishCategory(e.target.value as 'MAIN' | 'APPETISER' | 'COMPLEMENT' | 'DESSERT' | 'SIDES' | 'GARNISH' | 'DRINK')} required>
               <option value="MAIN">Main</option>
+              <option value="DRINK">Drinks</option>
               <option value="APPETISER">Appetiser</option>
+              <option value="GARNISH">Garnish</option>
               <option value="COMPLEMENT">Complement</option>
               <option value="DESSERT">Dessert</option>
               <option value="SIDES">Sides</option>
-              <option value="GARNISH">Garnish</option>
-              <option value="DRINK">Drink</option>
             </select>
           </label>
           <label>Description<input value={itemDescription} onChange={(e) => setItemDescription(e.target.value)} required /></label>
@@ -785,6 +807,7 @@ export default function AdminMenuPage() {
                     <div className="menu-actions-row">
                       <button className="btn btn-outline" type="button" onClick={() => onEditItem(item)} disabled={savingItem || actionLoading}>Edit Dish</button>
                       <button className="btn btn-outline" type="button" onClick={() => onSetDishActive(item, true)} disabled={savingItem || actionLoading}>Activate</button>
+                      <button className="btn btn-outline" type="button" onClick={() => onDeleteDish(item)} disabled={savingItem || actionLoading}>Delete Dish</button>
                     </div>
                   </label>
                 ))}

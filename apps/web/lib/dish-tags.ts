@@ -15,6 +15,7 @@ export function formatDishCategoryLabel(raw?: string): string {
   if (value === 'SIDES') return 'Sides';
   if (value === 'GARNISH') return 'Garnish';
   if (value === 'DRINK') return 'Drink';
+  if (value === 'SNACKS') return 'Sides';
   return 'Main';
 }
 

@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { fetchWithTimeout, getApiBase } from '../../lib/auth';
-import { formatDishCategoryLabel, formatDishDietaryTags } from '../../lib/dish-tags';
+import { formatDishDietaryTags } from '../../lib/dish-tags';
 
 type PublicMenuItem = {
   id: string;
@@ -45,6 +45,16 @@ function resolveDishImageSrc(item: PublicMenuItem) {
   return withCacheBust(normalized, item.updated_at);
 }
 
+const CATEGORY_GROUPS: Array<{ code: string; label: string }> = [
+  { code: 'MAIN', label: 'Main' },
+  { code: 'DRINK', label: 'Drinks' },
+  { code: 'APPETISER', label: 'Appetiser' },
+  { code: 'GARNISH', label: 'Garnish' },
+  { code: 'COMPLEMENT', label: 'Complement' },
+  { code: 'DESSERT', label: 'Dessert' },
+  { code: 'SIDES', label: 'Sides' },
+];
+
 export default function MenuPage() {
   const [items, setItems] = useState<PublicMenuItem[]>([]);
   const [serviceDate, setServiceDate] = useState('');
@@ -68,6 +78,20 @@ export default function MenuPage() {
     load().catch(() => undefined);
   }, []);
 
+  const groupedItems = useMemo(() => {
+    const byCategory = new Map<string, PublicMenuItem[]>();
+    for (const item of items) {
+      const rawCode = String(item.dish_category || 'MAIN').toUpperCase();
+      const code = rawCode === 'SNACKS' ? 'SIDES' : rawCode;
+      const list = byCategory.get(code) || [];
+      list.push(item);
+      byCategory.set(code, list);
+    }
+    return CATEGORY_GROUPS
+      .map((group) => ({ ...group, items: byCategory.get(group.code) || [] }))
+      .filter((group) => group.items.length > 0);
+  }, [items]);
+
   return (
     <main className="page-auth page-auth-mobile">
       <section className="auth-panel">
@@ -79,27 +103,33 @@ export default function MenuPage() {
         {items.length === 0 ? (
           <p className="auth-help">No active dishes available.</p>
         ) : (
-          <div className="menu-public-grid">
-            {items.map((item) => (
-              <article className="menu-public-card" key={item.id}>
-                <img
-                  src={resolveDishImageSrc(item)}
-                  alt={item.name}
-                  loading="lazy"
-                  onError={(e) => {
-                    const target = e.currentTarget;
-                    if (target.src.includes(FALLBACK_DISH_IMAGE)) return;
-                    target.src = FALLBACK_DISH_IMAGE;
-                  }}
-                />
-                <div>
-                  <strong>{item.name}</strong>
-                  <small>Rp {Number(item.price || 0).toLocaleString('id-ID')}</small>
-                  <small>Category: {formatDishCategoryLabel(item.dish_category)}</small>
-                  <small>Dietary: {formatDishDietaryTags(item)}</small>
-                  <small>{item.session}</small>
+          <div className="menu-category-grid">
+            {groupedItems.map((group) => (
+              <section className="menu-category-card" key={group.code}>
+                <h2>{group.label}</h2>
+                <div className="menu-public-grid">
+                  {group.items.map((item) => (
+                    <article className="menu-public-card" key={item.id}>
+                      <img
+                        src={resolveDishImageSrc(item)}
+                        alt={item.name}
+                        loading="lazy"
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          if (target.src.includes(FALLBACK_DISH_IMAGE)) return;
+                          target.src = FALLBACK_DISH_IMAGE;
+                        }}
+                      />
+                      <div>
+                        <strong>{item.name}</strong>
+                        <small>Rp {Number(item.price || 0).toLocaleString('id-ID')}</small>
+                        <small>Dietary: {formatDishDietaryTags(item)}</small>
+                        <small>{item.session}</small>
+                      </div>
+                    </article>
+                  ))}
                 </div>
-              </article>
+              </section>
             ))}
           </div>
         )}
@@ -110,6 +140,24 @@ export default function MenuPage() {
         </div>
       </section>
       <style jsx>{`
+        .menu-category-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 0.85rem;
+        }
+        .menu-category-card {
+          border: 1px solid #d8cab1;
+          border-radius: 0.85rem;
+          background: #fffdf9;
+          padding: 0.65rem;
+          display: grid;
+          gap: 0.6rem;
+        }
+        .menu-category-card h2 {
+          margin: 0;
+          font-size: 1rem;
+          color: #3b332a;
+        }
         .menu-public-grid {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -139,8 +187,11 @@ export default function MenuPage() {
           color: #5d554b;
         }
         @media (min-width: 900px) {
+          .menu-category-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
           .menu-public-grid {
-            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-template-columns: repeat(2, minmax(0, 1fr));
           }
         }
       `}</style>

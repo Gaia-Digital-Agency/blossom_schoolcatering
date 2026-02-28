@@ -662,6 +662,8 @@ export class CoreService {
 
   private normalizeDishCategory(value?: string): DishCategory {
     const normalized = String(value || '').trim().toUpperCase();
+    // Backward compatibility: old SNACKS label is folded into SIDES.
+    if (normalized === 'SNACKS') return 'SIDES';
     if ((DISH_CATEGORIES as readonly string[]).includes(normalized)) {
       return normalized as DishCategory;
     }
@@ -5141,9 +5143,39 @@ export class CoreService {
   async deleteMenuItem(actor: AccessUser, itemId: string) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     this.assertValidUuid(itemId, 'itemId');
+
+    const itemOut = await runSql(
+      `SELECT row_to_json(t)::text
+       FROM (
+         SELECT id, is_available, deleted_at::text AS deleted_at
+         FROM menu_items
+         WHERE id = $1
+         LIMIT 1
+       ) t;`,
+      [itemId],
+    );
+    if (!itemOut) throw new NotFoundException('Menu item not found');
+    const item = this.parseJsonLine<{ id: string; is_available: boolean; deleted_at?: string | null }>(itemOut);
+
+    if (item.is_available) {
+      throw new BadRequestException('Deactivate dish first before deleting permanently');
+    }
+
+    const cartRef = await runSql(`SELECT EXISTS (SELECT 1 FROM cart_items WHERE menu_item_id = $1);`, [itemId]);
+    if (cartRef === 't') throw new BadRequestException('Dish cannot be deleted: referenced by cart items');
+
+    const orderRef = await runSql(`SELECT EXISTS (SELECT 1 FROM order_items WHERE menu_item_id = $1);`, [itemId]);
+    if (orderRef === 't') throw new BadRequestException('Dish cannot be deleted: referenced by order history');
+
+    const favouriteRef = await runSql(`SELECT EXISTS (SELECT 1 FROM favourite_meal_items WHERE menu_item_id = $1);`, [itemId]);
+    if (favouriteRef === 't') throw new BadRequestException('Dish cannot be deleted: referenced by favourites');
+
+    const analyticsRef = await runSql(`SELECT EXISTS (SELECT 1 FROM analytics_daily_agg WHERE menu_item_id = $1);`, [itemId]);
+    if (analyticsRef === 't') throw new BadRequestException('Dish cannot be deleted: referenced by analytics');
+
     const out = await runSql(
-      `UPDATE menu_items SET deleted_at = now(), is_available = false, updated_at = now()
-       WHERE id = $1 AND deleted_at IS NULL
+      `DELETE FROM menu_items
+       WHERE id = $1
        RETURNING id;`,
       [itemId],
     );
