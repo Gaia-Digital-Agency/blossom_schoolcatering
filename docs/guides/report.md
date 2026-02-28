@@ -1,24 +1,31 @@
 # Report User Guide
 
+Last updated: 2026-02-28
+
 ## Access
 - Route: `/schoolcatering/admin/reports`
 - Role: `ADMIN`
 
-## Report Type
-- Revenue dashboard (`/admin/revenue` API)
+## Report Scope
+- Revenue and order/billing analytics via admin reporting API.
 
 ## Filters
-- Date range: `From`, `To`
-- Calendar slices: `Day`, `Month`, `Year`
-- Scope: `School`, `Delivery`, `Parent`
-- Business filters: `Session`, `Dish`, `Order Status`, `Billing Status`
+- Date range: `from`, `to`
+- Calendar focus: `day`, `month`, `year`
+- Scope filters:
+  - school
+  - delivery user
+  - parent
+  - session
+  - dish
+  - order status
+  - billing status
 
-## Output Blocks
+## Outputs
 - Total orders
 - Total revenue
-- Breakdown by school
-- Breakdown by session
+- School and session breakdowns
 
-## Usage Notes
-- Start with broad filters (`ALL`) and narrow down incrementally
-- Use the same date range when comparing school/session output
+## Usage Guidance
+- Start broad, then narrow by school/session to isolate anomalies.
+- Keep date range consistent when comparing different filters.

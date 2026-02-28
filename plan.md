@@ -1,12 +1,12 @@
 # Blossom School Catering Plan (Now -> Go-Live)
 
-Last updated: 2026-02-26
+Last updated: 2026-02-28
 Target go-live: 2026-04-01
 
-## Execution Note (Next Session: 2026-02-26)
+## Execution Note (Next Session: 2026-03-01)
 - Steps 1-5 are completed for current scope.
-- Tomorrow focus: Steps 6-10 only.
-- For Steps 6-10, implementation must align with:
+- Tomorrow focus: Steps 10-14 only.
+- For Steps 10-14, implementation must align with:
   - `docs/specifications/*` (API/RBAC/order/data contracts)
   - `docs/strategy/*` (approved scope and intake assumptions)
   - `docs/master_data/*` (master data shape and sample references)
@@ -111,22 +111,14 @@ Target go-live: 2026-04-01
 - [x] Birthday highlight indicators
 - [x] Clean Plate Club badge engine + display
 
-## 10) CSV Import and Data Operations
-- [ ] Define CSV template (parents + youngsters)
-- [ ] Build CSV import endpoint + validation
-- [ ] Import result report (success/fail + reasons)
-- [ ] Add admin UI for CSV upload and review
-- [ ] Add seed scripts for demo/test datasets
-
-## 11) API and Contract Completion
-- [ ] Implement endpoints from `docs/specifications/api-contract.md`
-- [ ] Request validation (DTO/class-validator)
+## 10) API and Contract Completion
+- [x] Request validation (DTO/class-validator)
 - [ ] OpenAPI docs generation at `/api/v1/docs`
 - [ ] Error response standardization
 - [ ] Correlation ID middleware
-- [ ] Rate limiting on sensitive endpoints
+- [x] Rate limiting on sensitive endpoints
 
-## 12) Security and Compliance
+## 11) Security and Compliance
 - [ ] Password policy and secure reset flow
 - [ ] Strict RBAC test matrix
 - [ ] Upload scanning/validation hardening
@@ -135,25 +127,24 @@ Target go-live: 2026-04-01
 - [ ] Privacy and Confidentiality page (public)
 - [ ] Basic audit trail for admin-critical actions
 
-## 13) Observability and Reliability
+## 12) Observability and Reliability
 - [ ] Structured logs (JSON)
 - [ ] Request/exception monitoring setup
 - [ ] DB backup and restore runbook + dry run
 - [ ] Healthcheck endpoints (`/health`, `/ready`)
-- [ ] PM2 ecosystem config and startup persistence
+- [x] PM2 ecosystem config and startup persistence
 - [ ] Nginx cache/compression/security headers review
-- [ ] Optional CDN hostname switch for asset delivery
 
-## 14) Testing and Quality Gates
+## 13) Testing and Quality Gates
 - [ ] Unit tests (validators, rules, pricing, badge logic)
 - [ ] Integration tests (API + DB flows)
 - [ ] E2E system tests per role
-- [ ] UAT scenarios with school operations
+- [x] UAT scenarios with school operations
 - [ ] Regression suite for cutoff/weekdays/blackouts
 - [ ] Security testing pass
 - [ ] Performance testing under peak ordering load
 
-## 15) Release Preparation
+## 14) Release Preparation
 - [ ] Create production `.env` template and final values checklist
 - [ ] Final migration plan for production DB
 - [ ] Go-live runbook with hour-by-hour steps
@@ -161,7 +152,7 @@ Target go-live: 2026-04-01
 - [ ] Final SEO check (title/meta/robots/sitemap canonical)
 - [ ] Stakeholder sign-off from product + ops + QA
 
-## 16) Go-Live Day
+## 15) Go-Live Day
 - [ ] Freeze non-critical changes
 - [ ] Deploy tagged release
 - [ ] Run smoke tests (all roles + key flows)
@@ -169,13 +160,13 @@ Target go-live: 2026-04-01
 - [ ] Verify logs/alerts and backup jobs
 - [ ] Announce go-live and monitor first-day incidents
 
-## 17) Post Go-Live (Week 1-2)
+## 16) Post Go-Live (Week 1-2)
 - [ ] Bug triage daily and hotfix SLA
 - [ ] Monitor conversion/drop-off in order funnel
 - [ ] Monitor performance and DB query hotspots
 - [ ] Prioritize v1.1 backlog from real usage
 
-## 18) Suggested Execution Order (Critical Path)
+## 17) Suggested Execution Order (Critical Path)
 This list maps directly to Sections **2-17** above for easy cross-reference.
 
 1 Create Baseline & Plan - Complete
@@ -187,11 +178,10 @@ This list maps directly to Sections **2-17** above for easy cross-reference.
 7 (Ordering Module Pages - Advanced) -  Complete
 8 (Billing Module Pages - Receipt + Payment) - Complete
 9 (Delivery + Kitchen + Admin Module Pages) - Complete
-10 (CSV Import and Data Operations) -   
-11 (API and Contract Completion) - 
-12 (Security and Compliance) - 
-13 (Observability and Reliability) -   
-14 (Testing and Quality Gates) - 
-15 (Release Preparation) - 
-16 (Go-Live Day) - 
-17 (Post Go-Live Week 1-2) - 
+10 (API and Contract Completion) - In Progress
+11 (Security and Compliance) - 
+12 (Observability and Reliability) - In Progress  
+13 (Testing and Quality Gates) - In Progress
+14 (Release Preparation) - 
+15 (Go-Live Day) - 
+16 (Post Go-Live Week 1-2) - 

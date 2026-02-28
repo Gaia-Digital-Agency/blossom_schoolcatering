@@ -1,42 +1,36 @@
 # Registration Guide (Youngster + Parent)
 
+Last updated: 2026-02-28
+
 URL: `/schoolcatering/register/youngsters`
 
-This is the only registration flow for youngster onboarding.
-It also creates or links the parent account in the same process.
+This is the active youngster onboarding flow. It can create or link parent data in the same submission.
 
-## Required Fields
-- Youngster First Name
-- Youngster Last Name
-- Youngster Gender
-- Youngster Date Of Birth
-- Youngster School (dropdown from active Admin schools)
-- Youngster Grade on Registration Date
-- Youngster Phone
-- Parent First Name
-- Parent Last Name (must match youngster last name)
-- Parent Mobile Number
-- Parent Email
+## Required Inputs
+- Registrant type (`Youngster`, `Parent`, `Teacher`)
+- Youngster first name, last name, gender, date of birth
+- Youngster school and grade
+- Youngster phone
+- Youngster allergies
+- Parent first name, last name, mobile, email
 
-## Optional Fields
-- Youngster Email
-- Parent Address
+## Conditional Inputs
+- `Teacher Name` is required only when registrant type is `Teacher`.
 
-## Behavior Rules
-- `Register As` is not used on this page
-- Parent last name must match youngster last name
-- If parent email already exists on a parent account:
-  - existing parent account is reused
-  - new youngster is linked to that parent
-- On success, response includes generated login details for youngster and parent (if parent account was newly created)
+## Optional Inputs
+- Youngster email
+- Parent address
+
+## Behavior Notes
+- School list is loaded from active admin-managed schools.
+- Parent account can be reused if parent email already exists.
+- Successful registration links parent and youngster records.
+- Record mode (`?mode=record`) is read-only for authenticated parent/youngster users.
 
 ## Data Linking
-Successful registration creates/updates:
-- `users` (parent and youngster accounts)
-- `parents` (parent profile)
-- `children` (youngster profile + school/grade/gender/DOB)
-- `parent_children` (youngster-parent linkage)
-
-## Notes
-- School choices are loaded from admin-managed active schools only
-- Use date picker format: `YYYY-MM-DD`
+Successful flow writes/updates:
+- `users`
+- `parents`
+- `children`
+- `parent_children`
+- registration metadata fields on `children`

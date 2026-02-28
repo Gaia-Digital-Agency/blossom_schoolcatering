@@ -1,82 +1,264 @@
-# Blossom School Catering Data Map
+# Blossom School Catering Unified Map (Pages, API, DB)
 
-## Scope
-This map lists current application tables, core fields, key attributes, and relationships based on the active code + schema docs.
+Last synced: 2026-02-28  
+Base URL: `/schoolcatering`  
+API Base: `/schoolcatering/api/v1`
 
-Record counts:
-- Live DB record counts are **not available** in this workspace because the local PostgreSQL role/database is not initialized (`role "schoolcatering" does not exist`).
-- Replace `N/A` with live counts after DB is running.
+This file is the merged, deduplicated map for:
+- navigation and pages
+- form/input fields
+- API endpoints
+- runtime DB model
 
-## Tables, Fields, Records, Attributes
+## 1) Navigation and Page Map
 
-| Table | Core Fields | Attributes / Constraints | Records |
-|---|---|---|---|
-| `users` | `id`, `role`, `username`, `password_hash`, `first_name`, `last_name`, `phone_number`, `email`, `is_active`, `last_login_at` | PK `id`, unique `username`, role enum, soft-delete via `deleted_at` | N/A |
-| `user_preferences` | `id`, `user_id`, `dark_mode_enabled`, `onboarding_completed`, `tooltips_enabled` | PK `id`, unique FK `user_id -> users.id` | N/A |
-| `user_identities` | `id`, `user_id`, `provider`, `provider_user_id`, `provider_email` | PK `id`, unique (`provider`,`provider_user_id`) | N/A |
-| `auth_refresh_sessions` | `id`, `user_id`, `token_hash`, `expires_at`, `revoked_at` | Refresh token rotation store | N/A |
-| `parents` | `id`, `user_id`, `address` | PK `id`, unique FK `user_id -> users.id` | N/A |
-| `children` | `id`, `user_id`, `school_id`, `date_of_birth`, `gender`, `school_grade`, `registration_actor_type`, `registration_actor_teacher_name`, `photo_url`, `is_active` | PK `id`, unique FK `user_id -> users.id` | N/A |
-| `parent_children` | `id`, `parent_id`, `child_id` | PK `id`, unique (`parent_id`,`child_id`) | N/A |
-| `schools` | `id`, `name`, `address`, `city`, `contact_email`, `contact_phone`, `is_active` | PK `id`, soft-delete, active/inactive toggle | N/A |
-| `academic_years` | `id`, `school_id`, `label`, `start_date`, `end_date`, `is_active` | PK `id`, FK `school_id -> schools.id` | N/A |
-| `academic_terms` | `id`, `academic_year_id`, `label`, `term_number`, `start_date`, `end_date`, `is_active` | PK `id`, FK `academic_year_id -> academic_years.id` | N/A |
-| `child_dietary_restrictions` | `id`, `child_id`, `restriction_label`, `restriction_details`, `is_active` | FK `child_id -> children.id`, soft-delete | N/A |
-| `menus` | `id`, `session`, `service_date`, `is_published` | unique (`session`,`service_date`), soft-delete | N/A |
-| `menu_items` | `id`, `menu_id`, `name`, `description`, `nutrition_facts_text`, `calories_kcal`, `price`, `image_url`, `is_available`, `display_order`, `cutlery_required`, `packing_requirement` | FK `menu_id -> menus.id`, soft-delete | N/A |
-| `ingredients` | `id`, `name`, `allergen_flag`, `is_active`, `notes` | unique normalized name, soft-delete | N/A |
-| `menu_item_ingredients` | `id`, `menu_item_id`, `ingredient_id` | unique (`menu_item_id`,`ingredient_id`) | N/A |
-| `blackout_days` | `id`, `blackout_date`, `type`, `reason`, `created_by` | unique `blackout_date`, enum type | N/A |
-| `session_settings` | `session`, `is_active` | Controls orderable sessions (Lunch enforced active) | N/A |
-| `order_carts` | `id`, `child_id`, `created_by_user_id`, `session`, `service_date`, `status`, `expires_at` | one open cart per child/date/session, enum `cart_status` | N/A |
-| `cart_items` | `id`, `cart_id`, `menu_item_id`, `quantity` | unique (`cart_id`,`menu_item_id`) | N/A |
-| `orders` | `id`, `order_number`, `cart_id`, `child_id`, `placed_by_user_id`, `session`, `service_date`, `status`, `total_price`, `dietary_snapshot`, `delivery_status` | unique active order per child/date/session | N/A |
-| `order_items` | `id`, `order_id`, `menu_item_id`, `item_name_snapshot`, `price_snapshot`, `quantity` | unique (`order_id`,`menu_item_id`) | N/A |
-| `order_mutations` | `id`, `order_id`, `action`, `actor_user_id`, `mutation_at`, `before_json`, `after_json` | Order audit history | N/A |
-| `favourite_meals` | `id`, `created_by_user_id`, `child_id`, `label`, `session`, `is_active` | soft-delete, user-scoped templates | N/A |
-| `favourite_meal_items` | `id`, `favourite_meal_id`, `menu_item_id`, `quantity` | FK to favourite template + menu item | N/A |
-| `billing_records` | `id`, `order_id`, `parent_id`, `status`, `proof_image_url`, `proof_uploaded_at`, `verified_by`, `verified_at`, `delivery_status`, `delivered_at` | payment status enum, proof-based verification | N/A |
-| `digital_receipts` | `id`, `billing_record_id`, `receipt_number`, `pdf_url`, `generated_by_user_id`, `generated_at` | one receipt row per billing record | N/A |
-| `delivery_assignments` | `id`, `order_id`, `delivery_user_id`, `assigned_at`, `confirmed_at`, `confirmation_note` | one assignment per order | N/A |
-| `delivery_school_assignments` | `delivery_user_id`, `school_id`, `is_active` | composite PK (`delivery_user_id`,`school_id`) | N/A |
-| `child_badges` | `id`, `child_id`, `badge_type`, `earned_at`, `streak_count` | badge progression | N/A |
-| `analytics_daily_agg` | `service_date`, `session`, `menu_item_id`, `total_qty` | aggregate table for reporting | N/A |
+### Public and Entry
+| Page | Purpose | Notes |
+|---|---|---|
+| `/` | Landing page | Home hero, links, login/register CTA |
+| `/home` | Home alias | Re-exports `/` |
+| `/menu` | Public menu | Read-only menu view |
+| `/guide` | Guides and T&C | Loads markdown from `docs/guides/*` |
+| `/login` | Generic login | Parent/Youngster focused, accepts returned role |
+| `/register` | Registration entry | Points to youngster flow |
+| `/register/youngsters` | Combined youngster+parent registration | Includes required registrant type and teacher conditional field |
+| `/register/parent` | Legacy parent entry | Redirects to `/register/youngsters` |
+| `/register/delivery` | Legacy delivery entry | Redirects to `/register` |
+| `/rating` | Dish rating page | Auth-required |
 
-## Schema and Relationships
+### Role Login Pages
+- `/admin/login`
+- `/kitchen/login`
+- `/delivery/login`
+- `/parent/login`
+- `/youngster/login`
+
+### Protected Modules
+- Parent: `/parents` (alias: `/parent`)
+- Youngster: `/youngsters` (alias: `/youngster`)
+- Delivery: `/delivery`
+- Kitchen: `/kitchen`, `/kitchen/yesterday`, `/kitchen/today`, `/kitchen/tomorrow`
+- Admin:
+  - `/admin`
+  - `/admin/menu`
+  - `/admin/parents`
+  - `/admin/youngsters`
+  - `/admin/schools`
+  - `/admin/blackout-dates`
+  - `/admin/billing`
+  - `/admin/delivery`
+  - `/admin/reports`
+  - `/admin/kitchen`
+  - `/admin/backout-dates` (placeholder page)
+
+## 2) Key Page Field Map
+
+### `/register/youngsters`
+- `registrantType` (required): `YOUNGSTER | PARENT | TEACHER`
+- `teacherName` (required when teacher, max 50)
+- Youngster profile fields (name, gender, DOB, school, grade, phone, email optional, allergies)
+- Parent profile fields (name, phone, email, address optional)
+
+### `/parents`
+- Child selector (`selectedChildId`)
+- Ordering fields: `serviceDate`, `session`, quantity map per menu item
+- Consolidated order actions: edit-before-cutoff, delete-before-cutoff, quick reorder
+- Billing fields: selected billing IDs, proof image payload
+- Spending dashboard read state
+
+### `/youngsters`
+- Profile summary + allergy display
+- Weekly insight display (badge, calories, counts)
+- Ordering fields: `serviceDate`, `session`, quantity map per menu item
+
+### `/delivery`
+- `date`
+- `note` (optional)
+- assignment toggle action per row
+
+### `/admin/schools`
+- New school form (`name`, `city`, `address`, `contactEmail`)
+- School active toggle and delete
+- Session setting toggle
+
+### `/admin/menu`
+- Context fields: `serviceDate`, `session`
+- Menu item upsert fields:
+  - `name`, `description`, `nutritionFactsText`, `caloriesKcal`, `price`
+  - `imageUrl` or uploaded image
+  - `ingredientIds[]`
+  - `isAvailable`, `displayOrder`, `cutleryRequired`, `packingRequirement`
+
+### `/admin/delivery`
+- Delivery user create/edit fields
+- School-delivery assignment fields (`deliveryUserId`, `schoolId`, `isActive`)
+- Auto-assign date
+
+## 3) API Map (Implemented)
+
+## Auth (`/api/v1/auth`)
+- `POST /login`
+- `POST /register`
+- `GET /register/schools`
+- `POST /register/youngsters`
+- `POST /google/dev`
+- `POST /google/verify`
+- `GET /me`
+- `POST /refresh`
+- `POST /username/generate`
+- `GET /onboarding`
+- `POST /onboarding`
+- `POST /role-check`
+- `POST /logout`
+- `POST /change-password`
+- `GET /admin-ping`
+
+## Public (`/api/v1/public`)
+- `GET /menu`
+
+## Core (`/api/v1`)
+- Schools/session:
+  - `GET /schools`
+  - `POST /admin/schools`
+  - `PATCH /admin/schools/:schoolId`
+  - `DELETE /admin/schools/:schoolId`
+  - `GET /admin/session-settings`
+  - `GET /session-settings`
+  - `PATCH /admin/session-settings/:session`
+- Parent/youngster management:
+  - `POST /children/register`
+  - `GET /admin/parents`
+  - `PATCH /admin/parents/:parentId`
+  - `DELETE /admin/parents/:parentId`
+  - `GET /admin/children`
+  - `PATCH /admin/youngsters/:youngsterId`
+  - `DELETE /admin/youngsters/:youngsterId`
+  - `PATCH /admin/users/:userId/reset-password`
+  - `GET /children/me`
+  - `GET /youngsters/me/insights`
+  - `GET /youngsters/me/orders/consolidated`
+  - `GET /parents/me/children/pages`
+  - `POST /parents/:parentId/children/:childId/link`
+- Admin dashboard/reports:
+  - `GET /admin/dashboard`
+  - `GET /admin/revenue`
+  - `GET /admin/reports`
+- Blackout:
+  - `GET /blackout-days`
+  - `POST /blackout-days`
+  - `DELETE /blackout-days/:id`
+- Ingredient/menu/menu ratings:
+  - `GET /admin/ingredients`
+  - `POST /admin/ingredients`
+  - `PATCH /admin/ingredients/:ingredientId`
+  - `DELETE /admin/ingredients/:ingredientId`
+  - `GET /admin/menus`
+  - `GET /admin/menu-ratings`
+  - `POST /admin/menus/sample-seed`
+  - `POST /admin/menu-items`
+  - `PATCH /admin/menu-items/:itemId`
+  - `DELETE /admin/menu-items/:itemId`
+  - `POST /admin/menu-images/upload`
+- Menu/order acceleration:
+  - `GET /menus`
+  - `GET /favourites`
+  - `POST /favourites`
+  - `DELETE /favourites/:favouriteId`
+  - `POST /favourites/:favouriteId/apply`
+  - `POST /carts/quick-reorder`
+  - `POST /meal-plans/wizard`
+  - `POST /ratings`
+- Billing:
+  - `GET /billing/parent/consolidated`
+  - `POST /billing/:billingId/proof-upload`
+  - `POST /billing/proof-upload-batch`
+  - `GET /billing/:billingId/receipt`
+  - `GET /admin/billing`
+  - `POST /admin/billing/:billingId/verify`
+  - `POST /admin/billing/:billingId/receipt`
+- Delivery:
+  - `GET /delivery/users`
+  - `POST /admin/delivery/users`
+  - `PATCH /admin/delivery/users/:userId/deactivate`
+  - `PATCH /admin/delivery/users/:userId`
+  - `GET /delivery/school-assignments`
+  - `POST /delivery/school-assignments`
+  - `POST /delivery/auto-assign`
+  - `POST /delivery/assign`
+  - `GET /delivery/assignments`
+  - `POST /delivery/assignments/:assignmentId/confirm`
+  - `PATCH /delivery/assignments/:assignmentId/toggle`
+- Cart/order:
+  - `GET /carts`
+  - `POST /carts`
+  - `GET /carts/:cartId`
+  - `PATCH /carts/:cartId/items`
+  - `DELETE /carts/:cartId`
+  - `POST /carts/:cartId/submit`
+  - `GET /orders/:orderId`
+  - `GET /parents/me/orders/consolidated`
+  - `GET /parents/me/spending-dashboard`
+  - `PATCH /orders/:orderId`
+  - `DELETE /orders/:orderId`
+- Kitchen:
+  - `GET /kitchen/daily-summary`
+  - `POST /kitchen/orders/:orderId/complete`
+
+## System Endpoint
+- `GET /api/v1/health`
+
+## 4) Runtime DB Map
 
 ### Identity and Profile
-- `users` 1:1 `user_preferences`
-- `users` 1:1 `parents`
-- `users` 1:1 `children`
-- `users` 1:N `user_identities`
-- `parents` N:M `children` via `parent_children`
+- `users`
+- `user_preferences`
+- `user_identities`
+- `auth_refresh_sessions`
+- `parents`
+- `children`
+  - includes registration metadata:
+    - `registration_actor_type`
+    - `registration_actor_teacher_name`
+- `parent_children`
 
-### School and Academic Structure
-- `schools` 1:N `children`
-- `schools` 1:N `academic_years`
-- `academic_years` 1:N `academic_terms`
+### School and Calendar
+- `schools`
+- `academic_years`
+- `academic_terms`
+- `session_settings`
+- `blackout_days`
 
-### Menu and Ingredient Model
-- `menus` 1:N `menu_items`
-- `menu_items` N:M `ingredients` via `menu_item_ingredients`
-- `session_settings` controls active sessions exposed to ordering users
+### Menu and Ingredients
+- `menus`
+- `menu_items`
+- `ingredients`
+- `menu_item_ingredients`
 
-### Ordering Flow
-- `children` 1:N `order_carts`
-- `order_carts` 1:N `cart_items`
-- `order_carts` 1:1/N `orders` (cart submission)
-- `orders` 1:N `order_items`
-- `orders` 1:N `order_mutations`
-- `favourite_meals` 1:N `favourite_meal_items`
+### Ordering and Favourites
+- `order_carts`
+- `cart_items`
+- `orders`
+- `order_items`
+- `order_mutations`
+- `favourite_meals`
+- `favourite_meal_items`
 
 ### Billing and Delivery
-- `orders` 1:1 `billing_records`
-- `billing_records` 1:1 `digital_receipts` (upsert behavior)
-- `orders` 1:1 `delivery_assignments`
-- `delivery_school_assignments` links delivery users to school routing
+- `billing_records`
+- `digital_receipts`
+- `delivery_users`
+- `delivery_assignments`
+- `delivery_school_assignments`
 
-### Admin / Rule Controls
-- `blackout_days` controls blocked order/service dates
-- `session_settings` controls orderable sessions
-- `child_badges` stores youngster gamification milestones
-- `analytics_daily_agg` stores reporting aggregates
+### Analytics/Gamification
+- `child_badges`
+- `analytics_daily_agg`
+
+## 5) Core Relationship Summary
+- `users` 1:1 `parents` and `children` by role-linked entities.
+- `parents` N:M `children` through `parent_children`.
+- `schools` 1:N `children` and supports delivery mapping.
+- `menus` 1:N `menu_items`; `menu_items` N:M `ingredients`.
+- `order_carts` -> `cart_items` -> submitted `orders` -> `order_items`.
+- `orders` 1:1 billing (`billing_records`) and 1:1 delivery assignment.
+- `billing_records` upsert to `digital_receipts`.

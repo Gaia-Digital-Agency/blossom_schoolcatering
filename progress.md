@@ -1,5 +1,18 @@
 # Progress Update
 
+## 2026-02-28 (Documentation sync to latest runtime state)
+- Updated core runtime documentation to match current implemented behavior:
+  - `README.md`
+  - `docs/Features/full_feature_matrix.md`
+  - `docs/Features/buttons.md`
+  - `docs/Features/inventory.md`
+- Merged maps with deduplication:
+  - merged `docs/complementary/map.md` coverage into `docs/Features/map.md`
+  - `docs/Features/map.md` is now the unified page/API/DB map source
+- Updated all guide markdown files under `docs/guides` for latest route/action/rule behavior:
+  - `admin.md`, `billing-payment.md`, `contact-us.md`, `delivery.md`, `kitchen.md`, `menu.md`, `parents.md`, `register.md`, `report.md`, `terms-and-condition.md`, `youngsters.md`
+- Refreshed inventory baseline to tracked app files (`git ls-files apps`) and current counts.
+
 ## 2026-02-28 (Teacher-assisted youngster registration + deploy)
 - Updated youngster registration flow to support teacher-assisted registration:
   - added required registrant selector at top of `/register/youngsters`: `Youngster | Parent | Teacher`

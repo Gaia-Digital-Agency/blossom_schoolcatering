@@ -1,38 +1,36 @@
 # Parent User Guide
 
+Last updated: 2026-02-28
+
 ## Access
 - Login: `/schoolcatering/parent/login`
 - Main page: `/schoolcatering/parents`
-- Parent view is youngster-scoped. Select a youngster first.
 
 ## Core Modules
-- Session menu + draft cart
-- Consolidated orders
-- Favourite meal combos (save/apply/delete)
-- Quick reorder from existing order
-- Meal plan wizard (copy one source order to multiple dates)
-- Consolidated billing + proof upload + receipt access
-- Spending dashboard
+- Linked youngster selector.
+- Menu and draft cart.
+- Confirmed order of the day.
+- Consolidated order history.
+- Consolidated billing (proof upload and receipts).
+- Spending dashboard.
 
 ## Ordering Flow
-- Pick youngster, `Service Date`, and `Session`
-- Menu is loaded from active admin dishes for that date/session
-- Add dishes to draft (max 5 items per order)
-- Adjust quantity or remove dish in Draft Section
-- Place order
+1. Select youngster.
+2. Choose service date and session.
+3. Add menu items to draft (max 5 distinct items).
+4. Adjust quantities and place order.
 
-## Draft Behavior
-- Existing open draft cart auto-resumes
-- Draft expiration is shown with countdown
-- You can discard a draft cart when needed
+## Order Management
+- `Edit Before Cutoff` reopens selected order as draft.
+- `Delete Before Cutoff` removes editable order.
+- `Quick Reorder` clones historical order to target date.
 
 ## Billing Flow
-- Billing cards show payment + delivery status
-- Upload proof image (WebP/data URL or URL)
-- Admin verifies/rejects proof
-- Receipt opens after admin generates it
+- Select unpaid billing rows.
+- Upload one proof image for selected bills.
+- Monitor verification status.
+- Open receipt for paid rows (when generated).
 
-## Rules
-- Cutoff and blackout/session rules are enforced by API
-- Non-lunch sessions can be disabled by admin settings
-- Duplicate menu item lines are rejected in an order
+## Important Rules
+- Cutoff, blackout, and session enablement are enforced by API.
+- Duplicate active order for same child/date/session is blocked.

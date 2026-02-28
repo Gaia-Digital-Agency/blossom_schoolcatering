@@ -1,56 +1,53 @@
 # Terms and Conditions
 
-Last updated: 2026-02-27
+Last updated: 2026-02-28
 
 ## 1. Scope
-- These terms apply to all users of the Blossom School Catering meal ordering platform.
-- By using the platform, you agree to these terms and any posted operational policies.
+- These terms apply to all users of the Blossom School Catering platform.
+- Using the platform means acceptance of these terms and operational policies.
 
 ## 2. Accounts and Access
-- Users must provide accurate registration and profile information.
-- Login credentials are personal and must not be shared.
-- We may suspend access for misuse, fraud, policy violations, or security risk.
+- Users must provide accurate information.
+- Credentials are personal and must not be shared.
+- Access may be suspended for misuse, fraud, or security risk.
 
-## 3. Ordering and Cutoff Rules
-- Orders are accepted only for available service dates and active sessions.
-- Weekend blocks, blackout dates, and cutoff windows are enforced by system rules.
-- Orders may be edited or cancelled only while the allowed edit window is open.
+## 3. Ordering Rules
+- Orders are allowed only for valid service dates and active sessions.
+- Blackout and cutoff rules are system-enforced.
+- Edit/delete actions are allowed only when order policy allows.
 
-## 4. Menu, Allergens, and Nutrition
-- Menu availability may change due to operations, supply, or school policy.
-- Allergen and nutrition information is provided for guidance only.
-- Users are responsible for reviewing ingredients and allergy suitability before confirming orders.
+## 4. Menu and Allergen Information
+- Menu availability may change due to operations.
+- Allergen and nutrition data are provided for guidance.
+- Guardians remain responsible for suitability checks.
 
-## 5. Billing and Payments
-- Charges are based on confirmed order items and quantities.
-- Payment proof uploads may be reviewed before verification.
-- Receipt issuance, if available, is tied to verified billing records.
+## 5. Billing and Receipts
+- Billing is based on confirmed order data.
+- Proof uploads may be reviewed before verification.
+- Receipt availability depends on verification and system generation flow.
 
-## 6. Delivery and Completion Status
-- Delivery updates are operational records and may be revised if correction is required.
-- Completed delivery does not remove user responsibility to report issues promptly.
+## 6. Delivery Status
+- Delivery statuses are operational records and may be corrected if needed.
 
 ## 7. Acceptable Use
-- Do not attempt unauthorized access, automation abuse, reverse engineering, or disruption.
-- Do not upload unlawful, harmful, or misleading content.
+- Do not attempt unauthorized access or disruption.
+- Do not upload harmful or unlawful content.
 
 ## 8. Service Availability
-- We aim for continuous service but do not guarantee uninterrupted availability.
-- Planned maintenance, emergency fixes, network failures, or third-party outages may affect access.
+- The platform targets high availability but may be interrupted by maintenance or outages.
 
-## 9. Liability Disclaimer
-- The platform is provided on an "as is" and "as available" basis.
-- To the maximum extent permitted by applicable law, we disclaim indirect, incidental, and consequential losses arising from platform use.
+## 9. Disclaimer
+- Platform is provided "as is" and "as available".
+- Liability is limited to the maximum extent allowed by law.
 
 ## 10. Health and Allergy Disclaimer
-- This platform does not provide medical advice.
-- Ingredient and allergen data can change; users with medical dietary needs should confirm independently with qualified professionals.
-- In urgent health situations, seek immediate medical assistance.
+- This platform is not medical advice.
+- Seek professional/medical support for urgent health concerns.
 
 ## 11. Privacy and Data Handling
-- We collect and process account and order data needed to operate meal ordering, billing, and delivery workflows.
-- Users should avoid uploading unnecessary sensitive data in free-text fields.
+- Data is processed for account, ordering, billing, and delivery operations.
+- Avoid uploading unnecessary sensitive data in free-text fields.
 
-## 12. Changes to Terms
-- We may update these terms from time to time.
-- Continued use after updates means acceptance of the revised terms.
+## 12. Changes
+- Terms may be updated periodically.
+- Continued usage after updates indicates acceptance.
