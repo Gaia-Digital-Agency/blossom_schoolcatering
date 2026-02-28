@@ -172,7 +172,8 @@ export default function MenuPage() {
           gap: 0.4rem;
           padding-bottom: 0.5rem;
         }
-        .menu-public-grid > .menu-public-card:only-child {
+        .menu-public-grid > .menu-public-card:only-child,
+        .menu-public-grid > .menu-public-card:last-child:nth-child(odd) {
           grid-column: 1 / -1;
         }
         .menu-public-card img {
