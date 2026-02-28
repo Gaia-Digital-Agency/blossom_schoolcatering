@@ -26,6 +26,7 @@ type ChildRow = {
   school_name: string;
   school_grade: string;
   dietary_allergies?: string;
+  registration_actor_teacher_name?: string | null;
   parent_ids: string[];
 };
 
@@ -56,6 +57,7 @@ export default function AdminYoungstersPage() {
   const [schoolId, setSchoolId] = useState('');
   const [schoolGrade, setSchoolGrade] = useState(GRADES[0]);
   const [allergies, setAllergies] = useState('');
+  const [registrationNote, setRegistrationNote] = useState('');
 
   const parentLabelById = useMemo(() => {
     const map = new Map<string, string>();
@@ -91,6 +93,7 @@ export default function AdminYoungstersPage() {
     setGender('UNDISCLOSED');
     setSchoolGrade(GRADES[0]);
     setAllergies('');
+    setRegistrationNote('');
     if (parents.length > 0) setSelectedParentId(parents[0].id);
   };
 
@@ -105,6 +108,11 @@ export default function AdminYoungstersPage() {
     setSchoolId(child.school_id || '');
     setSchoolGrade(child.school_grade || GRADES[0]);
     setAllergies(child.dietary_allergies || '');
+    setRegistrationNote(
+      child.registration_actor_teacher_name
+        ? `Registered by Teacher: ${child.registration_actor_teacher_name}`
+        : ''
+    );
     if ((child.parent_ids || []).length > 0) {
       setSelectedParentId(child.parent_ids[0]);
     }
@@ -234,6 +242,12 @@ export default function AdminYoungstersPage() {
             </select>
           </label>
           <label>Allergies (Optional)<input value={allergies} onChange={(e) => setAllergies(e.target.value)} placeholder="No input => No allergies" /></label>
+          {registrationNote ? (
+            <label>
+              Registration Note
+              <input value={registrationNote} readOnly className="registration-note-field" />
+            </label>
+          ) : null}
           <div className="menu-actions-row">
             <button className="btn btn-primary" type="submit" disabled={busy}>{busy ? 'Saving...' : editingYoungsterId ? 'Update Youngster' : 'Create Youngster'}</button>
             {editingYoungsterId ? <button className="btn btn-outline" type="button" onClick={resetForm}>Cancel Edit</button> : null}
@@ -294,6 +308,13 @@ export default function AdminYoungstersPage() {
         .action-row {
           display: flex;
           gap: 0.35rem;
+        }
+        :global(.registration-note-field) {
+          background: #f7f3ec !important;
+          color: #7a6a58 !important;
+          border-color: #d8cab1 !important;
+          cursor: default;
+          font-style: italic;
         }
       `}</style>
     </main>

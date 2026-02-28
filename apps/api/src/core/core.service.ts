@@ -983,6 +983,7 @@ export class CoreService {
                  ORDER BY cdr.updated_at DESC NULLS LAST, cdr.created_at DESC
                  LIMIT 1
                ), '') AS dietary_allergies,
+               c.registration_actor_teacher_name,
                coalesce(array_agg(pc.parent_id) FILTER (WHERE pc.parent_id IS NOT NULL), '{}') AS parent_ids
         FROM children c
         JOIN users u ON u.id = c.user_id
@@ -991,7 +992,7 @@ export class CoreService {
         WHERE c.is_active = true
           AND c.deleted_at IS NULL
           AND u.is_active = true
-        GROUP BY c.id, c.user_id, u.username, u.first_name, u.last_name, u.phone_number, u.email, c.date_of_birth, c.gender, c.school_id, c.school_grade, s.name
+        GROUP BY c.id, c.user_id, u.username, u.first_name, u.last_name, u.phone_number, u.email, c.date_of_birth, c.gender, c.school_id, c.school_grade, s.name, c.registration_actor_teacher_name
         ORDER BY u.first_name, u.last_name
       ) t;
     `);
