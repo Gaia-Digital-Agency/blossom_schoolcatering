@@ -40,7 +40,7 @@ export default function HomePage() {
             <h1>Meal Order App</h1>
             <p className="lead">
               Lunch Meal For Youngsters, Up To Five Dishes Per Meal, Register or Log In.
-              Click Guides button for more details.
+              Click the Menu button for more details.
             </p>
             <div className="auth-grid">
               <Link className="btn btn-primary" href="/login">Log In</Link>

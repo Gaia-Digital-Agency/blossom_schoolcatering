@@ -14,6 +14,30 @@ type PublicMenuItem = {
   service_date: string;
 };
 
+const FALLBACK_DISH_IMAGE = '/schoolcatering/assets/hero-meal.jpg';
+
+function withCacheBust(src: string, updatedAt?: string) {
+  if (!updatedAt?.trim()) return src;
+  try {
+    const u = new URL(src, typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
+    u.searchParams.set('v', updatedAt);
+    if (/^https?:\/\//i.test(src)) return u.toString();
+    return `${u.pathname}${u.search}`;
+  } catch {
+    const sep = src.includes('?') ? '&' : '?';
+    return `${src}${sep}v=${encodeURIComponent(updatedAt)}`;
+  }
+}
+
+function resolveDishImageSrc(item: PublicMenuItem) {
+  const raw = String(item.image_url || '').trim();
+  if (!raw) return withCacheBust(FALLBACK_DISH_IMAGE, item.updated_at);
+  if (raw.startsWith('data:image/')) return raw;
+  if (/^https?:\/\//i.test(raw)) return withCacheBust(raw, item.updated_at);
+  const normalized = raw.startsWith('/') ? raw : `/${raw}`;
+  return withCacheBust(normalized, item.updated_at);
+}
+
 export default function MenuPage() {
   const [items, setItems] = useState<PublicMenuItem[]>([]);
   const [serviceDate, setServiceDate] = useState('');
@@ -52,9 +76,14 @@ export default function MenuPage() {
             {items.map((item) => (
               <article className="menu-public-card" key={item.id}>
                 <img
-                  src={`${item.image_url}${item.updated_at ? `?v=${encodeURIComponent(item.updated_at)}` : ''}`}
+                  src={resolveDishImageSrc(item)}
                   alt={item.name}
                   loading="lazy"
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    if (target.src.includes(FALLBACK_DISH_IMAGE)) return;
+                    target.src = FALLBACK_DISH_IMAGE;
+                  }}
                 />
                 <div>
                   <strong>{item.name}</strong>
@@ -67,7 +96,6 @@ export default function MenuPage() {
 
         <div className="dev-links">
           <Link href="/">Back to Home</Link>
-          <Link href="/guide">Menu &amp; Guide</Link>
         </div>
       </section>
       <style jsx>{`
