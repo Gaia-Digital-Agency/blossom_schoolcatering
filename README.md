@@ -9,6 +9,7 @@ Repository: `git@github.com-net1io:Gaia-Digital-Agency/blossom_schoolcatering.gi
 Blossom School Catering is a mobile-first school meal ordering app for Bali school operations.
 
 - Roles: Parent, Youngster, Admin, Kitchen, Delivery
+- Registration actor on youngster registration page: Youngster, Parent, Teacher
 - Sessions: Lunch, Snack, Breakfast
 - Core rule: one meal set per youngster, per session, per day
 - Runtime target: GCP VM with Nginx + PM2 + PostgreSQL + GCS assets
@@ -73,6 +74,11 @@ Blossom School Catering is a mobile-first school meal ordering app for Bali scho
 
 ## Latest Verified State (2026-02-28)
 - Production deploy completed on `main` with server rebuild/restart and post-deploy fixes.
+- Latest registration update deployed on `main` (`f2795a1`):
+  - `/register/youngsters` now requires registrant type selection (`Youngster`, `Parent`, `Teacher`)
+  - Teacher path now requires `Teacher Name` (max 50 chars)
+  - `Parent Allergies` field removed from youngster registration form/API requirement
+  - registration source metadata now stored on `children` (`registration_actor_type`, `registration_actor_teacher_name`)
 - Runtime/API issues fixed during production validation:
   - billing verify not-found handling for empty proof rows
   - kitchen daily summary SQL grouping issue
@@ -161,7 +167,7 @@ Located in `docs/master_data`:
 - How: follow before changing VM runtime config
 
 ### `docs/db`
-- What: SQL migration scripts (`001` to `005`)
+- What: SQL migration scripts (`001` to `009`)
 - Why: schema and seed consistency
 - When: new environment setup or schema updates
 - How: apply sequentially on PostgreSQL with rollback discipline

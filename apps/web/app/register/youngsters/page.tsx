@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { fetchWithTimeout, getApiBase } from '../../../lib/auth';
+import { apiFetch, fetchWithTimeout, getApiBase, ROLE_KEY, type Role } from '../../../lib/auth';
 
 type School = {
   id: string;
@@ -20,6 +20,17 @@ type RegisterResponse = {
     generatedPassword: string;
     lastName: string;
   };
+};
+
+type RecordChild = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  school_id: string;
+  school_grade: string;
+  gender: string;
+  date_of_birth: string;
+  dietary_allergies?: string;
 };
 
 const GRADES = Array.from({ length: 12 }, (_v, i) => `Grade ${i + 1}`);
@@ -46,6 +57,12 @@ export default function YoungsterRegisterPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState<RegisterResponse | null>(null);
+  const [recordRole, setRecordRole] = useState<Role | ''>('');
+  const [recordChildren, setRecordChildren] = useState<RecordChild[]>([]);
+  const [recordChildId, setRecordChildId] = useState('');
+  const [isRecordMode, setIsRecordMode] = useState(false);
+
+  const isReadonlyRecord = isRecordMode && (recordRole === 'PARENT' || recordRole === 'YOUNGSTER');
 
   useEffect(() => {
     let active = true;
@@ -71,6 +88,73 @@ export default function YoungsterRegisterPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setIsRecordMode(new URLSearchParams(window.location.search).get('mode') === 'record');
+    const stored = localStorage.getItem(ROLE_KEY) as Role | null;
+    if (!stored) return;
+    setRecordRole(stored);
+  }, []);
+
+  useEffect(() => {
+    if (!isReadonlyRecord) return;
+    let active = true;
+    const loadRecord = async () => {
+      try {
+        setError('');
+        if (recordRole === 'YOUNGSTER') {
+          const child = await apiFetch('/children/me') as RecordChild;
+          if (!active) return;
+          setRecordChildren([child]);
+          setRecordChildId(child.id);
+          setRegistrantType('YOUNGSTER');
+          return;
+        }
+
+        if (recordRole === 'PARENT') {
+          const data = await apiFetch('/parents/me/children/pages') as { children?: RecordChild[] };
+          const children = Array.isArray(data.children) ? data.children : [];
+          if (!active) return;
+          setRecordChildren(children);
+          if (children.length > 0) {
+            setRecordChildId(children[0].id);
+            setRegistrantType('PARENT');
+          }
+
+          const me = await apiFetch('/auth/me') as { displayName?: string };
+          const fullName = (me.displayName || '').trim();
+          if (fullName) {
+            const parts = fullName.split(/\s+/);
+            setParentFirstName(parts[0] || '');
+            setParentLastName(parts.slice(1).join(' ') || '');
+          }
+        }
+      } catch (err) {
+        if (!active) return;
+        setError(err instanceof Error ? err.message : 'Failed to load youngster record');
+      }
+    };
+    loadRecord();
+    return () => { active = false; };
+  }, [isReadonlyRecord, recordRole]);
+
+  const selectedRecordChild = useMemo(
+    () => recordChildren.find((c) => c.id === recordChildId) || null,
+    [recordChildren, recordChildId],
+  );
+
+  useEffect(() => {
+    if (!isReadonlyRecord || !selectedRecordChild) return;
+    setYoungsterFirstName(selectedRecordChild.first_name || '');
+    setYoungsterLastName(selectedRecordChild.last_name || '');
+    setYoungsterGender((selectedRecordChild.gender || 'UNDISCLOSED').toUpperCase());
+    setYoungsterDateOfBirth(selectedRecordChild.date_of_birth || '');
+    setYoungsterSchoolId(selectedRecordChild.school_id || '');
+    setYoungsterGrade(selectedRecordChild.school_grade || '');
+    setYoungsterAllergies(selectedRecordChild.dietary_allergies || 'No Allergies');
+    setParentLastName(selectedRecordChild.last_name || '');
+  }, [isReadonlyRecord, selectedRecordChild]);
+
   const selectedSchoolLabel = useMemo(() => {
     const found = schools.find((s) => s.id === youngsterSchoolId);
     if (!found) return '';
@@ -79,6 +163,7 @@ export default function YoungsterRegisterPage() {
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (isReadonlyRecord) return;
     setError('');
     setSuccess(null);
     setSubmitting(true);
@@ -125,6 +210,24 @@ export default function YoungsterRegisterPage() {
         <h1>Youngster Registration</h1>
         <p className="auth-help">Youngster registration also creates/links the parent account in one flow.</p>
         <form onSubmit={onSubmit} className="auth-form">
+          {isReadonlyRecord ? (
+            <p className="auth-help">
+              Record view only. To edit registered youngster information, please request Admin.
+            </p>
+          ) : null}
+          {isReadonlyRecord && recordRole === 'PARENT' && recordChildren.length > 1 ? (
+            <label>
+              Youngster Record
+              <select value={recordChildId} onChange={(e) => setRecordChildId(e.target.value)}>
+                {recordChildren.map((child) => (
+                  <option key={child.id} value={child.id}>
+                    {child.first_name} {child.last_name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          <fieldset disabled={isReadonlyRecord}>
           <fieldset>
             <legend>Are You the Youngster, Parent, Teacher? (required)</legend>
             <label>
@@ -257,6 +360,7 @@ export default function YoungsterRegisterPage() {
             Parent Address (Optional)
             <input value={parentAddress} onChange={(e) => setParentAddress(e.target.value)} />
           </label>
+          </fieldset>
           {error ? <p className="auth-error">{error}</p> : null}
           {success ? (
             <div className="soft-card">
@@ -273,9 +377,11 @@ export default function YoungsterRegisterPage() {
               {success.parent.existed ? <p className="auth-help">Parent email already existed, linked to existing parent account.</p> : null}
             </div>
           ) : null}
-          <button className="btn btn-primary" type="submit" disabled={submitting || loadingSchools || schools.length === 0}>
-            {submitting ? 'Creating Accounts...' : 'Register Youngster'}
-          </button>
+          {!isReadonlyRecord ? (
+            <button className="btn btn-primary" type="submit" disabled={submitting || loadingSchools || schools.length === 0}>
+              {submitting ? 'Creating Accounts...' : 'Register Youngster'}
+            </button>
+          ) : null}
         </form>
       </section>
     </main>

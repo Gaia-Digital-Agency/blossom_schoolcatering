@@ -1,6 +1,6 @@
 # Blossom School Catering - Site, Navigation, API, and DB Map
 
-Last synced: 2026-02-26
+Last synced: 2026-02-28
 Base URL: `/schoolcatering`
 API Base: `/schoolcatering/api/v1`
 
@@ -14,7 +14,7 @@ API Base: `/schoolcatering/api/v1`
 | `/login` | Home login (Parent/Youngster) | On success -> `/dashboard` |
 | `/register` | Registration role chooser | Links to `/register/youngsters`, `/register/delivery` |
 | `/register/parent` | Legacy parent registration path | Redirects to `/register/youngsters` |
-| `/register/youngsters` | Parent + Youngster combined registration (account role selected in form) | On success -> `/dashboard` |
+| `/register/youngsters` | Parent + Youngster combined registration with required registrant selector (`Youngster/Parent/Teacher`) and conditional teacher name | On success -> `/dashboard` |
 | `/register/delivery` | Delivery registration (account role) | On success -> `/dashboard` |
 | `/dashboard` | Post-login landing | Role-specific navigation continues |
 
@@ -92,6 +92,13 @@ Admin top nav component: `Dashboard, Menu, Parents, Youngsters, Schools, Blackou
 - `phoneNumber`
 - `email` (required)
 - `address` (required when role is `PARENT`)
+
+### `/register/youngsters` (combined registration)
+- `registrantType` (required): `YOUNGSTER | PARENT | TEACHER`
+- `teacherName` (required when `registrantType=TEACHER`, max 50 chars)
+- `youngsterFirstName`, `youngsterLastName`, `youngsterGender`, `youngsterDateOfBirth`, `youngsterSchoolId`, `youngsterGrade`, `youngsterPhone`, `youngsterEmail?`, `youngsterAllergies`
+- `parentFirstName`, `parentLastName`, `parentMobileNumber`, `parentEmail`, `parentAddress?`
+- Note: `parentAllergies` is no longer required on this flow
 
 ### `/parents` (single consolidated parent module page)
 - Youngster selector: `selectedChildId`
@@ -179,6 +186,7 @@ Admin top nav component: `Dashboard, Menu, Parents, Youngsters, Schools, Blackou
 |---|---|---|
 | POST | `/login` | `username`/`identifier`, `password`, `role` |
 | POST | `/register` | `role`, `username`, `password`, `firstName`, `lastName`, `phoneNumber`, `email`, `address?` |
+| POST | `/register/youngsters` | `registrantType`, `teacherName?`, `youngsterFirstName`, `youngsterLastName`, `youngsterGender`, `youngsterDateOfBirth`, `youngsterSchoolId`, `youngsterGrade`, `youngsterPhone`, `youngsterEmail?`, `youngsterAllergies`, `parentFirstName`, `parentLastName`, `parentMobileNumber`, `parentEmail`, `parentAddress?` |
 | POST | `/google/dev` | `googleEmail`, `role` |
 | POST | `/google/verify` | `idToken`, `role` |
 | GET | `/me` | Bearer token |
@@ -274,7 +282,7 @@ Admin top nav component: `Dashboard, Menu, Parents, Youngsters, Schools, Blackou
 | `schools` | `id, name, city, address, is_active` | referenced by `children`, `academic_years`, delivery mapping |
 | `academic_years` | `school_id, label, start_date, end_date, is_active` | school calendar master data |
 | `academic_terms` | `academic_year_id, label, term_number, start_date, end_date` | terms under academic years |
-| `children` | `id, user_id, school_id, date_of_birth, gender, school_grade, is_active` | youngster profile |
+| `children` | `id, user_id, school_id, date_of_birth, gender, school_grade, registration_actor_type, registration_actor_teacher_name, is_active` | youngster profile + registration source metadata |
 | `parent_children` | `parent_id, child_id` | many-to-many parent-youngster links |
 | `child_dietary_restrictions` | `child_id, restriction_label, restriction_details, is_active` | includes allergy text |
 | `menus` | `session, service_date, is_published` | menu header per day/session |

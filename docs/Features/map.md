@@ -16,7 +16,7 @@ Record counts:
 | `user_identities` | `id`, `user_id`, `provider`, `provider_user_id`, `provider_email` | PK `id`, unique (`provider`,`provider_user_id`) | N/A |
 | `auth_refresh_sessions` | `id`, `user_id`, `token_hash`, `expires_at`, `revoked_at` | Refresh token rotation store | N/A |
 | `parents` | `id`, `user_id`, `address` | PK `id`, unique FK `user_id -> users.id` | N/A |
-| `children` | `id`, `user_id`, `school_id`, `date_of_birth`, `gender`, `school_grade`, `photo_url`, `is_active` | PK `id`, unique FK `user_id -> users.id` | N/A |
+| `children` | `id`, `user_id`, `school_id`, `date_of_birth`, `gender`, `school_grade`, `registration_actor_type`, `registration_actor_teacher_name`, `photo_url`, `is_active` | PK `id`, unique FK `user_id -> users.id` | N/A |
 | `parent_children` | `id`, `parent_id`, `child_id` | PK `id`, unique (`parent_id`,`child_id`) | N/A |
 | `schools` | `id`, `name`, `address`, `city`, `contact_email`, `contact_phone`, `is_active` | PK `id`, soft-delete, active/inactive toggle | N/A |
 | `academic_years` | `id`, `school_id`, `label`, `start_date`, `end_date`, `is_active` | PK `id`, FK `school_id -> schools.id` | N/A |

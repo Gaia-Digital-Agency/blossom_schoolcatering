@@ -1,5 +1,22 @@
 # Progress Update
 
+## 2026-02-28 (Teacher-assisted youngster registration + deploy)
+- Updated youngster registration flow to support teacher-assisted registration:
+  - added required registrant selector at top of `/register/youngsters`: `Youngster | Parent | Teacher`
+  - when `Teacher` is selected, `Teacher Name` input is required and capped at 50 chars
+  - removed `Parent Allergies (Required)` field from youngster registration UI
+- Updated backend auth registration contract:
+  - `POST /api/v1/auth/register/youngsters` now accepts `registrantType` and conditional `teacherName`
+  - parent allergies are no longer required in this endpoint payload
+  - server writes registration source metadata to `children`:
+    - `registration_actor_type`
+    - `registration_actor_teacher_name`
+- Completed release cycle:
+  - committed: `f2795a1`
+  - pushed to `origin/main`
+  - deployed on VM (`git pull`, `npm run build:api`, `npm run build:web`, `pm2 restart schoolcatering-api`, `pm2 restart schoolcatering-web`)
+  - verification: `/schoolcatering/register/youngsters` returned `200` server-local after deploy
+
 ## 2026-02-28 (Production deploy completion + full validation pass)
 - Completed commit/push/deploy cycle to production `main` and resolved deploy blockers:
   - server pull conflict on `package-lock.json` (stashed server-local change before pull)
