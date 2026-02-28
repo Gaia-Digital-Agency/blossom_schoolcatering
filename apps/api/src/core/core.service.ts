@@ -4430,7 +4430,7 @@ export class CoreService {
         LEFT JOIN users up ON up.id = p.user_id
         WHERE o.service_date = $1::date
           AND o.status IN ('PLACED', 'LOCKED')
-        GROUP BY o.id, uc.first_name, uc.last_name, up.first_name, up.last_name
+        GROUP BY o.id, s.name, uc.first_name, uc.last_name, up.first_name, up.last_name
         ORDER BY s.name ASC, child_name ASC, o.session ASC
       ) t;
     `,
