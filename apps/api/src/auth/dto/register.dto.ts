@@ -28,4 +28,8 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   address?: string;
+
+  @IsOptional()
+  @IsString()
+  allergies?: string;
 }

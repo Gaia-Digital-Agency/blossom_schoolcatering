@@ -107,7 +107,7 @@ function redirectToLogin(): void {
  *
  * Catch SessionExpiredError to suppress error UI when a redirect has fired.
  */
-export async function apiFetch(path: string, init?: RequestInit): Promise<unknown> {
+export async function apiFetch(path: string, init?: RequestInit, options?: { skipAutoReload?: boolean }): Promise<unknown> {
   let token = localStorage.getItem(ACCESS_KEY);
   if (!token) {
     redirectToLogin();
@@ -140,6 +140,7 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<unknow
 
   const method = String(init?.method || 'GET').toUpperCase();
   const shouldAutoRefresh =
+    !options?.skipAutoReload &&
     typeof window !== 'undefined' &&
     ['POST', 'PATCH', 'PUT', 'DELETE'].includes(method);
 

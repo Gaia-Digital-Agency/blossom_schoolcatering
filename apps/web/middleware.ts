@@ -38,6 +38,7 @@ export function middleware(request: NextRequest) {
 
   const hasToken = Boolean(request.cookies.get(AUTH_COOKIE)?.value);
   const role = request.cookies.get(ROLE_COOKIE)?.value as Role | undefined;
+  const isRatingPath = normalizedPath === '/rating' || normalizedPath.startsWith('/rating/');
   const requiredRole = getRequiredRole(normalizedPath);
   const isPublic =
     normalizedPath === '/' ||
@@ -53,6 +54,13 @@ export function middleware(request: NextRequest) {
     normalizedPath === '/delivery/login' ||
     normalizedPath === '/parent/login' ||
     normalizedPath === '/youngster/login';
+
+  if (isRatingPath) {
+    if (!hasToken || (role !== 'PARENT' && role !== 'YOUNGSTER')) {
+      return NextResponse.redirect(new URL(`${BASE_PATH}/login`, request.url));
+    }
+    return NextResponse.next();
+  }
 
   if (requiredRole && normalizedPath === roleLoginPath(requiredRole)) {
     if (hasToken && role === requiredRole) {

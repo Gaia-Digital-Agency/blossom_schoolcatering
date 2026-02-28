@@ -47,6 +47,8 @@ const SESSIONS: SessionType[] = ['LUNCH', 'SNACK', 'BREAKFAST'];
 @Injectable()
 export class CoreService {
   private menuItemExtendedColumnsReady = false;
+  private menuRatingsTableReady = false;
+  private parentDietaryRestrictionsReady = false;
   private deliverySchoolAssignmentsReady = false;
   private sessionSettingsReady = false;
 
@@ -553,6 +555,26 @@ export class CoreService {
     this.menuItemExtendedColumnsReady = true;
   }
 
+  private async ensureMenuRatingsTable() {
+    if (this.menuRatingsTableReady) return;
+    await runSql(`
+      CREATE TABLE IF NOT EXISTS menu_item_ratings (
+        menu_item_id uuid NOT NULL REFERENCES menu_items(id) ON DELETE CASCADE,
+        user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        user_role text NOT NULL,
+        stars smallint NOT NULL CHECK (stars BETWEEN 1 AND 5),
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        PRIMARY KEY (menu_item_id, user_id)
+      );
+    `);
+    await runSql(`
+      CREATE INDEX IF NOT EXISTS idx_menu_item_ratings_item_stars
+      ON menu_item_ratings(menu_item_id, stars);
+    `);
+    this.menuRatingsTableReady = true;
+  }
+
   private async ensureDeliverySchoolAssignmentsTable() {
     if (this.deliverySchoolAssignmentsReady) return;
     await runSql(`
@@ -624,6 +646,55 @@ export class CoreService {
       throw new BadRequestException('Allergies must be less than 10 words');
     }
     return cleaned;
+  }
+
+  private async ensureParentDietaryRestrictionsTable() {
+    if (this.parentDietaryRestrictionsReady) return;
+    await runSql(`
+      CREATE TABLE IF NOT EXISTS parent_dietary_restrictions (
+        parent_id uuid PRIMARY KEY REFERENCES parents(id) ON DELETE CASCADE,
+        restriction_label text NOT NULL DEFAULT 'ALLERGIES',
+        restriction_details text NOT NULL,
+        is_active boolean NOT NULL DEFAULT true,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        deleted_at timestamptz NULL
+      );
+    `);
+    this.parentDietaryRestrictionsReady = true;
+  }
+
+  private async getOrderDietarySnapshot(childId: string) {
+    await this.ensureParentDietaryRestrictionsTable();
+    const childAllergiesRaw = await runSql(
+      `SELECT cdr.restriction_details
+       FROM child_dietary_restrictions cdr
+       WHERE cdr.child_id = $1
+         AND cdr.is_active = true
+         AND cdr.deleted_at IS NULL
+         AND upper(cdr.restriction_label) = 'ALLERGIES'
+       ORDER BY cdr.updated_at DESC NULLS LAST, cdr.created_at DESC
+       LIMIT 1;`,
+      [childId],
+    );
+    const parentAllergiesRaw = await runSql(
+      `SELECT COALESCE(string_agg(DISTINCT pdr.restriction_details, '; '), '')
+       FROM parent_children pc
+       JOIN parent_dietary_restrictions pdr ON pdr.parent_id = pc.parent_id
+       WHERE pc.child_id = $1
+         AND pdr.is_active = true
+         AND pdr.deleted_at IS NULL;`,
+      [childId],
+    );
+
+    const childAllergies = this.normalizeAllergies(childAllergiesRaw || '');
+    const parentAllergies = this.normalizeAllergies(parentAllergiesRaw || '');
+    const hasChild = childAllergies.toLowerCase() !== 'no allergies';
+    const hasParent = parentAllergies.toLowerCase() !== 'no allergies';
+    if (!hasChild && !hasParent) return 'No Allergies';
+    if (hasChild && hasParent) return `Youngster Allergies: ${childAllergies}; Parent Allergies: ${parentAllergies}`;
+    if (hasChild) return `Youngster Allergies: ${childAllergies}`;
+    return `Parent Allergies: ${parentAllergies}`;
   }
 
   private async ensureMenuForDateSession(serviceDate: string, session: SessionType) {
@@ -745,6 +816,9 @@ export class CoreService {
     const gender = (input.gender || '').trim().toUpperCase();
     const schoolId = (input.schoolId || '').trim();
     const schoolGrade = (input.schoolGrade || '').trim();
+    if (actor.role === 'PARENT' && !String(input.allergies || '').trim()) {
+      throw new BadRequestException('Allergies is required');
+    }
     const allergies = this.normalizeAllergies(input.allergies);
 
     const schoolExists = await runSql(
@@ -817,7 +891,11 @@ export class CoreService {
     await runSql(
       `INSERT INTO child_dietary_restrictions (child_id, restriction_label, restriction_details, is_active)
        VALUES ($1, 'ALLERGIES', $2, true)
-       ON CONFLICT DO NOTHING;`,
+       ON CONFLICT (child_id, restriction_label)
+       DO UPDATE SET restriction_details = EXCLUDED.restriction_details,
+                     is_active = true,
+                     deleted_at = NULL,
+                     updated_at = now();`,
       [child.id, allergies],
     );
 
@@ -1598,6 +1676,99 @@ export class CoreService {
     };
   }
 
+  async getAdminMenuRatings(query: { serviceDate?: string; session?: string }) {
+    await this.ensureMenuRatingsTable();
+    const serviceDate = this.validateServiceDate(query.serviceDate);
+    const session = this.normalizeSession(query.session);
+    const out = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT mi.id AS menu_item_id,
+               mi.name,
+               m.session::text AS session,
+               m.service_date::text AS service_date,
+               COALESCE(SUM(CASE WHEN mir.stars = 1 THEN 1 ELSE 0 END), 0)::int AS star_1_votes,
+               COALESCE(SUM(CASE WHEN mir.stars = 2 THEN 1 ELSE 0 END), 0)::int AS star_2_votes,
+               COALESCE(SUM(CASE WHEN mir.stars = 3 THEN 1 ELSE 0 END), 0)::int AS star_3_votes,
+               COALESCE(SUM(CASE WHEN mir.stars = 4 THEN 1 ELSE 0 END), 0)::int AS star_4_votes,
+               COALESCE(SUM(CASE WHEN mir.stars = 5 THEN 1 ELSE 0 END), 0)::int AS star_5_votes,
+               COALESCE(COUNT(mir.user_id), 0)::int AS total_votes
+        FROM menus m
+        JOIN menu_items mi ON mi.menu_id = m.id
+        LEFT JOIN menu_item_ratings mir ON mir.menu_item_id = mi.id
+        WHERE m.service_date = $1::date
+          AND m.session = $2::session_type
+          AND m.deleted_at IS NULL
+          AND mi.deleted_at IS NULL
+        GROUP BY mi.id, mi.name, m.session, m.service_date
+        ORDER BY mi.display_order ASC, mi.name ASC
+      ) t;
+      `,
+      [serviceDate, session],
+    );
+    return {
+      serviceDate,
+      session,
+      items: this.parseJsonLines(out),
+    };
+  }
+
+  async createOrUpdateMenuRating(actor: AccessUser, input: { menuItemId: string; stars: number }) {
+    await this.ensureMenuRatingsTable();
+    if (!['PARENT', 'YOUNGSTER'].includes(actor.role)) {
+      throw new ForbiddenException('Role not allowed');
+    }
+    const menuItemId = (input.menuItemId || '').trim();
+    const stars = Number(input.stars);
+    if (!menuItemId) throw new BadRequestException('menuItemId is required');
+    if (!Number.isInteger(stars) || stars < 1 || stars > 5) {
+      throw new BadRequestException('stars must be an integer between 1 and 5');
+    }
+
+    const activeItem = await runSql(
+      `SELECT mi.id
+       FROM menu_items mi
+       JOIN menus m ON m.id = mi.menu_id
+       WHERE mi.id = $1
+         AND mi.is_available = true
+         AND mi.deleted_at IS NULL
+         AND m.is_published = true
+         AND m.deleted_at IS NULL
+       LIMIT 1;`,
+      [menuItemId],
+    );
+    if (!activeItem) throw new NotFoundException('Active dish not found');
+
+    await runSql(
+      `INSERT INTO menu_item_ratings (menu_item_id, user_id, user_role, stars)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (menu_item_id, user_id)
+       DO UPDATE SET stars = EXCLUDED.stars,
+                     user_role = EXCLUDED.user_role,
+                     updated_at = now();`,
+      [menuItemId, actor.uid, actor.role, stars],
+    );
+
+    return { ok: true, menuItemId, stars };
+  }
+
+  async uploadMenuImage(buffer: Buffer, mimetype: string): Promise<{ url: string }> {
+    if (!buffer?.length) throw new BadRequestException('No file data received');
+    if (!mimetype?.startsWith('image/')) throw new BadRequestException('File must be an image');
+    if (buffer.length > 10 * 1024 * 1024) throw new BadRequestException('Image exceeds 10MB size limit');
+    const ext = this.getFileExtFromContentType(mimetype);
+    const objectName = `${this.getGcsCategoryFolder('menu-images')}/upload-${Date.now()}.${ext}`;
+    const uploaded = await this.uploadToGcs({
+      objectName,
+      contentType: mimetype,
+      data: buffer,
+      cacheControl: 'public, max-age=86400',
+      publicRead: true,
+    });
+    return { url: this.buildGoogleStoragePublicUrl(uploaded.objectName) };
+  }
+
   async createAdminMenuItem(input: {
     serviceDate?: string;
     session?: string;
@@ -2203,15 +2374,7 @@ export class CoreService {
     await this.validateOrderDayRules(cart.service_date);
     await this.assertSessionActiveForOrdering(cart.session);
 
-    const dietaryOut = await runSql(
-      `SELECT coalesce(string_agg(cdr.restriction_label || ': ' || coalesce(cdr.restriction_details, ''), '; '), '')
-       FROM child_dietary_restrictions cdr
-       WHERE cdr.child_id = $1
-         AND cdr.is_active = true
-         AND cdr.deleted_at IS NULL;`,
-      [cart.child_id],
-    );
-    const dietarySnapshot = dietaryOut || '';
+    const dietarySnapshot = await this.getOrderDietarySnapshot(cart.child_id);
 
     const totalPrice = items.reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0);
 
@@ -3765,15 +3928,7 @@ export class CoreService {
       return sum + price * item.quantity;
     }, 0);
 
-    const dietaryOut = await runSql(
-      `SELECT coalesce(string_agg(cdr.restriction_label || ': ' || coalesce(cdr.restriction_details, ''), '; '), '')
-       FROM child_dietary_restrictions cdr
-       WHERE cdr.child_id = $1
-         AND cdr.is_active = true
-         AND cdr.deleted_at IS NULL;`,
-      [order.child_id],
-    );
-    const dietarySnapshot = dietaryOut || '';
+    const dietarySnapshot = await this.getOrderDietarySnapshot(order.child_id);
 
     await runSql(
       `UPDATE orders
@@ -4429,21 +4584,16 @@ export class CoreService {
                  FROM order_items oi2
                  WHERE oi2.order_id = o.id
                ), 0) AS dish_count,
-               COALESCE((
-                 SELECT bool_or(i2.allergen_flag)
-                 FROM order_items oi2
-                 JOIN menu_item_ingredients mii2 ON mii2.menu_item_id = oi2.menu_item_id
-                 JOIN ingredients i2 ON i2.id = mii2.ingredient_id AND i2.deleted_at IS NULL
-                 WHERE oi2.order_id = o.id
-               ), false) AS has_allergen,
-               COALESCE((
-                 SELECT string_agg(DISTINCT i2.name, ', ')
-                 FROM order_items oi2
-                 JOIN menu_item_ingredients mii2 ON mii2.menu_item_id = oi2.menu_item_id
-                 JOIN ingredients i2 ON i2.id = mii2.ingredient_id AND i2.deleted_at IS NULL
-                 WHERE oi2.order_id = o.id
-                   AND i2.allergen_flag = true
-               ), '') AS allergen_items,
+               CASE
+                 WHEN COALESCE(trim(o.dietary_snapshot), '') = '' THEN false
+                 WHEN lower(o.dietary_snapshot) LIKE '%no allergies%' THEN false
+                 ELSE true
+               END AS has_allergen,
+               CASE
+                 WHEN COALESCE(trim(o.dietary_snapshot), '') = '' THEN ''
+                 WHEN lower(o.dietary_snapshot) LIKE '%no allergies%' THEN ''
+                 ELSE o.dietary_snapshot
+               END AS allergen_items,
                COALESCE((
                  SELECT json_agg(row_to_json(d) ORDER BY d.item_name)
                  FROM (

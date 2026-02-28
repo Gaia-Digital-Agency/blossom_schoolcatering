@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import ingredientMaster from '../../../../../docs/master_data/ingredient.json';
 import dishMaster from '../../../../../docs/master_data/dish.json';
-import { apiFetch } from '../../../lib/auth';
+import { ACCESS_KEY, apiFetch, fetchWithTimeout, getApiBase } from '../../../lib/auth';
 import { fileToWebpDataUrl } from '../../../lib/image';
 import AdminNav from '../_components/admin-nav';
 
@@ -23,6 +23,19 @@ type AdminMenuItem = {
   display_order: number;
   ingredient_ids: string[];
   ingredients: string[];
+};
+
+type MenuRatingSummary = {
+  menu_item_id: string;
+  name: string;
+  session: 'LUNCH' | 'SNACK' | 'BREAKFAST';
+  service_date: string;
+  star_1_votes: number;
+  star_2_votes: number;
+  star_3_votes: number;
+  star_4_votes: number;
+  star_5_votes: number;
+  total_votes: number;
 };
 
 type MasterIngredientFile = {
@@ -72,14 +85,6 @@ function buildPackingRequirement(packingCareRequired: boolean, wetDish: boolean)
   return flags.join('; ');
 }
 
-function inferAllergenFlagFromName(raw: string) {
-  const v = raw.toLowerCase();
-  return [
-    'milk', 'dairy', 'egg', 'peanut', 'almond', 'cashew', 'walnut',
-    'prawn', 'shrimp', 'crab', 'fish', 'wheat', 'soy', 'sesame',
-  ].some((k) => v.includes(k));
-}
-
 const masterIngredients = ((ingredientMaster as MasterIngredientFile).ingredients || []).map((x) => ({
   key: x.name,
   label: toLabel(x.name),
@@ -96,6 +101,7 @@ export default function AdminMenuPage() {
   const [menuSession, setMenuSession] = useState<'LUNCH' | 'SNACK' | 'BREAKFAST'>('LUNCH');
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [menuItems, setMenuItems] = useState<AdminMenuItem[]>([]);
+  const [menuRatings, setMenuRatings] = useState<MenuRatingSummary[]>([]);
   const [editingItemId, setEditingItemId] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -168,12 +174,14 @@ export default function AdminMenuPage() {
   }, [itemName, mergedDishOptions]);
 
   const loadMenuData = async () => {
-    const [ings, menu] = await Promise.all([
+    const [ings, menu, ratings] = await Promise.all([
       apiFetch('/admin/ingredients') as Promise<Ingredient[]>,
       apiFetch(`/admin/menus?service_date=${menuServiceDate}&session=${menuSession}`) as Promise<{ items: AdminMenuItem[] }>,
+      apiFetch(`/admin/menu-ratings?service_date=${menuServiceDate}&session=${menuSession}`) as Promise<{ items: MenuRatingSummary[] }>,
     ]);
     setIngredients(ings);
     setMenuItems(menu.items || []);
+    setMenuRatings(ratings.items || []);
   };
 
   const clearUploadSelection = () => {
@@ -227,12 +235,34 @@ export default function AdminMenuPage() {
     setMessage('');
     setImageConverting(true);
     try {
+      // Convert to WebP client-side for consistent format and reduced size
       const asWebpDataUrl = await fileToWebpDataUrl(file);
-      setItemImageUrl(asWebpDataUrl);
-      setItemImageFileName(file.name || 'uploaded-image.webp');
-      setMessage(`Image converted to WebP and attached: ${file.name || 'uploaded-image.webp'}`);
+      setItemImageFileName(file.name || 'image.webp');
+      setMessage('Converting and uploading image...');
+
+      // Convert data URL to Blob and upload as multipart (avoids JSON body size limit)
+      const blobRes = await fetch(asWebpDataUrl);
+      const blob = await blobRes.blob();
+      const formData = new FormData();
+      formData.append('image', blob, `menu-${Date.now()}.webp`);
+
+      const token = localStorage.getItem(ACCESS_KEY);
+      const uploadRes = await fetchWithTimeout(`${getApiBase()}/admin/menu-images/upload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token ?? ''}` },
+        credentials: 'include',
+        body: formData,
+      });
+      if (!uploadRes.ok) {
+        const errBody = await uploadRes.json().catch(() => ({})) as { message?: string };
+        throw new Error(errBody.message ?? 'Image upload failed');
+      }
+      const { url } = await uploadRes.json() as { url: string };
+      setItemImageUrl(url);
+      setMessage(`Image uploaded: ${url.split('/').pop()}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed converting image to WebP');
+      setError(err instanceof Error ? err.message : 'Failed uploading image');
+      setItemImageFileName('');
     } finally {
       setImageConverting(false);
     }
@@ -288,10 +318,10 @@ export default function AdminMenuPage() {
     setSavingItem(true);
     try {
       if (editingItemId) {
-        await apiFetch(`/admin/menu-items/${editingItemId}`, { method: 'PATCH', body: JSON.stringify(payload) });
+        await apiFetch(`/admin/menu-items/${editingItemId}`, { method: 'PATCH', body: JSON.stringify(payload) }, { skipAutoReload: true });
         setMessage('Dish updated.');
       } else {
-        await apiFetch('/admin/menu-items', { method: 'POST', body: JSON.stringify(payload) });
+        await apiFetch('/admin/menu-items', { method: 'POST', body: JSON.stringify(payload) }, { skipAutoReload: true });
         setMessage('Dish created.');
       }
       resetForm();
@@ -326,9 +356,8 @@ export default function AdminMenuPage() {
             method: 'POST',
             body: JSON.stringify({
               name: masterName,
-              allergenFlag: inferAllergenFlagFromName(masterName),
             }),
-          });
+          }, { skipAutoReload: true });
         } catch {
           // Ignore conflict or transient create errors and fallback to reload.
         }
@@ -414,7 +443,7 @@ export default function AdminMenuPage() {
         cutleryRequired: itemCutleryRequired,
         packingRequirement: buildPackingRequirement(itemPackingCareRequired, itemWetDish),
       };
-      await apiFetch('/admin/menu-items', { method: 'POST', body: JSON.stringify(payload) });
+      await apiFetch('/admin/menu-items', { method: 'POST', body: JSON.stringify(payload) }, { skipAutoReload: true });
       setItemName(dish);
       if (!itemDescription.trim()) setItemDescription(dish);
       setMessage(`Dish auto-created: ${dish}`);
@@ -431,7 +460,7 @@ export default function AdminMenuPage() {
     setMessage('');
     setActionLoading(true);
     try {
-      await apiFetch('/admin/menus/sample-seed', { method: 'POST', body: JSON.stringify({ serviceDate: menuServiceDate }) });
+      await apiFetch('/admin/menus/sample-seed', { method: 'POST', body: JSON.stringify({ serviceDate: menuServiceDate }) }, { skipAutoReload: true });
       setMessage('Sample menus seeded for selected date.');
       await loadMenuData();
     } catch (err) {
@@ -469,7 +498,7 @@ export default function AdminMenuPage() {
       await apiFetch(`/admin/menu-items/${item.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ isAvailable }),
-      });
+      }, { skipAutoReload: true });
       setMessage(isAvailable ? 'Dish activated.' : 'Dish deactivated.');
       await loadMenuData();
     } catch (e) {
@@ -620,7 +649,7 @@ export default function AdminMenuPage() {
                     if (!ing) return null;
                     return (
                       <button key={id} className="btn btn-outline ingredient-chip" type="button" onClick={() => onToggleIngredient(id)}>
-                        {toLabel(ing.name)}{ing.allergen_flag ? ' (allergen)' : ''} x
+                        {toLabel(ing.name)} x
                       </button>
                     );
                   })}
@@ -699,6 +728,24 @@ export default function AdminMenuPage() {
                 {inactiveMenuItems.length === 0 ? <p className="auth-help">No deactivated dishes.</p> : null}
               </div>
             </div>
+          </div>
+        </div>
+
+        <div className="menu-ratings-shell">
+          <h2>Menu Ratings</h2>
+          <div className="auth-form menu-list-card">
+            {menuRatings.map((rating) => (
+              <label key={rating.menu_item_id}>
+                <strong>{rating.name}</strong>
+                <small>1 Star &gt; {rating.star_1_votes} Votes</small>
+                <small>2 Stars &gt; {rating.star_2_votes} Votes</small>
+                <small>3 Stars &gt; {rating.star_3_votes} Votes</small>
+                <small>4 Stars &gt; {rating.star_4_votes} Votes</small>
+                <small>5 Stars &gt; {rating.star_5_votes} Votes</small>
+                <small>Total Votes: {rating.total_votes}</small>
+              </label>
+            ))}
+            {menuRatings.length === 0 ? <p className="auth-help">No dishes found for selected date/session.</p> : null}
           </div>
         </div>
       </section>
@@ -790,6 +837,16 @@ export default function AdminMenuPage() {
           padding: 0.75rem;
         }
         .menu-items-shell h2 {
+          margin: 0 0 0.7rem 0;
+        }
+        .menu-ratings-shell {
+          margin-top: 0.9rem;
+          border: 1px solid #ccbda2;
+          border-radius: 0.75rem;
+          background: #fffaf3;
+          padding: 0.75rem;
+        }
+        .menu-ratings-shell h2 {
           margin: 0 0 0.7rem 0;
         }
         .menu-list-card {

@@ -35,11 +35,13 @@ export default function YoungsterRegisterPage() {
   const [youngsterGrade, setYoungsterGrade] = useState(GRADES[0]);
   const [youngsterPhone, setYoungsterPhone] = useState('');
   const [youngsterEmail, setYoungsterEmail] = useState('');
+  const [youngsterAllergies, setYoungsterAllergies] = useState('');
   const [parentFirstName, setParentFirstName] = useState('');
   const [parentLastName, setParentLastName] = useState('');
   const [parentMobileNumber, setParentMobileNumber] = useState('');
   const [parentEmail, setParentEmail] = useState('');
   const [parentAddress, setParentAddress] = useState('');
+  const [parentAllergies, setParentAllergies] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState<RegisterResponse | null>(null);
@@ -93,11 +95,13 @@ export default function YoungsterRegisterPage() {
           youngsterGrade,
           youngsterPhone,
           youngsterEmail,
+          youngsterAllergies,
           parentFirstName,
           parentLastName,
           parentMobileNumber,
           parentEmail,
           parentAddress,
+          parentAllergies,
         }),
       });
       if (!res.ok) {
@@ -176,6 +180,15 @@ export default function YoungsterRegisterPage() {
             <input type="email" value={youngsterEmail} onChange={(e) => setYoungsterEmail(e.target.value)} />
           </label>
           <label>
+            Youngster Allergies (Required)
+            <input
+              value={youngsterAllergies}
+              onChange={(e) => setYoungsterAllergies(e.target.value)}
+              placeholder="Type No Allergies if none"
+              required
+            />
+          </label>
+          <label>
             Parent First Name
             <input value={parentFirstName} onChange={(e) => setParentFirstName(e.target.value)} required />
           </label>
@@ -194,6 +207,15 @@ export default function YoungsterRegisterPage() {
           <label>
             Parent Address (Optional)
             <input value={parentAddress} onChange={(e) => setParentAddress(e.target.value)} />
+          </label>
+          <label>
+            Parent Allergies (Required)
+            <input
+              value={parentAllergies}
+              onChange={(e) => setParentAllergies(e.target.value)}
+              placeholder="Type No Allergies if none"
+              required
+            />
           </label>
           {error ? <p className="auth-error">{error}</p> : null}
           {success ? (

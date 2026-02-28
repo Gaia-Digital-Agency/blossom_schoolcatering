@@ -9,8 +9,11 @@ import {
   Post,
   Query,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -25,6 +28,7 @@ import {
   CreateFavouriteDto,
   CreateIngredientDto,
   CreateMenuItemDto,
+  CreateMenuRatingDto,
   CreateSchoolDto,
   MealPlanWizardDto,
   NoteDto,
@@ -261,6 +265,12 @@ export class CoreController {
     return this.coreService.getAdminMenus({ serviceDate, session });
   }
 
+  @Get('admin/menu-ratings')
+  @Roles('ADMIN')
+  getAdminMenuRatings(@Query('service_date') serviceDate?: string, @Query('session') session?: string) {
+    return this.coreService.getAdminMenuRatings({ serviceDate, session });
+  }
+
   @Post('admin/menus/sample-seed')
   @Roles('ADMIN')
   seedAdminMenus(@Body() body: SeedMenuDto) {
@@ -280,6 +290,19 @@ export class CoreController {
     @Body() body: UpdateMenuItemDto,
   ) {
     return this.coreService.updateAdminMenuItem(itemId, body);
+  }
+
+  @Post('admin/menu-images/upload')
+  @Roles('ADMIN')
+  @UseInterceptors(FileInterceptor('image', { limits: { fileSize: 10 * 1024 * 1024 } }))
+  uploadMenuImage(@UploadedFile() file: any) {
+    return this.coreService.uploadMenuImage(file?.buffer, file?.mimetype);
+  }
+
+  @Post('ratings')
+  @Roles('PARENT', 'YOUNGSTER')
+  createOrUpdateMenuRating(@Req() req: AuthRequest, @Body() body: CreateMenuRatingDto) {
+    return this.coreService.createOrUpdateMenuRating(req.user, body);
   }
 
   @Get('children/me')

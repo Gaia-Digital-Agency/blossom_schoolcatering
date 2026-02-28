@@ -94,6 +94,7 @@ export class AuthController {
     const phoneNumber = body.phoneNumber;
     const email = body.email;
     const address = body.address;
+    const allergies = body.allergies;
     const result = await this.authService.register({
       role: role as Role,
       username,
@@ -103,6 +104,7 @@ export class AuthController {
       phoneNumber,
       email,
       address,
+      allergies,
     });
     this.setRefreshCookie(req, res, result.refreshToken);
     return { accessToken: result.accessToken, user: result.user };
@@ -125,11 +127,13 @@ export class AuthController {
       youngsterGrade: body.youngsterGrade,
       youngsterPhone: body.youngsterPhone || '',
       youngsterEmail: body.youngsterEmail || '',
+      youngsterAllergies: body.youngsterAllergies,
       parentFirstName: body.parentFirstName,
       parentLastName: body.parentLastName,
       parentMobileNumber: body.parentMobileNumber,
       parentEmail: body.parentEmail,
       parentAddress: body.parentAddress || '',
+      parentAllergies: body.parentAllergies,
     });
   }
 

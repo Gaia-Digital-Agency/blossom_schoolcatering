@@ -7,6 +7,7 @@ export * from './create-delivery-user.dto';
 export * from './create-favourite.dto';
 export * from './create-ingredient.dto';
 export * from './create-menu-item.dto';
+export * from './create-menu-rating.dto';
 export * from './create-school.dto';
 export * from './meal-plan-wizard.dto';
 export * from './note.dto';

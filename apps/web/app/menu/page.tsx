@@ -96,6 +96,7 @@ export default function MenuPage() {
 
         <div className="dev-links">
           <Link href="/">Back to Home</Link>
+          <Link href="/rating">Rating</Link>
         </div>
       </section>
       <style jsx>{`

@@ -462,7 +462,7 @@ export default function ParentsPage() {
                 <div className="auth-form">
                   {menuItems.map((item) => (
                     <label key={item.id}>
-                      <span><strong>{item.name}</strong> - Rp {Number(item.price).toLocaleString('id-ID')}{item.has_allergen ? ' (Contains allergen)' : ''}</span>
+                      <span><strong>{item.name}</strong> - Rp {Number(item.price).toLocaleString('id-ID')}</span>
                       <small>{item.description}</small>
                       <small>{item.nutrition_facts_text}</small>
                       <small>Ingredients: {item.ingredients.join(', ') || '-'}</small>

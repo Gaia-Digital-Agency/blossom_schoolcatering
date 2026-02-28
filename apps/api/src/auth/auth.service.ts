@@ -45,6 +45,7 @@ type RegisterInput = {
   phoneNumber: string;
   email?: string;
   address?: string;
+  allergies?: string;
 };
 
 type RegisterYoungsterWithParentInput = {
@@ -56,11 +57,13 @@ type RegisterYoungsterWithParentInput = {
   youngsterGrade: string;
   youngsterPhone: string;
   youngsterEmail?: string;
+  youngsterAllergies: string;
   parentFirstName: string;
   parentLastName?: string;
   parentMobileNumber: string;
   parentEmail: string;
   parentAddress?: string;
+  parentAllergies: string;
 };
 
 type RegistrationSchoolRow = {
@@ -84,6 +87,8 @@ const REFRESH_TTL = '7d';
 
 @Injectable()
 export class AuthService {
+  private parentDietaryRestrictionsReady = false;
+
   private normalizeRole(role: string): Role {
     const normalized = role?.toUpperCase() as Role;
     if (!ROLES.includes(normalized)) {
@@ -186,6 +191,48 @@ export class AuthService {
     const digits = (phoneLike || '').replace(/\D/g, '');
     if (digits.length >= 6) return digits;
     return `${digits}123456`.slice(0, 6);
+  }
+
+  private normalizeAllergies(allergiesRaw?: string) {
+    const cleaned = (allergiesRaw || '').trim().replace(/\s+/g, ' ');
+    const fallback = 'No Allergies';
+    if (!cleaned) return fallback;
+    const words = cleaned.split(' ').filter(Boolean);
+    if (words.length >= 10) {
+      throw new BadRequestException('Allergies must be less than 10 words');
+    }
+    return cleaned;
+  }
+
+  private async ensureParentDietaryRestrictionsTable() {
+    if (this.parentDietaryRestrictionsReady) return;
+    await runSql(`
+      CREATE TABLE IF NOT EXISTS parent_dietary_restrictions (
+        parent_id uuid PRIMARY KEY REFERENCES parents(id) ON DELETE CASCADE,
+        restriction_label text NOT NULL DEFAULT 'ALLERGIES',
+        restriction_details text NOT NULL,
+        is_active boolean NOT NULL DEFAULT true,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        deleted_at timestamptz NULL
+      );
+    `);
+    this.parentDietaryRestrictionsReady = true;
+  }
+
+  private async upsertParentAllergies(parentId: string, allergies: string) {
+    await this.ensureParentDietaryRestrictionsTable();
+    await runSql(
+      `INSERT INTO parent_dietary_restrictions (parent_id, restriction_label, restriction_details, is_active, deleted_at)
+       VALUES ($1, 'ALLERGIES', $2, true, NULL)
+       ON CONFLICT (parent_id)
+       DO UPDATE SET restriction_label = 'ALLERGIES',
+                     restriction_details = EXCLUDED.restriction_details,
+                     is_active = true,
+                     deleted_at = NULL,
+                     updated_at = now();`,
+      [parentId, allergies],
+    );
   }
 
   private async ensureSystemUsers() {
@@ -452,6 +499,7 @@ export class AuthService {
     const password = input.password || '';
     const email = (input.email || '').trim().toLowerCase();
     const address = (input.address || '').trim();
+    const allergies = this.normalizeAllergies(input.allergies);
 
     if (!username || !firstName || !lastName || !phoneNumber || !password || !email) {
       throw new BadRequestException('Required fields are missing');
@@ -461,6 +509,9 @@ export class AuthService {
     }
     if (role === 'PARENT' && !address) {
       throw new BadRequestException('Address is required for parent registration');
+    }
+    if (role === 'PARENT' && !String(input.allergies || '').trim()) {
+      throw new BadRequestException('Allergies is required for parent registration');
     }
 
     const existing = await this.findUserByUsername(username);
@@ -501,10 +552,13 @@ export class AuthService {
     );
 
     if (role === 'PARENT') {
-      await runSql(
-        `INSERT INTO parents (user_id, address) VALUES ($1, $2);`,
+      const parentId = await runSql(
+        `INSERT INTO parents (user_id, address)
+         VALUES ($1, $2)
+         RETURNING id;`,
         [created.id, address],
       );
+      await this.upsertParentAllergies(parentId, allergies);
     }
 
     const user = this.buildUser(created, role);
@@ -540,11 +594,13 @@ export class AuthService {
     const youngsterGrade = (input.youngsterGrade || '').trim();
     const youngsterPhone = (input.youngsterPhone || '').trim();
     const youngsterEmail = (input.youngsterEmail || '').trim().toLowerCase();
+    const youngsterAllergies = this.normalizeAllergies(input.youngsterAllergies);
     const parentFirstName = (input.parentFirstName || '').trim();
     const parentLastNameInput = (input.parentLastName || '').trim();
     const parentMobileNumber = (input.parentMobileNumber || '').trim();
     const parentEmail = (input.parentEmail || '').trim().toLowerCase();
     const parentAddress = (input.parentAddress || '').trim();
+    const parentAllergies = this.normalizeAllergies(input.parentAllergies);
 
     if (
       !youngsterFirstName ||
@@ -557,7 +613,9 @@ export class AuthService {
       !parentFirstName ||
       !parentLastNameInput ||
       !parentMobileNumber ||
-      !parentEmail
+      !parentEmail ||
+      !String(input.youngsterAllergies || '').trim() ||
+      !String(input.parentAllergies || '').trim()
     ) {
       throw new BadRequestException('Missing required youngster/parent fields');
     }
@@ -670,6 +728,7 @@ export class AuthService {
     if (!parentId) {
       throw new BadRequestException('Failed to resolve parent profile');
     }
+    await this.upsertParentAllergies(parentId, parentAllergies);
 
     const youngsterUsernameBase = this.sanitizeUsernamePart(`${youngsterLastName}_${youngsterFirstName}`);
     const youngsterUsername = await runSql(`SELECT generate_unique_username($1);`, [youngsterUsernameBase]);
@@ -705,6 +764,16 @@ export class AuthService {
       [youngsterCreated.id, youngsterSchoolId, youngsterDateOfBirth, youngsterGender, youngsterGrade],
     );
     const youngsterChild = this.parseJsonLine<{ id: string }>(youngsterChildOut);
+    await runSql(
+      `INSERT INTO child_dietary_restrictions (child_id, restriction_label, restriction_details, is_active)
+       VALUES ($1, 'ALLERGIES', $2, true)
+       ON CONFLICT (child_id, restriction_label)
+       DO UPDATE SET restriction_details = EXCLUDED.restriction_details,
+                     is_active = true,
+                     deleted_at = NULL,
+                     updated_at = now();`,
+      [youngsterChild.id, youngsterAllergies],
+    );
 
     await runSql(
       `INSERT INTO parent_children (parent_id, child_id)

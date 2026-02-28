@@ -29,6 +29,9 @@ export class RegisterYoungsterWithParentDto {
   youngsterEmail?: string;
 
   @IsString()
+  youngsterAllergies!: string;
+
+  @IsString()
   parentFirstName!: string;
 
   @IsString()
@@ -39,6 +42,9 @@ export class RegisterYoungsterWithParentDto {
 
   @IsString()
   parentEmail!: string;
+
+  @IsString()
+  parentAllergies!: string;
 
   @IsOptional()
   @IsString()

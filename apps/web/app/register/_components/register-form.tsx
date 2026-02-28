@@ -25,6 +25,7 @@ export default function RegisterForm({ role, allowedRoles, title, subtitle }: Re
   const [phoneNumber, setPhoneNumber] = useState('');
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
+  const [allergies, setAllergies] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const isParentRole = selectedRole === 'PARENT';
@@ -47,6 +48,7 @@ export default function RegisterForm({ role, allowedRoles, title, subtitle }: Re
           phoneNumber,
           email,
           address: isParentRole ? address : undefined,
+          allergies: isParentRole ? allergies : undefined,
         }),
       });
       if (!res.ok) {
@@ -113,6 +115,17 @@ export default function RegisterForm({ role, allowedRoles, title, subtitle }: Re
             <label>
               Address
               <input value={address} onChange={(e) => setAddress(e.target.value)} required />
+            </label>
+          ) : null}
+          {isParentRole ? (
+            <label>
+              Allergies
+              <input
+                value={allergies}
+                onChange={(e) => setAllergies(e.target.value)}
+                placeholder="Type No Allergies if none"
+                required
+              />
             </label>
           ) : null}
           {error ? <p className="auth-error">{error}</p> : null}

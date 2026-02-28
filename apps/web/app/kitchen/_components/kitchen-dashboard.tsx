@@ -193,14 +193,14 @@ export default function KitchenDashboard({
 
             {showOrderBoards ? (
               <>
-                <h2>Allergen Alerts</h2>
-                {data.allergenAlerts.length === 0 ? <p className="auth-help">No allergen-alert orders.</p> : (
+                <h2>Dietary Alerts</h2>
+                {data.allergenAlerts.length === 0 ? <p className="auth-help">No dietary-alert orders.</p> : (
                   <div className="kitchen-alert-grid">
                     {data.allergenAlerts.map((o) => (
                       <article className="kitchen-alert-card" key={o.id}>
                         <strong>{o.session} - {o.child_name}</strong>
                         <small>Parent: {o.parent_name}</small>
-                        <small>Allergens: {o.allergen_items || '-'}</small>
+                        <small>Dietary Allergies: {o.allergen_items || '-'}</small>
                         <small>Dishes: {o.dish_count}</small>
                       </article>
                     ))}
@@ -219,6 +219,7 @@ export default function KitchenDashboard({
                               <strong>{o.session} - {o.child_name}</strong>
                               <small>School: {o.school_name || '-'}</small>
                               <small>Parent: {o.parent_name}</small>
+                              <small>Dietary Allergies: {o.allergen_items || '-'}</small>
                               <small>Status: {o.status} | Delivery: {o.delivery_status}</small>
                               <small>Dishes: {o.dishes.map((d) => `${d.item_name} x${d.quantity}`).join(', ') || '-'}</small>
                               <span className="kitchen-card-action">
@@ -240,6 +241,7 @@ export default function KitchenDashboard({
                               <strong>{o.session} - {o.child_name}</strong>
                               <small>School: {o.school_name || '-'}</small>
                               <small>Parent: {o.parent_name}</small>
+                              <small>Dietary Allergies: {o.allergen_items || '-'}</small>
                               <small>Status: {o.status} | Delivery: {o.delivery_status}</small>
                               <small>Dishes: {o.dishes.map((d) => `${d.item_name} x${d.quantity}`).join(', ') || '-'}</small>
                             </button>
