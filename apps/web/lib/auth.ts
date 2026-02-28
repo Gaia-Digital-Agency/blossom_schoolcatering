@@ -102,6 +102,20 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<unknow
     throw new Error(msg);
   }
 
-  if (res.status === 204) return null;
-  return res.json();
+  const method = String(init?.method || 'GET').toUpperCase();
+  const shouldAutoRefresh =
+    typeof window !== 'undefined' &&
+    ['POST', 'PATCH', 'PUT', 'DELETE'].includes(method);
+
+  if (res.status === 204) {
+    if (shouldAutoRefresh) {
+      window.setTimeout(() => window.location.reload(), 120);
+    }
+    return null;
+  }
+  const data = await res.json();
+  if (shouldAutoRefresh) {
+    window.setTimeout(() => window.location.reload(), 120);
+  }
+  return data;
 }
