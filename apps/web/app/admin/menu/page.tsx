@@ -230,7 +230,7 @@ export default function AdminMenuPage() {
   const getImageFileLabel = (imageUrl?: string | null) => {
     const raw = String(imageUrl || '').trim();
     if (!raw) return '-';
-    if (raw.startsWith('data:image/')) return itemImageFileName || 'image.webp';
+    if (raw.startsWith('data:image/')) return 'embedded-image.webp';
     try {
       const pathname = new URL(raw, 'http://localhost').pathname;
       const fileName = pathname.split('/').pop() || raw;

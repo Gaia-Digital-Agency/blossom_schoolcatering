@@ -21,5 +21,9 @@ export async function fileToWebpDataUrl(file: File, quality = 0.82): Promise<str
     throw new Error('Canvas context is unavailable');
   }
   ctx.drawImage(image, 0, 0);
-  return canvas.toDataURL('image/webp', quality);
+  const webp = canvas.toDataURL('image/webp', quality);
+  if (!webp.startsWith('data:image/webp')) {
+    throw new Error('Failed converting image to WebP');
+  }
+  return webp;
 }

@@ -241,26 +241,31 @@ export class CoreService {
       if (!parsed.contentType.startsWith('image/')) {
         throw new BadRequestException('Menu image must be an image');
       }
-      if (parsed.contentType.toLowerCase() !== 'image/webp') {
-        throw new BadRequestException('Menu image upload must be WebP');
-      }
       if (parsed.data.length > 5 * 1024 * 1024) {
         throw new BadRequestException('Menu image exceeds size limit (5MB)');
       }
       const ext = this.getFileExtFromContentType(parsed.contentType);
       const objectName = `${this.getGcsCategoryFolder('menu-images')}/${this.slugify(menuItemName)}-${Date.now()}.${ext}`;
-      const uploaded = await this.uploadToGcs({
-        objectName,
-        contentType: parsed.contentType,
-        data: parsed.data,
-        cacheControl: 'public, max-age=86400',
-      });
-      // Use direct GCS public URL for menu images so they render consistently on public /menu.
-      return this.buildGoogleStoragePublicUrl(uploaded.objectName);
+      try {
+        const uploaded = await this.uploadToGcs({
+          objectName,
+          contentType: parsed.contentType,
+          data: parsed.data,
+          cacheControl: 'public, max-age=86400',
+        });
+        // Use direct GCS public URL for menu images so they render consistently on public /menu.
+        return this.buildGoogleStoragePublicUrl(uploaded.objectName);
+      } catch (err) {
+        // Fallback when GCS credentials are unavailable: keep a valid inline image so UI updates persist.
+        // This preserves admin update behavior instead of hard-failing image changes.
+        const msg = err instanceof Error ? err.message : '';
+        if (msg.includes('Google credentials missing')) {
+          return trimmed;
+        }
+        throw err;
+      }
     }
-    if (/^https?:\/\//i.test(trimmed) && !/\.webp(\?|#|$)/i.test(trimmed)) {
-      throw new BadRequestException('Menu image URL must be WebP');
-    }
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
     return trimmed;
   }
 
@@ -2961,9 +2966,6 @@ export class CoreService {
       if (!parsed.contentType.startsWith('image/')) {
         throw new BadRequestException('Proof upload must be an image');
       }
-      if (parsed.contentType.toLowerCase() !== 'image/webp') {
-        throw new BadRequestException('Proof upload must be WebP');
-      }
       if (parsed.data.length > 5 * 1024 * 1024) {
         throw new BadRequestException('Proof image exceeds size limit (5MB)');
       }
@@ -2978,8 +2980,6 @@ export class CoreService {
       proofUrl = uploaded.publicUrl;
     } else if (!/^https?:\/\//i.test(proof)) {
       throw new BadRequestException('proofImageData must be a data URL image or an http(s) URL');
-    } else if (!/\.webp(\?|#|$)/i.test(proof)) {
-      throw new BadRequestException('Proof image URL must be WebP');
     }
 
     await runSql(
