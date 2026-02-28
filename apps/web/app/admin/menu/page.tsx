@@ -106,6 +106,7 @@ export default function AdminMenuPage() {
   const [itemCaloriesKcal, setItemCaloriesKcal] = useState('');
   const [itemImageUrl, setItemImageUrl] = useState('');
   const [itemImageFileName, setItemImageFileName] = useState('');
+  const [storedImageUrl, setStoredImageUrl] = useState('');
   const [uploadInputKey, setUploadInputKey] = useState(0);
   const [imageConverting, setImageConverting] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
@@ -123,11 +124,6 @@ export default function AdminMenuPage() {
   const [customIngredientInput, setCustomIngredientInput] = useState('');
   const [customIngredientOptions, setCustomIngredientOptions] = useState<Array<{ key: string; label: string }>>([]);
   const ingredientLimit = 20;
-  const refreshPage = () => {
-    if (typeof window === 'undefined') return;
-    window.location.reload();
-  };
-
   const ingredientIdByNormalizedName = useMemo(() => {
     const map = new Map<string, string>();
     for (const i of ingredients) map.set(normalize(i.name), i.id);
@@ -202,6 +198,7 @@ export default function AdminMenuPage() {
   };
 
   useEffect(() => {
+    clearUploadSelection();
     loadMenuData().catch((e) => setError(e instanceof Error ? e.message : 'Failed'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [menuServiceDate, menuSession]);
@@ -213,6 +210,7 @@ export default function AdminMenuPage() {
     setItemPrice('');
     setItemCaloriesKcal('');
     setItemImageUrl('');
+    setStoredImageUrl('');
     clearUploadSelection();
     setItemAvailable(true);
     setItemDisplayOrder('1');
@@ -298,7 +296,6 @@ export default function AdminMenuPage() {
       }
       resetForm();
       await loadMenuData();
-      refreshPage();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed saving dish');
     } finally {
@@ -353,7 +350,6 @@ export default function AdminMenuPage() {
         }
         return [...prev, ingredientId];
       });
-      refreshPage();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed adding ingredient');
     } finally {
@@ -375,7 +371,6 @@ export default function AdminMenuPage() {
     if (!itemDescription.trim()) setItemDescription(raw);
     setCustomDishInput('');
     setMessage(`Dish added to selection: ${raw}`);
-    refreshPage();
   };
 
   const onAddCustomIngredientOption = () => {
@@ -391,7 +386,6 @@ export default function AdminMenuPage() {
     setCustomIngredientOptions((prev) => [...prev, { key: raw, label: toLabel(raw) }]);
     setCustomIngredientInput('');
     setMessage(`Ingredient added to selection: ${toLabel(raw)}`);
-    refreshPage();
   };
 
   const onAutoCreateDishFromMaster = async (dish: string) => {
@@ -425,7 +419,6 @@ export default function AdminMenuPage() {
       if (!itemDescription.trim()) setItemDescription(dish);
       setMessage(`Dish auto-created: ${dish}`);
       await loadMenuData();
-      refreshPage();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed auto-creating dish');
     } finally {
@@ -441,7 +434,6 @@ export default function AdminMenuPage() {
       await apiFetch('/admin/menus/sample-seed', { method: 'POST', body: JSON.stringify({ serviceDate: menuServiceDate }) });
       setMessage('Sample menus seeded for selected date.');
       await loadMenuData();
-      refreshPage();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed seeding sample menus');
     } finally {
@@ -456,6 +448,7 @@ export default function AdminMenuPage() {
     setItemPrice(String(item.price));
     setItemCaloriesKcal(item.calories_kcal === null || item.calories_kcal === undefined ? '' : String(item.calories_kcal));
     setItemImageUrl(item.image_url || '');
+    setStoredImageUrl(item.image_url || '');
     clearUploadSelection();
     setItemAvailable(Boolean(item.is_available));
     setItemDisplayOrder(String(item.display_order ?? 0));
@@ -479,7 +472,6 @@ export default function AdminMenuPage() {
       });
       setMessage(isAvailable ? 'Dish activated.' : 'Dish deactivated.');
       await loadMenuData();
-      refreshPage();
     } catch (e) {
       setMenuItems(previous);
       setError(e instanceof Error ? e.message : 'Failed updating dish availability');
@@ -552,7 +544,7 @@ export default function AdminMenuPage() {
             />
           </label>
           <p className="auth-help menu-full-row">Pending upload file: {imageConverting ? 'Converting...' : (itemImageFileName || '-')}</p>
-          {editingItemId ? <p className="auth-help menu-full-row">Current stored image: {getImageFileLabel(itemImageUrl)}</p> : null}
+          {editingItemId && storedImageUrl ? <p className="auth-help menu-full-row">Current stored image: {getImageFileLabel(storedImageUrl)}</p> : null}
 
           <div className="menu-selection-columns menu-full-row">
             <div className="ingredient-selected-box">
