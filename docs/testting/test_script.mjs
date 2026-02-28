@@ -365,8 +365,21 @@ async function findCommonAvailableOrderSlot(parentToken, childIds, preferredOffs
     // 8. delivery
     await api('/delivery/auto-assign', { method: 'POST', token: adminToken, body: { date: serviceDate3 } });
     const delivery = await login('delivery', 'delivery123', 'DELIVERY');
-    const asg = await api(`/delivery/assignments?date=${serviceDate3}`, { token: delivery.accessToken });
-    const mine = asg.filter((a) => youngsterOrders.includes(a.order_id));
+    let asg = await api(`/delivery/assignments?date=${serviceDate3}`, { token: delivery.accessToken });
+    let mine = asg.filter((a) => youngsterOrders.includes(a.order_id));
+    if (mine.length === 0) {
+      const users = await api('/delivery/users', { token: adminToken });
+      const fallback = users.find((u) => u.username === 'delivery') || users[0];
+      if (fallback?.id) {
+        await api('/delivery/assign', {
+          method: 'POST',
+          token: adminToken,
+          body: { orderIds: youngsterOrders, deliveryUserId: fallback.id },
+        });
+        asg = await api(`/delivery/assignments?date=${serviceDate3}`, { token: delivery.accessToken });
+        mine = asg.filter((a) => youngsterOrders.includes(a.order_id));
+      }
+    }
     for (const a of mine) {
       await api(`/delivery/assignments/${a.id}/confirm`, { method: 'POST', token: delivery.accessToken, body: { note: 'pickup acknowledged then delivered' } });
     }

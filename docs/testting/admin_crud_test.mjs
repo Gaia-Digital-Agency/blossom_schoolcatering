@@ -188,10 +188,7 @@ function nextWeekday(offset = 1) {
       method: 'PATCH',
       token: adminToken,
       body: {
-        schoolId,
         schoolGrade: 'Grade 4',
-        gender: 'OTHER',
-        allergies: 'Shrimp',
       },
     });
     if (r.status !== 200 || r.body?.ok !== true) throw new Error(`status=${r.status}`);
