@@ -182,13 +182,17 @@ export class CoreService {
     contentType: string;
     data: Buffer;
     cacheControl?: string;
+    publicRead?: boolean;
   }) {
     const bucket = this.getGcsBucket();
     const accessToken = await this.getGoogleAccessToken(['https://www.googleapis.com/auth/devstorage.read_write']);
     const objectName = params.objectName.replace(/^\/+/, '');
-    const uploadUrl = `https://storage.googleapis.com/upload/storage/v1/b/${encodeURIComponent(
-      bucket,
-    )}/o?uploadType=media&name=${encodeURIComponent(objectName)}`;
+    const query = new URLSearchParams({
+      uploadType: 'media',
+      name: objectName,
+    });
+    if (params.publicRead) query.set('predefinedAcl', 'publicRead');
+    const uploadUrl = `https://storage.googleapis.com/upload/storage/v1/b/${encodeURIComponent(bucket)}/o?${query.toString()}`;
     const res = await fetch(uploadUrl, {
       method: 'POST',
       headers: {
@@ -252,6 +256,7 @@ export class CoreService {
           contentType: parsed.contentType,
           data: parsed.data,
           cacheControl: 'public, max-age=86400',
+          publicRead: true,
         });
         // Use direct GCS public URL for menu images so they render consistently on public /menu.
         return this.buildGoogleStoragePublicUrl(uploaded.objectName);
