@@ -8,6 +8,7 @@ type PublicMenuItem = {
   id: string;
   name: string;
   image_url: string;
+  is_available?: boolean;
   updated_at?: string;
   session: 'LUNCH' | 'SNACK' | 'BREAKFAST';
   service_date: string;
@@ -28,7 +29,7 @@ export default function MenuPage() {
         if (!res.ok) throw new Error('Failed loading menu');
         const data = await res.json() as { serviceDate: string; items: PublicMenuItem[] };
         setServiceDate(data.serviceDate || '');
-        setItems(data.items || []);
+        setItems((data.items || []).filter((item) => item.is_available !== false));
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed loading menu');
       }

@@ -10,6 +10,7 @@ import AdminNav from '../_components/admin-nav';
 type Ingredient = { id: string; name: string; allergen_flag: boolean; is_active: boolean };
 type AdminMenuItem = {
   id: string;
+  session?: 'LUNCH' | 'SNACK' | 'BREAKFAST';
   name: string;
   description: string;
   nutrition_facts_text: string;
@@ -171,7 +172,7 @@ export default function AdminMenuPage() {
   useEffect(() => {
     loadMenuData().catch((e) => setError(e instanceof Error ? e.message : 'Failed'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [menuServiceDate, menuSession]);
 
   const resetForm = () => {
     setEditingItemId('');
@@ -391,8 +392,12 @@ export default function AdminMenuPage() {
     }
   };
 
-  const activeMenuItems = useMemo(() => menuItems.filter((x) => x.is_available), [menuItems]);
-  const inactiveMenuItems = useMemo(() => menuItems.filter((x) => !x.is_available), [menuItems]);
+  const sessionScopedItems = useMemo(
+    () => menuItems.filter((x) => !x.session || x.session === menuSession),
+    [menuItems, menuSession],
+  );
+  const activeMenuItems = useMemo(() => sessionScopedItems.filter((x) => x.is_available), [sessionScopedItems]);
+  const inactiveMenuItems = useMemo(() => sessionScopedItems.filter((x) => !x.is_available), [sessionScopedItems]);
 
   useEffect(() => {
     if (activeMenuItems.length > 0 && activeMenuItems.length < 5) {
@@ -540,7 +545,7 @@ export default function AdminMenuPage() {
         </form>
 
         <div className="menu-items-shell">
-          <h2>Menu Items</h2>
+          <h2>Menu Items ({menuSession})</h2>
           <div className="menu-item-columns">
             <div className="menu-list-group">
               <h3 className="menu-list-title">Active Dishes</h3>

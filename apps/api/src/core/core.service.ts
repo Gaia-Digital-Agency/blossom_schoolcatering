@@ -1480,6 +1480,7 @@ export class CoreService {
         SELECT mi.id,
                mi.name,
                mi.image_url,
+               mi.is_available,
                mi.updated_at::text AS updated_at,
                m.session::text AS session,
                m.service_date::text AS service_date
@@ -1527,6 +1528,7 @@ export class CoreService {
       FROM (
         SELECT mi.id,
                mi.menu_id,
+               m.session::text AS session,
                mi.name,
                mi.description,
                mi.nutrition_facts_text,
@@ -1547,7 +1549,7 @@ export class CoreService {
           AND m.session = $2::session_type
           AND m.deleted_at IS NULL
           AND mi.deleted_at IS NULL
-        GROUP BY mi.id
+        GROUP BY mi.id, m.session
         ORDER BY mi.display_order ASC, mi.name ASC
       ) t;
     `,
