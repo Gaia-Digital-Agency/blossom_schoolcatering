@@ -103,8 +103,9 @@ export default function MenuPage() {
         {items.length === 0 ? (
           <p className="auth-help">No active dishes available.</p>
         ) : (
-          <div className="menu-category-grid">
-            {groupedItems.map((group) => (
+          <div className="menu-layout">
+            {/* Left column: Main dishes only */}
+            {groupedItems.filter((g) => g.code === 'MAIN').map((group) => (
               <section className="menu-category-card" key={group.code}>
                 <h2>{group.label}</h2>
                 <div className="menu-public-grid">
@@ -131,6 +132,38 @@ export default function MenuPage() {
                 </div>
               </section>
             ))}
+            {/* Right column: Dessert, Sides, Drinks, etc. stacked independently */}
+            {groupedItems.some((g) => g.code !== 'MAIN') ? (
+              <div className="menu-col-secondary">
+                {groupedItems.filter((g) => g.code !== 'MAIN').map((group) => (
+                  <section className="menu-category-card" key={group.code}>
+                    <h2>{group.label}</h2>
+                    <div className="menu-public-grid">
+                      {group.items.map((item) => (
+                        <article className="menu-public-card" key={item.id}>
+                          <img
+                            src={resolveDishImageSrc(item)}
+                            alt={item.name}
+                            loading="lazy"
+                            onError={(e) => {
+                              const target = e.currentTarget;
+                              if (target.src.includes(FALLBACK_DISH_IMAGE)) return;
+                              target.src = FALLBACK_DISH_IMAGE;
+                            }}
+                          />
+                          <div>
+                            <strong>{item.name}</strong>
+                            <small>Rp {Number(item.price || 0).toLocaleString('id-ID')}</small>
+                            <small>Dietary: {formatDishDietaryTags(item)}</small>
+                            <small>{item.session}</small>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            ) : null}
           </div>
         )}
 
@@ -140,10 +173,18 @@ export default function MenuPage() {
         </div>
       </section>
       <style jsx>{`
-        .menu-category-grid {
+        /* Outer two-column layout: Main left, secondary categories right */
+        .menu-layout {
           display: grid;
           grid-template-columns: 1fr;
           gap: 0.85rem;
+          align-items: start;
+        }
+        /* Right column: stacks Dessert, Sides, etc. each at their own height */
+        .menu-col-secondary {
+          display: grid;
+          gap: 0.85rem;
+          align-content: start;
         }
         .menu-category-card {
           border: 1px solid #d8cab1;
@@ -191,11 +232,9 @@ export default function MenuPage() {
           color: #5d554b;
         }
         @media (min-width: 900px) {
-          .menu-category-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-          }
-          .menu-public-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+          /* Side-by-side: Main (left) | secondary categories (right) */
+          .menu-layout {
+            grid-template-columns: 1fr 1fr;
           }
         }
       `}</style>
