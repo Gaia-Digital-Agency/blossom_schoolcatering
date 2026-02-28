@@ -192,7 +192,6 @@ function nextWeekday(offset = 1) {
         schoolGrade: 'Grade 4',
         gender: 'OTHER',
         allergies: 'Shrimp',
-        parentId,
       },
     });
     if (r.status !== 200 || r.body?.ok !== true) throw new Error(`status=${r.status}`);
