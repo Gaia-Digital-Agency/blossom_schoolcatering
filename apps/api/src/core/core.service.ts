@@ -43,6 +43,8 @@ type CartRow = {
 };
 
 const SESSIONS: SessionType[] = ['LUNCH', 'SNACK', 'BREAKFAST'];
+const DISH_CATEGORIES = ['MAIN', 'APPETISER', 'COMPLEMENT', 'DESSERT', 'SIDES', 'GARNISH', 'DRINK'] as const;
+type DishCategory = (typeof DISH_CATEGORIES)[number];
 
 @Injectable()
 export class CoreService {
@@ -553,6 +555,26 @@ export class CoreService {
       ALTER TABLE menu_items
       ADD COLUMN IF NOT EXISTS calories_kcal integer;
     `);
+    await runSql(`
+      ALTER TABLE menu_items
+      ADD COLUMN IF NOT EXISTS is_vegetarian boolean NOT NULL DEFAULT false;
+    `);
+    await runSql(`
+      ALTER TABLE menu_items
+      ADD COLUMN IF NOT EXISTS is_gluten_free boolean NOT NULL DEFAULT false;
+    `);
+    await runSql(`
+      ALTER TABLE menu_items
+      ADD COLUMN IF NOT EXISTS is_dairy_free boolean NOT NULL DEFAULT false;
+    `);
+    await runSql(`
+      ALTER TABLE menu_items
+      ADD COLUMN IF NOT EXISTS contains_peanut boolean NOT NULL DEFAULT false;
+    `);
+    await runSql(`
+      ALTER TABLE menu_items
+      ADD COLUMN IF NOT EXISTS dish_category text NOT NULL DEFAULT 'MAIN';
+    `);
     this.menuItemExtendedColumnsReady = true;
   }
 
@@ -636,6 +658,14 @@ export class CoreService {
 
   private sanitizePackingRequirement(value?: string) {
     return (value || '').trim().slice(0, 200);
+  }
+
+  private normalizeDishCategory(value?: string): DishCategory {
+    const normalized = String(value || '').trim().toUpperCase();
+    if ((DISH_CATEGORIES as readonly string[]).includes(normalized)) {
+      return normalized as DishCategory;
+    }
+    throw new BadRequestException('Invalid dish category');
   }
 
   private normalizeAllergies(allergiesRaw?: string) {
@@ -1539,7 +1569,12 @@ export class CoreService {
                mi.nutrition_facts_text,
                mi.calories_kcal,
                mi.price,
+               mi.dish_category,
                mi.image_url,
+               mi.is_vegetarian,
+               mi.is_gluten_free,
+               mi.is_dairy_free,
+               mi.contains_peanut,
                mi.cutlery_required,
                mi.packing_requirement,
                mi.display_order,
@@ -1605,8 +1640,14 @@ export class CoreService {
       FROM (
         SELECT mi.id,
                mi.name,
+               mi.price,
+               mi.dish_category,
                mi.image_url,
                mi.is_available,
+               mi.is_vegetarian,
+               mi.is_gluten_free,
+               mi.is_dairy_free,
+               mi.contains_peanut,
                mi.updated_at::text AS updated_at,
                m.session::text AS session,
                m.service_date::text AS service_date
@@ -1661,8 +1702,13 @@ export class CoreService {
                mi.nutrition_facts_text,
                mi.calories_kcal,
                mi.price,
+               mi.dish_category,
                mi.image_url,
                mi.is_available,
+               mi.is_vegetarian,
+               mi.is_gluten_free,
+               mi.is_dairy_free,
+               mi.contains_peanut,
                mi.cutlery_required,
                mi.packing_requirement,
                mi.display_order,
@@ -1796,6 +1842,11 @@ export class CoreService {
     displayOrder?: number;
     cutleryRequired?: boolean;
     packingRequirement?: string;
+    isVegetarian?: boolean;
+    isGlutenFree?: boolean;
+    isDairyFree?: boolean;
+    containsPeanut?: boolean;
+    dishCategory?: string;
   }) {
     await this.ensureMenuItemExtendedColumns();
     const serviceDate = this.validateServiceDate(input.serviceDate);
@@ -1811,6 +1862,11 @@ export class CoreService {
     const displayOrder = Number.isInteger(input.displayOrder) ? Number(input.displayOrder) : 0;
     const cutleryRequired = Boolean(input.cutleryRequired);
     const packingRequirement = this.sanitizePackingRequirement(input.packingRequirement);
+    const isVegetarian = Boolean(input.isVegetarian);
+    const isGlutenFree = Boolean(input.isGlutenFree);
+    const isDairyFree = Boolean(input.isDairyFree);
+    const containsPeanut = Boolean(input.containsPeanut);
+    const dishCategory = this.normalizeDishCategory(input.dishCategory);
 
     if (price < 0) {
       throw new BadRequestException('Invalid price');
@@ -1827,10 +1883,12 @@ export class CoreService {
     const itemOut = await runSql(
       `WITH inserted AS (
          INSERT INTO menu_items (
-           menu_id, name, description, nutrition_facts_text, calories_kcal, price, image_url, is_available, display_order, cutlery_required, packing_requirement
+           menu_id, name, description, nutrition_facts_text, calories_kcal, price, image_url, is_available, display_order, cutlery_required, packing_requirement,
+           is_vegetarian, is_gluten_free, is_dairy_free, contains_peanut, dish_category
          )
          VALUES (
-           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+           $12, $13, $14, $15, $16
          )
          RETURNING id, name
        )
@@ -1848,6 +1906,11 @@ export class CoreService {
         displayOrder,
         cutleryRequired,
         packingRequirement || null,
+        isVegetarian,
+        isGlutenFree,
+        isDairyFree,
+        containsPeanut,
+        dishCategory,
       ],
     );
     const item = this.parseJsonLine<{ id: string; name: string }>(itemOut);
@@ -1880,6 +1943,11 @@ export class CoreService {
       displayOrder?: number;
       cutleryRequired?: boolean;
       packingRequirement?: string;
+      isVegetarian?: boolean;
+      isGlutenFree?: boolean;
+      isDairyFree?: boolean;
+      containsPeanut?: boolean;
+      dishCategory?: string;
     },
   ) {
     await this.ensureMenuItemExtendedColumns();
@@ -1895,9 +1963,14 @@ export class CoreService {
                mi.nutrition_facts_text,
                mi.calories_kcal,
                mi.price,
+               mi.dish_category,
                mi.image_url,
                mi.is_available,
                mi.display_order,
+               mi.is_vegetarian,
+               mi.is_gluten_free,
+               mi.is_dairy_free,
+               mi.contains_peanut,
                mi.cutlery_required,
                mi.packing_requirement,
                COALESCE(array_agg(DISTINCT i.id::text) FILTER (WHERE i.id IS NOT NULL), '{}') AS ingredient_ids
@@ -1923,9 +1996,14 @@ export class CoreService {
       nutrition_facts_text?: string | null;
       calories_kcal?: number | null;
       price: string | number;
+      dish_category: string;
       image_url?: string | null;
       is_available: boolean;
       display_order: number;
+      is_vegetarian: boolean;
+      is_gluten_free: boolean;
+      is_dairy_free: boolean;
+      contains_peanut: boolean;
       cutlery_required: boolean;
       packing_requirement?: string | null;
       ingredient_ids: string[];
@@ -1951,6 +2029,13 @@ export class CoreService {
     const isAvailable = input.isAvailable === undefined ? Boolean(current.is_available) : Boolean(input.isAvailable);
     const displayOrder = Number.isInteger(input.displayOrder) ? Number(input.displayOrder) : Number(current.display_order || 0);
     const cutleryRequired = input.cutleryRequired === undefined ? Boolean(current.cutlery_required) : Boolean(input.cutleryRequired);
+    const isVegetarian = input.isVegetarian === undefined ? Boolean(current.is_vegetarian) : Boolean(input.isVegetarian);
+    const isGlutenFree = input.isGlutenFree === undefined ? Boolean(current.is_gluten_free) : Boolean(input.isGlutenFree);
+    const isDairyFree = input.isDairyFree === undefined ? Boolean(current.is_dairy_free) : Boolean(input.isDairyFree);
+    const containsPeanut = input.containsPeanut === undefined ? Boolean(current.contains_peanut) : Boolean(input.containsPeanut);
+    const dishCategory = input.dishCategory === undefined
+      ? this.normalizeDishCategory(current.dish_category)
+      : this.normalizeDishCategory(input.dishCategory);
     const packingRequirement = this.sanitizePackingRequirement(
       input.packingRequirement === undefined ? (current.packing_requirement || '') : input.packingRequirement,
     );
@@ -1982,8 +2067,13 @@ export class CoreService {
            display_order = $9,
            cutlery_required = $10,
            packing_requirement = $11,
+           is_vegetarian = $12,
+           is_gluten_free = $13,
+           is_dairy_free = $14,
+           contains_peanut = $15,
+           dish_category = $16,
            updated_at = now()
-       WHERE id = $12
+       WHERE id = $17
          AND deleted_at IS NULL;`,
       [
         menuId,
@@ -1997,6 +2087,11 @@ export class CoreService {
         displayOrder,
         cutleryRequired,
         packingRequirement || null,
+        isVegetarian,
+        isGlutenFree,
+        isDairyFree,
+        containsPeanut,
+        dishCategory,
         itemId,
       ],
     );

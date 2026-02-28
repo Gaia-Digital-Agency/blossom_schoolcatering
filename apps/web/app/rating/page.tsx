@@ -3,12 +3,19 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch, clearAuthState, fetchWithTimeout, getApiBase } from '../../lib/auth';
+import { formatDishCategoryLabel, formatDishDietaryTags } from '../../lib/dish-tags';
 
 type PublicMenuItem = {
   id: string;
   name: string;
+  price: number;
   image_url: string;
   is_available?: boolean;
+  is_vegetarian?: boolean;
+  is_gluten_free?: boolean;
+  is_dairy_free?: boolean;
+  contains_peanut?: boolean;
+  dish_category?: string;
   updated_at?: string;
   session: 'LUNCH' | 'SNACK' | 'BREAKFAST';
   service_date: string;
@@ -132,6 +139,9 @@ export default function RatingPage() {
                   />
                   <div>
                     <strong>{item.name}</strong>
+                    <small>Rp {Number(item.price || 0).toLocaleString('id-ID')}</small>
+                    <small>Category: {formatDishCategoryLabel(item.dish_category)}</small>
+                    <small>Dietary: {formatDishDietaryTags(item)}</small>
                     <small>{item.session}</small>
                     <div className="rating-stars" role="group" aria-label={`Rate ${item.name}`}>
                       {starOptions.map((stars) => (

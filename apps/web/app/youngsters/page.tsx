@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../../lib/auth';
+import { formatDishCategoryLabel, formatDishDietaryTags } from '../../lib/dish-tags';
 import LogoutButton from '../_components/logout-button';
 
 type Youngster = {
@@ -24,6 +25,11 @@ type MenuItem = {
   price: number;
   ingredients: string[];
   has_allergen: boolean;
+  is_vegetarian?: boolean;
+  is_gluten_free?: boolean;
+  is_dairy_free?: boolean;
+  contains_peanut?: boolean;
+  dish_category?: string;
 };
 type DraftCart = {
   id: string;
@@ -386,6 +392,8 @@ export default function YoungstersPage() {
                     {menuItems.map((item) => (
                       <label key={item.id}>
                         <span><strong>{item.name}</strong> - Rp {Number(item.price).toLocaleString('id-ID')}</span>
+                        <small>Category: {formatDishCategoryLabel(item.dish_category)}</small>
+                        <small>Dietary: {formatDishDietaryTags(item)}</small>
                         <small>{item.description}</small>
                         <small>{item.nutrition_facts_text}</small>
                         <small>Ingredients: {item.ingredients.join(', ') || '-'}</small>
@@ -402,6 +410,8 @@ export default function YoungstersPage() {
                     {draftItems.map((d) => (
                       <label key={d.id}>
                         <span><strong>{d.menuItem?.name}</strong> - Rp {Number(d.menuItem?.price || 0).toLocaleString('id-ID')}</span>
+                        <small>Category: {d.menuItem ? formatDishCategoryLabel(d.menuItem.dish_category) : '-'}</small>
+                        <small>Dietary: {d.menuItem ? formatDishDietaryTags(d.menuItem) : '-'}</small>
                         <small>{d.menuItem?.description}</small>
                         <input type="number" min={0} max={5} value={d.qty} onChange={(e) => setItemQty((prev) => ({ ...prev, [d.id]: Number(e.target.value || 0) }))} />
                         <button className="btn btn-outline" type="button" onClick={() => onRemoveDraftItem(d.id)}>Remove</button>

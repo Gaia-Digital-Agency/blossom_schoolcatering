@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import ingredientMaster from '../../../../../docs/master_data/ingredient.json';
 import dishMaster from '../../../../../docs/master_data/dish.json';
 import { ACCESS_KEY, apiFetch, fetchWithTimeout, getApiBase } from '../../../lib/auth';
+import { formatDishCategoryLabel, formatDishDietaryTags } from '../../../lib/dish-tags';
 import { fileToWebpDataUrl } from '../../../lib/image';
 import AdminNav from '../_components/admin-nav';
 
@@ -12,12 +13,17 @@ type AdminMenuItem = {
   id: string;
   session?: 'LUNCH' | 'SNACK' | 'BREAKFAST';
   name: string;
+  dish_category?: string;
   description: string;
   nutrition_facts_text: string;
   calories_kcal?: number | null;
   price: number;
   image_url: string;
   is_available: boolean;
+  is_vegetarian?: boolean;
+  is_gluten_free?: boolean;
+  is_dairy_free?: boolean;
+  contains_peanut?: boolean;
   cutlery_required: boolean;
   packing_requirement?: string | null;
   display_order: number;
@@ -108,6 +114,7 @@ export default function AdminMenuPage() {
 
   const [itemName, setItemName] = useState('');
   const [itemDescription, setItemDescription] = useState('');
+  const [itemDishCategory, setItemDishCategory] = useState<'MAIN' | 'APPETISER' | 'COMPLEMENT' | 'DESSERT' | 'SIDES' | 'GARNISH' | 'DRINK'>('MAIN');
   const [itemPrice, setItemPrice] = useState('');
   const [itemCaloriesKcal, setItemCaloriesKcal] = useState('');
   const [itemImageUrl, setItemImageUrl] = useState('');
@@ -123,6 +130,10 @@ export default function AdminMenuPage() {
   const [itemCutleryRequired, setItemCutleryRequired] = useState(true);
   const [itemPackingCareRequired, setItemPackingCareRequired] = useState(false);
   const [itemWetDish, setItemWetDish] = useState(false);
+  const [itemIsVegetarian, setItemIsVegetarian] = useState(false);
+  const [itemIsGlutenFree, setItemIsGlutenFree] = useState(false);
+  const [itemIsDairyFree, setItemIsDairyFree] = useState(false);
+  const [itemContainsPeanut, setItemContainsPeanut] = useState(false);
   const [itemIngredientIds, setItemIngredientIds] = useState<string[]>([]);
   const [ingredientSearch, setIngredientSearch] = useState('');
   const [customDishInput, setCustomDishInput] = useState('');
@@ -215,6 +226,7 @@ export default function AdminMenuPage() {
     setEditingItemId('');
     setItemName('');
     setItemDescription('');
+    setItemDishCategory('MAIN');
     setItemPrice('');
     setItemCaloriesKcal('');
     setItemImageUrl('');
@@ -225,6 +237,10 @@ export default function AdminMenuPage() {
     setItemCutleryRequired(true);
     setItemPackingCareRequired(false);
     setItemWetDish(false);
+    setItemIsVegetarian(false);
+    setItemIsGlutenFree(false);
+    setItemIsDairyFree(false);
+    setItemContainsPeanut(false);
     setItemIngredientIds([]);
     setIngredientSearch('');
   };
@@ -303,6 +319,7 @@ export default function AdminMenuPage() {
       serviceDate: menuServiceDate,
       session: menuSession,
       name: itemName,
+      dishCategory: itemDishCategory,
       description: itemDescription,
       nutritionFactsText: 'TBA',
       caloriesKcal: itemCaloriesKcal ? Number(itemCaloriesKcal) : null,
@@ -313,6 +330,10 @@ export default function AdminMenuPage() {
       displayOrder: Number(itemDisplayOrder || 0),
       cutleryRequired: itemCutleryRequired,
       packingRequirement: buildPackingRequirement(itemPackingCareRequired, itemWetDish),
+      isVegetarian: itemIsVegetarian,
+      isGlutenFree: itemIsGlutenFree,
+      isDairyFree: itemIsDairyFree,
+      containsPeanut: itemContainsPeanut,
     };
 
     setSavingItem(true);
@@ -432,6 +453,7 @@ export default function AdminMenuPage() {
         serviceDate: menuServiceDate,
         session: menuSession,
         name: dish,
+        dishCategory: itemDishCategory,
         description: dish,
         nutritionFactsText: 'TBA',
         caloriesKcal: null,
@@ -442,6 +464,10 @@ export default function AdminMenuPage() {
         displayOrder: Math.max(0, ...menuItems.map((x) => Number(x.display_order || 0))) + 1,
         cutleryRequired: itemCutleryRequired,
         packingRequirement: buildPackingRequirement(itemPackingCareRequired, itemWetDish),
+        isVegetarian: itemIsVegetarian,
+        isGlutenFree: itemIsGlutenFree,
+        isDairyFree: itemIsDairyFree,
+        containsPeanut: itemContainsPeanut,
       };
       await apiFetch('/admin/menu-items', { method: 'POST', body: JSON.stringify(payload) }, { skipAutoReload: true });
       setItemName(dish);
@@ -473,6 +499,7 @@ export default function AdminMenuPage() {
   const onEditItem = (item: AdminMenuItem) => {
     setEditingItemId(item.id);
     setItemName(item.name);
+    setItemDishCategory((String(item.dish_category || 'MAIN').toUpperCase() as 'MAIN' | 'APPETISER' | 'COMPLEMENT' | 'DESSERT' | 'SIDES' | 'GARNISH' | 'DRINK'));
     setItemDescription(item.description);
     setItemPrice(String(item.price));
     setItemCaloriesKcal(item.calories_kcal === null || item.calories_kcal === undefined ? '' : String(item.calories_kcal));
@@ -485,6 +512,10 @@ export default function AdminMenuPage() {
     const flags = parsePackingFlags(item.packing_requirement || '');
     setItemPackingCareRequired(flags.packingCareRequired);
     setItemWetDish(flags.wetDish);
+    setItemIsVegetarian(Boolean(item.is_vegetarian));
+    setItemIsGlutenFree(Boolean(item.is_gluten_free));
+    setItemIsDairyFree(Boolean(item.is_dairy_free));
+    setItemContainsPeanut(Boolean(item.contains_peanut));
     setItemIngredientIds(item.ingredient_ids || []);
   };
 
@@ -558,6 +589,18 @@ export default function AdminMenuPage() {
         </div>
 
         <form id="menu-item-form" className="auth-form" onSubmit={onSaveItem}>
+          <label>
+            Dish Label
+            <select value={itemDishCategory} onChange={(e) => setItemDishCategory(e.target.value as 'MAIN' | 'APPETISER' | 'COMPLEMENT' | 'DESSERT' | 'SIDES' | 'GARNISH' | 'DRINK')} required>
+              <option value="MAIN">Main</option>
+              <option value="APPETISER">Appetiser</option>
+              <option value="COMPLEMENT">Complement</option>
+              <option value="DESSERT">Dessert</option>
+              <option value="SIDES">Sides</option>
+              <option value="GARNISH">Garnish</option>
+              <option value="DRINK">Drink</option>
+            </select>
+          </label>
           <label>Description<input value={itemDescription} onChange={(e) => setItemDescription(e.target.value)} required /></label>
           <label>Price (IDR)<input type="number" min={0} step={100} value={itemPrice} onChange={(e) => setItemPrice(e.target.value)} required /></label>
           <label>Calories (kcal)<input type="number" min={0} step={1} value={itemCaloriesKcal} onChange={(e) => setItemCaloriesKcal(e.target.value)} placeholder="leave empty for TBA" /></label>
@@ -622,6 +665,22 @@ export default function AdminMenuPage() {
                 <label className="menu-check-row">
                   <input type="checkbox" checked={itemWetDish} onChange={(e) => setItemWetDish(e.target.checked)} />
                   <span>Wet Dish</span>
+                </label>
+                <label className="menu-check-row">
+                  <input type="checkbox" checked={itemIsVegetarian} onChange={(e) => setItemIsVegetarian(e.target.checked)} />
+                  <span>Vegetarian</span>
+                </label>
+                <label className="menu-check-row">
+                  <input type="checkbox" checked={itemIsGlutenFree} onChange={(e) => setItemIsGlutenFree(e.target.checked)} />
+                  <span>Gluten Free</span>
+                </label>
+                <label className="menu-check-row">
+                  <input type="checkbox" checked={itemIsDairyFree} onChange={(e) => setItemIsDairyFree(e.target.checked)} />
+                  <span>Dairy Free</span>
+                </label>
+                <label className="menu-check-row">
+                  <input type="checkbox" checked={itemContainsPeanut} onChange={(e) => setItemContainsPeanut(e.target.checked)} />
+                  <span>Contain Peanut</span>
                 </label>
               </div>
 
@@ -693,6 +752,8 @@ export default function AdminMenuPage() {
                     <small>Image File: {getImageFileLabel(item.image_url)}</small>
                     <small>Calories: {item.calories_kcal ?? 'TBA'}</small>
                     <small>Price: Rp {Number(item.price).toLocaleString('id-ID')}</small>
+                    <small>Category: {formatDishCategoryLabel(item.dish_category)}</small>
+                    <small>Dietary: {formatDishDietaryTags(item)}</small>
                     <small>Ingredients: {item.ingredients.map(toLabel).join(', ') || '-'}</small>
                     <small>Cutlery: {item.cutlery_required ? 'Required' : 'Not required'}</small>
                     <small>Packing: {item.packing_requirement || '-'}</small>
@@ -716,6 +777,8 @@ export default function AdminMenuPage() {
                     <small>Image File: {getImageFileLabel(item.image_url)}</small>
                     <small>Calories: {item.calories_kcal ?? 'TBA'}</small>
                     <small>Price: Rp {Number(item.price).toLocaleString('id-ID')}</small>
+                    <small>Category: {formatDishCategoryLabel(item.dish_category)}</small>
+                    <small>Dietary: {formatDishDietaryTags(item)}</small>
                     <small>Ingredients: {item.ingredients.map(toLabel).join(', ') || '-'}</small>
                     <small>Cutlery: {item.cutlery_required ? 'Required' : 'Not required'}</small>
                     <small>Packing: {item.packing_requirement || '-'}</small>

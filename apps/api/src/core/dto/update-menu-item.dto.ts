@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { ArrayMaxSize, IsArray, IsBoolean, IsInt, IsNumber, IsOptional, IsString, IsUUID, Matches, Min } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Matches, Min } from 'class-validator';
 
 export class UpdateMenuItemDto {
   @IsOptional()
@@ -40,6 +40,11 @@ export class UpdateMenuItemDto {
   imageUrl?: string;
 
   @IsOptional()
+  @IsString()
+  @IsIn(['MAIN', 'APPETISER', 'COMPLEMENT', 'DESSERT', 'SIDES', 'GARNISH', 'DRINK'])
+  dishCategory?: string;
+
+  @IsOptional()
   @IsArray()
   @IsUUID('4', { each: true })
   @ArrayMaxSize(20)
@@ -61,4 +66,20 @@ export class UpdateMenuItemDto {
   @IsOptional()
   @IsString()
   packingRequirement?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isVegetarian?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isGlutenFree?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isDairyFree?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  containsPeanut?: boolean;
 }

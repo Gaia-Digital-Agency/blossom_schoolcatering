@@ -3,12 +3,19 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { fetchWithTimeout, getApiBase } from '../../lib/auth';
+import { formatDishCategoryLabel, formatDishDietaryTags } from '../../lib/dish-tags';
 
 type PublicMenuItem = {
   id: string;
   name: string;
+  price: number;
   image_url: string;
   is_available?: boolean;
+  is_vegetarian?: boolean;
+  is_gluten_free?: boolean;
+  is_dairy_free?: boolean;
+  contains_peanut?: boolean;
+  dish_category?: string;
   updated_at?: string;
   session: 'LUNCH' | 'SNACK' | 'BREAKFAST';
   service_date: string;
@@ -87,6 +94,9 @@ export default function MenuPage() {
                 />
                 <div>
                   <strong>{item.name}</strong>
+                  <small>Rp {Number(item.price || 0).toLocaleString('id-ID')}</small>
+                  <small>Category: {formatDishCategoryLabel(item.dish_category)}</small>
+                  <small>Dietary: {formatDishDietaryTags(item)}</small>
                   <small>{item.session}</small>
                 </div>
               </article>
