@@ -26,6 +26,7 @@ export default function HomePage() {
             Menu
           </button>
           <nav className={`nav ${open ? 'open' : ''}`}>
+            <Link className="nav-guide-link" href="/menu">Menu</Link>
             <a className="nav-guide-link" href="https://www.blossomsteakhouse.com/" target="_blank" rel="noopener noreferrer">
               Steakhouse
             </a>

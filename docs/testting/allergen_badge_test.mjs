@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
-const BASE = process.env.BASE_URL || 'http://127.0.0.1/schoolcatering/api/v1';
+const BASE = process.env.BASE_URL || 'http://127.0.0.1:3000/api/v1';
 const short = String(Date.now()).slice(-6);
 const results = [];
 
@@ -11,9 +11,9 @@ function ok(step, pass, detail) {
 }
 
 function dbUrl() {
-  const raw = fs.readFileSync('/var/www/_env/schoolcatering.env', 'utf8');
-  const line = raw.split('\n').find((l) => l.startsWith('DATABASE_URL='));
-  return line.replace('DATABASE_URL=', '').trim();
+  const envUrl = (process.env.DATABASE_URL || '').trim();
+  if (envUrl) return envUrl;
+  throw new Error('DATABASE_URL is required for allergen_badge_test.mjs');
 }
 
 function db(sql) {

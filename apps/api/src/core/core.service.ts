@@ -313,9 +313,50 @@ export class CoreService {
     return serviceDate;
   }
 
+  private nextWeekdayIsoDate() {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() + 1);
+    while (d.getUTCDay() === 0 || d.getUTCDay() === 6) {
+      d.setUTCDate(d.getUTCDate() + 1);
+    }
+    return d.toISOString().slice(0, 10);
+  }
+
+  private makassarTodayIsoDate() {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Makassar',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(new Date());
+    const yyyy = Number(parts.find((p) => p.type === 'year')?.value || '1970');
+    const mm = Number(parts.find((p) => p.type === 'month')?.value || '01');
+    const dd = Number(parts.find((p) => p.type === 'day')?.value || '01');
+    return new Date(Date.UTC(yyyy, mm - 1, dd)).toISOString().slice(0, 10);
+  }
+
   private isAfterOrAtMakassarCutoff(serviceDate: string) {
     const cutoffUtc = new Date(`${serviceDate}T00:00:00.000Z`).getTime();
     return Date.now() >= cutoffUtc;
+  }
+
+  private async lockOrdersForServiceDateIfCutoffPassed(serviceDate: string) {
+    if (!this.isAfterOrAtMakassarCutoff(serviceDate)) return { lockedCount: 0 };
+    const lockedCount = Number(await runSql(
+      `WITH locked AS (
+         UPDATE orders
+         SET status = 'LOCKED',
+             locked_at = COALESCE(locked_at, now()),
+             updated_at = now()
+         WHERE service_date = $1::date
+           AND status = 'PLACED'
+           AND deleted_at IS NULL
+         RETURNING id
+       )
+       SELECT count(*)::int FROM locked;`,
+      [serviceDate],
+    ) || 0);
+    return { lockedCount };
   }
 
   private hashPassword(raw: string) {
@@ -1421,6 +1462,47 @@ export class CoreService {
     };
   }
 
+  async getPublicActiveMenu(query: { serviceDate?: string; session?: string }) {
+    await this.ensureMenuItemExtendedColumns();
+    const serviceDate = query.serviceDate
+      ? this.validateServiceDate(query.serviceDate)
+      : this.nextWeekdayIsoDate();
+    const session = query.session ? this.normalizeSession(query.session) : null;
+    const params: unknown[] = [serviceDate];
+    const whereSession = session
+      ? `AND m.session = $2::session_type`
+      : '';
+    if (session) params.push(session);
+    const out = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT mi.id,
+               mi.name,
+               mi.image_url,
+               m.session::text AS session,
+               m.service_date::text AS service_date
+        FROM menus m
+        JOIN menu_items mi ON mi.menu_id = m.id
+        WHERE m.service_date = $1::date
+          ${whereSession}
+          AND m.is_published = true
+          AND m.deleted_at IS NULL
+          AND mi.is_available = true
+          AND mi.deleted_at IS NULL
+        ORDER BY m.session ASC, mi.display_order ASC, mi.name ASC
+      ) t;
+      `,
+      params,
+    );
+
+    return {
+      serviceDate,
+      session: session || 'ALL',
+      items: this.parseJsonLines(out),
+    };
+  }
+
   async getAdminIngredients() {
     const out = await runSql(`
       SELECT row_to_json(t)::text
@@ -2225,6 +2307,7 @@ export class CoreService {
       placed_at: string;
       child_name: string;
     }>(out);
+    await this.lockOrdersForServiceDateIfCutoffPassed(order.service_date);
 
     if (actor.role === 'YOUNGSTER') {
       const childId = await this.getChildIdByUserId(actor.uid);
@@ -2263,6 +2346,7 @@ export class CoreService {
     if (actor.role !== 'PARENT') throw new ForbiddenException('Role not allowed');
     const parentId = await this.getParentIdByUserId(actor.uid);
     if (!parentId) throw new BadRequestException('Parent profile not found');
+    await this.lockOrdersForServiceDateIfCutoffPassed(this.makassarTodayIsoDate());
 
     const out = await runSql(
       `
@@ -2336,6 +2420,81 @@ export class CoreService {
       parentId,
       orders: result,
     };
+  }
+
+  async getYoungsterConsolidatedOrders(actor: AccessUser) {
+    if (actor.role !== 'YOUNGSTER') throw new ForbiddenException('Role not allowed');
+    const childId = await this.getChildIdByUserId(actor.uid);
+    if (!childId) throw new BadRequestException('Youngster profile not found');
+    await this.lockOrdersForServiceDateIfCutoffPassed(this.makassarTodayIsoDate());
+
+    const out = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT o.id,
+               o.order_number::text AS order_number,
+               o.child_id,
+               o.session::text AS session,
+               o.service_date::text AS service_date,
+               o.status::text AS status,
+               o.total_price,
+               o.dietary_snapshot,
+               o.placed_at::text AS placed_at,
+               (u.first_name || ' ' || u.last_name) AS child_name,
+               br.status::text AS billing_status,
+               br.delivery_status::text AS delivery_status
+        FROM orders o
+        JOIN children c ON c.id = o.child_id
+        JOIN users u ON u.id = c.user_id
+        LEFT JOIN billing_records br ON br.order_id = o.id
+        WHERE o.child_id = $1
+          AND o.deleted_at IS NULL
+        ORDER BY o.service_date DESC, o.created_at DESC
+        LIMIT 120
+      ) t;
+      `,
+      [childId],
+    );
+
+    const orders = this.parseJsonLines<{
+      id: string;
+      order_number: string;
+      child_id: string;
+      session: SessionType;
+      service_date: string;
+      status: string;
+      total_price: string | number;
+      dietary_snapshot?: string | null;
+      placed_at: string;
+      child_name: string;
+      billing_status?: string | null;
+      delivery_status?: string | null;
+    }>(out);
+
+    const result: Array<Record<string, unknown>> = [];
+    for (const order of orders) {
+      const itemsOut = await runSql(
+        `
+        SELECT row_to_json(t)::text
+        FROM (
+          SELECT oi.menu_item_id, oi.item_name_snapshot, oi.price_snapshot, oi.quantity
+          FROM order_items oi
+          WHERE oi.order_id = $1
+          ORDER BY oi.created_at ASC
+        ) t;
+      `,
+        [order.id],
+      );
+      const items = this.parseJsonLines(itemsOut);
+      result.push({
+        ...order,
+        total_price: Number(order.total_price),
+        can_edit: false,
+        items,
+      });
+    }
+    return { childId, orders: result };
   }
 
   async getFavourites(actor: AccessUser, query: { childId?: string; session?: string }) {
@@ -2806,6 +2965,58 @@ export class CoreService {
     return { ok: true };
   }
 
+  async uploadBillingProofBatch(actor: AccessUser, billingIdsRaw: string[], proofImageData?: string) {
+    if (actor.role !== 'PARENT') throw new ForbiddenException('Role not allowed');
+    const parentId = await this.getParentIdByUserId(actor.uid);
+    if (!parentId) throw new BadRequestException('Parent profile not found');
+    const billingIds = (billingIdsRaw || []).map((x) => String(x || '').trim()).filter(Boolean);
+    if (billingIds.length === 0) throw new BadRequestException('billingIds is required');
+    if (billingIds.length > 50) throw new BadRequestException('Maximum 50 billing records per batch');
+
+    const ph = billingIds.map((_, i) => `$${i + 1}`).join(', ');
+    const allowedOut = await runSql(
+      `SELECT row_to_json(t)::text
+       FROM (
+         SELECT id
+         FROM billing_records
+         WHERE id IN (${ph})
+           AND parent_id = $${billingIds.length + 1}
+       ) t;`,
+      [...billingIds, parentId],
+    );
+    const allowedIds = new Set(this.parseJsonLines<{ id: string }>(allowedOut).map((x) => x.id));
+    if (allowedIds.size !== billingIds.length) {
+      throw new NotFoundException('One or more billing records not found');
+    }
+
+    const firstId = billingIds[0];
+    await this.uploadBillingProof(actor, firstId, proofImageData);
+    const firstOut = await runSql(
+      `SELECT proof_image_url
+       FROM billing_records
+       WHERE id = $1
+       LIMIT 1;`,
+      [firstId],
+    );
+    const proofUrl = (firstOut || '').trim();
+    if (!proofUrl) throw new BadRequestException('Failed uploading proof image');
+    if (billingIds.length === 1) return { ok: true, updatedCount: 1 };
+
+    const restIds = billingIds.slice(1);
+    const restPh = restIds.map((_, i) => `$${i + 2}`).join(', ');
+    await runSql(
+      `UPDATE billing_records
+       SET proof_image_url = $1,
+           proof_uploaded_at = now(),
+           status = 'PENDING_VERIFICATION',
+           updated_at = now()
+       WHERE id IN (${restPh})
+         AND parent_id = $${restIds.length + 2};`,
+      [proofUrl, ...restIds, parentId],
+    );
+    return { ok: true, updatedCount: billingIds.length };
+  }
+
   async getAdminBilling(status?: string) {
     const statusFilter = (status || '').toUpperCase();
     const whereStatus = ['UNPAID', 'PENDING_VERIFICATION', 'VERIFIED', 'REJECTED'].includes(statusFilter)
@@ -2850,6 +3061,19 @@ export class CoreService {
 
   async verifyBilling(actor: AccessUser, billingId: string, decision: 'VERIFIED' | 'REJECTED') {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    if (decision === 'VERIFIED') {
+      const proofOut = await runSql(
+        `SELECT COALESCE(NULLIF(TRIM(proof_image_url), ''), '')
+         FROM billing_records
+         WHERE id = $1
+         LIMIT 1;`,
+        [billingId],
+      );
+      if (!proofOut) throw new NotFoundException('Billing record not found');
+      if (!String(proofOut).trim()) {
+        throw new BadRequestException('BILLING_PROOF_IMAGE_REQUIRED');
+      }
+    }
     await runSql(
       `UPDATE billing_records
        SET status = $1::payment_status,
@@ -3082,7 +3306,7 @@ export class CoreService {
         [schoolId, deliveryUserId],
       );
     }
-    await this.autoAssignDeliveriesForDate(new Date().toISOString().slice(0, 10));
+    await this.autoAssignDeliveriesForDate(this.makassarTodayIsoDate());
     return { ok: true };
   }
 
@@ -3097,7 +3321,7 @@ export class CoreService {
         JOIN children c ON c.id = o.child_id
         WHERE o.service_date = $1::date
           AND o.status IN ('PLACED', 'LOCKED')
-          AND o.delivery_status <> 'DELIVERED'
+          AND o.delivery_status = 'OUT_FOR_DELIVERY'
       ) t;
     `,
       [serviceDate],
@@ -3179,7 +3403,7 @@ export class CoreService {
 
   async autoAssignDeliveries(actor: AccessUser, dateRaw?: string) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
-    const serviceDate = dateRaw ? this.validateServiceDate(dateRaw) : new Date().toISOString().slice(0, 10);
+    const serviceDate = dateRaw ? this.validateServiceDate(dateRaw) : this.makassarTodayIsoDate();
     return this.autoAssignDeliveriesForDate(serviceDate);
   }
 
@@ -3214,7 +3438,7 @@ export class CoreService {
   async getDeliveryAssignments(actor: AccessUser, dateRaw?: string) {
     if (!['DELIVERY', 'ADMIN'].includes(actor.role)) throw new ForbiddenException('Role not allowed');
     const serviceDate = dateRaw ? this.validateServiceDate(dateRaw) : null;
-    await this.autoAssignDeliveriesForDate(serviceDate || new Date().toISOString().slice(0, 10));
+    await this.autoAssignDeliveriesForDate(serviceDate || this.makassarTodayIsoDate());
     const params: unknown[] = [];
     const roleFilter = actor.role === 'DELIVERY'
       ? (() => {
@@ -3444,6 +3668,9 @@ export class CoreService {
 
     const targetServiceDate = input.serviceDate ? this.validateServiceDate(input.serviceDate) : order.service_date;
     const targetSession = input.session ? this.normalizeSession(input.session) : order.session;
+    if (actor.role === 'PARENT' && this.isAfterOrAtMakassarCutoff(targetServiceDate)) {
+      throw new BadRequestException('ORDER_CUTOFF_EXCEEDED');
+    }
     const items = Array.isArray(input.items) ? input.items : [];
     if (items.length > 5) throw new BadRequestException('ORDER_ITEM_LIMIT_EXCEEDED');
 
@@ -4113,7 +4340,8 @@ export class CoreService {
 
   async getKitchenDailySummary(actor: AccessUser, dateRaw?: string) {
     if (!['KITCHEN', 'ADMIN'].includes(actor.role)) throw new ForbiddenException('Role not allowed');
-    const serviceDate = dateRaw ? this.validateServiceDate(dateRaw) : new Date().toISOString().slice(0, 10);
+    const serviceDate = dateRaw ? this.validateServiceDate(dateRaw) : this.makassarTodayIsoDate();
+    await this.lockOrdersForServiceDateIfCutoffPassed(serviceDate);
 
     const totalsOut = await runSql(
       `
@@ -4149,6 +4377,7 @@ export class CoreService {
                o.session::text AS session,
                o.status::text AS status,
                o.delivery_status::text AS delivery_status,
+               s.name AS school_name,
                (uc.first_name || ' ' || uc.last_name) AS child_name,
                COALESCE((up.first_name || ' ' || up.last_name), '-') AS parent_name,
                COALESCE((
@@ -4184,6 +4413,7 @@ export class CoreService {
                ), '[]'::json) AS dishes
         FROM orders o
         JOIN children c ON c.id = o.child_id
+        JOIN schools s ON s.id = c.school_id
         JOIN users uc ON uc.id = c.user_id
         LEFT JOIN parent_children pc ON pc.child_id = c.id
         LEFT JOIN parents p ON p.id = pc.parent_id
@@ -4191,7 +4421,7 @@ export class CoreService {
         WHERE o.service_date = $1::date
           AND o.status IN ('PLACED', 'LOCKED')
         GROUP BY o.id, uc.first_name, uc.last_name, up.first_name, up.last_name
-        ORDER BY o.session ASC, child_name ASC
+        ORDER BY s.name ASC, child_name ASC, o.session ASC
       ) t;
     `,
       [serviceDate],
@@ -4202,6 +4432,7 @@ export class CoreService {
       session: string;
       status: string;
       delivery_status: string;
+      school_name: string;
       child_name: string;
       parent_name: string;
       dish_count: number;
@@ -4243,7 +4474,47 @@ export class CoreService {
     };
   }
 
-  // ─── Missing CRUD: Schools ───────────────────────────────────────────────
+  async markKitchenOrderComplete(actor: AccessUser, orderId: string) {
+    if (!['KITCHEN', 'ADMIN'].includes(actor.role)) throw new ForbiddenException('Role not allowed');
+    const out = await runSql(
+      `SELECT row_to_json(t)::text
+       FROM (
+         SELECT id, service_date::text AS service_date, status::text AS status, delivery_status::text AS delivery_status
+         FROM orders
+         WHERE id = $1
+           AND deleted_at IS NULL
+         LIMIT 1
+       ) t;`,
+      [orderId],
+    );
+    if (!out) throw new NotFoundException('Order not found');
+    const order = this.parseJsonLine<{ id: string; service_date: string; status: string; delivery_status: string }>(out);
+    if (!['PLACED', 'LOCKED'].includes(order.status)) {
+      throw new BadRequestException('ORDER_NOT_READY_FOR_KITCHEN_COMPLETE');
+    }
+    if (order.delivery_status === 'DELIVERED') {
+      return { ok: true, alreadyDelivered: true, deliveryStatus: order.delivery_status };
+    }
+
+    await runSql(
+      `UPDATE orders
+       SET delivery_status = 'OUT_FOR_DELIVERY',
+           updated_at = now()
+       WHERE id = $1;`,
+      [order.id],
+    );
+    await runSql(
+      `UPDATE billing_records
+       SET delivery_status = 'OUT_FOR_DELIVERY',
+           updated_at = now()
+       WHERE order_id = $1;`,
+      [order.id],
+    );
+    await this.autoAssignDeliveriesForDate(order.service_date);
+    return { ok: true, deliveryStatus: 'OUT_FOR_DELIVERY' };
+  }
+
+  // ─── Schools CRUD ────────────────────────────────────────────────────────
 
   async createSchool(actor: AccessUser, input: { name?: string; address?: string; city?: string; contactEmail?: string }) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
@@ -4290,7 +4561,7 @@ export class CoreService {
     return { ok: true };
   }
 
-  // ─── Missing CRUD: Parent ────────────────────────────────────────────────
+  // ─── Parent CRUD ─────────────────────────────────────────────────────────
 
   async updateParentProfile(actor: AccessUser, targetParentId: string, input: { firstName?: string; lastName?: string; phoneNumber?: string; email?: string; address?: string }) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
@@ -4338,7 +4609,7 @@ export class CoreService {
     return { ok: true };
   }
 
-  // ─── Missing CRUD: Youngster ─────────────────────────────────────────────
+  // ─── Youngster CRUD ──────────────────────────────────────────────────────
 
   async updateYoungsterProfile(
     actor: AccessUser,
@@ -4478,7 +4749,7 @@ export class CoreService {
     return { ok: true, userId, username: target.username, role: target.role, newPassword };
   }
 
-  // ─── Missing CRUD: Ingredients ───────────────────────────────────────────
+  // ─── Ingredients CRUD ────────────────────────────────────────────────────
 
   async createIngredient(actor: AccessUser, input: { name?: string; allergenFlag?: boolean }) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
@@ -4563,7 +4834,7 @@ export class CoreService {
     return { ok: true };
   }
 
-  // ─── Missing CRUD: Menu Items ────────────────────────────────────────────
+  // ─── Menu Items CRUD ─────────────────────────────────────────────────────
 
   async deleteMenuItem(actor: AccessUser, itemId: string) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
@@ -4578,7 +4849,7 @@ export class CoreService {
     return { ok: true };
   }
 
-  // ─── Missing CRUD: Delivery user deactivate ──────────────────────────────
+  // ─── Delivery User CRUD ──────────────────────────────────────────────────
 
   async createDeliveryUser(
     actor: AccessUser,

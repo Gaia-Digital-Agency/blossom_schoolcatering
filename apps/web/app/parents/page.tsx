@@ -42,12 +42,6 @@ type ConsolidatedOrder = {
   items: OrderItem[];
 };
 type DraftCart = { id: string; status: 'OPEN' | 'SUBMITTED' | 'EXPIRED'; expires_at: string };
-type Favourite = {
-  id: string;
-  label: string;
-  session: 'LUNCH' | 'SNACK' | 'BREAKFAST';
-  items: Array<{ menu_item_id: string; quantity: number; name?: string }>;
-};
 type BillingRow = {
   id: string;
   order_id: string;
@@ -86,6 +80,21 @@ function formatRemaining(ms: number) {
   return `${hours}:${minutes}:${seconds}`;
 }
 
+function todayMakassarIsoDate() {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Makassar',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now);
+  const yyyy = Number(parts.find((p) => p.type === 'year')?.value || '1970');
+  const mm = Number(parts.find((p) => p.type === 'month')?.value || '01');
+  const dd = Number(parts.find((p) => p.type === 'day')?.value || '01');
+  const d = new Date(Date.UTC(yyyy, mm - 1, dd));
+  return d.toISOString().slice(0, 10);
+}
+
 export default function ParentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -109,15 +118,11 @@ export default function ParentsPage() {
   const [draftCartId, setDraftCartId] = useState('');
   const [draftExpiresAt, setDraftExpiresAt] = useState('');
 
-  const [favourites, setFavourites] = useState<Favourite[]>([]);
-  const [favLabel, setFavLabel] = useState('');
-
   const [quickReorderDate, setQuickReorderDate] = useState(nextWeekdayIsoDate());
-  const [wizardSourceOrderId, setWizardSourceOrderId] = useState('');
-  const [wizardDates, setWizardDates] = useState('');
   const [billings, setBillings] = useState<BillingRow[]>([]);
   const [spending, setSpending] = useState<SpendingDashboard | null>(null);
-  const [billingProof, setBillingProof] = useState<Record<string, string>>({});
+  const [batchProofData, setBatchProofData] = useState('');
+  const [selectedBillingIds, setSelectedBillingIds] = useState<string[]>([]);
 
   const draftSectionRef = useRef<HTMLDivElement | null>(null);
 
@@ -130,15 +135,31 @@ export default function ParentsPage() {
     () => (selectedChildId ? orders.filter((o) => o.child_id === selectedChildId) : orders),
     [orders, selectedChildId],
   );
-  const visibleBillings = useMemo(() => {
-    const scoped = selectedChildId ? billings.filter((b) => b.child_id === selectedChildId) : billings;
-    const uploaded = scoped
-      .filter((b) => Boolean((b.proof_image_url || '').trim()))
-      .sort((a, b) => String(b.service_date).localeCompare(String(a.service_date)))
-      .slice(0, 5);
-    const notUploaded = scoped.filter((b) => !Boolean((b.proof_image_url || '').trim()));
-    return [...notUploaded, ...uploaded];
-  }, [billings, selectedChildId]);
+  const visibleBillings = useMemo(
+    () => (selectedChildId ? billings.filter((b) => b.child_id === selectedChildId) : billings),
+    [billings, selectedChildId],
+  );
+
+  const thirtyDaysAgo = useMemo(() => {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - 30);
+    return d.toISOString().slice(0, 10);
+  }, []);
+
+  const unpaidBillings = useMemo(
+    () => visibleBillings
+      .filter((b) => !(b.status === 'VERIFIED' && Boolean((b.proof_image_url || '').trim())))
+      .sort((a, b) => String(b.service_date).localeCompare(String(a.service_date))),
+    [visibleBillings],
+  );
+
+  const paidBillings = useMemo(
+    () => visibleBillings
+      .filter((b) => b.status === 'VERIFIED' && Boolean((b.proof_image_url || '').trim()) && String(b.service_date) >= thirtyDaysAgo)
+      .sort((a, b) => String(b.service_date).localeCompare(String(a.service_date))),
+    [visibleBillings, thirtyDaysAgo],
+  );
+
   const visibleSpendingByChild = useMemo(() => {
     if (!spending) return [];
     if (!selectedChildId) return spending.byChild || [];
@@ -147,6 +168,7 @@ export default function ParentsPage() {
     const fullName = `${selected.first_name} ${selected.last_name}`.trim();
     return (spending.byChild || []).filter((row) => row.child_name === fullName);
   }, [spending, selectedChildId, children]);
+
   const draftItems = useMemo(() => {
     const index = new Map(menuItems.map((m) => [m.id, m]));
     return Object.entries(itemQty)
@@ -154,6 +176,16 @@ export default function ParentsPage() {
       .map(([id, qty]) => ({ menuItem: index.get(id), id, qty }))
       .filter((x) => Boolean(x.menuItem));
   }, [itemQty, menuItems]);
+
+  const todayOrder = useMemo(() => {
+    const today = todayMakassarIsoDate();
+    return visibleOrders.find((o) => o.service_date === today && o.status === 'PLACED') || null;
+  }, [visibleOrders]);
+
+  const selectedDayOrder = useMemo(
+    () => visibleOrders.find((o) => o.service_date === serviceDate && o.session === session && o.status === 'PLACED') || null,
+    [visibleOrders, serviceDate, session],
+  );
 
   const loadOrders = async () => {
     setLoadingOrders(true);
@@ -163,14 +195,6 @@ export default function ParentsPage() {
     } finally {
       setLoadingOrders(false);
     }
-  };
-
-  const loadFavourites = async () => {
-    const qs = new URLSearchParams();
-    if (selectedChildId) qs.set('child_id', selectedChildId);
-    qs.set('session', session);
-    const data = await apiFetch(`/favourites?${qs.toString()}`) as Favourite[];
-    setFavourites(data || []);
   };
 
   const loadBilling = async () => {
@@ -187,7 +211,7 @@ export default function ParentsPage() {
     setParentId(childrenData.parentId);
     setChildren(childrenData.children);
     if (childrenData.children.length > 0 && !selectedChildId) setSelectedChildId(childrenData.children[0].id);
-    await Promise.all([loadOrders(), loadFavourites(), loadBilling(), loadSpending()]);
+    await Promise.all([loadOrders(), loadBilling(), loadSpending()]);
   };
 
   useEffect(() => {
@@ -245,7 +269,6 @@ export default function ParentsPage() {
 
   useEffect(() => {
     loadMenuAndDraft().catch((err) => setError(err instanceof Error ? err.message : 'Failed loading draft'));
-    loadFavourites().catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedChildId, serviceDate, session]);
 
@@ -265,7 +288,7 @@ export default function ParentsPage() {
       const order = await apiFetch(`/carts/${cartId}/submit`, { method: 'POST' }) as { id: string; total_price: number };
       setMessage(`Order placed successfully. Order ID: ${order.id}, total: Rp ${order.total_price.toLocaleString('id-ID')}.`);
       setItemQty({}); setDraftCartId(''); setDraftExpiresAt('');
-      await Promise.all([loadOrders(), loadFavourites()]);
+      await Promise.all([loadOrders(), loadBilling()]);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Order placement failed';
       if (msg.includes('ORDER_SESSION_DISABLED') && session !== 'LUNCH') {
@@ -275,40 +298,6 @@ export default function ParentsPage() {
         setError(msg);
       }
     } finally { setSubmitting(false); }
-  };
-
-  const onSaveFavourite = async () => {
-    const items = Object.entries(itemQty).filter(([, qty]) => qty > 0).map(([menuItemId, quantity]) => ({ menuItemId, quantity }));
-    if (!favLabel.trim()) return setError('Favourite label is required.');
-    if (items.length === 0) return setError('Select items before saving favourite.');
-    setError(''); setMessage('');
-    try {
-      await apiFetch('/favourites', { method: 'POST', body: JSON.stringify({ childId: selectedChildId, label: favLabel, session, items }) });
-      setFavLabel('');
-      setMessage('Favourite meal combo saved.');
-      await loadFavourites();
-    } catch (err) { setError(err instanceof Error ? err.message : 'Save favourite failed'); }
-  };
-
-  const onApplyFavourite = async (favouriteId: string) => {
-    setError(''); setMessage('');
-    try {
-      const out = await apiFetch(`/favourites/${favouriteId}/apply`, { method: 'POST', body: JSON.stringify({ serviceDate }) }) as { excludedItemIds: string[] };
-      setMessage(out.excludedItemIds.length ? `Favourite applied with ${out.excludedItemIds.length} unavailable item exclusions.` : 'Favourite applied to cart.');
-      await loadMenuAndDraft();
-    } catch (err) { setError(err instanceof Error ? err.message : 'Apply favourite failed'); }
-  };
-
-  const onDeleteFavourite = async (favouriteId: string) => {
-    if (!window.confirm('Delete this saved favourite combo?')) return;
-    setError(''); setMessage('');
-    try {
-      await apiFetch(`/favourites/${favouriteId}`, { method: 'DELETE' });
-      setMessage('Favourite combo deleted.');
-      await loadFavourites();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Delete favourite failed');
-    }
   };
 
   const onOpenOrderAsDraft = async (order: ConsolidatedOrder, targetDate: string) => {
@@ -331,43 +320,47 @@ export default function ParentsPage() {
     } catch (err) { setError(err instanceof Error ? err.message : 'Failed to reopen order as draft'); }
   };
 
-  const onRunMealPlanWizard = async () => {
-    const dates = wizardDates.split(',').map((x) => x.trim()).filter(Boolean);
-    if (!selectedChildId || !wizardSourceOrderId || dates.length === 0) return setError('Meal plan needs youngster, source order id, and dates.');
-    setError(''); setMessage('');
-    try {
-      const out = await apiFetch('/meal-plans/wizard', { method: 'POST', body: JSON.stringify({ childId: selectedChildId, sourceOrderId: wizardSourceOrderId, dates }) }) as { successCount: number; failureCount: number };
-      setMessage(`Meal plan finished. Success: ${out.successCount}, Failures: ${out.failureCount}.`);
-      await loadOrders();
-    } catch (err) { setError(err instanceof Error ? err.message : 'Meal plan wizard failed'); }
-  };
-
-  const onUploadProof = async (billingId: string) => {
-    const proof = (billingProof[billingId] || '').trim();
-    if (!proof) return setError('Upload/select a proof image first.');
-    setError(''); setMessage('');
-    try {
-      await apiFetch(`/billing/${billingId}/proof-upload`, {
-        method: 'POST',
-        body: JSON.stringify({ proofImageData: proof }),
-      });
-      setMessage('Proof uploaded successfully.');
-      await loadBilling();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Proof upload failed');
-    }
-  };
-
-  const onProofImageUpload = async (billingId: string, file?: File | null) => {
+  const onProofImageUpload = async (file?: File | null) => {
     if (!file) return;
     setError('');
     setMessage('');
     try {
       const webpDataUrl = await fileToWebpDataUrl(file);
-      setBillingProof((prev) => ({ ...prev, [billingId]: webpDataUrl }));
+      setBatchProofData(webpDataUrl);
       setMessage('Proof image converted to WebP.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed converting proof image to WebP');
+    }
+  };
+
+  const onToggleBillingSelect = (billingId: string, checked: boolean) => {
+    setSelectedBillingIds((prev) => {
+      if (checked) return [...new Set([...prev, billingId])];
+      return prev.filter((id) => id !== billingId);
+    });
+  };
+
+  const onUploadBatchProof = async () => {
+    if (!batchProofData.trim()) {
+      setError('Upload/select a proof image first.');
+      return;
+    }
+    if (selectedBillingIds.length === 0) {
+      setError('Select at least one unpaid bill.');
+      return;
+    }
+    setError('');
+    setMessage('');
+    try {
+      const out = await apiFetch('/billing/proof-upload-batch', {
+        method: 'POST',
+        body: JSON.stringify({ billingIds: selectedBillingIds, proofImageData: batchProofData }),
+      }) as { updatedCount: number };
+      setMessage(`Proof uploaded for ${out.updatedCount} billing record(s).`);
+      setSelectedBillingIds([]);
+      await loadBilling();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Proof upload failed');
     }
   };
 
@@ -388,7 +381,7 @@ export default function ParentsPage() {
   const onDeleteOrder = async (orderId: string) => {
     if (!window.confirm('Confirm delete this order before cutoff?')) return;
     setError(''); setMessage('');
-    try { await apiFetch(`/orders/${orderId}`, { method: 'DELETE' }); setMessage('Order deleted successfully.'); await loadOrders(); }
+    try { await apiFetch(`/orders/${orderId}`, { method: 'DELETE' }); setMessage('Order deleted successfully.'); await Promise.all([loadOrders(), loadBilling()]); }
     catch (err) { setError(err instanceof Error ? err.message : 'Order delete failed'); }
   };
 
@@ -401,7 +394,7 @@ export default function ParentsPage() {
       <section className="auth-panel">
         <h1>Parent Page</h1>
         {parentId ? <p className="auth-help">Parent Profile ID: {parentId}</p> : null}
-        <p className="auth-help">Advanced ordering: search/filter, favourites, quick reorder, meal plan wizard.</p>
+        <p className="auth-help">Ordering and billing dashboard for linked youngsters.</p>
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
 
@@ -412,29 +405,52 @@ export default function ParentsPage() {
         </div>
 
         <div className="module-section">
+          <h2>Confirmed Order Of The Day</h2>
+          {todayOrder ? (
+            <div className="auth-form">
+              <label>
+                <strong>{todayOrder.child_name} - {todayOrder.service_date} {todayOrder.session}</strong>
+                <small>Status: {todayOrder.status} | Billing: {todayOrder.billing_status || '-'} | Delivery: {todayOrder.delivery_status || '-'}</small>
+                <small>Total: Rp {Number(todayOrder.total_price).toLocaleString('id-ID')}</small>
+                <small>Items: {todayOrder.items.map((item) => `${item.item_name_snapshot} x${item.quantity}`).join(', ') || '-'}</small>
+              </label>
+            </div>
+          ) : <p className="auth-help">No confirmed order found for today.</p>}
+        </div>
+
+        <div className="module-section">
           <h2>Menu and Cart</h2>
           <label>Service Date<input type="date" value={serviceDate} onChange={(e) => setServiceDate(e.target.value)} /></label>
+          <label>
+            Session
+            <select value={session} onChange={(e) => setSession(e.target.value as 'LUNCH' | 'SNACK' | 'BREAKFAST')}>
+              <option value="LUNCH">LUNCH</option>
+              <option value="SNACK">SNACK</option>
+              <option value="BREAKFAST">BREAKFAST</option>
+            </select>
+          </label>
           <p className="auth-help">Place-order cutoff countdown: {formatRemaining(placeCutoffMs)} (08:00 Asia/Makassar)</p>
           {draftCartId && hasOpenDraft ? <p className="auth-help">Open draft detected and loaded automatically.</p> : null}
+          {selectedDayOrder ? (
+            <p className="auth-help">Confirmed order already exists for selected day/session: {selectedDayOrder.id}</p>
+          ) : null}
           <p className="auth-help">Menu is auto-populated from active dishes set by Admin.</p>
 
           {menuItems.length > 0 ? (
             <div className="menu-flow-grid">
               <div className="menu-search-section">
                 <h3>Menu Section</h3>
-                {menuItems.length === 0 ? <p className="auth-help">No dishes found.</p> : (
-                  <div className="auth-form">
-                    {menuItems.map((item) => (
-                      <label key={item.id}>
-                        <span><strong>{item.name}</strong> - Rp {Number(item.price).toLocaleString('id-ID')}{item.has_allergen ? ' (Contains allergen)' : ''}</span>
-                        <small>{item.description}</small>
-                        <small>{item.nutrition_facts_text}</small>
-                        <small>Ingredients: {item.ingredients.join(', ') || '-'}</small>
-                        <button className="btn btn-outline" type="button" onClick={() => onAddDraftItem(item.id)}>Add</button>
-                      </label>
-                    ))}
-                  </div>
-                )}
+                <div className="auth-form">
+                  {menuItems.map((item) => (
+                    <label key={item.id}>
+                      <span><strong>{item.name}</strong> - Rp {Number(item.price).toLocaleString('id-ID')}{item.has_allergen ? ' (Contains allergen)' : ''}</span>
+                      <small>{item.description}</small>
+                      <small>{item.nutrition_facts_text}</small>
+                      <small>Ingredients: {item.ingredients.join(', ') || '-'}</small>
+                      <button className="btn btn-outline" type="button" onClick={() => onAddDraftItem(item.id)}>Add</button>
+                    </label>
+                  ))}
+                </div>
               </div>
               <div className="menu-draft-section" ref={draftSectionRef}>
                 <h3>Draft Section</h3>
@@ -452,37 +468,13 @@ export default function ParentsPage() {
                 )}
                 <div className="draft-actions">
                   <p className="auth-help">Selected items: {selectedCount} / 5</p>
-                  <label>
-                    Favourite Label
-                    <input value={favLabel} onChange={(e) => setFavLabel(e.target.value)} placeholder="My combo" />
-                  </label>
                   <button className="btn btn-primary" type="button" disabled={submitting || placementExpired} onClick={onPlaceOrder}>
                     {submitting ? 'Placing Order...' : 'Place Order'}
                   </button>
-                  <button className="btn btn-outline" type="button" onClick={onSaveFavourite}>Save Favourite Combo (OPTIONAL)</button>
                 </div>
               </div>
             </div>
-          ) : <p className="auth-help">Loading menu for selected date/session...</p>}
-        </div>
-
-        <div className="module-section">
-          <h2>Favourite Meal Combos</h2>
-          <p className="auth-help">Note: Saves a reusable item set (template).</p>
-          <button className="btn btn-outline" type="button" onClick={loadFavourites}>Refresh Favourites</button>
-          {favourites.length === 0 ? <p className="auth-help">No favourite combos saved.</p> : (
-            <div className="auth-form">
-              {favourites.map((fav) => (
-                <label key={fav.id}>
-                  <strong>{fav.label}</strong>
-                  <small>Session: {fav.session}</small>
-                  <small>Items: {fav.items.map((i) => `${i.name || i.menu_item_id} x${i.quantity}`).join(', ')}</small>
-                  <button className="btn btn-outline" type="button" onClick={() => onApplyFavourite(fav.id)}>Apply Favourite</button>
-                  <button className="btn btn-outline" type="button" onClick={() => onDeleteFavourite(fav.id)}>Delete Favourite</button>
-                </label>
-              ))}
-            </div>
-          )}
+          ) : <p className="auth-help">No active dishes configured by Admin for this date/session.</p>}
         </div>
 
         <div className="module-section">
@@ -498,7 +490,6 @@ export default function ParentsPage() {
                   <small>Order: {order.id}</small>
                   <small>Status: {order.status} | Billing: {order.billing_status || '-'} | Delivery: {order.delivery_status || '-'}</small>
                   <small>Total: Rp {Number(order.total_price).toLocaleString('id-ID')}</small>
-                  <small>Dietary snapshot source: persisted at order creation/update.</small>
                   <small>Items: {order.items.map((item) => `${item.item_name_snapshot} x${item.quantity}`).join(', ') || '-'}</small>
                   <button className="btn btn-outline" type="button" onClick={() => onOpenOrderAsDraft(order, order.service_date)} disabled={!order.can_edit || submitting}>Edit Before Cutoff</button>
                   <button className="btn btn-outline" type="button" onClick={() => onDeleteOrder(order.id)} disabled={!order.can_edit || submitting}>Delete Before Cutoff</button>
@@ -511,20 +502,45 @@ export default function ParentsPage() {
         </div>
 
         <div className="module-section">
-          <h2>Meal Plan Wizard</h2>
-          <p className="auth-help">Note: Copies one existing order to multiple target dates in one run.</p>
-          <label>Source Order ID<input value={wizardSourceOrderId} onChange={(e) => setWizardSourceOrderId(e.target.value)} placeholder="order uuid" /></label>
-          <label>Target Dates (comma separated YYYY-MM-DD)<input value={wizardDates} onChange={(e) => setWizardDates(e.target.value)} placeholder="2026-03-02,2026-03-03" /></label>
-          <button className="btn btn-outline" type="button" onClick={onRunMealPlanWizard}>Run Meal Plan Wizard</button>
-        </div>
-
-        <div className="module-section">
           <h2>Consolidated Billing</h2>
           <button className="btn btn-outline" type="button" onClick={loadBilling}>Refresh Billing</button>
-          <p className="auth-help">Showing all billings where proof is not uploaded yet, plus last 5 uploaded billings.</p>
-          {visibleBillings.length === 0 ? <p className="auth-help">No billing records for selected youngster.</p> : (
+
+          <div className="auth-form billing-proof-batch">
+            <label>
+              One Proof Image for Selected Bills
+              <input type="file" accept="image/*" onChange={(e) => onProofImageUpload(e.target.files?.[0])} />
+            </label>
+            <button className="btn btn-primary" type="button" onClick={onUploadBatchProof}>Upload Proof For Selected Unpaid Bills</button>
+            <small>{selectedBillingIds.length} bill(s) selected.</small>
+          </div>
+
+          <h3>Unpaid Bills (All)</h3>
+          {unpaidBillings.length === 0 ? <p className="auth-help">No unpaid billing records.</p> : (
             <div className="auth-form">
-              {visibleBillings.map((b) => (
+              {unpaidBillings.map((b) => (
+                <label key={b.id}>
+                  <strong>{b.service_date} {b.session}</strong>
+                  <small>Order: {b.order_id}</small>
+                  <small>Status: {b.status} | Delivery: {b.delivery_status}</small>
+                  <small>Total: Rp {Number(b.total_price).toLocaleString('id-ID')}</small>
+                  <small>Proof: {b.proof_image_url ? 'Uploaded' : 'Not uploaded'}</small>
+                  <label className="checkbox-inline">
+                    <input
+                      type="checkbox"
+                      checked={selectedBillingIds.includes(b.id)}
+                      onChange={(e) => onToggleBillingSelect(b.id, e.target.checked)}
+                    />
+                    <span>Select for batch proof upload</span>
+                  </label>
+                </label>
+              ))}
+            </div>
+          )}
+
+          <h3>Paid Bills (Past 30 Days)</h3>
+          {paidBillings.length === 0 ? <p className="auth-help">No paid billing records in last 30 days.</p> : (
+            <div className="auth-form">
+              {paidBillings.map((b) => (
                 <label key={b.id}>
                   <strong>{b.service_date} {b.session}</strong>
                   <small>Order: {b.order_id}</small>
@@ -532,8 +548,6 @@ export default function ParentsPage() {
                   <small>Total: Rp {Number(b.total_price).toLocaleString('id-ID')}</small>
                   <small>Receipt: {b.receipt_number || '-'}</small>
                   <div className="billing-action-row">
-                    <input type="file" accept="image/*" onChange={(e) => onProofImageUpload(b.id, e.target.files?.[0])} />
-                    <button className="btn btn-outline" type="button" onClick={() => onUploadProof(b.id)}>Upload Proof</button>
                     <button className="btn btn-outline" type="button" onClick={() => onOpenReceipt(b.id)}>Open Receipt</button>
                   </div>
                 </label>

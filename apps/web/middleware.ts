@@ -41,6 +41,8 @@ export function middleware(request: NextRequest) {
   const requiredRole = getRequiredRole(normalizedPath);
   const isPublic =
     normalizedPath === '/' ||
+    normalizedPath === '/menu' ||
+    normalizedPath.startsWith('/menu/') ||
     normalizedPath === '/guide' ||
     normalizedPath.startsWith('/guide/') ||
     normalizedPath === '/login' ||
@@ -76,7 +78,18 @@ export function middleware(request: NextRequest) {
   }
 
   if (hasToken && normalizedPath === '/login') {
-    return NextResponse.redirect(new URL(`${BASE_PATH}/dashboard`, request.url));
+    const destination = role === 'PARENT'
+      ? '/parents'
+      : role === 'YOUNGSTER'
+        ? '/youngsters'
+        : role === 'ADMIN'
+          ? '/admin'
+          : role === 'KITCHEN'
+            ? '/kitchen'
+            : role === 'DELIVERY'
+              ? '/delivery'
+              : '/dashboard';
+    return NextResponse.redirect(new URL(`${BASE_PATH}${destination}`, request.url));
   }
 
   return NextResponse.next();

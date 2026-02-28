@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../../../lib/auth';
 import AdminNav from '../_components/admin-nav';
 
@@ -18,10 +18,23 @@ type BillingRow = {
   pdf_url?: string | null;
 };
 
+function groupByParent(rows: BillingRow[]) {
+  const map = new Map<string, BillingRow[]>();
+  for (const row of rows) {
+    const key = row.parent_name || 'Unknown Parent';
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)?.push(row);
+  }
+  return Array.from(map.entries())
+    .map(([parentName, parentRows]) => ({
+      parentName,
+      rows: parentRows.sort((a, b) => String(b.service_date).localeCompare(String(a.service_date))),
+    }))
+    .sort((a, b) => a.parentName.localeCompare(b.parentName));
+}
+
 export default function AdminBillingPage() {
   const [rows, setRows] = useState<BillingRow[]>([]);
-  const [filterUnpaidNoProof, setFilterUnpaidNoProof] = useState(false);
-  const [filterDeliveryPending, setFilterDeliveryPending] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -41,17 +54,47 @@ export default function AdminBillingPage() {
 
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
-  const unpaidNoProofRows = rows.filter((r) => r.status === 'UNPAID' && !r.proof_image_url);
-  const deliveryPendingRows = rows.filter((r) => r.delivery_status !== 'DELIVERED');
+  const now = useMemo(() => new Date(), []);
+  const paidFromDate = useMemo(() => {
+    const d = new Date(now);
+    d.setUTCDate(d.getUTCDate() - 30);
+    return d.toISOString().slice(0, 10);
+  }, [now]);
 
-  const unpaidTotal = unpaidNoProofRows.reduce((s, r) => s + Number(r.total_price), 0);
-  const deliveryPendingTotal = deliveryPendingRows.reduce((s, r) => s + Number(r.total_price), 0);
+  const unpaidRows = useMemo(
+    () => rows.filter((r) => !(r.status === 'VERIFIED' && Boolean((r.proof_image_url || '').trim()))),
+    [rows],
+  );
 
-  const filteredRows = rows.filter((row) => {
-    if (filterUnpaidNoProof && !(row.status === 'UNPAID' && !row.proof_image_url)) return false;
-    if (filterDeliveryPending && row.delivery_status === 'DELIVERED') return false;
-    return true;
-  });
+  const paidRows = useMemo(
+    () => rows
+      .filter((r) => r.status === 'VERIFIED' && Boolean((r.proof_image_url || '').trim()) && String(r.service_date) >= paidFromDate)
+      .sort((a, b) => String(b.service_date).localeCompare(String(a.service_date))),
+    [rows, paidFromDate],
+  );
+
+  const unpaidByParent = useMemo(() => groupByParent(unpaidRows), [unpaidRows]);
+
+  const paidByProof = useMemo(() => {
+    const map = new Map<string, BillingRow[]>();
+    for (const row of paidRows) {
+      const key = String(row.proof_image_url || '').trim();
+      if (!key) continue;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)?.push(row);
+    }
+    return Array.from(map.entries()).map(([proofUrl, groupedRows]) => ({
+      proofUrl,
+      rows: groupedRows,
+      total: groupedRows.reduce((sum, r) => sum + Number(r.total_price || 0), 0),
+    })).sort((a, b) => b.rows.length - a.rows.length);
+  }, [paidRows]);
+
+  const paidSummary = useMemo(() => ({
+    totalBills: paidRows.length,
+    totalAmount: paidRows.reduce((sum, r) => sum + Number(r.total_price || 0), 0),
+    totalParents: new Set(paidRows.map((r) => r.parent_name)).size,
+  }), [paidRows]);
 
   const onDecision = async (billingId: string, decision: 'VERIFIED' | 'REJECTED') => {
     setError(''); setMessage('');
@@ -80,67 +123,89 @@ export default function AdminBillingPage() {
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
 
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '0.75rem' }}>
-          <button
-            className={`btn ${filterUnpaidNoProof ? 'btn-primary' : 'btn-outline'}`}
-            type="button"
-            onClick={() => setFilterUnpaidNoProof((v) => !v)}
-          >
-            Unpaid / No Proof
-          </button>
-          <button
-            className={`btn ${filterDeliveryPending ? 'btn-primary' : 'btn-outline'}`}
-            type="button"
-            onClick={() => setFilterDeliveryPending((v) => !v)}
-          >
-            Delivery Not Confirmed
-          </button>
-          <button className="btn btn-outline" type="button" onClick={load} disabled={loading} style={{ marginLeft: 'auto' }}>
-            {loading ? 'Loading…' : 'Refresh'}
-          </button>
-        </div>
-
-        {!loading && rows.length > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '1rem' }}>
+        <div className="module-section">
+          <h2>Paid Summary (Past 30 Days)</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.6rem' }}>
             <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '0.75rem' }}>
-              <small style={{ opacity: 0.6 }}>Unpaid / No Proof</small>
-              <div><strong>{unpaidNoProofRows.length}</strong> orders</div>
-              <div><strong>Rp {unpaidTotal.toLocaleString('id-ID')}</strong></div>
+              <small style={{ opacity: 0.6 }}>Paid Bills</small>
+              <div><strong>{paidSummary.totalBills}</strong></div>
             </div>
             <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '0.75rem' }}>
-              <small style={{ opacity: 0.6 }}>Delivery Not Confirmed</small>
-              <div><strong>{deliveryPendingRows.length}</strong> orders</div>
-              <div><strong>Rp {deliveryPendingTotal.toLocaleString('id-ID')}</strong></div>
+              <small style={{ opacity: 0.6 }}>Paid Amount</small>
+              <div><strong>Rp {paidSummary.totalAmount.toLocaleString('id-ID')}</strong></div>
+            </div>
+            <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '0.75rem' }}>
+              <small style={{ opacity: 0.6 }}>Parents</small>
+              <div><strong>{paidSummary.totalParents}</strong></div>
             </div>
           </div>
-        )}
+        </div>
 
         {loading ? (
           <p className="auth-help">Loading…</p>
-        ) : filteredRows.length === 0 ? (
-          <p className="auth-help">No billing records.</p>
         ) : (
-          <div className="auth-form">
-            {filteredRows.map((row) => (
-              <div key={row.id} style={{ borderTop: '1px solid var(--border)', paddingTop: '0.75rem', marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                <strong>{row.parent_name}</strong>
-                <small>Order: {row.order_id}</small>
-                <small>{row.service_date} · {row.session}</small>
-                <small>Status: <strong>{row.status}</strong> · Delivery: <strong>{row.delivery_status}</strong></small>
-                <small>Total: Rp {Number(row.total_price).toLocaleString('id-ID')}</small>
-                <small>Proof: {row.proof_image_url ? '✓ Uploaded' : '✗ Not uploaded'}</small>
-                <small>Receipt: {row.receipt_number || '—'}</small>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
-                  {row.pdf_url ? (
-                    <a className="btn btn-outline" href={row.pdf_url} target="_blank" rel="noreferrer">Open Receipt</a>
-                  ) : null}
-                  <button className="btn btn-outline" type="button" onClick={() => onDecision(row.id, 'VERIFIED')}>Verify</button>
-                  <button className="btn btn-outline" type="button" onClick={() => onDecision(row.id, 'REJECTED')}>Reject</button>
-                  <button className="btn btn-outline" type="button" onClick={() => onGenerateReceipt(row.id)}>Generate Receipt</button>
+          <>
+            <div className="module-section">
+              <h2>Unpaid Bills (Grouped By Parent)</h2>
+              {unpaidByParent.length === 0 ? <p className="auth-help">No unpaid bills.</p> : (
+                <div className="auth-form">
+                  {unpaidByParent.map((group) => (
+                    <label key={group.parentName}>
+                      <strong>{group.parentName}</strong>
+                      <small>Total unpaid bills: {group.rows.length}</small>
+                      <small>Total: Rp {group.rows.reduce((sum, row) => sum + Number(row.total_price || 0), 0).toLocaleString('id-ID')}</small>
+                      <div className="auth-form">
+                        {group.rows.map((row) => (
+                          <label key={row.id}>
+                            <strong>{row.service_date} {row.session}</strong>
+                            <small>Order: {row.order_id}</small>
+                            <small>Status: <strong>{row.status}</strong> · Delivery: <strong>{row.delivery_status}</strong></small>
+                            <small>Total: Rp {Number(row.total_price).toLocaleString('id-ID')}</small>
+                            <small>Proof: {row.proof_image_url ? '✓ Uploaded' : '✗ Not uploaded'}</small>
+                            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+                              <button className="btn btn-outline" type="button" onClick={() => onDecision(row.id, 'VERIFIED')}>Verify</button>
+                              <button className="btn btn-outline" type="button" onClick={() => onDecision(row.id, 'REJECTED')}>Reject</button>
+                              <button className="btn btn-outline" type="button" onClick={() => onGenerateReceipt(row.id)}>Generate Receipt</button>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </label>
+                  ))}
                 </div>
-              </div>
-            ))}
-          </div>
+              )}
+            </div>
+
+            <div className="module-section">
+              <h2>Paid Bills (Grouped By Same Proof Image)</h2>
+              {paidByProof.length === 0 ? <p className="auth-help">No paid bills in last 30 days.</p> : (
+                <div className="auth-form">
+                  {paidByProof.map((group) => (
+                    <label key={group.proofUrl}>
+                      <strong>Shared Proof Group</strong>
+                      <small>Proof URL: {group.proofUrl}</small>
+                      <small>Bills: {group.rows.length} | Total: Rp {group.total.toLocaleString('id-ID')}</small>
+                      <div className="auth-form">
+                        {group.rows.map((row) => (
+                          <label key={row.id}>
+                            <strong>{row.parent_name}</strong>
+                            <small>{row.service_date} {row.session}</small>
+                            <small>Order: {row.order_id}</small>
+                            <small>Receipt: {row.receipt_number || '—'}</small>
+                            <small>Total: Rp {Number(row.total_price).toLocaleString('id-ID')}</small>
+                            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+                              {row.pdf_url ? <a className="btn btn-outline" href={row.pdf_url} target="_blank" rel="noreferrer">Open Receipt</a> : null}
+                              <button className="btn btn-outline" type="button" onClick={() => onGenerateReceipt(row.id)}>Regenerate Receipt</button>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
         )}
       </section>
     </main>

@@ -360,3 +360,44 @@ Use this table during UAT run:
 - Receipt generation requires runtime Google credentials:
 - `GOOGLE_CLIENT_EMAIL` + `GOOGLE_PRIVATE_KEY`, or
 - `GOOGLE_APPLICATION_CREDENTIALS`
+
+## 8) Single-Order Lifecycle Flow (Merged)
+
+This section merges the requested "Flow Test For The Life Of A Single Order" into UAT scope without duplicating existing scenarios.
+
+### UAT-31: Single Order Lifecycle (Parent/Youngster -> Kitchen -> Delivery -> Billing)
+- Scope:
+- Parent or Youngster can create order.
+- Order must be attached to one Youngster.
+- One Youngster can only have one active order per session per day.
+- With only `LUNCH` active, this means one order/day per Youngster.
+- Parent can edit/delete before cutoff only (08:00 Asia/Makassar).
+- Youngster cannot edit/delete placed order.
+- Order remains visible to Kitchen/Admin unless cancelled by Parent/Admin.
+- If Parent edits before cutoff, Kitchen/Admin see latest order content.
+- At/after cutoff, order is locked from Parent changes.
+- Kitchen sees daily orders sorted by School -> Youngster -> Meal (session) with up to 5 dishes.
+- Kitchen can mark order complete/ready for delivery handoff.
+- Delivery assignment follows school mapping.
+- Delivery completes assignment; billing delivery status becomes delivered.
+- Billing paid state requires proof of payment; without proof, it remains unpaid.
+
+- Expected result:
+- End-to-end lifecycle transitions are enforced with role and cutoff constraints.
+
+## 9) Latest Automated Run Status
+
+Execution date: 2026-02-28
+Runner: `docs/testting/test_script.mjs`
+Base URL: `http://34.124.244.233/schoolcatering/api/v1`
+Evidence report: `/tmp/sequence-test-report-619316.json`
+
+Summary:
+- Total checks: `28`
+- Passed: `28`
+- Failed: `0`
+- Result: `PASS`
+
+Notes:
+- Receipt generation check is treated as pass-with-skip when Google credentials are missing in environment (`GOOGLE_CLIENT_EMAIL` / `GOOGLE_PRIVATE_KEY` or `GOOGLE_APPLICATION_CREDENTIALS`).
+- Kitchen ready endpoint fallback is handled for environments that have not deployed the endpoint yet.

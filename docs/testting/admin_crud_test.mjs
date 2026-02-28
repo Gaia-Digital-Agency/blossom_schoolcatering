@@ -1,6 +1,4 @@
-import fs from 'node:fs';
-
-const BASE = 'http://127.0.0.1/schoolcatering/api/v1';
+const BASE = process.env.BASE_URL || 'http://127.0.0.1:3000/api/v1';
 const stamp = Date.now().toString().slice(-6);
 const results = [];
 
@@ -61,14 +59,15 @@ function nextWeekday(offset = 1) {
   let schoolId = '';
   let parentId = '';
   let childId = '';
-  let childUsername = '';
-  let childPassword = '';
   let orderId = '';
   let dishId = '';
   let dishName = '';
+  let dishDeleteId = '';
+  let ingredientId = '';
   let updateMenuItemId = '';
   let blackoutId = '';
   let deliveryUserId = '';
+  let createSchoolId = '';
 
   const schools = await req('/schools?active=true', { token: adminToken });
   schoolId = (schools.body || [])[0]?.id || '';
@@ -104,11 +103,41 @@ function nextWeekday(offset = 1) {
   });
 
   await test('Parent', 'Update', async () => {
-    throw new Error('Missing API endpoint for parent update');
+    if (!parentId) throw new Error('missing parentId');
+    const r = await req(`/admin/parents/${parentId}`, {
+      method: 'PATCH',
+      token: adminToken,
+      body: {
+        firstName: 'CrudUpdated',
+        address: 'Jl CRUD Parent Updated',
+      },
+    });
+    if (r.status !== 200 || r.body?.ok !== true) throw new Error(`status=${r.status}`);
+    return `updated parentId=${parentId}`;
   });
 
   await test('Parent', 'Delete', async () => {
-    throw new Error('Missing API endpoint for parent delete');
+    const username = `crud_parent_del_${stamp}`;
+    const reg = await req('/auth/register', {
+      method: 'POST',
+      body: {
+        role: 'PARENT',
+        username,
+        password: 'Parent123',
+        firstName: 'CrudDel',
+        lastName: 'Parent',
+        phoneNumber: `62867${stamp}01`,
+        email: `${username}@mail.local`,
+        address: 'Jl CRUD Parent Del',
+      },
+    });
+    if (reg.status < 200 || reg.status >= 300) throw new Error(`register status=${reg.status}`);
+    const p = await req('/admin/parents', { token: adminToken });
+    const row = (p.body || []).find((x) => x.username === username);
+    if (!row?.id) throw new Error('delete parent id not found');
+    const del = await req(`/admin/parents/${row.id}`, { method: 'DELETE', token: adminToken });
+    if (del.status !== 200 || del.body?.ok !== true) throw new Error(`delete status=${del.status}`);
+    return `deleted parentId=${row.id}`;
   });
 
   await test('Youngster', 'Create', async () => {
@@ -131,10 +160,8 @@ function nextWeekday(offset = 1) {
     });
     if (r.status < 200 || r.status >= 300) throw new Error(`status=${r.status}`);
     childId = r.body.childId;
-    childUsername = r.body.username;
-    childPassword = r.body.generatedPassword;
     if (!childId) throw new Error('missing childId');
-    return `childId=${childId} username=${childUsername}`;
+    return `childId=${childId} username=${r.body.username || ''}`;
   });
 
   await test('Youngster', 'Read', async () => {
@@ -146,11 +173,44 @@ function nextWeekday(offset = 1) {
   });
 
   await test('Youngster', 'Update', async () => {
-    throw new Error('Missing API endpoint for youngster update');
+    if (!childId || !schoolId || !parentId) throw new Error('missing childId/schoolId/parentId');
+    const r = await req(`/admin/youngsters/${childId}`, {
+      method: 'PATCH',
+      token: adminToken,
+      body: {
+        schoolId,
+        schoolGrade: 'Grade 4',
+        gender: 'OTHER',
+        allergies: 'Shrimp',
+        parentId,
+      },
+    });
+    if (r.status !== 200 || r.body?.ok !== true) throw new Error(`status=${r.status}`);
+    return `updated childId=${childId}`;
   });
 
   await test('Youngster', 'Delete', async () => {
-    throw new Error('Missing API endpoint for youngster delete');
+    if (!parentId || !schoolId) throw new Error('missing parentId/schoolId');
+    const c = await req('/children/register', {
+      method: 'POST',
+      token: adminToken,
+      body: {
+        firstName: 'CrudKidDel',
+        lastName: `Flow${stamp}`,
+        phoneNumber: `62866${stamp}09`,
+        email: `crudkid.del.${stamp}@mail.local`,
+        dateOfBirth: '2015-01-01',
+        gender: 'MALE',
+        schoolId,
+        schoolGrade: 'Grade 3',
+        parentId,
+        allergies: 'No Allergies',
+      },
+    });
+    if (c.status < 200 || c.status >= 300 || !c.body?.childId) throw new Error(`create status=${c.status}`);
+    const del = await req(`/admin/youngsters/${c.body.childId}`, { method: 'DELETE', token: adminToken });
+    if (del.status !== 200 || del.body?.ok !== true) throw new Error(`delete status=${del.status}`);
+    return `deleted childId=${c.body.childId}`;
   });
 
   await test('Dish/Menu', 'Create', async () => {
@@ -218,7 +278,32 @@ function nextWeekday(offset = 1) {
   });
 
   await test('Dish/Menu', 'Delete', async () => {
-    throw new Error('Missing API endpoint for dish/menu-item delete');
+    const ings = await req('/admin/ingredients', { token: adminToken });
+    const ingredientIds = (ings.body || []).slice(0, 3).map((i) => i.id);
+    const create = await req('/admin/menu-items', {
+      method: 'POST',
+      token: adminToken,
+      body: {
+        serviceDate: orderDate,
+        session: 'LUNCH',
+        name: `CRUD Dish Delete ${stamp}`,
+        description: 'CRUD dish delete test',
+        nutritionFactsText: 'Calories 500',
+        caloriesKcal: 500,
+        price: 32000,
+        imageUrl: '/schoolcatering/assets/hero-meal.jpg',
+        ingredientIds,
+        isAvailable: true,
+        displayOrder: 60,
+        cutleryRequired: true,
+        packingRequirement: 'CRUD pack delete',
+      },
+    });
+    dishDeleteId = create.body.itemId || create.body.id;
+    if (create.status < 200 || create.status >= 300 || !dishDeleteId) throw new Error(`create status=${create.status}`);
+    const del = await req(`/admin/menu-items/${dishDeleteId}`, { method: 'DELETE', token: adminToken });
+    if (del.status !== 200 || del.body?.ok !== true) throw new Error(`delete status=${del.status}`);
+    return `deleted dishId=${dishDeleteId}`;
   });
 
   await test('Ingredient', 'Read', async () => {
@@ -228,15 +313,42 @@ function nextWeekday(offset = 1) {
   });
 
   await test('Ingredient', 'Create', async () => {
-    throw new Error('Missing API endpoint for ingredient create');
+    const r = await req('/admin/ingredients', {
+      method: 'POST',
+      token: adminToken,
+      body: {
+        name: `CRUD Ingredient ${stamp}`,
+        allergenFlag: false,
+      },
+    });
+    if (r.status < 200 || r.status >= 300) throw new Error(`status=${r.status}`);
+    ingredientId = r.body?.id;
+    if (!ingredientId) throw new Error('missing ingredientId');
+    return `ingredientId=${ingredientId}`;
   });
 
   await test('Ingredient', 'Update', async () => {
-    throw new Error('Missing API endpoint for ingredient update');
+    if (!ingredientId) throw new Error('missing ingredientId');
+    const r = await req(`/admin/ingredients/${ingredientId}`, {
+      method: 'PATCH',
+      token: adminToken,
+      body: {
+        name: `CRUD Ingredient Updated ${stamp}`,
+        allergenFlag: true,
+      },
+    });
+    if (r.status !== 200) throw new Error(`status=${r.status}`);
+    return `updated ingredientId=${ingredientId}`;
   });
 
   await test('Ingredient', 'Delete', async () => {
-    throw new Error('Missing API endpoint for ingredient delete');
+    if (!ingredientId) throw new Error('missing ingredientId');
+    const r = await req(`/admin/ingredients/${ingredientId}`, {
+      method: 'DELETE',
+      token: adminToken,
+    });
+    if (r.status !== 200 || r.body?.ok !== true) throw new Error(`status=${r.status}`);
+    return `deleted ingredientId=${ingredientId}`;
   });
 
   await test('Order', 'Create', async () => {
@@ -342,7 +454,14 @@ function nextWeekday(offset = 1) {
   });
 
   await test('Delivery', 'Delete', async () => {
-    throw new Error('Missing API endpoint for delivery user delete/deactivate');
+    if (!deliveryUserId) throw new Error('missing deliveryUserId');
+    const r = await req(`/admin/delivery/users/${deliveryUserId}/deactivate`, {
+      method: 'PATCH',
+      token: adminToken,
+      body: {},
+    });
+    if (r.status !== 200 || r.body?.ok !== true) throw new Error(`status=${r.status}`);
+    return `deactivated deliveryUserId=${deliveryUserId}`;
   });
 
   await test('Blackout Date', 'Create', async () => {
@@ -391,7 +510,19 @@ function nextWeekday(offset = 1) {
   });
 
   await test('School', 'Create', async () => {
-    throw new Error('Missing API endpoint for school create');
+    const r = await req('/admin/schools', {
+      method: 'POST',
+      token: adminToken,
+      body: {
+        name: `CRUD School ${stamp}`,
+        address: 'Jl CRUD School',
+        city: 'Denpasar',
+        contactEmail: `crud.school.${stamp}@mail.local`,
+      },
+    });
+    if (r.status < 200 || r.status >= 300 || !r.body?.id) throw new Error(`status=${r.status}`);
+    createSchoolId = r.body.id;
+    return `schoolId=${createSchoolId}`;
   });
 
   await test('School', 'Update', async () => {
@@ -411,7 +542,13 @@ function nextWeekday(offset = 1) {
   });
 
   await test('School', 'Delete', async () => {
-    throw new Error('Missing API endpoint for school delete');
+    if (!createSchoolId) throw new Error('missing createSchoolId');
+    const r = await req(`/admin/schools/${createSchoolId}`, {
+      method: 'DELETE',
+      token: adminToken,
+    });
+    if (r.status !== 200 || r.body?.ok !== true) throw new Error(`status=${r.status}`);
+    return `deleted schoolId=${createSchoolId}`;
   });
 
   const byEntity = results.reduce((acc, row) => {

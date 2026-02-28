@@ -42,6 +42,7 @@ import {
   UpdateSessionSettingDto,
   UpdateYoungsterDto,
   UploadBillingProofDto,
+  UploadBillingProofBatchDto,
   UpsertDeliveryAssignmentDto,
   VerifyBillingDto,
 } from './dto';
@@ -287,6 +288,12 @@ export class CoreController {
     return this.coreService.getYoungsterInsights(req.user, date);
   }
 
+  @Get('youngsters/me/orders/consolidated')
+  @Roles('YOUNGSTER')
+  getYoungsterConsolidatedOrders(@Req() req: AuthRequest) {
+    return this.coreService.getYoungsterConsolidatedOrders(req.user);
+  }
+
   @Get('parents/me/children/pages')
   @Roles('PARENT')
   getParentChildrenPages(@Req() req: AuthRequest) {
@@ -382,6 +389,15 @@ export class CoreController {
     @Body() body: UploadBillingProofDto,
   ) {
     return this.coreService.uploadBillingProof(req.user, billingId, body.proofImageData);
+  }
+
+  @Post('billing/proof-upload-batch')
+  @Roles('PARENT')
+  uploadBillingProofBatch(
+    @Req() req: AuthRequest,
+    @Body() body: UploadBillingProofBatchDto,
+  ) {
+    return this.coreService.uploadBillingProofBatch(req.user, body.billingIds, body.proofImageData);
   }
 
   @Get('billing/:billingId/receipt')
@@ -584,6 +600,12 @@ export class CoreController {
   @Roles('KITCHEN', 'ADMIN')
   getKitchenDailySummary(@Req() req: AuthRequest, @Query('date') date?: string) {
     return this.coreService.getKitchenDailySummary(req.user, date);
+  }
+
+  @Post('kitchen/orders/:orderId/complete')
+  @Roles('KITCHEN', 'ADMIN')
+  markKitchenOrderComplete(@Req() req: AuthRequest, @Param('orderId', ParseUUIDPipe) orderId: string) {
+    return this.coreService.markKitchenOrderComplete(req.user, orderId);
   }
 
 }

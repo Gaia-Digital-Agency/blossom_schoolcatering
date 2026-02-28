@@ -16,6 +16,7 @@ type KitchenOrder = {
   session: string;
   status: string;
   delivery_status: string;
+  school_name?: string;
   child_name: string;
   parent_name: string;
   dish_count: number;
@@ -79,15 +80,17 @@ export default function KitchenDashboard({
 }) {
   const [data, setData] = useState<KitchenData | null>(null);
   const [error, setError] = useState('');
-  const [completedOrderIds, setCompletedOrderIds] = useState<Set<string>>(new Set());
+  const [message, setMessage] = useState('');
+  const [submittingOrderId, setSubmittingOrderId] = useState('');
   const serviceDate = useMemo(() => dateInMakassar(offsetDays), [offsetDays]);
+  const completedStatuses = useMemo(() => new Set(['OUT_FOR_DELIVERY', 'ASSIGNED', 'DELIVERED']), []);
   const pendingOrders = useMemo(
-    () => (data?.orders || []).filter((o) => !completedOrderIds.has(o.id)),
-    [data?.orders, completedOrderIds],
+    () => (data?.orders || []).filter((o) => !completedStatuses.has(String(o.delivery_status || '').toUpperCase())),
+    [data?.orders, completedStatuses],
   );
   const completedOrders = useMemo(
-    () => (data?.orders || []).filter((o) => completedOrderIds.has(o.id)),
-    [data?.orders, completedOrderIds],
+    () => (data?.orders || []).filter((o) => completedStatuses.has(String(o.delivery_status || '').toUpperCase())),
+    [data?.orders, completedStatuses],
   );
 
   const load = async () => {
@@ -100,13 +103,21 @@ export default function KitchenDashboard({
     }
   };
 
-  const onTogglePrepared = (orderId: string) => {
-    setCompletedOrderIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(orderId)) next.delete(orderId);
-      else next.add(orderId);
-      return next;
-    });
+  const onMarkKitchenComplete = async (orderId: string) => {
+    setError('');
+    setMessage('');
+    setSubmittingOrderId(orderId);
+    try {
+      await apiFetch(`/kitchen/orders/${orderId}/complete`, {
+        method: 'POST',
+      });
+      setMessage('Order marked kitchen-complete and sent to delivery assignment.');
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed updating kitchen completion');
+    } finally {
+      setSubmittingOrderId('');
+    }
   };
 
   useEffect(() => {
@@ -129,6 +140,7 @@ export default function KitchenDashboard({
           <Link className="btn btn-outline" href="/kitchen/tomorrow">Tomorrow</Link>
           <button className="btn btn-outline" type="button" onClick={load}>Refresh Now</button>
         </div>
+        {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
 
         {data ? (
@@ -203,11 +215,17 @@ export default function KitchenDashboard({
                       {pendingOrders.length === 0 ? <p className="auth-help">No pending orders.</p> : (
                         <div className="kitchen-order-list">
                           {pendingOrders.map((o) => (
-                            <button className="kitchen-order-card" key={o.id} type="button" onClick={() => onTogglePrepared(o.id)}>
+                            <button className="kitchen-order-card" key={o.id} type="button" onClick={() => onMarkKitchenComplete(o.id)}>
                               <strong>{o.session} - {o.child_name}</strong>
+                              <small>School: {o.school_name || '-'}</small>
                               <small>Parent: {o.parent_name}</small>
                               <small>Status: {o.status} | Delivery: {o.delivery_status}</small>
                               <small>Dishes: {o.dishes.map((d) => `${d.item_name} x${d.quantity}`).join(', ') || '-'}</small>
+                              <span className="kitchen-card-action">
+                                <span className="btn btn-primary">
+                                  {submittingOrderId === o.id ? 'Updating...' : 'Mark Kitchen Complete'}
+                                </span>
+                              </span>
                             </button>
                           ))}
                         </div>
@@ -218,8 +236,9 @@ export default function KitchenDashboard({
                       {completedOrders.length === 0 ? <p className="auth-help">No completed orders.</p> : (
                         <div className="kitchen-order-list">
                           {completedOrders.map((o) => (
-                            <button className="kitchen-order-card kitchen-order-card-complete" key={o.id} type="button" onClick={() => onTogglePrepared(o.id)}>
+                            <button className="kitchen-order-card kitchen-order-card-complete" key={o.id} type="button">
                               <strong>{o.session} - {o.child_name}</strong>
+                              <small>School: {o.school_name || '-'}</small>
                               <small>Parent: {o.parent_name}</small>
                               <small>Status: {o.status} | Delivery: {o.delivery_status}</small>
                               <small>Dishes: {o.dishes.map((d) => `${d.item_name} x${d.quantity}`).join(', ') || '-'}</small>
@@ -239,26 +258,30 @@ export default function KitchenDashboard({
         .kitchen-top-actions {
           display: flex;
           gap: 0.8rem;
-          flex-wrap: nowrap;
-          overflow-x: auto;
+          flex-wrap: wrap;
+          overflow-x: hidden;
           padding-bottom: 0.35rem;
           margin-bottom: 0.35rem;
+          max-width: 100%;
         }
         .kitchen-top-actions :global(.btn) {
-          white-space: nowrap;
+          white-space: normal;
           min-height: 2.4rem;
           padding-inline: 0.95rem;
           border-radius: 0.65rem;
+          max-width: 100%;
         }
         .kitchen-compact-view {
           place-items: start center;
           padding-top: 1.2rem;
         }
         .kitchen-table-wrap {
-          overflow-x: auto;
+          overflow-x: hidden;
+          max-width: 100%;
         }
         .kitchen-table {
           width: 100%;
+          table-layout: fixed;
           border-collapse: collapse;
           background: #fff;
           border: 1px solid #e2d6c2;
@@ -271,6 +294,8 @@ export default function KitchenDashboard({
           border-bottom: 1px solid #efe7da;
           padding: 0.65rem;
           text-align: left;
+          overflow-wrap: anywhere;
+          word-break: break-word;
         }
         .kitchen-table tbody tr:last-child td {
           border-bottom: none;
@@ -309,6 +334,13 @@ export default function KitchenDashboard({
           flex-direction: column;
           gap: 0.2rem;
           cursor: pointer;
+        }
+        .kitchen-card-action {
+          margin-top: 0.3rem;
+          display: inline-flex;
+        }
+        .kitchen-order-card .btn {
+          pointer-events: none;
         }
         .kitchen-order-card-complete {
           border-color: #7fb08a;

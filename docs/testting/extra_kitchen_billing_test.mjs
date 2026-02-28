@@ -1,4 +1,4 @@
-const base='http://127.0.0.1/schoolcatering/api/v1';
+const base=process.env.BASE_URL || 'http://127.0.0.1:3000/api/v1';
 const out=[];
 function add(area,name,pass,detail){out.push({area,name,pass,detail});}
 async function req(path,{method='GET',token,body}={}){const h={'content-type':'application/json'};if(token)h.authorization='Bearer '+token;const r=await fetch(base+path,{method,headers:h,body:body!==undefined?JSON.stringify(body):undefined});const t=await r.text();let b;try{b=t?JSON.parse(t):{}}catch{b={raw:t}};return {status:r.status,body:b};}

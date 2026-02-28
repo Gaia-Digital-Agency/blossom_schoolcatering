@@ -24,5 +24,6 @@ export * from './update-school.dto';
 export * from './update-session-setting.dto';
 export * from './update-youngster.dto';
 export * from './upload-billing-proof.dto';
+export * from './upload-billing-proof-batch.dto';
 export * from './upsert-delivery-assignment.dto';
 export * from './verify-billing.dto';

@@ -110,6 +110,10 @@ export default function AdminMenuPage() {
   const [itemWetDish, setItemWetDish] = useState(false);
   const [itemIngredientIds, setItemIngredientIds] = useState<string[]>([]);
   const [ingredientSearch, setIngredientSearch] = useState('');
+  const [customDishInput, setCustomDishInput] = useState('');
+  const [customDishOptions, setCustomDishOptions] = useState<string[]>([]);
+  const [customIngredientInput, setCustomIngredientInput] = useState('');
+  const [customIngredientOptions, setCustomIngredientOptions] = useState<Array<{ key: string; label: string }>>([]);
   const ingredientLimit = 20;
 
   const ingredientIdByNormalizedName = useMemo(() => {
@@ -123,16 +127,37 @@ export default function AdminMenuPage() {
     [ingredients, itemIngredientIds],
   );
 
+  const mergedIngredientOptions = useMemo(() => {
+    const byNorm = new Map<string, { key: string; label: string }>();
+    for (const item of masterIngredients) byNorm.set(normalize(item.key), item);
+    for (const item of customIngredientOptions) {
+      const norm = normalize(item.key);
+      if (!byNorm.has(norm)) byNorm.set(norm, item);
+    }
+    return Array.from(byNorm.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [customIngredientOptions]);
+
   const filteredMasterIngredients = useMemo(() => {
     const q = ingredientSearch.trim().toLowerCase();
-    if (!q) return masterIngredients;
-    return masterIngredients.filter((i) => i.label.toLowerCase().includes(q));
-  }, [ingredientSearch]);
+    if (!q) return mergedIngredientOptions;
+    return mergedIngredientOptions.filter((i) => i.label.toLowerCase().includes(q));
+  }, [ingredientSearch, mergedIngredientOptions]);
+
+  const mergedDishOptions = useMemo(() => {
+    const byNorm = new Map<string, string>();
+    for (const dish of masterDishes) byNorm.set(normalize(dish), dish);
+    for (const dish of customDishOptions) {
+      const norm = normalize(dish);
+      if (!byNorm.has(norm)) byNorm.set(norm, dish);
+    }
+    return Array.from(byNorm.values()).sort((a, b) => a.localeCompare(b));
+  }, [customDishOptions]);
+
   const filteredMasterDishes = useMemo(() => {
     const q = itemName.trim().toLowerCase();
-    if (!q) return masterDishes;
-    return masterDishes.filter((d) => d.toLowerCase().includes(q));
-  }, [itemName]);
+    if (!q) return mergedDishOptions;
+    return mergedDishOptions.filter((d) => d.toLowerCase().includes(q));
+  }, [itemName, mergedDishOptions]);
 
   const loadMenuData = async () => {
     const [ings, menu] = await Promise.all([
@@ -262,6 +287,37 @@ export default function AdminMenuPage() {
     });
   };
 
+  const onAddCustomDishOption = () => {
+    const raw = customDishInput.trim();
+    if (!raw) return;
+    const exists = mergedDishOptions.some((d) => normalize(d) === normalize(raw));
+    if (exists) {
+      setMessage(`Dish already exists in selection: ${raw}`);
+      setCustomDishInput('');
+      return;
+    }
+    setCustomDishOptions((prev) => [...prev, raw]);
+    setItemName(raw);
+    if (!itemDescription.trim()) setItemDescription(raw);
+    setCustomDishInput('');
+    setMessage(`Dish added to selection: ${raw}`);
+  };
+
+  const onAddCustomIngredientOption = () => {
+    const raw = customIngredientInput.trim();
+    if (!raw) return;
+    const norm = normalize(raw);
+    const exists = mergedIngredientOptions.some((i) => normalize(i.key) === norm);
+    if (exists) {
+      setMessage(`Ingredient already exists in selection: ${toLabel(raw)}`);
+      setCustomIngredientInput('');
+      return;
+    }
+    setCustomIngredientOptions((prev) => [...prev, { key: raw, label: toLabel(raw) }]);
+    setCustomIngredientInput('');
+    setMessage(`Ingredient added to selection: ${toLabel(raw)}`);
+  };
+
   const onAutoCreateDishFromMaster = async (dish: string) => {
     setError('');
     setMessage('');
@@ -338,6 +394,12 @@ export default function AdminMenuPage() {
   const activeMenuItems = useMemo(() => menuItems.filter((x) => x.is_available), [menuItems]);
   const inactiveMenuItems = useMemo(() => menuItems.filter((x) => !x.is_available), [menuItems]);
 
+  useEffect(() => {
+    if (activeMenuItems.length > 0 && activeMenuItems.length < 5) {
+      window.alert(`Active dishes are below minimum (current: ${activeMenuItems.length}, required: 5).`);
+    }
+  }, [activeMenuItems.length]);
+
   return (
     <main className="page-auth page-auth-desktop">
       <section className="auth-panel">
@@ -377,6 +439,16 @@ export default function AdminMenuPage() {
           <div className="menu-selection-columns menu-full-row">
             <div className="ingredient-selected-box">
               <label>Dish Name<input value={itemName} onChange={(e) => setItemName(e.target.value)} required /></label>
+              <div className="menu-add-row">
+                <input
+                  value={customDishInput}
+                  onChange={(e) => setCustomDishInput(e.target.value)}
+                  placeholder="Add new dish to selection"
+                />
+                <button className="btn btn-outline" type="button" onClick={onAddCustomDishOption}>
+                  Add Dish
+                </button>
+              </div>
               <strong>Dishes</strong>
               <div className="ingredient-chip-wrap ingredient-list-scroll">
                 {filteredMasterDishes.slice(0, 160).map((dish) => (
@@ -421,6 +493,16 @@ export default function AdminMenuPage() {
                   onChange={(e) => setIngredientSearch(e.target.value)}
                   placeholder="Search ingredient..."
                 />
+                <div className="menu-add-row">
+                  <input
+                    value={customIngredientInput}
+                    onChange={(e) => setCustomIngredientInput(e.target.value)}
+                    placeholder="Add new ingredient to selection"
+                  />
+                  <button className="btn btn-outline" type="button" onClick={onAddCustomIngredientOption}>
+                    Add Ingredient
+                  </button>
+                </div>
                 <div className="ingredient-chip-wrap ingredient-list-scroll">
                   {itemIngredientIds.length === 0 ? <small>-</small> : null}
                   {itemIngredientIds.map((id) => {
@@ -517,6 +599,15 @@ export default function AdminMenuPage() {
         }
         .menu-actions-row :global(.btn) {
           min-width: 170px;
+        }
+        .menu-add-row {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          gap: 0.45rem;
+          align-items: center;
+        }
+        .menu-add-row input {
+          min-width: 0;
         }
         .menu-check-grid {
           display: grid;

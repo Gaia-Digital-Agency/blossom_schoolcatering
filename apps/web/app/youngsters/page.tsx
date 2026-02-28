@@ -44,6 +44,24 @@ type YoungsterInsights = {
   birthdayHighlight: { date_of_birth: string; days_until: number };
 };
 
+type ConsolidatedOrder = {
+  id: string;
+  child_id: string;
+  child_name: string;
+  session: 'LUNCH' | 'SNACK' | 'BREAKFAST';
+  service_date: string;
+  status: string;
+  total_price: number;
+  billing_status?: string | null;
+  delivery_status?: string | null;
+  items: Array<{
+    menu_item_id: string;
+    item_name_snapshot: string;
+    price_snapshot: number;
+    quantity: number;
+  }>;
+};
+
 function nextWeekdayIsoDate() {
   const d = new Date();
   d.setUTCDate(d.getUTCDate() + 1);
@@ -66,6 +84,21 @@ function formatRemaining(ms: number) {
   return `${hours}:${minutes}:${seconds}`;
 }
 
+function todayMakassarIsoDate() {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Makassar',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now);
+  const yyyy = Number(parts.find((p) => p.type === 'year')?.value || '1970');
+  const mm = Number(parts.find((p) => p.type === 'month')?.value || '01');
+  const dd = Number(parts.find((p) => p.type === 'day')?.value || '01');
+  const d = new Date(Date.UTC(yyyy, mm - 1, dd));
+  return d.toISOString().slice(0, 10);
+}
+
 export default function YoungstersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -81,6 +114,7 @@ export default function YoungstersPage() {
   const [draftCartId, setDraftCartId] = useState('');
   const [draftExpiresAt, setDraftExpiresAt] = useState('');
   const [insights, setInsights] = useState<YoungsterInsights | null>(null);
+  const [orders, setOrders] = useState<ConsolidatedOrder[]>([]);
 
   const selectedCount = useMemo(
     () => Object.values(itemQty).filter((qty) => qty > 0).length,
@@ -98,6 +132,21 @@ export default function YoungstersPage() {
   const placementExpired = cutoffRemainingMs <= 0;
   const hasOpenDraft = Boolean(draftCartId) && draftRemainingMs > 0;
 
+  const todayOrder = useMemo(() => {
+    const today = todayMakassarIsoDate();
+    return orders.find((o) => o.service_date === today && o.status === 'PLACED') || null;
+  }, [orders]);
+
+  const selectedDayOrder = useMemo(
+    () => orders.find((o) => o.service_date === serviceDate && o.session === session && o.status === 'PLACED') || null,
+    [orders, serviceDate, session],
+  );
+
+  const loadOrders = async () => {
+    const data = await apiFetch('/youngsters/me/orders/consolidated') as { orders: ConsolidatedOrder[] };
+    setOrders(data.orders || []);
+  };
+
   useEffect(() => {
     apiFetch('/children/me')
       .then((data) => setYoungster(data as Youngster))
@@ -106,6 +155,7 @@ export default function YoungstersPage() {
     apiFetch('/youngsters/me/insights')
       .then((data) => setInsights(data as YoungsterInsights))
       .catch(() => undefined);
+    loadOrders().catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -215,6 +265,7 @@ export default function YoungstersPage() {
       setDraftCartId('');
       setDraftExpiresAt('');
       apiFetch('/youngsters/me/insights').then((x) => setInsights(x as YoungsterInsights)).catch(() => undefined);
+      loadOrders().catch(() => undefined);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Order placement failed';
       if (msg.includes('ORDER_SESSION_DISABLED') && session !== 'LUNCH') {
@@ -252,6 +303,20 @@ export default function YoungstersPage() {
         {error ? <p className="auth-error">{error}</p> : null}
 
         <div className="module-section">
+          <h2>Confirmed Order Of The Day</h2>
+          {todayOrder ? (
+            <div className="auth-form">
+              <label>
+                <strong>{todayOrder.service_date} {todayOrder.session}</strong>
+                <small>Status: {todayOrder.status} | Billing: {todayOrder.billing_status || '-'} | Delivery: {todayOrder.delivery_status || '-'}</small>
+                <small>Total: Rp {Number(todayOrder.total_price).toLocaleString('id-ID')}</small>
+                <small>Items: {todayOrder.items.map((item) => `${item.item_name_snapshot} x${item.quantity}`).join(', ') || '-'}</small>
+              </label>
+            </div>
+          ) : <p className="auth-help">No confirmed order found for today.</p>}
+        </div>
+
+        <div className="module-section">
           <h2>Weekly Nutrition + Badge</h2>
           {insights ? (
             <div className="auth-form">
@@ -260,31 +325,35 @@ export default function YoungstersPage() {
                 <small>Max consecutive order days: {insights.badge.maxConsecutiveOrderDays}</small>
                 <small>Max consecutive order weeks: {insights.badge.maxConsecutiveOrderWeeks ?? '-'}</small>
                 <small>Current month orders: {insights.badge.currentMonthOrders}</small>
+                <small>Birthday in {insights.birthdayHighlight.days_until} day(s)</small>
               </label>
               <label>
-                <strong>Nutrition Week {insights.week.start} to {insights.week.end}</strong>
-                <small>Total Calories: {insights.week.totalCalories} kcal</small>
-                <small>Number Of Orders: {insights.week.totalOrders ?? '-'}</small>
-                <small>Number of Dishes: {insights.week.totalDishes ?? '-'}</small>
+                <strong>Current Week ({insights.week.start} to {insights.week.end})</strong>
+                <small>Total Calories: {insights.week.totalCalories}</small>
+                <small>Total Orders: {insights.week.totalOrders ?? '-'}</small>
+                <small>Total Dishes: {insights.week.totalDishes ?? '-'}</small>
+                <small>
+                  Daily: {insights.week.days.map((d) => `${d.service_date}: ${d.calories_display}`).join(' | ') || '-'}
+                </small>
               </label>
             </div>
-          ) : (
-            <p className="auth-help">Loading nutrition insights...</p>
-          )}
+          ) : <p className="auth-help">Insights loading...</p>}
         </div>
 
         <div className="module-section">
           <h2>Menu and Cart</h2>
+          <label>Service Date<input type="date" value={serviceDate} onChange={(e) => setServiceDate(e.target.value)} /></label>
           <label>
-            Service Date
-            <input type="date" value={serviceDate} onChange={(e) => setServiceDate(e.target.value)} />
+            Session
+            <select value={session} onChange={(e) => setSession(e.target.value as 'LUNCH' | 'SNACK' | 'BREAKFAST')}>
+              <option value="LUNCH">LUNCH</option>
+              <option value="SNACK">SNACK</option>
+              <option value="BREAKFAST">BREAKFAST</option>
+            </select>
           </label>
           <p className="auth-help">Place-order cutoff countdown: {formatRemaining(cutoffRemainingMs)} (08:00 Asia/Makassar)</p>
           {draftCartId && hasOpenDraft ? <p className="auth-help">Open draft detected and loaded automatically.</p> : null}
-          <label>
-            Allergies
-            <input value={youngster?.dietary_allergies || 'No Allergies'} readOnly />
-          </label>
+          {selectedDayOrder ? <p className="auth-help">Confirmed order already exists for selected day/session: {selectedDayOrder.id}</p> : null}
           <p className="auth-help">Menu is auto-populated from active dishes set by Admin.</p>
 
           {menuItems.length > 0 ? (
@@ -295,10 +364,7 @@ export default function YoungstersPage() {
                   <div className="auth-form">
                     {menuItems.map((item) => (
                       <label key={item.id}>
-                        <span>
-                          <strong>{item.name}</strong> - Rp {Number(item.price).toLocaleString('id-ID')}
-                          {item.has_allergen ? ' (Contains allergen)' : ''}
-                        </span>
+                        <span><strong>{item.name}</strong> - Rp {Number(item.price).toLocaleString('id-ID')}{item.has_allergen ? ' (Contains allergen)' : ''}</span>
                         <small>{item.description}</small>
                         <small>{item.nutrition_facts_text}</small>
                         <small>Ingredients: {item.ingredients.join(', ') || '-'}</small>
@@ -316,33 +382,23 @@ export default function YoungstersPage() {
                       <label key={d.id}>
                         <span><strong>{d.menuItem?.name}</strong> - Rp {Number(d.menuItem?.price || 0).toLocaleString('id-ID')}</span>
                         <small>{d.menuItem?.description}</small>
-                        <input
-                          type="number"
-                          min={0}
-                          max={5}
-                          value={d.qty}
-                          onChange={(e) => setItemQty((prev) => ({ ...prev, [d.id]: Number(e.target.value || 0) }))}
-                        />
+                        <input type="number" min={0} max={5} value={d.qty} onChange={(e) => setItemQty((prev) => ({ ...prev, [d.id]: Number(e.target.value || 0) }))} />
                         <button className="btn btn-outline" type="button" onClick={() => onRemoveDraftItem(d.id)}>Remove</button>
                       </label>
                     ))}
                   </div>
                 )}
-                <p className="auth-help">Selected items: {selectedCount} / 5</p>
-                <button className="btn btn-primary" type="button" disabled={submitting || placementExpired} onClick={onPlaceOrder}>
-                  {submitting ? 'Placing Order...' : 'Place Order'}
-                </button>
+                <div className="draft-actions">
+                  <p className="auth-help">Selected items: {selectedCount} / 5</p>
+                  <button className="btn btn-primary" type="button" disabled={submitting || placementExpired} onClick={onPlaceOrder}>
+                    {submitting ? 'Placing Order...' : 'Place Order'}
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
-            <p className="auth-help">Loading menu for selected date/session...</p>
+            <p className="auth-help">No active dishes configured by Admin for this date/session.</p>
           )}
-        </div>
-
-        <div className="youngsters-bottom-action">
-          <button className="btn btn-outline" type="button" onClick={() => { window.location.href = '/register/youngsters'; }}>
-            Update Registration Details
-          </button>
         </div>
       </section>
     </main>
