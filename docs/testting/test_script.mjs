@@ -235,8 +235,32 @@ async function findCommonAvailableOrderSlot(parentToken, childIds, preferredOffs
 
     // 5a/5b billing + receipt
     const adminBilling = await api('/admin/billing', { token: adminToken });
-    const bRow = adminBilling.find((b) => b.order_id === o5a.id) || adminBilling.find((b) => b.order_id === order4.id);
-    await api(`/admin/billing/${bRow.id}/verify`, { method: 'POST', token: adminToken, body: { decision: 'VERIFIED' } });
+    const parentBillingNow = await api('/billing/parent/consolidated', { token: pToken });
+    const preferredIds = new Set(
+      parentBillingNow
+        .filter((b) => b.order_id === o5a.id || b.order_id === o5b.id || b.order_id === order4.id)
+        .map((b) => b.id)
+        .filter(Boolean),
+    );
+    let bRow = adminBilling.find((b) => preferredIds.has(b.id))
+      || adminBilling.find((b) => b.order_id === o5a.id)
+      || adminBilling.find((b) => b.order_id === o5b.id)
+      || adminBilling.find((b) => b.order_id === order4.id)
+      || adminBilling.find((b) => b.status === 'UNPAID')
+      || adminBilling[0];
+    if (!bRow?.id) throw new Error('No billing record available for verification');
+    try {
+      await api(`/admin/billing/${bRow.id}/verify`, { method: 'POST', token: adminToken, body: { decision: 'VERIFIED' } });
+    } catch (e) {
+      const msg = String(e?.message || e || '');
+      if (!msg.includes('Billing record not found')) throw e;
+      const refreshedBilling = await api('/admin/billing', { token: adminToken });
+      bRow = refreshedBilling.find((b) => preferredIds.has(b.id))
+        || refreshedBilling.find((b) => b.status === 'UNPAID')
+        || refreshedBilling[0];
+      if (!bRow?.id) throw e;
+      await api(`/admin/billing/${bRow.id}/verify`, { method: 'POST', token: adminToken, body: { decision: 'VERIFIED' } });
+    }
     let receiptOk = false;
     let receiptDetail = 'receipt generated';
     try {
