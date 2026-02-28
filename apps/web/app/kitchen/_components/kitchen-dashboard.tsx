@@ -131,6 +131,7 @@ export default function KitchenDashboard({
   }, [serviceDate]);
 
   return (
+    <>
     <main className={`page-auth page-auth-desktop ${showOrderBoards ? '' : 'kitchen-compact-view'}`}>
       <section className="auth-panel">
         <h1>{title}</h1>
@@ -375,5 +376,6 @@ export default function KitchenDashboard({
       `}</style>
     </main>
     <LogoutButton />
+    </>
   );
 }
