@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '../../lib/auth';
 import { fileToWebpDataUrl } from '../../lib/image';
+import LogoutButton from '../_components/logout-button';
 
 type Child = {
   id: string;
@@ -411,6 +412,7 @@ export default function ParentsPage() {
   }
 
   return (
+    <>
     <main className="page-auth page-auth-mobile parents-page">
       <section className="auth-panel">
         <h1>Parent Page</h1>
@@ -597,5 +599,7 @@ export default function ParentsPage() {
         </div>
       </section>
     </main>
+    <LogoutButton />
+    </>
   );
 }

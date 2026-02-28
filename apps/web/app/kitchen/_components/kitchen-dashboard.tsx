@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../../../lib/auth';
+import LogoutButton from '../../_components/logout-button';
 
 type KitchenDish = {
   menu_item_id: string;
@@ -373,5 +374,6 @@ export default function KitchenDashboard({
         }
       `}</style>
     </main>
+    <LogoutButton />
   );
 }

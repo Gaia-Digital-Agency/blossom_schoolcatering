@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import LogoutButton from '../../../app/_components/logout-button';
 
 const leftLinks = [
   { href: '/admin', label: 'Dashboard' },
@@ -22,6 +23,8 @@ const rightLinks = [
 export default function AdminNav() {
   const pathname = usePathname();
   return (
+    <>
+    <LogoutButton />
     <div className="admin-nav-shell">
       <div className="admin-nav-columns">
         <div className="dev-links admin-nav-links">
@@ -101,5 +104,6 @@ export default function AdminNav() {
         }
       `}</style>
     </div>
+    </>
   );
 }

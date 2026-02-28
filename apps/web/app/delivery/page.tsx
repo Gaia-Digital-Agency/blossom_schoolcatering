@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { apiFetch, SessionExpiredError } from '../../lib/auth';
+import LogoutButton from '../_components/logout-button';
 
 type Assignment = {
   id: string;
@@ -82,6 +83,7 @@ export default function DeliveryPage() {
   const nextDate = toIso(next);
 
   return (
+    <>
     <main className="page-auth page-auth-mobile delivery-page">
       <section className="auth-panel">
         <h1>My Deliveries</h1>
@@ -138,5 +140,7 @@ export default function DeliveryPage() {
         )}
       </section>
     </main>
+    <LogoutButton />
+    </>
   );
 }

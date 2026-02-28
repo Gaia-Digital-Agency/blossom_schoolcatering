@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../../lib/auth';
+import LogoutButton from '../_components/logout-button';
 
 type Youngster = {
   id: string;
@@ -312,6 +313,7 @@ export default function YoungstersPage() {
   }
 
   return (
+    <>
     <main className="page-auth page-auth-mobile youngsters-page">
       <section className="auth-panel">
         <h1>Youngsters Module</h1>
@@ -421,5 +423,7 @@ export default function YoungstersPage() {
         </div>
       </section>
     </main>
+    <LogoutButton />
+    </>
   );
 }
