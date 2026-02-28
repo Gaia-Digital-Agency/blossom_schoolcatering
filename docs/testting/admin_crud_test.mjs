@@ -7,21 +7,31 @@ function add(entity, op, pass, detail) {
 }
 
 async function req(path, { method = 'GET', token, body } = {}) {
-  const headers = { 'content-type': 'application/json' };
-  if (token) headers.authorization = `Bearer ${token}`;
-  const res = await fetch(`${BASE}${path}`, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
-  const text = await res.text();
-  let json;
-  try {
-    json = text ? JSON.parse(text) : {};
-  } catch {
-    json = { raw: text };
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const headers = { 'content-type': 'application/json' };
+    if (token) headers.authorization = `Bearer ${token}`;
+    const res = await fetch(`${BASE}${path}`, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+    const text = await res.text();
+    let json;
+    try {
+      json = text ? JSON.parse(text) : {};
+    } catch {
+      json = { raw: text };
+    }
+    if (res.status === 429 && attempt < 4) {
+      const retryHeader = Number(res.headers.get('retry-after') || 0);
+      const waitMs = Math.max(retryHeader * 1000, 1200 * (attempt + 1));
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+      continue;
+    }
+    return { status: res.status, body: json };
   }
-  return { status: res.status, body: json };
+  return { status: 429, body: { message: 'retry limit exceeded' } };
 }
 
 async function test(entity, op, fn) {
