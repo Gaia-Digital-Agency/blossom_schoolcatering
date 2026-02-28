@@ -123,8 +123,7 @@ export default function RegisterForm({ role, allowedRoles, title, subtitle }: Re
               <input
                 value={allergies}
                 onChange={(e) => setAllergies(e.target.value)}
-                placeholder="Type No Allergies if none"
-                required
+                placeholder="Optional — e.g. nuts, dairy"
               />
             </label>
           ) : null}
