@@ -556,7 +556,9 @@ export default function AdminMenuPage() {
       if (editingItemId === item.id) resetForm();
       await loadMenuData();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed deleting dish');
+      const msg = e instanceof Error ? e.message : 'Failed deleting dish';
+      setError(msg);
+      window.alert(`Cannot delete "${item.name}": ${msg}`);
     } finally {
       setActionLoading(false);
     }

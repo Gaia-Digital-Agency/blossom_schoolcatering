@@ -5161,25 +5161,14 @@ export class CoreService {
       throw new BadRequestException('Deactivate dish first before deleting permanently');
     }
 
-    const cartRef = await runSql(`SELECT EXISTS (SELECT 1 FROM cart_items WHERE menu_item_id = $1);`, [itemId]);
-    if (cartRef === 't') throw new BadRequestException('Dish cannot be deleted: referenced by cart items');
-
-    const orderRef = await runSql(`SELECT EXISTS (SELECT 1 FROM order_items WHERE menu_item_id = $1);`, [itemId]);
-    if (orderRef === 't') throw new BadRequestException('Dish cannot be deleted: referenced by order history');
-
-    const favouriteRef = await runSql(`SELECT EXISTS (SELECT 1 FROM favourite_meal_items WHERE menu_item_id = $1);`, [itemId]);
-    if (favouriteRef === 't') throw new BadRequestException('Dish cannot be deleted: referenced by favourites');
-
-    const analyticsRef = await runSql(`SELECT EXISTS (SELECT 1 FROM analytics_daily_agg WHERE menu_item_id = $1);`, [itemId]);
-    if (analyticsRef === 't') throw new BadRequestException('Dish cannot be deleted: referenced by analytics');
-
-    const out = await runSql(
-      `DELETE FROM menu_items
-       WHERE id = $1
-       RETURNING id;`,
+    // Soft-delete the dish so FK references in order history remain valid.
+    // Clear cart and favourite references (pending/ephemeral data) before hiding.
+    await runSql(`DELETE FROM cart_items WHERE menu_item_id = $1;`, [itemId]);
+    await runSql(`DELETE FROM favourite_meal_items WHERE menu_item_id = $1;`, [itemId]);
+    await runSql(
+      `UPDATE menu_items SET deleted_at = now(), updated_at = now() WHERE id = $1;`,
       [itemId],
     );
-    if (!out) throw new NotFoundException('Menu item not found');
     return { ok: true };
   }
 
