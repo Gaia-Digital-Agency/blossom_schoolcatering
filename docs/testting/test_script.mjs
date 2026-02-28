@@ -257,7 +257,7 @@ async function findCommonAvailableOrderSlot(parentToken, childIds, preferredOffs
         await api(`/billing/${bRow.id}/proof-upload`, {
           method: 'POST',
           token: pToken,
-          body: { proofImageData: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==' },
+          body: { proofImageData: 'data:image/webp;base64,UklGRjgAAABXRUJQVlA4ICwAAACQAQCdASoCAAIAAgA0JQBOgCHEgmAA+EQpUapV94M5NPm3kbfRz1ZaiFyAAA==' },
         });
       } else if (msg.includes('Billing record not found')) {
         const refreshedBilling = await api('/admin/billing', { token: adminToken });
