@@ -767,7 +767,7 @@ export default function AdminMenuPage() {
               <h3 className="menu-list-title">Active Dishes</h3>
               <div className="auth-form menu-list-card menu-list-card-active">
                 {activeMenuItems.map((item) => (
-                  <label key={item.id}>
+                  <article key={item.id} className="menu-item-card">
                     <strong>{item.name}</strong>
                     <small>{item.description}</small>
                     <small>Image: {hasUploadedImage(item.image_url) ? 'Uploaded' : 'Default image'}</small>
@@ -783,7 +783,7 @@ export default function AdminMenuPage() {
                       <button className="btn btn-outline" type="button" onClick={() => onEditItem(item)} disabled={savingItem || actionLoading}>Edit Dish</button>
                       <button className="btn btn-outline" type="button" onClick={() => onSetDishActive(item, false)} disabled={savingItem || actionLoading}>Deactivate</button>
                     </div>
-                  </label>
+                  </article>
                 ))}
                 {activeMenuItems.length === 0 ? <p className="auth-help">No active dishes.</p> : null}
               </div>
@@ -792,7 +792,7 @@ export default function AdminMenuPage() {
               <h3 className="menu-list-title">Non Active Dishes</h3>
               <div className="auth-form menu-list-card menu-list-card-inactive">
                 {inactiveMenuItems.map((item) => (
-                  <label key={item.id}>
+                  <article key={item.id} className="menu-item-card">
                     <strong>{item.name}</strong>
                     <small>{item.description}</small>
                     <small>Image: {hasUploadedImage(item.image_url) ? 'Uploaded' : 'Default image'}</small>
@@ -809,7 +809,7 @@ export default function AdminMenuPage() {
                       <button className="btn btn-outline" type="button" onClick={() => onSetDishActive(item, true)} disabled={savingItem || actionLoading}>Activate</button>
                       <button className="btn btn-outline" type="button" onClick={() => onDeleteDish(item)} disabled={savingItem || actionLoading}>Delete Dish</button>
                     </div>
-                  </label>
+                  </article>
                 ))}
                 {inactiveMenuItems.length === 0 ? <p className="auth-help">No deactivated dishes.</p> : null}
               </div>
@@ -821,7 +821,7 @@ export default function AdminMenuPage() {
           <h2>Menu Ratings</h2>
           <div className="auth-form menu-list-card">
             {menuRatings.map((rating) => (
-              <label key={rating.menu_item_id}>
+              <article key={rating.menu_item_id} className="menu-item-card">
                 <strong>{rating.name}</strong>
                 <small>1 Star &gt; {rating.star_1_votes} Votes</small>
                 <small>2 Stars &gt; {rating.star_2_votes} Votes</small>
@@ -829,13 +829,24 @@ export default function AdminMenuPage() {
                 <small>4 Stars &gt; {rating.star_4_votes} Votes</small>
                 <small>5 Stars &gt; {rating.star_5_votes} Votes</small>
                 <small>Total Votes: {rating.total_votes}</small>
-              </label>
+              </article>
             ))}
             {menuRatings.length === 0 ? <p className="auth-help">No dishes found for selected date/session.</p> : null}
           </div>
         </div>
       </section>
       <style jsx>{`
+        .menu-item-card {
+          display: grid;
+          gap: 0.25rem;
+          font-size: 0.9rem;
+          min-width: 0;
+        }
+        .menu-item-card small,
+        .menu-item-card strong {
+          overflow-wrap: anywhere;
+          word-break: break-word;
+        }
         .menu-context-form {
           margin-bottom: 0.8rem;
         }
