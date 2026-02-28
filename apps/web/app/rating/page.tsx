@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch, clearAuthState, fetchWithTimeout, getApiBase } from '../../lib/auth';
@@ -68,25 +67,32 @@ export default function RatingPage() {
 
   const starOptions = useMemo(() => [1, 2, 3, 4, 5], []);
 
-  const onRate = async (menuItemId: string, stars: number) => {
-    setError('');
-    setMessage('');
-    setSavingItemId(menuItemId);
-    try {
-      await apiFetch('/ratings', {
-        method: 'POST',
-        body: JSON.stringify({ menuItemId, stars }),
-      });
-      setSelectedStars((prev) => ({ ...prev, [menuItemId]: stars }));
-      setMessage(`Rating submitted: ${stars} star${stars > 1 ? 's' : ''}.`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed submitting rating');
-    } finally {
-      setSavingItemId('');
-    }
+  const onSelectStar = (menuItemId: string, stars: number) => {
+    setSelectedStars((prev) => ({ ...prev, [menuItemId]: stars }));
   };
 
-  const onBackHome = async () => {
+  const onSaveAndGoHome = async () => {
+    setError('');
+    setMessage('');
+    const entries = Object.entries(selectedStars);
+    if (entries.length > 0) {
+      setSavingItemId('all');
+      try {
+        await Promise.all(
+          entries.map(([menuItemId, stars]) =>
+            apiFetch('/ratings', {
+              method: 'POST',
+              body: JSON.stringify({ menuItemId, stars }),
+            }, { skipAutoReload: true })
+          )
+        );
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed submitting ratings');
+        setSavingItemId('');
+        return;
+      }
+      setSavingItemId('');
+    }
     await fetchWithTimeout(`${getApiBase()}/auth/logout`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -133,8 +139,8 @@ export default function RatingPage() {
                           key={`${item.id}-${stars}`}
                           type="button"
                           className={selected >= stars ? 'rating-star rating-star-active' : 'rating-star'}
-                          onClick={() => void onRate(item.id, stars)}
-                          disabled={savingItemId === item.id}
+                          onClick={() => onSelectStar(item.id, stars)}
+                          disabled={savingItemId === 'all'}
                           aria-label={`${stars} star${stars > 1 ? 's' : ''}`}
                         >
                           {selected >= stars ? '★' : '☆'}
@@ -150,9 +156,11 @@ export default function RatingPage() {
         )}
 
         <div className="dev-links">
-          <Link href="/menu">Back to Menu</Link>
-          <button className="btn btn-outline" type="button" onClick={onBackHome}>
-            Back To Home
+          <button className="btn btn-outline" type="button" onClick={onSaveAndGoHome} disabled={savingItemId === 'all'}>
+            {savingItemId === 'all' ? 'Saving...' : 'Back To Home'}
+          </button>
+          <button className="btn btn-primary" type="button" onClick={onSaveAndGoHome} disabled={savingItemId === 'all'}>
+            {savingItemId === 'all' ? 'Saving...' : 'Submit Review'}
           </button>
         </div>
       </section>
