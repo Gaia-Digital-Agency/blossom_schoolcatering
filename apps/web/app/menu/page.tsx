@@ -8,6 +8,7 @@ type PublicMenuItem = {
   id: string;
   name: string;
   image_url: string;
+  updated_at?: string;
   session: 'LUNCH' | 'SNACK' | 'BREAKFAST';
   service_date: string;
 };
@@ -20,7 +21,10 @@ export default function MenuPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetch(`${getApiBase()}/public/menu`, { credentials: 'include' });
+        const res = await fetch(`${getApiBase()}/public/menu`, {
+          credentials: 'include',
+          cache: 'no-store',
+        });
         if (!res.ok) throw new Error('Failed loading menu');
         const data = await res.json() as { serviceDate: string; items: PublicMenuItem[] };
         setServiceDate(data.serviceDate || '');
@@ -46,7 +50,11 @@ export default function MenuPage() {
           <div className="menu-public-grid">
             {items.map((item) => (
               <article className="menu-public-card" key={item.id}>
-                <img src={item.image_url} alt={item.name} loading="lazy" />
+                <img
+                  src={`${item.image_url}${item.updated_at ? `?v=${encodeURIComponent(item.updated_at)}` : ''}`}
+                  alt={item.name}
+                  loading="lazy"
+                />
                 <div>
                   <strong>{item.name}</strong>
                   <small>{item.session}</small>

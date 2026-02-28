@@ -1480,6 +1480,7 @@ export class CoreService {
         SELECT mi.id,
                mi.name,
                mi.image_url,
+               mi.updated_at::text AS updated_at,
                m.session::text AS session,
                m.service_date::text AS service_date
         FROM menus m

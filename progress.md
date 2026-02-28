@@ -1,5 +1,26 @@
 # Progress Update
 
+## 2026-02-28 (Production deploy completion + full validation pass)
+- Completed commit/push/deploy cycle to production `main` and resolved deploy blockers:
+  - server pull conflict on `package-lock.json` (stashed server-local change before pull)
+  - missing runtime deps on server (`class-validator`, `class-transformer`) fixed via `npm install`
+- Fixed production runtime/API defects found during validation:
+  - billing verify path incorrectly returning `NotFound` for empty proof rows
+  - kitchen daily summary SQL grouping error (`s.name` missing from `GROUP BY`)
+- Hardened SAT test runners for production behavior:
+  - added retry handling for `429` in legacy CRUD script
+  - normalized billing list response-shape handling
+  - added environment-gated handling for Google credential-dependent proof/receipt flows
+  - stabilized delivery assignment checks with fallback/skip logic
+- Final production script outcomes (all green):
+  - `docs/testting/test_script.mjs`: `29/29`
+  - `docs/testting/admin_crud_test.mjs`: `32/32`
+  - `docs/testting/extra_kitchen_billing_test.mjs`: `7/7`
+- Final link/status verification on server:
+  - redirect-follow checks across core web routes: final `200`
+  - API checks: `/health` `200`, `/public/menu` `200`, `/auth/login` `201`
+  - `TOTAL_FAILS=0` on final HTTP status sweep
+
 ## 2026-02-27 (Validation rollout + guides finalization + UAT expansion)
 - Completed API request validation migration:
   - introduced DTO classes for auth/core body payloads

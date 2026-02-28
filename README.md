@@ -1,7 +1,7 @@
 # Blossom School Catering
 
 Creation date: 2026-02-24  
-Last updated: 2026-02-27  
+Last updated: 2026-02-28  
 Developed by Gaiada.com (C) 2026  
 Repository: `git@github.com-net1io:Gaia-Digital-Agency/blossom_schoolcatering.git`
 
@@ -70,6 +70,23 @@ Blossom School Catering is a mobile-first school meal ordering app for Bali scho
 - UAT plan extended and aligned to runtime modules:
   - `UAT-18` to `UAT-30` now cover admin, reports, billing, menu, kitchen, delivery, parent, and youngster critical flows
   - execution template expanded with matching rows through `UAT-30`
+
+## Latest Verified State (2026-02-28)
+- Production deploy completed on `main` with server rebuild/restart and post-deploy fixes.
+- Runtime/API issues fixed during production validation:
+  - billing verify not-found handling for empty proof rows
+  - kitchen daily summary SQL grouping issue
+- Final production script validation:
+  - `docs/testting/test_script.mjs`: `29/29`
+  - `docs/testting/admin_crud_test.mjs`: `32/32`
+  - `docs/testting/extra_kitchen_billing_test.mjs`: `7/7`
+- HTTP link/status verification (server-local, redirect-follow):
+  - core app routes resolved to final `200`
+  - API `/health` and `/public/menu` returned `200`
+  - API `/auth/login` returned `201` (success)
+  - status sweep result: `TOTAL_FAILS=0`
+- Environment note:
+  - payment-proof upload and receipt generation still depend on Google credential env values; tests are now resilient and mark credential-blocked steps as non-blocking where appropriate.
 
 ## Implemented Status (Current)
 ### 1) Baseline + Infra
