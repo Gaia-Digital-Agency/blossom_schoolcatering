@@ -30,6 +30,7 @@ type MasterIngredientFile = {
 };
 
 type MasterDishFile = Record<string, string[]>;
+const DEFAULT_DISH_IMAGE = '/schoolcatering/assets/hero-meal.jpg';
 
 function nextWeekdayIsoDate() {
   const d = new Date();
@@ -407,6 +408,11 @@ export default function AdminMenuPage() {
     () => menuItems.filter((x) => !x.session || x.session === menuSession),
     [menuItems, menuSession],
   );
+  const hasUploadedImage = (imageUrl?: string | null) => {
+    const raw = String(imageUrl || '').trim().toLowerCase();
+    if (!raw) return false;
+    return !raw.includes(DEFAULT_DISH_IMAGE.toLowerCase());
+  };
   const activeMenuItems = useMemo(() => sessionScopedItems.filter((x) => x.is_available), [sessionScopedItems]);
   const inactiveMenuItems = useMemo(() => sessionScopedItems.filter((x) => !x.is_available), [sessionScopedItems]);
 
@@ -565,6 +571,7 @@ export default function AdminMenuPage() {
                   <label key={item.id}>
                     <strong>{item.name}</strong>
                     <small>{item.description}</small>
+                    <small>Image: {hasUploadedImage(item.image_url) ? 'Uploaded' : 'Default image'}</small>
                     <small>Calories: {item.calories_kcal ?? 'TBA'}</small>
                     <small>Price: Rp {Number(item.price).toLocaleString('id-ID')}</small>
                     <small>Ingredients: {item.ingredients.map(toLabel).join(', ') || '-'}</small>
@@ -586,6 +593,7 @@ export default function AdminMenuPage() {
                   <label key={item.id}>
                     <strong>{item.name}</strong>
                     <small>{item.description}</small>
+                    <small>Image: {hasUploadedImage(item.image_url) ? 'Uploaded' : 'Default image'}</small>
                     <small>Calories: {item.calories_kcal ?? 'TBA'}</small>
                     <small>Price: Rp {Number(item.price).toLocaleString('id-ID')}</small>
                     <small>Ingredients: {item.ingredients.map(toLabel).join(', ') || '-'}</small>

@@ -112,6 +112,11 @@ export class CoreService {
     return `https://storage.googleapis.com/${this.getGcsBucket()}/${normalizedObject}`;
   }
 
+  private buildGoogleStoragePublicUrl(objectName: string) {
+    const normalizedObject = objectName.replace(/^\/+/, '');
+    return `https://storage.googleapis.com/${this.getGcsBucket()}/${normalizedObject}`;
+  }
+
   private async getGoogleServiceAccount() {
     const envEmail = (process.env.GOOGLE_CLIENT_EMAIL || '').trim();
     const envKey = (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n').trim();
@@ -250,7 +255,8 @@ export class CoreService {
         data: parsed.data,
         cacheControl: 'public, max-age=86400',
       });
-      return uploaded.publicUrl;
+      // Use direct GCS public URL for menu images so they render consistently on public /menu.
+      return this.buildGoogleStoragePublicUrl(uploaded.objectName);
     }
     if (/^https?:\/\//i.test(trimmed) && !/\.webp(\?|#|$)/i.test(trimmed)) {
       throw new BadRequestException('Menu image URL must be WebP');
