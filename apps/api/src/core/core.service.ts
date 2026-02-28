@@ -3061,28 +3061,38 @@ export class CoreService {
 
   async verifyBilling(actor: AccessUser, billingId: string, decision: 'VERIFIED' | 'REJECTED') {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
-    if (decision === 'VERIFIED') {
-      const proofOut = await runSql(
-        `SELECT COALESCE(NULLIF(TRIM(proof_image_url), ''), '')
-         FROM billing_records
-         WHERE id = $1
-         LIMIT 1;`,
-        [billingId],
-      );
-      if (!proofOut) throw new NotFoundException('Billing record not found');
-      if (!String(proofOut).trim()) {
-        throw new BadRequestException('BILLING_PROOF_IMAGE_REQUIRED');
-      }
+    const billingOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT id,
+               COALESCE(NULLIF(TRIM(proof_image_url), ''), '') AS proof_image_url
+        FROM billing_records
+        WHERE id = $1
+        LIMIT 1
+      ) t;
+      `,
+      [billingId],
+    );
+    if (!billingOut) throw new NotFoundException('Billing record not found');
+    const billing = this.parseJsonLine<{ id: string; proof_image_url: string }>(billingOut);
+    if (decision === 'VERIFIED' && !String(billing.proof_image_url || '').trim()) {
+      throw new BadRequestException('BILLING_PROOF_IMAGE_REQUIRED');
     }
-    await runSql(
-      `UPDATE billing_records
-       SET status = $1::payment_status,
-           verified_by = $2,
-           verified_at = now(),
-           updated_at = now()
-       WHERE id = $3;`,
+    const updatedOut = await runSql(
+      `WITH updated AS (
+         UPDATE billing_records
+         SET status = $1::payment_status,
+             verified_by = $2,
+             verified_at = now(),
+             updated_at = now()
+         WHERE id = $3
+         RETURNING id
+       )
+       SELECT id FROM updated;`,
       [decision, actor.uid, billingId],
     );
+    if (!updatedOut) throw new NotFoundException('Billing record not found');
     return { ok: true, status: decision };
   }
 
