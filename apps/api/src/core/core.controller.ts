@@ -86,6 +86,12 @@ export class CoreController {
     return this.coreService.getSessionSettings();
   }
 
+  @Get('session-settings')
+  @Roles('PARENT', 'YOUNGSTER', 'ADMIN', 'KITCHEN', 'DELIVERY')
+  getSessionSettings() {
+    return this.coreService.getSessionSettings();
+  }
+
   @Patch('admin/session-settings/:session')
   @Roles('ADMIN')
   updateAdminSessionSetting(

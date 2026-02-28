@@ -12,9 +12,12 @@ type Child = {
   school_grade: string;
   dietary_allergies?: string;
 };
+type SessionType = 'LUNCH' | 'SNACK' | 'BREAKFAST';
+type SessionSetting = { session: SessionType; is_active: boolean };
+const SESSION_ORDER: SessionType[] = ['LUNCH', 'SNACK', 'BREAKFAST'];
 type MenuItem = {
   id: string;
-  session?: 'LUNCH' | 'SNACK' | 'BREAKFAST';
+  session?: SessionType;
   name: string;
   description: string;
   nutrition_facts_text: string;
@@ -32,7 +35,7 @@ type ConsolidatedOrder = {
   id: string;
   child_id: string;
   child_name: string;
-  session: 'LUNCH' | 'SNACK' | 'BREAKFAST';
+  session: SessionType;
   service_date: string;
   status: string;
   total_price: number;
@@ -108,7 +111,8 @@ export default function ParentsPage() {
 
   const [selectedChildId, setSelectedChildId] = useState('');
   const [serviceDate, setServiceDate] = useState(nextWeekdayIsoDate());
-  const [session, setSession] = useState<'LUNCH' | 'SNACK' | 'BREAKFAST'>('LUNCH');
+  const [session, setSession] = useState<SessionType>('LUNCH');
+  const [sessionSettings, setSessionSettings] = useState<SessionSetting[]>([{ session: 'LUNCH', is_active: true }]);
 
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [itemQty, setItemQty] = useState<Record<string, number>>({});
@@ -186,6 +190,17 @@ export default function ParentsPage() {
     () => visibleOrders.find((o) => o.service_date === serviceDate && o.session === session && o.status === 'PLACED') || null,
     [visibleOrders, serviceDate, session],
   );
+  const activeSessions = useMemo(
+    () => SESSION_ORDER.filter((s) => sessionSettings.find((x) => x.session === s)?.is_active),
+    [sessionSettings],
+  );
+
+  useEffect(() => {
+    if (activeSessions.length === 0) return;
+    if (!activeSessions.includes(session)) {
+      setSession(activeSessions[0]);
+    }
+  }, [activeSessions, session]);
 
   const loadOrders = async () => {
     setLoadingOrders(true);
@@ -205,13 +220,18 @@ export default function ParentsPage() {
     const data = await apiFetch('/parents/me/spending-dashboard') as SpendingDashboard;
     setSpending(data);
   };
+  const loadSessionSettings = async () => {
+    const settings = await apiFetch('/session-settings') as SessionSetting[];
+    if (!Array.isArray(settings) || settings.length === 0) return;
+    setSessionSettings(settings);
+  };
 
   const loadBaseData = async () => {
     const childrenData = await apiFetch('/parents/me/children/pages') as { parentId: string; children: Child[] };
     setParentId(childrenData.parentId);
     setChildren(childrenData.children);
     if (childrenData.children.length > 0 && !selectedChildId) setSelectedChildId(childrenData.children[0].id);
-    await Promise.all([loadOrders(), loadBilling(), loadSpending()]);
+    await Promise.all([loadOrders(), loadBilling(), loadSpending(), loadSessionSettings()]);
   };
 
   useEffect(() => {
@@ -309,8 +329,9 @@ export default function ParentsPage() {
       }) as { cartId: string; excludedItemIds: string[] };
       setSelectedChildId(order.child_id);
       setServiceDate(targetDate);
-      setSession(order.session);
-      const menuData = await apiFetch(`/menus?service_date=${targetDate}&session=${order.session}`) as { items: MenuItem[] };
+      const nextSession = activeSessions.includes(order.session) ? order.session : (activeSessions[0] || 'LUNCH');
+      setSession(nextSession);
+      const menuData = await apiFetch(`/menus?service_date=${targetDate}&session=${nextSession}`) as { items: MenuItem[] };
       setMenuItems(menuData.items || []);
       await loadDraftItems(out.cartId);
       setMessage(out.excludedItemIds.length
@@ -423,10 +444,8 @@ export default function ParentsPage() {
           <label>Service Date<input type="date" value={serviceDate} onChange={(e) => setServiceDate(e.target.value)} /></label>
           <label>
             Session
-            <select value={session} onChange={(e) => setSession(e.target.value as 'LUNCH' | 'SNACK' | 'BREAKFAST')}>
-              <option value="LUNCH">LUNCH</option>
-              <option value="SNACK">SNACK</option>
-              <option value="BREAKFAST">BREAKFAST</option>
+            <select value={session} onChange={(e) => setSession(e.target.value as SessionType)}>
+              {activeSessions.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </label>
           <p className="auth-help">Place-order cutoff countdown: {formatRemaining(placeCutoffMs)} (08:00 Asia/Makassar)</p>

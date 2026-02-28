@@ -1464,14 +1464,33 @@ export class CoreService {
 
   async getPublicActiveMenu(query: { serviceDate?: string; session?: string }) {
     await this.ensureMenuItemExtendedColumns();
+    await this.ensureSessionSettingsTable();
     const serviceDate = query.serviceDate
       ? this.validateServiceDate(query.serviceDate)
       : this.nextWeekdayIsoDate();
     const session = query.session ? this.normalizeSession(query.session) : null;
+    if (session) {
+      const active = await this.isSessionActive(session);
+      if (!active) {
+        return {
+          serviceDate,
+          session,
+          items: [],
+        };
+      }
+    }
     const params: unknown[] = [serviceDate];
     const whereSession = session
       ? `AND m.session = $2::session_type`
       : '';
+    const activeSessionFilter = session
+      ? ''
+      : `AND EXISTS (
+            SELECT 1
+            FROM session_settings ss
+            WHERE ss.session = m.session
+              AND ss.is_active = true
+          )`;
     if (session) params.push(session);
     const out = await runSql(
       `
@@ -1488,6 +1507,7 @@ export class CoreService {
         JOIN menu_items mi ON mi.menu_id = m.id
         WHERE m.service_date = $1::date
           ${whereSession}
+          ${activeSessionFilter}
           AND m.is_published = true
           AND m.deleted_at IS NULL
           AND mi.is_available = true

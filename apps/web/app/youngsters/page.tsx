@@ -11,6 +11,9 @@ type Youngster = {
   school_grade: string;
   dietary_allergies?: string;
 };
+type SessionType = 'LUNCH' | 'SNACK' | 'BREAKFAST';
+type SessionSetting = { session: SessionType; is_active: boolean };
+const SESSION_ORDER: SessionType[] = ['LUNCH', 'SNACK', 'BREAKFAST'];
 
 type MenuItem = {
   id: string;
@@ -48,7 +51,7 @@ type ConsolidatedOrder = {
   id: string;
   child_id: string;
   child_name: string;
-  session: 'LUNCH' | 'SNACK' | 'BREAKFAST';
+  session: SessionType;
   service_date: string;
   status: string;
   total_price: number;
@@ -106,7 +109,8 @@ export default function YoungstersPage() {
 
   const [youngster, setYoungster] = useState<Youngster | null>(null);
   const [serviceDate, setServiceDate] = useState(nextWeekdayIsoDate());
-  const [session, setSession] = useState<'LUNCH' | 'SNACK' | 'BREAKFAST'>('LUNCH');
+  const [session, setSession] = useState<SessionType>('LUNCH');
+  const [sessionSettings, setSessionSettings] = useState<SessionSetting[]>([{ session: 'LUNCH', is_active: true }]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [itemQty, setItemQty] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -141,6 +145,10 @@ export default function YoungstersPage() {
     () => orders.find((o) => o.service_date === serviceDate && o.session === session && o.status === 'PLACED') || null,
     [orders, serviceDate, session],
   );
+  const activeSessions = useMemo(
+    () => SESSION_ORDER.filter((s) => sessionSettings.find((x) => x.session === s)?.is_active),
+    [sessionSettings],
+  );
 
   const loadOrders = async () => {
     const data = await apiFetch('/youngsters/me/orders/consolidated') as { orders: ConsolidatedOrder[] };
@@ -155,9 +163,22 @@ export default function YoungstersPage() {
     apiFetch('/youngsters/me/insights')
       .then((data) => setInsights(data as YoungsterInsights))
       .catch(() => undefined);
+    apiFetch('/session-settings')
+      .then((data) => {
+        const settings = data as SessionSetting[];
+        if (Array.isArray(settings) && settings.length > 0) setSessionSettings(settings);
+      })
+      .catch(() => undefined);
     loadOrders().catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (activeSessions.length === 0) return;
+    if (!activeSessions.includes(session)) {
+      setSession(activeSessions[0]);
+    }
+  }, [activeSessions, session]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
@@ -345,10 +366,8 @@ export default function YoungstersPage() {
           <label>Service Date<input type="date" value={serviceDate} onChange={(e) => setServiceDate(e.target.value)} /></label>
           <label>
             Session
-            <select value={session} onChange={(e) => setSession(e.target.value as 'LUNCH' | 'SNACK' | 'BREAKFAST')}>
-              <option value="LUNCH">LUNCH</option>
-              <option value="SNACK">SNACK</option>
-              <option value="BREAKFAST">BREAKFAST</option>
+            <select value={session} onChange={(e) => setSession(e.target.value as SessionType)}>
+              {activeSessions.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </label>
           <p className="auth-help">Place-order cutoff countdown: {formatRemaining(cutoffRemainingMs)} (08:00 Asia/Makassar)</p>
