@@ -116,6 +116,10 @@ export default function AdminMenuPage() {
   const [customIngredientInput, setCustomIngredientInput] = useState('');
   const [customIngredientOptions, setCustomIngredientOptions] = useState<Array<{ key: string; label: string }>>([]);
   const ingredientLimit = 20;
+  const refreshPage = () => {
+    if (typeof window === 'undefined') return;
+    window.location.reload();
+  };
 
   const ingredientIdByNormalizedName = useMemo(() => {
     const map = new Map<string, string>();
@@ -240,6 +244,7 @@ export default function AdminMenuPage() {
     }
     resetForm();
     await loadMenuData();
+    refreshPage();
   };
 
   const onToggleIngredient = (ingredientId: string) => {
@@ -286,6 +291,7 @@ export default function AdminMenuPage() {
       }
       return [...prev, ingredientId];
     });
+    refreshPage();
   };
 
   const onAddCustomDishOption = () => {
@@ -302,6 +308,7 @@ export default function AdminMenuPage() {
     if (!itemDescription.trim()) setItemDescription(raw);
     setCustomDishInput('');
     setMessage(`Dish added to selection: ${raw}`);
+    refreshPage();
   };
 
   const onAddCustomIngredientOption = () => {
@@ -317,6 +324,7 @@ export default function AdminMenuPage() {
     setCustomIngredientOptions((prev) => [...prev, { key: raw, label: toLabel(raw) }]);
     setCustomIngredientInput('');
     setMessage(`Ingredient added to selection: ${toLabel(raw)}`);
+    refreshPage();
   };
 
   const onAutoCreateDishFromMaster = async (dish: string) => {
@@ -348,6 +356,7 @@ export default function AdminMenuPage() {
     if (!itemDescription.trim()) setItemDescription(dish);
     setMessage(`Dish auto-created: ${dish}`);
     await loadMenuData();
+    refreshPage();
   };
 
   const onSeed = async () => {
@@ -356,6 +365,7 @@ export default function AdminMenuPage() {
     await apiFetch('/admin/menus/sample-seed', { method: 'POST', body: JSON.stringify({ serviceDate: menuServiceDate }) });
     setMessage('Sample menus seeded for selected date.');
     await loadMenuData();
+    refreshPage();
   };
 
   const onEditItem = (item: AdminMenuItem) => {
@@ -386,6 +396,7 @@ export default function AdminMenuPage() {
       });
       setMessage(isAvailable ? 'Dish activated.' : 'Dish deactivated.');
       await loadMenuData();
+      refreshPage();
     } catch (e) {
       setMenuItems(previous);
       setError(e instanceof Error ? e.message : 'Failed updating dish availability');
