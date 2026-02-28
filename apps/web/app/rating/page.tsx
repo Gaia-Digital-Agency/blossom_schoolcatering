@@ -147,7 +147,6 @@ export default function RatingPage() {
                         </button>
                       ))}
                     </div>
-                    <small>Your rating: {selected ? `${selected} star${selected > 1 ? 's' : ''}` : 'Not rated yet'}</small>
                   </div>
                 </article>
               );
@@ -208,11 +207,26 @@ export default function RatingPage() {
           font-size: 1.1rem;
           line-height: 1;
           cursor: pointer;
+          transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.1s;
+        }
+        .rating-star:hover:not(:disabled) {
+          color: #b8860b;
+          border-color: #b8860b;
+          background: #fff8ec;
+          transform: scale(1.15);
+        }
+        .rating-star:active:not(:disabled) {
+          transform: scale(0.92);
         }
         .rating-star-active {
           color: #9a6c1f;
           border-color: #9a6c1f;
           background: #fff5e3;
+        }
+        .rating-star-active:hover:not(:disabled) {
+          color: #7a5010;
+          border-color: #7a5010;
+          background: #ffefd0;
         }
         .dev-links button {
           border: 1px solid #ccbda2;
