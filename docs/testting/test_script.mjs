@@ -253,12 +253,21 @@ async function findCommonAvailableOrderSlot(parentToken, childIds, preferredOffs
       await api(`/admin/billing/${bRow.id}/verify`, { method: 'POST', token: adminToken, body: { decision: 'VERIFIED' } });
     } catch (e) {
       const msg = String(e?.message || e || '');
-      if (!msg.includes('Billing record not found')) throw e;
-      const refreshedBilling = await api('/admin/billing', { token: adminToken });
-      bRow = refreshedBilling.find((b) => preferredIds.has(b.id))
-        || refreshedBilling.find((b) => b.status === 'UNPAID')
-        || refreshedBilling[0];
-      if (!bRow?.id) throw e;
+      if (msg.includes('BILLING_PROOF_IMAGE_REQUIRED')) {
+        await api(`/billing/${bRow.id}/proof-upload`, {
+          method: 'POST',
+          token: pToken,
+          body: { proofImageData: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==' },
+        });
+      } else if (msg.includes('Billing record not found')) {
+        const refreshedBilling = await api('/admin/billing', { token: adminToken });
+        bRow = refreshedBilling.find((b) => preferredIds.has(b.id))
+          || refreshedBilling.find((b) => b.status === 'UNPAID')
+          || refreshedBilling[0];
+        if (!bRow?.id) throw e;
+      } else {
+        throw e;
+      }
       await api(`/admin/billing/${bRow.id}/verify`, { method: 'POST', token: adminToken, body: { decision: 'VERIFIED' } });
     }
     let receiptOk = false;
