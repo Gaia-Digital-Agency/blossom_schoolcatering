@@ -318,7 +318,7 @@ async function findCommonAvailableOrderSlot(parentToken, childIds, preferredOffs
     logResult('4b', paidUnpaidOk, paidUnpaidDetail);
 
     // 6. 3 youngsters create order
-    const serviceDate3 = nextWeekday(30);
+    const serviceDate3 = nextWeekday(6);
     const lunch3 = await ensureMenuItem(adminToken, serviceDate3, 'LUNCH');
     const youngsterOrders = [];
     for (let idx = 0; idx < 3; idx += 1) {
