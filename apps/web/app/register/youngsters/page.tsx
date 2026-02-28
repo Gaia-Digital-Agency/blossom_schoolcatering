@@ -27,6 +27,8 @@ const GRADES = Array.from({ length: 12 }, (_v, i) => `Grade ${i + 1}`);
 export default function YoungsterRegisterPage() {
   const [schools, setSchools] = useState<School[]>([]);
   const [loadingSchools, setLoadingSchools] = useState(true);
+  const [registrantType, setRegistrantType] = useState<'' | 'YOUNGSTER' | 'PARENT' | 'TEACHER'>('');
+  const [teacherName, setTeacherName] = useState('');
   const [youngsterFirstName, setYoungsterFirstName] = useState('');
   const [youngsterLastName, setYoungsterLastName] = useState('');
   const [youngsterGender, setYoungsterGender] = useState('UNDISCLOSED');
@@ -41,7 +43,6 @@ export default function YoungsterRegisterPage() {
   const [parentMobileNumber, setParentMobileNumber] = useState('');
   const [parentEmail, setParentEmail] = useState('');
   const [parentAddress, setParentAddress] = useState('');
-  const [parentAllergies, setParentAllergies] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState<RegisterResponse | null>(null);
@@ -87,6 +88,8 @@ export default function YoungsterRegisterPage() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
+          registrantType,
+          teacherName: registrantType === 'TEACHER' ? teacherName : '',
           youngsterFirstName,
           youngsterLastName,
           youngsterGender,
@@ -101,7 +104,6 @@ export default function YoungsterRegisterPage() {
           parentMobileNumber,
           parentEmail,
           parentAddress,
-          parentAllergies,
         }),
       });
       if (!res.ok) {
@@ -123,6 +125,53 @@ export default function YoungsterRegisterPage() {
         <h1>Youngster Registration</h1>
         <p className="auth-help">Youngster registration also creates/links the parent account in one flow.</p>
         <form onSubmit={onSubmit} className="auth-form">
+          <fieldset>
+            <legend>Are You the Youngster, Parent, Teacher? (required)</legend>
+            <label>
+              <input
+                type="radio"
+                name="registrantType"
+                value="YOUNGSTER"
+                checked={registrantType === 'YOUNGSTER'}
+                onChange={() => setRegistrantType('YOUNGSTER')}
+                required
+              />
+              Youngster
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="registrantType"
+                value="PARENT"
+                checked={registrantType === 'PARENT'}
+                onChange={() => setRegistrantType('PARENT')}
+                required
+              />
+              Parent
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="registrantType"
+                value="TEACHER"
+                checked={registrantType === 'TEACHER'}
+                onChange={() => setRegistrantType('TEACHER')}
+                required
+              />
+              Teacher
+            </label>
+          </fieldset>
+          {registrantType === 'TEACHER' ? (
+            <label>
+              Teacher Name (Max 50 Characters)
+              <input
+                value={teacherName}
+                onChange={(e) => setTeacherName(e.target.value.slice(0, 50))}
+                maxLength={50}
+                required
+              />
+            </label>
+          ) : null}
           <label>
             Youngster First Name
             <input value={youngsterFirstName} onChange={(e) => setYoungsterFirstName(e.target.value)} required />
@@ -207,15 +256,6 @@ export default function YoungsterRegisterPage() {
           <label>
             Parent Address (Optional)
             <input value={parentAddress} onChange={(e) => setParentAddress(e.target.value)} />
-          </label>
-          <label>
-            Parent Allergies (Required)
-            <input
-              value={parentAllergies}
-              onChange={(e) => setParentAllergies(e.target.value)}
-              placeholder="Type No Allergies if none"
-              required
-            />
           </label>
           {error ? <p className="auth-error">{error}</p> : null}
           {success ? (

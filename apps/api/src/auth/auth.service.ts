@@ -49,6 +49,8 @@ type RegisterInput = {
 };
 
 type RegisterYoungsterWithParentInput = {
+  registrantType: 'YOUNGSTER' | 'PARENT' | 'TEACHER';
+  teacherName?: string;
   youngsterFirstName: string;
   youngsterLastName: string;
   youngsterGender: string;
@@ -63,7 +65,7 @@ type RegisterYoungsterWithParentInput = {
   parentMobileNumber: string;
   parentEmail: string;
   parentAddress?: string;
-  parentAllergies: string;
+  parentAllergies?: string;
 };
 
 type RegistrationSchoolRow = {
@@ -88,6 +90,7 @@ const REFRESH_TTL = '7d';
 @Injectable()
 export class AuthService {
   private parentDietaryRestrictionsReady = false;
+  private childRegistrationSourceColumnsReady = false;
 
   private normalizeRole(role: string): Role {
     const normalized = role?.toUpperCase() as Role;
@@ -218,6 +221,16 @@ export class AuthService {
       );
     `);
     this.parentDietaryRestrictionsReady = true;
+  }
+
+  private async ensureChildRegistrationSourceColumns() {
+    if (this.childRegistrationSourceColumnsReady) return;
+    await runSql(`
+      ALTER TABLE children
+      ADD COLUMN IF NOT EXISTS registration_actor_type varchar(20) NOT NULL DEFAULT 'PARENT',
+      ADD COLUMN IF NOT EXISTS registration_actor_teacher_name varchar(50);
+    `);
+    this.childRegistrationSourceColumnsReady = true;
   }
 
   private async upsertParentAllergies(parentId: string, allergies: string) {
@@ -586,6 +599,8 @@ export class AuthService {
   }
 
   async registerYoungsterWithParent(input: RegisterYoungsterWithParentInput) {
+    const registrantType = (input.registrantType || '').trim().toUpperCase();
+    const teacherName = (input.teacherName || '').trim();
     const youngsterFirstName = (input.youngsterFirstName || '').trim();
     const youngsterLastNameRaw = (input.youngsterLastName || '').trim();
     const youngsterGender = (input.youngsterGender || '').trim().toUpperCase();
@@ -603,6 +618,7 @@ export class AuthService {
     const parentAllergies = this.normalizeAllergies(input.parentAllergies);
 
     if (
+      !registrantType ||
       !youngsterFirstName ||
       !youngsterLastNameRaw ||
       !youngsterGender ||
@@ -614,10 +630,19 @@ export class AuthService {
       !parentLastNameInput ||
       !parentMobileNumber ||
       !parentEmail ||
-      !String(input.youngsterAllergies || '').trim() ||
-      !String(input.parentAllergies || '').trim()
+      !String(input.youngsterAllergies || '').trim()
     ) {
       throw new BadRequestException('Missing required youngster/parent fields');
+    }
+    if (!['YOUNGSTER', 'PARENT', 'TEACHER'].includes(registrantType)) {
+      throw new BadRequestException('registrantType must be YOUNGSTER, PARENT, or TEACHER');
+    }
+    if (registrantType === 'TEACHER') {
+      if (!teacherName) throw new BadRequestException('Teacher name is required when registrantType is TEACHER');
+      if (teacherName.length > 50) throw new BadRequestException('Teacher name must be max 50 characters');
+    }
+    if (registrantType !== 'TEACHER' && teacherName) {
+      throw new BadRequestException('Teacher name is only allowed when registrantType is TEACHER');
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(youngsterDateOfBirth)) {
       throw new BadRequestException('Youngster date of birth must be YYYY-MM-DD');
@@ -753,15 +778,33 @@ export class AuthService {
       [youngsterCreated.id],
     );
 
+    await this.ensureChildRegistrationSourceColumns();
     const youngsterChildOut = await runSql(
       `WITH inserted AS (
-         INSERT INTO children (user_id, school_id, date_of_birth, gender, school_grade, photo_url)
-         VALUES ($1, $2, $3::date, $4::gender_type, $5, NULL)
+         INSERT INTO children (
+           user_id,
+           school_id,
+           date_of_birth,
+           gender,
+           school_grade,
+           photo_url,
+           registration_actor_type,
+           registration_actor_teacher_name
+         )
+         VALUES ($1, $2, $3::date, $4::gender_type, $5, NULL, $6, $7)
          RETURNING id
        )
        SELECT row_to_json(inserted)::text
        FROM inserted;`,
-      [youngsterCreated.id, youngsterSchoolId, youngsterDateOfBirth, youngsterGender, youngsterGrade],
+      [
+        youngsterCreated.id,
+        youngsterSchoolId,
+        youngsterDateOfBirth,
+        youngsterGender,
+        youngsterGrade,
+        registrantType,
+        registrantType === 'TEACHER' ? teacherName : null,
+      ],
     );
     const youngsterChild = this.parseJsonLine<{ id: string }>(youngsterChildOut);
     await runSql(

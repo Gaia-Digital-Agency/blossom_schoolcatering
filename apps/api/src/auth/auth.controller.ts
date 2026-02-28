@@ -119,6 +119,8 @@ export class AuthController {
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   async registerYoungsterWithParent(@Body() body: RegisterYoungsterWithParentDto) {
     return this.authService.registerYoungsterWithParent({
+      registrantType: body.registrantType,
+      teacherName: body.teacherName || '',
       youngsterFirstName: body.youngsterFirstName,
       youngsterLastName: body.youngsterLastName,
       youngsterGender: body.youngsterGender,
@@ -133,7 +135,6 @@ export class AuthController {
       parentMobileNumber: body.parentMobileNumber,
       parentEmail: body.parentEmail,
       parentAddress: body.parentAddress || '',
-      parentAllergies: body.parentAllergies,
     });
   }
 

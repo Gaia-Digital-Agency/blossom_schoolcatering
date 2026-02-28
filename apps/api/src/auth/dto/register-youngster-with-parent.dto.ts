@@ -1,6 +1,15 @@
-import { IsOptional, IsString, Matches } from 'class-validator';
+import { IsIn, IsOptional, IsString, Matches, MaxLength, ValidateIf } from 'class-validator';
 
 export class RegisterYoungsterWithParentDto {
+  @IsString()
+  @IsIn(['YOUNGSTER', 'PARENT', 'TEACHER'])
+  registrantType!: 'YOUNGSTER' | 'PARENT' | 'TEACHER';
+
+  @ValidateIf((o: RegisterYoungsterWithParentDto) => o.registrantType === 'TEACHER')
+  @IsString()
+  @MaxLength(50)
+  teacherName?: string;
+
   @IsString()
   youngsterFirstName!: string;
 
@@ -42,9 +51,6 @@ export class RegisterYoungsterWithParentDto {
 
   @IsString()
   parentEmail!: string;
-
-  @IsString()
-  parentAllergies!: string;
 
   @IsOptional()
   @IsString()
