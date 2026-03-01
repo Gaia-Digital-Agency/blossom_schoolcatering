@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { apiFetch } from '../../lib/auth';
 import { formatDishCategoryLabel, formatDishDietaryTags } from '../../lib/dish-tags';
 import LogoutButton from '../_components/logout-button';
@@ -360,6 +361,12 @@ export default function YoungstersPage() {
     <main className="page-auth page-auth-mobile youngsters-page">
       <section className="auth-panel">
         <h1>Youngsters Module</h1>
+        <nav className="module-nav" aria-label="Youngster Module Navigation">
+          <Link href="/">Home</Link>
+          <a href="#youngster-order">Order</a>
+          <Link href="/menu">Menu</Link>
+          <Link href="/rating">Rating</Link>
+        </nav>
         {youngster ? (
           <p className="auth-help">
             {youngster.first_name} {youngster.last_name} - {youngster.school_name} ({youngster.school_grade})
@@ -368,7 +375,7 @@ export default function YoungstersPage() {
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
 
-        <div className="module-section">
+        <div className="module-section" id="youngster-order">
           <h2>Confirmed Order Of The Day</h2>
           {todayOrder ? (
             <div className="auth-form">

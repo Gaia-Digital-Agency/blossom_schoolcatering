@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { apiFetch } from '../../lib/auth';
 import { formatDishCategoryLabel, formatDishDietaryTags } from '../../lib/dish-tags';
 import { fileToWebpDataUrl } from '../../lib/image';
@@ -458,18 +459,19 @@ export default function ParentsPage() {
     <main className="page-auth page-auth-mobile parents-page">
       <section className="auth-panel">
         <h1>Parent Page</h1>
+        <nav className="module-nav" aria-label="Parent Module Navigation">
+          <Link href="/">Home</Link>
+          <a href="#parent-order">Order</a>
+          <Link href="/menu">Menu</Link>
+          <Link href="/rating">Rating</Link>
+          <a href="#parent-billing">Billing</a>
+        </nav>
         {parentId ? <p className="auth-help">Parent Profile ID: {parentId}</p> : null}
         <p className="auth-help">Ordering and billing dashboard for linked youngsters.</p>
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
 
-        <div className="module-section">
-          <h2>Linked Youngsters</h2>
-          <p className="auth-help">Youngster registration is done on `/register/youngsters`. Linked youngsters are auto-linked by matching parent and youngster last name.</p>
-          <label>Select Youngster<select value={selectedChildId} onChange={(e) => setSelectedChildId(e.target.value)}><option value="">Select...</option>{children.map((child) => <option key={child.id} value={child.id}>{child.first_name} {child.last_name} ({child.school_grade})</option>)}</select></label>
-        </div>
-
-        <div className="module-section">
+        <div className="module-section" id="parent-order">
           <h2>Confirmed Order Of The Day</h2>
           {todayOrder ? (
             <div className="auth-form">
@@ -547,6 +549,12 @@ export default function ParentsPage() {
               </div>
             </div>
           ) : <p className="auth-help">No active dishes configured by Admin for this date/session.</p>}
+        </div>
+
+        <div className="module-section" id="parent-billing">
+          <h2>Linked Youngsters</h2>
+          <p className="auth-help">Youngster registration is done on `/register/youngsters`. Linked youngsters are auto-linked by matching parent and youngster last name.</p>
+          <label>Select Youngster<select value={selectedChildId} onChange={(e) => setSelectedChildId(e.target.value)}><option value="">Select...</option>{children.map((child) => <option key={child.id} value={child.id}>{child.first_name} {child.last_name} ({child.school_grade})</option>)}</select></label>
         </div>
 
         <div className="module-section">

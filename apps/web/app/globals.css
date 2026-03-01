@@ -390,6 +390,34 @@ button:hover,
   margin-top: 0;
 }
 
+.module-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 0.8rem;
+}
+
+.module-nav a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid #ccbda2;
+  background: #fff;
+  color: #3b342b;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.module-nav a:hover {
+  background: #f0e0c4;
+  border-color: #9e6b20;
+  color: #35220c;
+}
+
 .page-auth-mobile .auth-panel {
   width: min(680px, 100%);
   max-width: 100%;
