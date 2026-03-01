@@ -119,6 +119,28 @@ describe('CoreService ownership and cutoff rules', () => {
     ).rejects.toThrow('ORDER_SERVICE_BLOCKED');
   });
 
+  it('blocks parent cart creation before 08:00 Asia/Makassar', async () => {
+    jest.spyOn(service as any, 'getMakassarNowContext').mockReturnValue({ dateIso: '2026-03-01', hour: 7 });
+
+    await expect(
+      service.createCart(
+        { uid: 'parent-1', role: 'PARENT', sub: 'parent_user' },
+        { childId: 'child-1', serviceDate: '2026-03-02', session: 'LUNCH' },
+      ),
+    ).rejects.toThrow('ORDERING_AVAILABLE_FROM_0800_WITA');
+  });
+
+  it('blocks youngster cart creation for same-day service date', async () => {
+    jest.spyOn(service as any, 'getMakassarNowContext').mockReturnValue({ dateIso: '2026-03-01', hour: 9 });
+
+    await expect(
+      service.createCart(
+        { uid: 'youngster-1', role: 'YOUNGSTER', sub: 'youngster_user' },
+        { childId: 'child-1', serviceDate: '2026-03-01', session: 'LUNCH' },
+      ),
+    ).rejects.toThrow('ORDER_TOMORROW_ONWARDS_ONLY');
+  });
+
   it('uses blackout guard in submitCart flow', async () => {
     jest.spyOn(service as any, 'ensureCartIsOpenAndOwned').mockResolvedValue({
       id: 'cart-1',

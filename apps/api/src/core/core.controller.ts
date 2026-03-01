@@ -37,6 +37,7 @@ import {
   ReplaceCartItemsDto,
   ResetPasswordDto,
   SeedMenuDto,
+  SeedOrdersDto,
   UpdateDeliveryUserDto,
   UpdateIngredientDto,
   UpdateMenuItemDto,
@@ -275,6 +276,12 @@ export class CoreController {
   @Roles('ADMIN')
   seedAdminMenus(@Body() body: SeedMenuDto) {
     return this.coreService.seedAdminMenuSample(body.serviceDate);
+  }
+
+  @Post('admin/orders/sample-seed')
+  @Roles('ADMIN')
+  seedAdminOrders(@Req() req: AuthRequest, @Body() body: SeedOrdersDto) {
+    return this.coreService.seedAdminOrdersSample(req.user, body);
   }
 
   @Post('admin/menu-items')

@@ -119,9 +119,34 @@ function todayMakassarIsoDate() {
   return d.toISOString().slice(0, 10);
 }
 
+function getMakassarOrderingWindow() {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Makassar',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    hour12: false,
+  }).formatToParts(now);
+  const yyyy = Number(parts.find((p) => p.type === 'year')?.value || '1970');
+  const mm = Number(parts.find((p) => p.type === 'month')?.value || '01');
+  const dd = Number(parts.find((p) => p.type === 'day')?.value || '01');
+  const hh = Number(parts.find((p) => p.type === 'hour')?.value || '00');
+  const today = new Date(Date.UTC(yyyy, mm - 1, dd)).toISOString().slice(0, 10);
+  return {
+    nowHour: hh,
+    today,
+    earliestServiceDate: nextWeekdayIsoDate(),
+    canOrderNow: hh >= 8,
+  };
+}
+
 function mapOrderRuleError(raw: string) {
   if (raw.includes('ORDER_BLACKOUT_BLOCKED')) return 'Ordering is blocked for this date (ORDER_BLOCK/BOTH blackout).';
   if (raw.includes('ORDER_SERVICE_BLOCKED')) return 'Service is blocked for this date (SERVICE_BLOCK/BOTH blackout).';
+  if (raw.includes('ORDER_TOMORROW_ONWARDS_ONLY')) return 'Orders can only be placed for tomorrow onward.';
+  if (raw.includes('ORDERING_AVAILABLE_FROM_0800_WITA')) return 'Ordering opens daily at 08:00 Asia/Makassar.';
   return raw;
 }
 
@@ -161,9 +186,11 @@ export default function YoungstersPage() {
       .map(([id, qty]) => ({ menuItem: index.get(id), id, qty }))
       .filter((x) => Boolean(x.menuItem));
   }, [itemQty, menuItems]);
+  const orderingWindow = useMemo(() => getMakassarOrderingWindow(), [nowMs]);
   const cutoffRemainingMs = getCutoffTimestamp(serviceDate) - nowMs;
   const draftRemainingMs = draftExpiresAt ? new Date(draftExpiresAt).getTime() - nowMs : 0;
   const placementExpired = cutoffRemainingMs <= 0;
+  const placementBlockedByWindow = !orderingWindow.canOrderNow || serviceDate <= orderingWindow.today;
   const hasOpenDraft = Boolean(draftCartId) && draftRemainingMs > 0;
   const placementBlockedByBlackout = Boolean(activeBlackout);
 
@@ -296,6 +323,14 @@ export default function YoungstersPage() {
       setError(activeBlackoutMessage(activeBlackout));
       return;
     }
+    if (!orderingWindow.canOrderNow) {
+      setError('Ordering opens daily at 08:00 Asia/Makassar.');
+      return;
+    }
+    if (serviceDate <= orderingWindow.today) {
+      setError('Orders can only be placed for tomorrow onward.');
+      return;
+    }
     if (placementExpired) {
       setError('ORDER_CUTOFF_EXCEEDED');
       return;
@@ -415,7 +450,7 @@ export default function YoungstersPage() {
 
         <div className="module-section">
           <h2>Menu and Cart</h2>
-          <label>Service Date<input type="date" value={serviceDate} onChange={(e) => setServiceDate(e.target.value)} /></label>
+          <label>Service Date<input type="date" value={serviceDate} min={orderingWindow.earliestServiceDate} onChange={(e) => setServiceDate(e.target.value)} /></label>
           <label>
             Session
             <select value={session} onChange={(e) => setSession(e.target.value as SessionType)}>
@@ -423,6 +458,8 @@ export default function YoungstersPage() {
             </select>
           </label>
           <p className="auth-help">Place-order cutoff countdown: {formatRemaining(cutoffRemainingMs)} (08:00 Asia/Makassar)</p>
+          {!orderingWindow.canOrderNow ? <p className="auth-help">Ordering opens at 08:00 Asia/Makassar.</p> : null}
+          {serviceDate <= orderingWindow.today ? <p className="auth-help">Select tomorrow or a later date to place an order.</p> : null}
           {activeBlackout ? (
             <p className="auth-error">
               Blackout active on {serviceDate}: {activeBlackout.type}{activeBlackout.reason ? ` - ${activeBlackout.reason}` : ''}.
@@ -470,7 +507,7 @@ export default function YoungstersPage() {
                 )}
                 <div className="draft-actions">
                   <p className="auth-help">Selected items: {selectedCount} / 5</p>
-                  <button className="btn btn-primary" type="button" disabled={submitting || placementExpired || placementBlockedByBlackout} onClick={onPlaceOrder}>
+                  <button className="btn btn-primary" type="button" disabled={submitting || placementExpired || placementBlockedByBlackout || placementBlockedByWindow} onClick={onPlaceOrder}>
                     {submitting ? 'Placing Order...' : 'Place Order'}
                   </button>
                 </div>

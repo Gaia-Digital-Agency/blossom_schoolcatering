@@ -17,16 +17,24 @@ type Assignment = {
   confirmed_at?: string | null;
 };
 
-function todayIsoLocal() {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
+function dateInMakassar(offsetDays = 0) {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Makassar',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now);
+  const yyyy = Number(parts.find((p) => p.type === 'year')?.value || '1970');
+  const mm = Number(parts.find((p) => p.type === 'month')?.value || '01');
+  const dd = Number(parts.find((p) => p.type === 'day')?.value || '01');
+  const d = new Date(Date.UTC(yyyy, mm - 1, dd));
+  d.setUTCDate(d.getUTCDate() + offsetDays);
+  return d.toISOString().slice(0, 10);
 }
 
 export default function DeliveryPage() {
-  const [date, setDate] = useState(todayIsoLocal());
+  const [date, setDate] = useState(dateInMakassar(0));
   const [rows, setRows] = useState<Assignment[]>([]);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -70,17 +78,9 @@ export default function DeliveryPage() {
     acc[key].push(row);
     return acc;
   }, {});
-  const d = new Date(`${date}T00:00:00`);
-  const prev = new Date(d); prev.setDate(d.getDate() - 1);
-  const next = new Date(d); next.setDate(d.getDate() + 1);
-  const toIso = (x: Date) => {
-    const yyyy = x.getFullYear();
-    const mm = String(x.getMonth() + 1).padStart(2, '0');
-    const dd = String(x.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  };
-  const prevDate = toIso(prev);
-  const nextDate = toIso(next);
+  const yesterday = dateInMakassar(-1);
+  const today = dateInMakassar(0);
+  const tomorrow = dateInMakassar(1);
 
   return (
     <>
@@ -91,16 +91,12 @@ export default function DeliveryPage() {
         {error ? <p className="auth-error">{error}</p> : null}
 
         <div className="delivery-controls">
-          <label className="delivery-control delivery-date">
-            Date
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          </label>
           <div className="delivery-control delivery-window">
-            <small><strong>Date Window:</strong> {prevDate} to {nextDate}</small>
+            <small><strong>Date Window:</strong> Yesterday, Today, Tomorrow</small>
             <div className="delivery-window-actions">
-              <button className="btn btn-outline" type="button" onClick={() => setDate(prevDate)}>Past</button>
-              <button className="btn btn-outline" type="button" onClick={() => setDate(todayIsoLocal())}>Today</button>
-              <button className="btn btn-outline" type="button" onClick={() => setDate(nextDate)}>Future</button>
+              <button className="btn btn-outline" type="button" onClick={() => setDate(yesterday)}>Yesterday</button>
+              <button className="btn btn-outline" type="button" onClick={() => setDate(today)}>Today</button>
+              <button className="btn btn-outline" type="button" onClick={() => setDate(tomorrow)}>Tomorrow</button>
             </div>
           </div>
           <button className="btn btn-outline delivery-refresh" type="button" onClick={load} disabled={loading}>

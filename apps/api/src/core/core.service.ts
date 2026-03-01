@@ -373,6 +373,40 @@ export class CoreService implements OnModuleInit {
     return new Date(Date.UTC(yyyy, mm - 1, dd)).toISOString().slice(0, 10);
   }
 
+  private getMakassarNowContext() {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Makassar',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      hour12: false,
+    }).formatToParts(new Date());
+    const yyyy = Number(parts.find((p) => p.type === 'year')?.value || '1970');
+    const mm = Number(parts.find((p) => p.type === 'month')?.value || '01');
+    const dd = Number(parts.find((p) => p.type === 'day')?.value || '01');
+    const hour = Number(parts.find((p) => p.type === 'hour')?.value || '00');
+    const dateIso = new Date(Date.UTC(yyyy, mm - 1, dd)).toISOString().slice(0, 10);
+    return { dateIso, hour };
+  }
+
+  private enforceParentYoungsterOrderingWindow(actor: AccessUser, serviceDate: string) {
+    if (!['PARENT', 'YOUNGSTER'].includes(actor.role)) return;
+    const now = this.getMakassarNowContext();
+    if (now.hour < 8) {
+      throw new BadRequestException('ORDERING_AVAILABLE_FROM_0800_WITA');
+    }
+    if (serviceDate <= now.dateIso) {
+      throw new BadRequestException('ORDER_TOMORROW_ONWARDS_ONLY');
+    }
+  }
+
+  private addDaysIsoDate(dateIso: string, days: number) {
+    const d = new Date(`${dateIso}T00:00:00.000Z`);
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().slice(0, 10);
+  }
+
   private isAfterOrAtMakassarCutoff(serviceDate: string) {
     const cutoffUtc = new Date(`${serviceDate}T00:00:00.000Z`).getTime();
     return Date.now() >= cutoffUtc;
@@ -2298,6 +2332,342 @@ export class CoreService implements OnModuleInit {
     return { ok: true, serviceDate, createdItemIds: createdIds };
   }
 
+  private pickSeedDeliveryUser(
+    schoolId: string,
+    bySchool: Map<string, string[]>,
+    fallback: string[],
+    cursor: number,
+  ) {
+    const schoolUsers = bySchool.get(schoolId) || [];
+    const pool = schoolUsers.length > 0 ? schoolUsers : fallback;
+    if (pool.length === 0) return null;
+    return pool[cursor % pool.length];
+  }
+
+  private async applySeedOrderLifecycle(
+    orderId: string,
+    schoolId: string,
+    bySchool: Map<string, string[]>,
+    allDeliveryUserIds: string[],
+    seedNumber: number,
+  ) {
+    const mode = seedNumber % 4;
+    const deliveryUserId = this.pickSeedDeliveryUser(schoolId, bySchool, allDeliveryUserIds, seedNumber);
+    if (!deliveryUserId || mode === 0) {
+      return 'PLACED_PENDING';
+    }
+
+    await runSql(
+      `INSERT INTO delivery_assignments (order_id, delivery_user_id, assigned_at)
+       VALUES ($1, $2, now())
+       ON CONFLICT (order_id)
+       DO UPDATE SET delivery_user_id = EXCLUDED.delivery_user_id, assigned_at = now(), updated_at = now();`,
+      [orderId, deliveryUserId],
+    );
+
+    if (mode === 1) {
+      await runSql(
+        `UPDATE orders
+         SET status = 'LOCKED',
+             delivery_status = 'ASSIGNED',
+             updated_at = now()
+         WHERE id = $1;`,
+        [orderId],
+      );
+      await runSql(
+        `UPDATE billing_records
+         SET status = 'UNPAID',
+             delivery_status = 'ASSIGNED',
+             updated_at = now()
+         WHERE order_id = $1;`,
+        [orderId],
+      );
+      return 'LOCKED_ASSIGNED_UNPAID';
+    }
+
+    if (mode === 2) {
+      await runSql(
+        `UPDATE orders
+         SET status = 'LOCKED',
+             delivery_status = 'OUT_FOR_DELIVERY',
+             updated_at = now()
+         WHERE id = $1;`,
+        [orderId],
+      );
+      await runSql(
+        `UPDATE billing_records
+         SET status = 'PENDING_VERIFICATION',
+             delivery_status = 'OUT_FOR_DELIVERY',
+             proof_image_url = COALESCE(NULLIF(TRIM(proof_image_url), ''), 'https://example.com/payment-proof-seed.webp'),
+             proof_uploaded_at = COALESCE(proof_uploaded_at, now()),
+             updated_at = now()
+         WHERE order_id = $1;`,
+        [orderId],
+      );
+      return 'LOCKED_OUT_FOR_DELIVERY_PENDING_VERIFICATION';
+    }
+
+    await runSql(
+      `UPDATE delivery_assignments
+       SET confirmed_at = now(),
+           confirmation_note = 'Seed delivered order',
+           updated_at = now()
+       WHERE order_id = $1;`,
+      [orderId],
+    );
+    await runSql(
+      `UPDATE orders
+       SET status = 'LOCKED',
+           delivery_status = 'DELIVERED',
+           delivered_at = now(),
+           delivered_by_user_id = $2,
+           updated_at = now()
+       WHERE id = $1;`,
+      [orderId, deliveryUserId],
+    );
+    await runSql(
+      `UPDATE billing_records
+       SET status = 'VERIFIED',
+           delivery_status = 'DELIVERED',
+           proof_image_url = COALESCE(NULLIF(TRIM(proof_image_url), ''), 'https://example.com/payment-proof-seed.webp'),
+           proof_uploaded_at = COALESCE(proof_uploaded_at, now()),
+           delivered_at = now(),
+           verified_by = NULL,
+           verified_at = now(),
+           updated_at = now()
+       WHERE order_id = $1;`,
+      [orderId],
+    );
+    return 'LOCKED_DELIVERED_VERIFIED';
+  }
+
+  async seedAdminOrdersSample(
+    actor: AccessUser,
+    input: { fromDate?: string; toDate?: string; ordersPerDay?: number },
+  ) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+
+    const fromDate = input.fromDate ? this.validateServiceDate(input.fromDate) : '2026-03-02';
+    const toDate = input.toDate ? this.validateServiceDate(input.toDate) : '2026-03-20';
+    const ordersPerDayRaw = Number(input.ordersPerDay ?? 20);
+    const ordersPerDay = Number.isInteger(ordersPerDayRaw) && ordersPerDayRaw > 0
+      ? Math.min(ordersPerDayRaw, 100)
+      : 20;
+    if (fromDate > toDate) throw new BadRequestException('fromDate must be <= toDate');
+
+    const childrenOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT DISTINCT c.id, c.school_id
+        FROM children c
+        JOIN users uc ON uc.id = c.user_id
+        JOIN parent_children pc ON pc.child_id = c.id
+        JOIN parents p ON p.id = pc.parent_id
+        JOIN users up ON up.id = p.user_id
+        WHERE c.is_active = true
+          AND c.deleted_at IS NULL
+          AND uc.is_active = true
+          AND uc.deleted_at IS NULL
+          AND up.is_active = true
+          AND up.deleted_at IS NULL
+      ) t;
+      `,
+    );
+    const children = this.parseJsonLines<{ id: string; school_id: string }>(childrenOut);
+    if (children.length === 0) {
+      throw new BadRequestException('No active youngster with linked parent found for seeding');
+    }
+
+    const deliveryUsersOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT id
+        FROM users
+        WHERE role = 'DELIVERY'
+          AND is_active = true
+          AND deleted_at IS NULL
+        ORDER BY created_at ASC
+      ) t;
+      `,
+    );
+    const deliveryUserIds = this.parseJsonLines<{ id: string }>(deliveryUsersOut).map((row) => row.id);
+
+    const schoolAssignOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT school_id, delivery_user_id
+        FROM delivery_school_assignments
+        WHERE is_active = true
+      ) t;
+      `,
+    );
+    const schoolAssignments = this.parseJsonLines<{ school_id: string; delivery_user_id: string }>(schoolAssignOut);
+    const deliveryBySchool = new Map<string, string[]>();
+    for (const row of schoolAssignments) {
+      const list = deliveryBySchool.get(row.school_id) || [];
+      if (!list.includes(row.delivery_user_id)) list.push(row.delivery_user_id);
+      deliveryBySchool.set(row.school_id, list);
+    }
+
+    const daySummaries: Array<{
+      serviceDate: string;
+      target: number;
+      created: number;
+      skipped: number;
+      sessionsWithMenus: string[];
+      lifecycleBreakdown: Record<string, number>;
+    }> = [];
+
+    let totalCreated = 0;
+    let totalSkipped = 0;
+    let seedCursor = 0;
+    let current = fromDate;
+
+    while (current <= toDate) {
+      const menuOut = await runSql(
+        `
+        SELECT row_to_json(t)::text
+        FROM (
+          SELECT m.session::text AS session, mi.id
+          FROM menus m
+          JOIN menu_items mi ON mi.menu_id = m.id
+          WHERE m.service_date = $1::date
+            AND m.is_published = true
+            AND m.deleted_at IS NULL
+            AND mi.is_available = true
+            AND mi.deleted_at IS NULL
+          ORDER BY m.session ASC, mi.display_order ASC, mi.created_at ASC
+        ) t;
+        `,
+        [current],
+      );
+      const menuRows = this.parseJsonLines<{ session: SessionType; id: string }>(menuOut);
+      const menuBySession = new Map<SessionType, string[]>();
+      for (const row of menuRows) {
+        const list = menuBySession.get(row.session) || [];
+        list.push(row.id);
+        menuBySession.set(row.session, list);
+      }
+      const sessionsWithMenus = (['BREAKFAST', 'SNACK', 'LUNCH'] as SessionType[]).filter(
+        (session) => (menuBySession.get(session) || []).length > 0,
+      );
+
+      if (sessionsWithMenus.length === 0) {
+        daySummaries.push({
+          serviceDate: current,
+          target: ordersPerDay,
+          created: 0,
+          skipped: ordersPerDay,
+          sessionsWithMenus: [],
+          lifecycleBreakdown: {},
+        });
+        totalSkipped += ordersPerDay;
+        current = this.addDaysIsoDate(current, 1);
+        continue;
+      }
+
+      const existingOut = await runSql(
+        `
+        SELECT row_to_json(t)::text
+        FROM (
+          SELECT child_id, session::text AS session
+          FROM orders
+          WHERE service_date = $1::date
+            AND status <> 'CANCELLED'
+            AND deleted_at IS NULL
+        ) t;
+        `,
+        [current],
+      );
+      const existingSet = new Set(
+        this.parseJsonLines<{ child_id: string; session: SessionType }>(existingOut)
+          .map((x) => `${x.child_id}|${x.session}`),
+      );
+
+      const dayMaxCapacity = Math.max((children.length * sessionsWithMenus.length) - existingSet.size, 0);
+      const dayTarget = Math.min(ordersPerDay, dayMaxCapacity);
+      const lifecycleBreakdown: Record<string, number> = {};
+
+      let dayCreated = 0;
+      let daySkipped = 0;
+      let attempt = 0;
+      const maxAttempts = Math.max(dayTarget * 20, 200);
+
+      while (dayCreated < dayTarget && attempt < maxAttempts) {
+        const child = children[(seedCursor + attempt) % children.length];
+        const session = sessionsWithMenus[(dayCreated + attempt) % sessionsWithMenus.length];
+        const key = `${child.id}|${session}`;
+        attempt += 1;
+        if (existingSet.has(key)) continue;
+
+        const sessionItems = menuBySession.get(session) || [];
+        if (sessionItems.length === 0) continue;
+
+        const itemCount = Math.min(sessionItems.length, 1 + ((seedCursor + attempt) % 3));
+        const startIdx = (seedCursor + attempt) % sessionItems.length;
+        const items: CartItemInput[] = [];
+        const usedIds = new Set<string>();
+        for (let i = 0; i < sessionItems.length && items.length < itemCount; i += 1) {
+          const id = sessionItems[(startIdx + i) % sessionItems.length];
+          if (usedIds.has(id)) continue;
+          usedIds.add(id);
+          items.push({
+            menuItemId: id,
+            quantity: 1 + ((seedCursor + i) % 2),
+          });
+        }
+
+        try {
+          const cart = await this.createCart(actor, { childId: child.id, serviceDate: current, session });
+          await this.replaceCartItems(actor, cart.id, items);
+          const order = await this.submitCart(actor, cart.id) as { id: string };
+          const lifecycle = await this.applySeedOrderLifecycle(
+            order.id,
+            child.school_id,
+            deliveryBySchool,
+            deliveryUserIds,
+            seedCursor + dayCreated,
+          );
+          lifecycleBreakdown[lifecycle] = Number(lifecycleBreakdown[lifecycle] || 0) + 1;
+          existingSet.add(key);
+          dayCreated += 1;
+          totalCreated += 1;
+          seedCursor += 1;
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (msg.includes('ORDER_ALREADY_EXISTS_FOR_DATE')) {
+            existingSet.add(key);
+          }
+          daySkipped += 1;
+          totalSkipped += 1;
+        }
+      }
+
+      daySummaries.push({
+        serviceDate: current,
+        target: dayTarget,
+        created: dayCreated,
+        skipped: daySkipped,
+        sessionsWithMenus,
+        lifecycleBreakdown,
+      });
+      current = this.addDaysIsoDate(current, 1);
+    }
+
+    return {
+      ok: true,
+      fromDate,
+      toDate,
+      ordersPerDay,
+      totalCreated,
+      totalSkipped,
+      days: daySummaries,
+    };
+  }
+
   async getYoungsterMe(actor: AccessUser) {
     if (actor.role !== 'YOUNGSTER') throw new ForbiddenException('Role not allowed');
     const out = await runSql(
@@ -2339,6 +2709,7 @@ export class CoreService implements OnModuleInit {
     const session = this.normalizeSession(input.session);
     const childId = (input.childId || '').trim();
 
+    this.enforceParentYoungsterOrderingWindow(actor, serviceDate);
     await this.validateOrderDayRules(serviceDate);
     await this.assertSessionActiveForOrdering(session);
 
@@ -2564,6 +2935,7 @@ export class CoreService implements OnModuleInit {
     if (items.length > 5) throw new BadRequestException('ORDER_ITEM_LIMIT_EXCEEDED');
 
     await this.validateOrderDayRules(cart.service_date);
+    this.enforceParentYoungsterOrderingWindow(actor, cart.service_date);
     await this.assertSessionActiveForOrdering(cart.session);
 
     const dietarySnapshot = await this.getOrderDietarySnapshot(cart.child_id);
@@ -4116,6 +4488,7 @@ export class CoreService implements OnModuleInit {
     if (actor.role === 'PARENT' && this.isAfterOrAtMakassarCutoff(targetServiceDate)) {
       throw new BadRequestException('ORDER_CUTOFF_EXCEEDED');
     }
+    this.enforceParentYoungsterOrderingWindow(actor, targetServiceDate);
     const items = Array.isArray(input.items) ? input.items : [];
     if (items.length > 5) throw new BadRequestException('ORDER_ITEM_LIMIT_EXCEEDED');
 

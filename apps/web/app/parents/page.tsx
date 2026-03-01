@@ -115,9 +115,34 @@ function todayMakassarIsoDate() {
   return d.toISOString().slice(0, 10);
 }
 
+function getMakassarOrderingWindow() {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Makassar',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    hour12: false,
+  }).formatToParts(now);
+  const yyyy = Number(parts.find((p) => p.type === 'year')?.value || '1970');
+  const mm = Number(parts.find((p) => p.type === 'month')?.value || '01');
+  const dd = Number(parts.find((p) => p.type === 'day')?.value || '01');
+  const hh = Number(parts.find((p) => p.type === 'hour')?.value || '00');
+  const today = new Date(Date.UTC(yyyy, mm - 1, dd)).toISOString().slice(0, 10);
+  return {
+    nowHour: hh,
+    today,
+    earliestServiceDate: nextWeekdayIsoDate(),
+    canOrderNow: hh >= 8,
+  };
+}
+
 function mapOrderRuleError(raw: string) {
   if (raw.includes('ORDER_BLACKOUT_BLOCKED')) return 'Ordering is blocked for this date (ORDER_BLOCK/BOTH blackout).';
   if (raw.includes('ORDER_SERVICE_BLOCKED')) return 'Service is blocked for this date (SERVICE_BLOCK/BOTH blackout).';
+  if (raw.includes('ORDER_TOMORROW_ONWARDS_ONLY')) return 'Orders can only be placed for tomorrow onward.';
+  if (raw.includes('ORDERING_AVAILABLE_FROM_0800_WITA')) return 'Ordering opens daily at 08:00 Asia/Makassar.';
   return raw;
 }
 
@@ -163,9 +188,11 @@ export default function ParentsPage() {
   const draftSectionRef = useRef<HTMLDivElement | null>(null);
 
   const selectedCount = useMemo(() => Object.values(itemQty).filter((qty) => qty > 0).length, [itemQty]);
+  const orderingWindow = useMemo(() => getMakassarOrderingWindow(), [nowMs]);
   const placeCutoffMs = getCutoffTimestamp(serviceDate) - nowMs;
   const draftRemainingMs = draftExpiresAt ? new Date(draftExpiresAt).getTime() - nowMs : 0;
   const placementExpired = placeCutoffMs <= 0;
+  const placementBlockedByWindow = !orderingWindow.canOrderNow || serviceDate <= orderingWindow.today;
   const hasOpenDraft = Boolean(draftCartId) && draftRemainingMs > 0;
   const placementBlockedByBlackout = Boolean(activeBlackout);
   const visibleOrders = useMemo(
@@ -340,6 +367,8 @@ export default function ParentsPage() {
     const items = Object.entries(itemQty).filter(([, qty]) => qty > 0).map(([menuItemId, quantity]) => ({ menuItemId, quantity }));
     if (items.length === 0) return setError('Select at least one menu item.');
     if (placementBlockedByBlackout) return setError(activeBlackoutMessage(activeBlackout));
+    if (!orderingWindow.canOrderNow) return setError('Ordering opens daily at 08:00 Asia/Makassar.');
+    if (serviceDate <= orderingWindow.today) return setError('Orders can only be placed for tomorrow onward.');
     if (placementExpired) return setError('ORDER_CUTOFF_EXCEEDED');
     if (items.length > 5) return setError('Maximum 5 items per cart/order.');
 
@@ -490,7 +519,7 @@ export default function ParentsPage() {
 
         <div className="module-section">
           <h2>Menu and Cart</h2>
-          <label>Service Date<input type="date" value={serviceDate} onChange={(e) => setServiceDate(e.target.value)} /></label>
+          <label>Service Date<input type="date" value={serviceDate} min={orderingWindow.earliestServiceDate} onChange={(e) => setServiceDate(e.target.value)} /></label>
           <label>
             Session
             <select value={session} onChange={(e) => setSession(e.target.value as SessionType)}>
@@ -498,6 +527,8 @@ export default function ParentsPage() {
             </select>
           </label>
           <p className="auth-help">Place-order cutoff countdown: {formatRemaining(placeCutoffMs)} (08:00 Asia/Makassar)</p>
+          {!orderingWindow.canOrderNow ? <p className="auth-help">Ordering opens at 08:00 Asia/Makassar.</p> : null}
+          {serviceDate <= orderingWindow.today ? <p className="auth-help">Select tomorrow or a later date to place an order.</p> : null}
           {activeBlackout ? (
             <p className="auth-error">
               Blackout active on {serviceDate}: {activeBlackout.type}{activeBlackout.reason ? ` - ${activeBlackout.reason}` : ''}.
@@ -545,7 +576,7 @@ export default function ParentsPage() {
                 )}
                 <div className="draft-actions">
                   <p className="auth-help">Selected items: {selectedCount} / 5</p>
-                  <button className="btn btn-primary" type="button" disabled={submitting || placementExpired || placementBlockedByBlackout} onClick={onPlaceOrder}>
+                  <button className="btn btn-primary" type="button" disabled={submitting || placementExpired || placementBlockedByBlackout || placementBlockedByWindow} onClick={onPlaceOrder}>
                     {submitting ? 'Placing Order...' : 'Place Order'}
                   </button>
                 </div>
@@ -564,7 +595,7 @@ export default function ParentsPage() {
 
         <div className="module-section">
           <h2>Consolidated Orders</h2>
-          <label>Quick Reorder Target Date<input type="date" value={quickReorderDate} onChange={(e) => setQuickReorderDate(e.target.value)} /></label>
+          <label>Quick Reorder Target Date<input type="date" value={quickReorderDate} min={orderingWindow.earliestServiceDate} onChange={(e) => setQuickReorderDate(e.target.value)} /></label>
           <button className="btn btn-outline" type="button" onClick={loadOrders} disabled={loadingOrders}>{loadingOrders ? 'Refreshing...' : 'Refresh Orders'}</button>
 
           {visibleOrders.length === 0 ? <p className="auth-help">No orders yet for selected youngster.</p> : (

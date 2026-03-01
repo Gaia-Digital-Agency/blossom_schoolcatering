@@ -16,6 +16,7 @@ export * from './register-youngster.dto';
 export * from './replace-cart-items.dto';
 export * from './reset-password.dto';
 export * from './seed-menu.dto';
+export * from './seed-orders.dto';
 export * from './update-delivery-user.dto';
 export * from './update-ingredient.dto';
 export * from './update-menu-item.dto';
