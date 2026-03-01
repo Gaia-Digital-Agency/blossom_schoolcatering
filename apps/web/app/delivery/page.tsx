@@ -34,19 +34,28 @@ function dateInMakassar(offsetDays = 0) {
 }
 
 export default function DeliveryPage() {
-  const [date, setDate] = useState(dateInMakassar(0));
   const [rows, setRows] = useState<Assignment[]>([]);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const yesterday = dateInMakassar(-1);
+  const today = dateInMakassar(0);
+  const tomorrow = dateInMakassar(1);
+
   const load = async () => {
     setLoading(true);
     setError('');
     try {
-      const data = await apiFetch(`/delivery/assignments?date=${date}`) as Assignment[];
-      setRows(data || []);
+      const [y, t, tom] = await Promise.all([
+        apiFetch(`/delivery/assignments?date=${yesterday}`) as Promise<Assignment[]>,
+        apiFetch(`/delivery/assignments?date=${today}`) as Promise<Assignment[]>,
+        apiFetch(`/delivery/assignments?date=${tomorrow}`) as Promise<Assignment[]>,
+      ]);
+      const merged = [...(y || []), ...(t || []), ...(tom || [])];
+      const deduped = Array.from(new Map(merged.map((row) => [row.id, row])).values());
+      setRows(deduped);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed loading assignments');
     } finally {
@@ -71,16 +80,25 @@ export default function DeliveryPage() {
     }
   };
 
-  const todaysRows = rows.filter((r) => r.service_date === date);
-  const rowsBySchool = todaysRows.reduce<Record<string, Assignment[]>>((acc, row) => {
+  const pendingRows = rows.filter(
+    (r) => !r.confirmed_at && [yesterday, today, tomorrow].includes(r.service_date),
+  );
+  const completedRows = rows.filter(
+    (r) => Boolean(r.confirmed_at) && [yesterday, today].includes(r.service_date),
+  );
+
+  const pendingBySchool = pendingRows.reduce<Record<string, Assignment[]>>((acc, row) => {
     const key = row.school_name || 'Unassigned School';
     if (!acc[key]) acc[key] = [];
     acc[key].push(row);
     return acc;
   }, {});
-  const yesterday = dateInMakassar(-1);
-  const today = dateInMakassar(0);
-  const tomorrow = dateInMakassar(1);
+  const completedBySchool = completedRows.reduce<Record<string, Assignment[]>>((acc, row) => {
+    const key = row.school_name || 'Unassigned School';
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(row);
+    return acc;
+  }, {});
 
   return (
     <>
@@ -92,17 +110,8 @@ export default function DeliveryPage() {
 
         <div className="delivery-controls">
           <div className="delivery-control delivery-window">
-            <small><strong>Date Window:</strong> Yesterday, Today, Tomorrow</small>
-            <div className="delivery-window-actions">
-              <button className="btn btn-outline" type="button" onClick={() => setDate(yesterday)}>Yesterday</button>
-              <button className="btn btn-outline" type="button" onClick={() => setDate(today)}>Today</button>
-              <button className="btn btn-outline" type="button" onClick={() => setDate(tomorrow)}>Tomorrow</button>
-            </div>
+            <small><strong>Visible windows:</strong> Pending ({yesterday}, {today}, {tomorrow}) · Completed ({yesterday}, {today})</small>
           </div>
-          <label className="delivery-control">
-            Select Date
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          </label>
           <button className="btn btn-outline delivery-refresh" type="button" onClick={load} disabled={loading}>
             {loading ? 'Refreshing...' : 'Refresh Assignments'}
           </button>
@@ -112,32 +121,65 @@ export default function DeliveryPage() {
           </label>
         </div>
 
-        {todaysRows.length === 0 ? <p className="auth-help">No assigned orders for this date.</p> : (
-          <div className="auth-form">
-            {Object.entries(rowsBySchool).map(([schoolName, group]) => (
-              <div key={schoolName} className="delivery-school-group">
-                <h3 className="delivery-school-title">{schoolName}</h3>
-                {group.map((row) => (
-                  <label key={row.id}>
-                    <strong>{row.service_date} {row.session}</strong>
-                    <small>Order: {row.order_id}</small>
-                    <small>Youngster: {row.child_name}</small>
-                    <small>Youngster Mobile: {row.youngster_mobile || '-'}</small>
-                    <small>Parent: {row.parent_name}</small>
-                    <small>Status: {row.delivery_status} | Confirmed: {row.confirmed_at || '-'}</small>
-                    <button
-                      className={`btn ${row.confirmed_at ? 'btn-success' : 'btn-primary'}`}
-                      type="button"
-                      onClick={() => onToggleComplete(row.id)}
-                    >
-                      {row.confirmed_at ? 'Completed (Click to Undo)' : 'Mark Complete'}
-                    </button>
-                  </label>
-                ))}
-              </div>
-            ))}
-          </div>
-        )}
+        <div className="module-section">
+          <h2>Order Pending ({pendingRows.length})</h2>
+          {pendingRows.length === 0 ? <p className="auth-help">No pending orders in the window.</p> : (
+            <div className="auth-form">
+              {Object.entries(pendingBySchool).map(([schoolName, group]) => (
+                <div key={schoolName} className="delivery-school-group">
+                  <h3 className="delivery-school-title">{schoolName}</h3>
+                  {group.map((row) => (
+                    <label key={row.id}>
+                      <strong>{row.service_date} {row.session}</strong>
+                      <small>Order: {row.order_id}</small>
+                      <small>Youngster: {row.child_name}</small>
+                      <small>Youngster Mobile: {row.youngster_mobile || '-'}</small>
+                      <small>Parent: {row.parent_name}</small>
+                      <small>Status: {row.delivery_status} | Confirmed: {row.confirmed_at || '-'}</small>
+                      <button
+                        className="btn btn-primary"
+                        type="button"
+                        onClick={() => onToggleComplete(row.id)}
+                      >
+                        Mark Complete
+                      </button>
+                    </label>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="module-section">
+          <h2>Order Completed ({completedRows.length})</h2>
+          {completedRows.length === 0 ? <p className="auth-help">No completed orders in the window.</p> : (
+            <div className="auth-form">
+              {Object.entries(completedBySchool).map(([schoolName, group]) => (
+                <div key={schoolName} className="delivery-school-group">
+                  <h3 className="delivery-school-title">{schoolName}</h3>
+                  {group.map((row) => (
+                    <label key={row.id}>
+                      <strong>{row.service_date} {row.session}</strong>
+                      <small>Order: {row.order_id}</small>
+                      <small>Youngster: {row.child_name}</small>
+                      <small>Youngster Mobile: {row.youngster_mobile || '-'}</small>
+                      <small>Parent: {row.parent_name}</small>
+                      <small>Status: {row.delivery_status} | Confirmed: {row.confirmed_at || '-'}</small>
+                      <button
+                        className="btn btn-success"
+                        type="button"
+                        onClick={() => onToggleComplete(row.id)}
+                      >
+                        Completed (Click to Undo)
+                      </button>
+                    </label>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </section>
     </main>
     <LogoutButton />
