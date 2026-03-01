@@ -44,6 +44,16 @@ function todayIsoLocal() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function mapDeliveryAdminError(raw: string) {
+  if (raw.includes('Cannot delete delivery user with active assignments')) {
+    return 'Cannot delete delivery user: this user still has active delivery assignments. Reassign or complete those orders first.';
+  }
+  if (raw.includes('maximum 3 active delivery personnel')) {
+    return 'Cannot activate assignment: this school already has 3 active delivery personnel.';
+  }
+  return raw || 'Operation failed';
+}
+
 export default function AdminDeliveryPage() {
   const [users, setUsers] = useState<DeliveryUser[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
@@ -100,7 +110,7 @@ export default function AdminDeliveryPage() {
       setMessage('School assignment saved.');
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed saving mapping');
+      setError(e instanceof Error ? mapDeliveryAdminError(e.message) : 'Failed saving mapping');
     }
   };
 
@@ -115,7 +125,7 @@ export default function AdminDeliveryPage() {
       setMessage(isActive ? 'Mapping activated.' : 'Mapping deactivated.');
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed updating mapping');
+      setError(e instanceof Error ? mapDeliveryAdminError(e.message) : 'Failed updating mapping');
     }
   };
 
@@ -133,7 +143,7 @@ export default function AdminDeliveryPage() {
       setMessage('Mapping deleted.');
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed deleting mapping');
+      setError(e instanceof Error ? mapDeliveryAdminError(e.message) : 'Failed deleting mapping');
     } finally {
       setDeletingMappingKey('');
     }
@@ -254,7 +264,7 @@ export default function AdminDeliveryPage() {
       if (editingUserId === user.id) setEditingUserId('');
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed deleting delivery user');
+      setError(e instanceof Error ? mapDeliveryAdminError(e.message) : 'Failed deleting delivery user');
     } finally {
       setDeletingUserId('');
     }
@@ -379,7 +389,7 @@ export default function AdminDeliveryPage() {
 
         <div className="admin-section-card">
           <h2>Delivery vs School Assignment</h2>
-          <p className="auth-help">One school can have maximum 2 active delivery personnel assignments.</p>
+          <p className="auth-help">One school can have maximum 3 active delivery personnel assignments.</p>
           <div className="auth-form admin-mapping-controls">
             <label>
               School

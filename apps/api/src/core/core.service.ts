@@ -4142,8 +4142,8 @@ export class CoreService implements OnModuleInit {
         [schoolId, deliveryUserId],
       );
       const activeCount = Number(activeCountOut || 0);
-      if (activeCount >= 2) {
-        throw new BadRequestException('One school can only have maximum 2 active delivery personnel');
+      if (activeCount >= 3) {
+        throw new BadRequestException('One school can only have maximum 3 active delivery personnel');
       }
     }
 
