@@ -397,7 +397,8 @@ button:hover,
   margin: 0 0 0.8rem;
 }
 
-.module-nav a {
+.module-nav a,
+.module-nav button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -410,12 +411,21 @@ button:hover,
   font-size: 0.82rem;
   font-weight: 600;
   text-decoration: none;
+  cursor: pointer;
+  font-family: inherit;
 }
 
-.module-nav a:hover {
+.module-nav a:hover,
+.module-nav button:hover {
   background: #f0e0c4;
   border-color: #9e6b20;
   color: #35220c;
+}
+
+.module-nav button.active {
+  background: #e8a84a;
+  border-color: #9e6b20;
+  color: #1e1208;
 }
 
 .page-auth-mobile .auth-panel {

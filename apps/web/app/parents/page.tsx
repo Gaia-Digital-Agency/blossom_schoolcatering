@@ -158,6 +158,8 @@ export default function ParentsPage() {
   const [selectedBillingIds, setSelectedBillingIds] = useState<string[]>([]);
   const [activeBlackout, setActiveBlackout] = useState<ActiveBlackout | null>(null);
 
+  const [activeSection, setActiveSection] = useState<'order' | 'billing'>('order');
+
   const draftSectionRef = useRef<HTMLDivElement | null>(null);
 
   const selectedCount = useMemo(() => Object.values(itemQty).filter((qty) => qty > 0).length, [itemQty]);
@@ -461,16 +463,17 @@ export default function ParentsPage() {
         <h1>Parent Page</h1>
         <nav className="module-nav" aria-label="Parent Module Navigation">
           <Link href="/">Home</Link>
-          <a href="#parent-order">Order</a>
+          <button type="button" className={activeSection === 'order' ? 'active' : ''} onClick={() => setActiveSection('order')}>Order</button>
           <Link href="/menu">Menu</Link>
           <Link href="/rating">Rating</Link>
-          <a href="#parent-billing">Billing</a>
+          <button type="button" className={activeSection === 'billing' ? 'active' : ''} onClick={() => setActiveSection('billing')}>Billing</button>
         </nav>
         {parentId ? <p className="auth-help">Parent Profile ID: {parentId}</p> : null}
         <p className="auth-help">Ordering and billing dashboard for linked youngsters.</p>
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
 
+        {activeSection === 'order' && (<>
         <div className="module-section" id="parent-order">
           <h2>Confirmed Order Of The Day</h2>
           {todayOrder ? (
@@ -550,7 +553,9 @@ export default function ParentsPage() {
             </div>
           ) : <p className="auth-help">No active dishes configured by Admin for this date/session.</p>}
         </div>
+        </>)}
 
+        {activeSection === 'billing' && (<>
         <div className="module-section" id="parent-billing">
           <h2>Linked Youngsters</h2>
           <p className="auth-help">Youngster registration is done on `/register/youngsters`. Linked youngsters are auto-linked by matching parent and youngster last name.</p>
@@ -656,6 +661,7 @@ export default function ParentsPage() {
             </div>
           ) : null}
         </div>
+        </>)}
       </section>
     </main>
     <LogoutButton />
