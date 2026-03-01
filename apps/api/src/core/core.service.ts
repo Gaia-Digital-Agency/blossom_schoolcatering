@@ -253,6 +253,17 @@ export class CoreService implements OnModuleInit {
     return 'bin';
   }
 
+  private isAllowedProofImageUrl(urlRaw: string) {
+    try {
+      const parsed = new URL(urlRaw);
+      if (!['http:', 'https:'].includes(parsed.protocol)) return false;
+      const path = (parsed.pathname || '').toLowerCase();
+      return /\.(png|jpe?g|webp|gif|bmp|avif|heic|heif|svg)$/.test(path);
+    } catch {
+      return false;
+    }
+  }
+
   private slugify(value: string) {
     return value
       .toLowerCase()
@@ -3769,8 +3780,8 @@ export class CoreService implements OnModuleInit {
         cacheControl: 'private, max-age=0, no-cache',
       });
       proofUrl = uploaded.publicUrl;
-    } else if (!/^https?:\/\//i.test(proof)) {
-      throw new BadRequestException('proofImageData must be a data URL image or an http(s) URL');
+    } else if (!this.isAllowedProofImageUrl(proof)) {
+      throw new BadRequestException('proofImageData must be an image data URL or an http(s) image URL (PDF not allowed)');
     }
 
     await runSql(
