@@ -59,6 +59,7 @@ type DishCategory = (typeof DISH_CATEGORIES)[number];
 export class CoreService implements OnModuleInit {
   private parentDietaryRestrictionsReady = false;
   private deliverySchoolAssignmentsReady = false;
+  private billingReviewColumnsReady = false;
   private readonly publicMenuCacheTtlMs = 60_000;
   private publicMenuCache = new Map<string, {
     data: { serviceDate: string; session: SessionType | 'ALL'; items: unknown[] };
@@ -70,6 +71,7 @@ export class CoreService implements OnModuleInit {
     await this.ensureSessionSettingsTable();
     await this.ensureMenuRatingsTable();
     await this.ensureChildRegistrationSourceColumns();
+    await this.ensureBillingReviewColumns();
   }
 
   private parseJsonLine<T>(line: string): T {
@@ -1052,6 +1054,15 @@ export class CoreService implements OnModuleInit {
       ADD COLUMN IF NOT EXISTS registration_actor_type varchar(20) NOT NULL DEFAULT 'PARENT',
       ADD COLUMN IF NOT EXISTS registration_actor_teacher_name varchar(50);
     `);
+  }
+
+  private async ensureBillingReviewColumns() {
+    if (this.billingReviewColumnsReady) return;
+    await runSql(`
+      ALTER TABLE billing_records
+      ADD COLUMN IF NOT EXISTS admin_note text;
+    `);
+    this.billingReviewColumnsReady = true;
   }
 
   async getAdminChildren() {
@@ -3686,6 +3697,7 @@ export class CoreService implements OnModuleInit {
 
   async getParentConsolidatedBilling(actor: AccessUser) {
     if (actor.role !== 'PARENT') throw new ForbiddenException('Role not allowed');
+    await this.ensureBillingReviewColumns();
     const parentId = await this.getParentIdByUserId(actor.uid);
     if (!parentId) throw new BadRequestException('Parent profile not found');
     const out = await runSql(`
@@ -3700,6 +3712,7 @@ export class CoreService implements OnModuleInit {
                br.proof_uploaded_at::text AS proof_uploaded_at,
                br.delivered_at::text AS delivered_at,
                br.created_at::text AS created_at,
+               br.admin_note,
                o.service_date::text AS service_date,
                o.session::text AS session,
                o.total_price,
@@ -3765,6 +3778,7 @@ export class CoreService implements OnModuleInit {
        SET proof_image_url = $1,
            proof_uploaded_at = now(),
            status = 'PENDING_VERIFICATION',
+           admin_note = NULL,
            updated_at = now()
        WHERE id = $2;`,
       [proofUrl, billingId],
@@ -3816,6 +3830,7 @@ export class CoreService implements OnModuleInit {
        SET proof_image_url = $1,
            proof_uploaded_at = now(),
            status = 'PENDING_VERIFICATION',
+           admin_note = NULL,
            updated_at = now()
        WHERE id IN (${restPh})
          AND parent_id = $${restIds.length + 2};`,
@@ -3825,6 +3840,7 @@ export class CoreService implements OnModuleInit {
   }
 
   async getAdminBilling(status?: string) {
+    await this.ensureBillingReviewColumns();
     const statusFilter = (status || '').toUpperCase();
     const whereStatus = ['UNPAID', 'PENDING_VERIFICATION', 'VERIFIED', 'REJECTED'].includes(statusFilter)
       ? 'AND br.status = $1::payment_status'
@@ -3841,15 +3857,19 @@ export class CoreService implements OnModuleInit {
                br.proof_uploaded_at::text AS proof_uploaded_at,
                br.created_at::text AS created_at,
                br.verified_at::text AS verified_at,
+               br.admin_note,
                o.service_date::text AS service_date,
                o.session::text AS session,
                o.total_price,
                p.id AS parent_id,
                (up.first_name || ' ' || up.last_name) AS parent_name,
+               s.name AS school_name,
                dr.receipt_number,
                dr.pdf_url
         FROM billing_records br
         JOIN orders o ON o.id = br.order_id
+        JOIN children c ON c.id = o.child_id
+        JOIN schools s ON s.id = c.school_id
         JOIN parents p ON p.id = br.parent_id
         JOIN users up ON up.id = p.user_id
         LEFT JOIN digital_receipts dr ON dr.billing_record_id = br.id
@@ -3866,8 +3886,9 @@ export class CoreService implements OnModuleInit {
     }));
   }
 
-  async verifyBilling(actor: AccessUser, billingId: string, decision: 'VERIFIED' | 'REJECTED') {
+  async verifyBilling(actor: AccessUser, billingId: string, decision: 'VERIFIED' | 'REJECTED', note?: string) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    await this.ensureBillingReviewColumns();
     const billingOut = await runSql(
       `
       SELECT row_to_json(t)::text
@@ -3886,18 +3907,25 @@ export class CoreService implements OnModuleInit {
     if (decision === 'VERIFIED' && !String(billing.proof_image_url || '').trim()) {
       throw new BadRequestException('BILLING_PROOF_IMAGE_REQUIRED');
     }
+    const adminNote = decision === 'REJECTED'
+      ? (note || '').trim().slice(0, 500)
+      : '';
+    if (decision === 'REJECTED' && !adminNote) {
+      throw new BadRequestException('REJECTION_NOTE_REQUIRED');
+    }
     const updatedOut = await runSql(
       `WITH updated AS (
          UPDATE billing_records
          SET status = $1::payment_status,
              verified_by = $2,
+             admin_note = $3,
              verified_at = now(),
              updated_at = now()
-         WHERE id = $3
+         WHERE id = $4
          RETURNING id
        )
        SELECT id FROM updated;`,
-      [decision, actor.uid, billingId],
+      [decision, actor.uid, adminNote || null, billingId],
     );
     if (!updatedOut) throw new NotFoundException('Billing record not found');
     return { ok: true, status: decision };

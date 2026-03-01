@@ -62,6 +62,7 @@ type BillingRow = {
   service_date: string;
   session: string;
   total_price: number;
+  admin_note?: string | null;
   proof_image_url?: string | null;
   receipt_number?: string | null;
   pdf_url?: string | null;
@@ -673,6 +674,7 @@ export default function ParentsPage() {
                   <small>Status: {b.status} | Delivery: {b.delivery_status}</small>
                   <small>Total: Rp {Number(b.total_price).toLocaleString('id-ID')}</small>
                   <small>Proof: {b.proof_image_url ? 'Uploaded' : 'Not uploaded'}</small>
+                  {b.admin_note ? <small>Admin Note: {b.admin_note}</small> : null}
                   <label className="checkbox-inline">
                     <input
                       type="checkbox"
@@ -696,6 +698,7 @@ export default function ParentsPage() {
                   <small>Status: {b.status} | Delivery: {b.delivery_status}</small>
                   <small>Total: Rp {Number(b.total_price).toLocaleString('id-ID')}</small>
                   <small>Receipt: {b.receipt_number || '-'}</small>
+                  {b.admin_note ? <small>Admin Note: {b.admin_note}</small> : null}
                   <div className="billing-action-row">
                     <button className="btn btn-outline" type="button" onClick={() => onOpenReceipt(b.id)}>Open Receipt</button>
                   </div>

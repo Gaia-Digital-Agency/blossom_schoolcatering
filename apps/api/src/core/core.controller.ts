@@ -455,7 +455,7 @@ export class CoreController {
     @Param('billingId', ParseUUIDPipe) billingId: string,
     @Body() body: VerifyBillingDto,
   ) {
-    return this.coreService.verifyBilling(req.user, billingId, body.decision || 'VERIFIED');
+    return this.coreService.verifyBilling(req.user, billingId, body.decision || 'VERIFIED', body.note);
   }
 
   @Delete('admin/menu-items/:itemId')

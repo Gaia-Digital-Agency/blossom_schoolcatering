@@ -13,24 +13,39 @@ type BillingRow = {
   session: string;
   total_price: number;
   parent_name: string;
+  school_name?: string | null;
+  admin_note?: string | null;
   proof_image_url?: string | null;
   receipt_number?: string | null;
   pdf_url?: string | null;
 };
 
-function groupByParent(rows: BillingRow[]) {
-  const map = new Map<string, BillingRow[]>();
+function groupBySchoolThenParent(rows: BillingRow[]) {
+  const schoolMap = new Map<string, BillingRow[]>();
   for (const row of rows) {
-    const key = row.parent_name || 'Unknown Parent';
-    if (!map.has(key)) map.set(key, []);
-    map.get(key)?.push(row);
+    const schoolKey = (row.school_name || 'Unknown School').trim() || 'Unknown School';
+    if (!schoolMap.has(schoolKey)) schoolMap.set(schoolKey, []);
+    schoolMap.get(schoolKey)?.push(row);
   }
-  return Array.from(map.entries())
-    .map(([parentName, parentRows]) => ({
-      parentName,
-      rows: parentRows.sort((a, b) => String(b.service_date).localeCompare(String(a.service_date))),
-    }))
-    .sort((a, b) => a.parentName.localeCompare(b.parentName));
+  return Array.from(schoolMap.entries())
+    .map(([schoolName, schoolRows]) => {
+      const parentMap = new Map<string, BillingRow[]>();
+      for (const row of schoolRows) {
+        const parentKey = (row.parent_name || 'Unknown Parent').trim() || 'Unknown Parent';
+        if (!parentMap.has(parentKey)) parentMap.set(parentKey, []);
+        parentMap.get(parentKey)?.push(row);
+      }
+      return {
+        schoolName,
+        parents: Array.from(parentMap.entries())
+          .map(([parentName, parentRows]) => ({
+            parentName,
+            rows: parentRows.sort((a, b) => String(b.service_date).localeCompare(String(a.service_date))),
+          }))
+          .sort((a, b) => a.parentName.localeCompare(b.parentName)),
+      };
+    })
+    .sort((a, b) => a.schoolName.localeCompare(b.schoolName));
 }
 
 export default function AdminBillingPage() {
@@ -73,22 +88,8 @@ export default function AdminBillingPage() {
     [rows, paidFromDate],
   );
 
-  const unpaidByParent = useMemo(() => groupByParent(unpaidRows), [unpaidRows]);
-
-  const paidByProof = useMemo(() => {
-    const map = new Map<string, BillingRow[]>();
-    for (const row of paidRows) {
-      const key = String(row.proof_image_url || '').trim();
-      if (!key) continue;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)?.push(row);
-    }
-    return Array.from(map.entries()).map(([proofUrl, groupedRows]) => ({
-      proofUrl,
-      rows: groupedRows,
-      total: groupedRows.reduce((sum, r) => sum + Number(r.total_price || 0), 0),
-    })).sort((a, b) => b.rows.length - a.rows.length);
-  }, [paidRows]);
+  const unpaidBySchoolThenParent = useMemo(() => groupBySchoolThenParent(unpaidRows), [unpaidRows]);
+  const paidBySchoolThenParent = useMemo(() => groupBySchoolThenParent(paidRows), [paidRows]);
 
   const paidSummary = useMemo(() => ({
     totalBills: paidRows.length,
@@ -96,13 +97,32 @@ export default function AdminBillingPage() {
     totalParents: new Set(paidRows.map((r) => r.parent_name)).size,
   }), [paidRows]);
 
-  const onDecision = async (billingId: string, decision: 'VERIFIED' | 'REJECTED') => {
+  const onDecision = async (billingId: string, decision: 'VERIFIED' | 'REJECTED', note?: string) => {
     setError(''); setMessage('');
     try {
-      await apiFetch(`/admin/billing/${billingId}/verify`, { method: 'POST', body: JSON.stringify({ decision }) });
+      await apiFetch(`/admin/billing/${billingId}/verify`, { method: 'POST', body: JSON.stringify({ decision, note }) });
       setMessage(`Billing ${decision.toLowerCase()} successfully.`);
       await load();
     } catch (e) { setError(e instanceof Error ? e.message : 'Failed verify/reject'); }
+  };
+
+  const onReview = (row: BillingRow) => {
+    const proof = String(row.proof_image_url || '').trim();
+    if (!proof) {
+      setError('No uploaded proof image for this bill.');
+      return;
+    }
+    window.open(proof, '_blank', 'noopener,noreferrer');
+  };
+
+  const onReject = async (row: BillingRow) => {
+    const note = window.prompt('Reject note to parent (required):', 'Please re-upload payment proof attached to this order.');
+    if (note === null) return;
+    if (!note.trim()) {
+      setError('Reject note is required.');
+      return;
+    }
+    await onDecision(row.id, 'REJECTED', note.trim());
   };
 
   const onGenerateReceipt = async (billingId: string) => {
@@ -146,26 +166,39 @@ export default function AdminBillingPage() {
         ) : (
           <>
             <div className="module-section">
-              <h2>Unpaid Bills (Grouped By Parent)</h2>
-              {unpaidByParent.length === 0 ? <p className="auth-help">No unpaid bills.</p> : (
+              <h2>Unpaid Bills (Grouped By Parent, Sorted By School)</h2>
+              {unpaidBySchoolThenParent.length === 0 ? <p className="auth-help">No unpaid bills.</p> : (
                 <div className="auth-form">
-                  {unpaidByParent.map((group) => (
-                    <label key={group.parentName}>
-                      <strong>{group.parentName}</strong>
-                      <small>Total unpaid bills: {group.rows.length}</small>
-                      <small>Total: Rp {group.rows.reduce((sum, row) => sum + Number(row.total_price || 0), 0).toLocaleString('id-ID')}</small>
+                  {unpaidBySchoolThenParent.map((schoolGroup) => (
+                    <label key={schoolGroup.schoolName}>
+                      <strong>School: {schoolGroup.schoolName}</strong>
+                      <small>Total unpaid bills: {schoolGroup.parents.reduce((acc, parentGroup) => acc + parentGroup.rows.length, 0)}</small>
+                      <small>Total: Rp {schoolGroup.parents.reduce((acc, parentGroup) => (
+                        acc + parentGroup.rows.reduce((sum, row) => sum + Number(row.total_price || 0), 0)
+                      ), 0).toLocaleString('id-ID')}</small>
                       <div className="auth-form">
-                        {group.rows.map((row) => (
-                          <label key={row.id}>
-                            <strong>{row.service_date} {row.session}</strong>
-                            <small>Order: {row.order_id}</small>
-                            <small>Status: <strong>{row.status}</strong> · Delivery: <strong>{row.delivery_status}</strong></small>
-                            <small>Total: Rp {Number(row.total_price).toLocaleString('id-ID')}</small>
-                            <small>Proof: {row.proof_image_url ? '✓ Uploaded' : '✗ Not uploaded'}</small>
-                            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
-                              <button className="btn btn-outline" type="button" onClick={() => onDecision(row.id, 'VERIFIED')}>Verify</button>
-                              <button className="btn btn-outline" type="button" onClick={() => onDecision(row.id, 'REJECTED')}>Reject</button>
-                              <button className="btn btn-outline" type="button" onClick={() => onGenerateReceipt(row.id)}>Generate Receipt</button>
+                        {schoolGroup.parents.map((parentGroup) => (
+                          <label key={`${schoolGroup.schoolName}-${parentGroup.parentName}`}>
+                            <strong>Parent: {parentGroup.parentName}</strong>
+                            <small>Total bills: {parentGroup.rows.length}</small>
+                            <small>Total: Rp {parentGroup.rows.reduce((sum, row) => sum + Number(row.total_price || 0), 0).toLocaleString('id-ID')}</small>
+                            <div className="auth-form">
+                              {parentGroup.rows.map((row) => (
+                                <label key={row.id}>
+                                  <strong>{row.service_date} {row.session}</strong>
+                                  <small>Order: {row.order_id}</small>
+                                  <small>Status: <strong>{row.status}</strong> · Delivery: <strong>{row.delivery_status}</strong></small>
+                                  <small>Total: Rp {Number(row.total_price).toLocaleString('id-ID')}</small>
+                                  <small>Proof: {row.proof_image_url ? '✓ Uploaded' : '✗ Not uploaded'}</small>
+                                  {row.admin_note ? <small>Admin Note: {row.admin_note}</small> : null}
+                                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+                                    <button className="btn btn-outline" type="button" onClick={() => onReview(row)}>Review</button>
+                                    <button className="btn btn-outline" type="button" onClick={() => onReject(row)}>Reject</button>
+                                    <button className="btn btn-outline" type="button" onClick={() => onDecision(row.id, 'VERIFIED')}>Approve</button>
+                                    <button className="btn btn-outline" type="button" onClick={() => onGenerateReceipt(row.id)}>Generate Receipt</button>
+                                  </div>
+                                </label>
+                              ))}
                             </div>
                           </label>
                         ))}
@@ -177,25 +210,38 @@ export default function AdminBillingPage() {
             </div>
 
             <div className="module-section">
-              <h2>Paid Bills (Grouped By Same Proof Image)</h2>
-              {paidByProof.length === 0 ? <p className="auth-help">No paid bills in last 30 days.</p> : (
+              <h2>Paid Bills (Grouped By School, Grouped By Parent)</h2>
+              {paidBySchoolThenParent.length === 0 ? <p className="auth-help">No paid bills in last 30 days.</p> : (
                 <div className="auth-form">
-                  {paidByProof.map((group) => (
-                    <label key={group.proofUrl}>
-                      <strong>Shared Proof Group</strong>
-                      <small>Proof URL: {group.proofUrl}</small>
-                      <small>Bills: {group.rows.length} | Total: Rp {group.total.toLocaleString('id-ID')}</small>
+                  {paidBySchoolThenParent.map((schoolGroup) => (
+                    <label key={schoolGroup.schoolName}>
+                      <strong>School: {schoolGroup.schoolName}</strong>
+                      <small>Total paid bills: {schoolGroup.parents.reduce((acc, parentGroup) => acc + parentGroup.rows.length, 0)}</small>
+                      <small>Total: Rp {schoolGroup.parents.reduce((acc, parentGroup) => (
+                        acc + parentGroup.rows.reduce((sum, row) => sum + Number(row.total_price || 0), 0)
+                      ), 0).toLocaleString('id-ID')}</small>
                       <div className="auth-form">
-                        {group.rows.map((row) => (
-                          <label key={row.id}>
-                            <strong>{row.parent_name}</strong>
-                            <small>{row.service_date} {row.session}</small>
-                            <small>Order: {row.order_id}</small>
-                            <small>Receipt: {row.receipt_number || '—'}</small>
-                            <small>Total: Rp {Number(row.total_price).toLocaleString('id-ID')}</small>
-                            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
-                              {row.pdf_url ? <a className="btn btn-outline" href={row.pdf_url} target="_blank" rel="noreferrer">Open Receipt</a> : null}
-                              <button className="btn btn-outline" type="button" onClick={() => onGenerateReceipt(row.id)}>Regenerate Receipt</button>
+                        {schoolGroup.parents.map((parentGroup) => (
+                          <label key={`${schoolGroup.schoolName}-${parentGroup.parentName}`}>
+                            <strong>Parent: {parentGroup.parentName}</strong>
+                            <small>Total bills: {parentGroup.rows.length}</small>
+                            <small>Total: Rp {parentGroup.rows.reduce((sum, row) => sum + Number(row.total_price || 0), 0).toLocaleString('id-ID')}</small>
+                            <div className="auth-form">
+                              {parentGroup.rows.map((row) => (
+                                <label key={row.id}>
+                                  <strong>{row.service_date} {row.session}</strong>
+                                  <small>Order: {row.order_id}</small>
+                                  <small>Status: <strong>{row.status}</strong> · Delivery: <strong>{row.delivery_status}</strong></small>
+                                  <small>Total: Rp {Number(row.total_price).toLocaleString('id-ID')}</small>
+                                  <small>Receipt: {row.receipt_number || '—'}</small>
+                                  {row.admin_note ? <small>Admin Note: {row.admin_note}</small> : null}
+                                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+                                    <button className="btn btn-outline" type="button" onClick={() => onReview(row)}>Review</button>
+                                    {row.pdf_url ? <a className="btn btn-outline" href={row.pdf_url} target="_blank" rel="noreferrer">Open Receipt</a> : null}
+                                    <button className="btn btn-outline" type="button" onClick={() => onGenerateReceipt(row.id)}>Generate Receipt</button>
+                                  </div>
+                                </label>
+                              ))}
                             </div>
                           </label>
                         ))}
