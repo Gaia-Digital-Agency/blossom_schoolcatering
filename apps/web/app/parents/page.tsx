@@ -223,14 +223,24 @@ export default function ParentsPage() {
 
   const unpaidBillings = useMemo(
     () => visibleBillings
-      .filter((b) => !(b.status === 'VERIFIED' && Boolean((b.proof_image_url || '').trim())))
+      .filter((b) => {
+        const hasProof = Boolean((b.proof_image_url || '').trim());
+        // Rejected stays in unpaid bucket even if old proof exists; parent must re-upload.
+        if (b.status === 'REJECTED') return true;
+        return !hasProof;
+      })
       .sort((a, b) => String(b.service_date).localeCompare(String(a.service_date))),
     [visibleBillings],
   );
 
   const paidBillings = useMemo(
     () => visibleBillings
-      .filter((b) => b.status === 'VERIFIED' && Boolean((b.proof_image_url || '').trim()) && String(b.service_date) >= thirtyDaysAgo)
+      .filter((b) => {
+        const hasProof = Boolean((b.proof_image_url || '').trim());
+        if (!hasProof) return false;
+        if (!['PENDING_VERIFICATION', 'VERIFIED'].includes(b.status)) return false;
+        return String(b.service_date) >= thirtyDaysAgo;
+      })
       .sort((a, b) => String(b.service_date).localeCompare(String(a.service_date))),
     [visibleBillings, thirtyDaysAgo],
   );
@@ -341,6 +351,21 @@ export default function ParentsPage() {
     setDraftExpiresAt(detail.expires_at);
   };
 
+  const resetDraftState = () => {
+    setDraftCartId('');
+    setDraftExpiresAt('');
+    setItemQty({});
+  };
+
+  const clearOpenDraftsForContext = async (childId: string, draftDate: string, draftSession: SessionType) => {
+    const carts = await apiFetch(
+      `/carts?child_id=${childId}&service_date=${draftDate}&session=${draftSession}`,
+    ) as DraftCart[];
+    const openCarts = (carts || []).filter((cart) => cart.status === 'OPEN');
+    if (openCarts.length === 0) return;
+    await Promise.all(openCarts.map((cart) => apiFetch(`/carts/${cart.id}`, { method: 'DELETE' })));
+  };
+
   const loadMenuAndDraft = async () => {
     if (!selectedChildId) return;
     const [menuData, cartsData, blackoutRows] = await Promise.all([
@@ -408,10 +433,6 @@ export default function ParentsPage() {
   const onOpenOrderAsDraft = async (order: ConsolidatedOrder, targetDate: string, mode: 'edit' | 'quick-reorder') => {
     setError(''); setMessage('');
     try {
-      const out = await apiFetch('/carts/quick-reorder', {
-        method: 'POST',
-        body: JSON.stringify({ sourceOrderId: order.id, serviceDate: targetDate }),
-      }) as { cartId: string; excludedItemIds: string[] };
       setActiveSection('order');
       setSelectedChildId(order.child_id);
       setServiceDate(targetDate);
@@ -428,10 +449,20 @@ export default function ParentsPage() {
       });
       const menuData = await apiFetch(`/menus?service_date=${targetDate}&session=${nextSession}`) as { items: MenuItem[] };
       setMenuItems(menuData.items || []);
-      await loadDraftItems(out.cartId);
-      setMessage(out.excludedItemIds.length
-        ? `Order reopened as draft with ${out.excludedItemIds.length} excluded dish(es).`
-        : 'Order reopened as draft in Draft Section.');
+      if (mode === 'edit') {
+        await clearOpenDraftsForContext(order.child_id, targetDate, nextSession);
+        resetDraftState();
+        setMessage(`Edit mode ready for ${targetDate} ${nextSession}. Draft cart is empty by design.`);
+      } else {
+        const out = await apiFetch('/carts/quick-reorder', {
+          method: 'POST',
+          body: JSON.stringify({ sourceOrderId: order.id, serviceDate: targetDate }),
+        }) as { cartId: string; excludedItemIds: string[] };
+        await loadDraftItems(out.cartId);
+        setMessage(out.excludedItemIds.length
+          ? `Quick reorder loaded with ${out.excludedItemIds.length} excluded dish(es).`
+          : 'Quick reorder loaded with existing dishes in Draft Section.');
+      }
       window.setTimeout(() => draftSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
     } catch (err) {
       setError(err instanceof Error ? mapOrderRuleError(err.message) : 'Failed to reopen order as draft');
@@ -474,7 +505,7 @@ export default function ParentsPage() {
         method: 'POST',
         body: JSON.stringify({ billingIds: selectedBillingIds, proofImageData: batchProofData }),
       }) as { updatedCount: number };
-      setMessage(`Proof uploaded for ${out.updatedCount} billing record(s).`);
+      setMessage(`Proof uploaded and stored for ${out.updatedCount} billing record(s). Moved to Paid Bills (Past 30 Days) with pending admin verification.`);
       setSelectedBillingIds([]);
       await loadBilling();
     } catch (err) {
@@ -500,7 +531,7 @@ export default function ParentsPage() {
     if (!window.confirm('Confirm delete this order before cutoff?')) return;
     setError(''); setMessage('');
     try { await apiFetch(`/orders/${orderId}`, { method: 'DELETE' }); setMessage('Order deleted successfully.'); await Promise.all([loadOrders(), loadBilling()]); }
-    catch (err) { setError(err instanceof Error ? err.message : 'Order delete failed'); }
+    catch (err) { setError(err instanceof Error ? mapOrderRuleError(err.message) : 'Order delete failed'); }
   };
 
   if (loading) {
@@ -635,17 +666,19 @@ export default function ParentsPage() {
           {visibleOrders.length === 0 ? <p className="auth-help">No orders yet for selected youngster.</p> : (
             <div className="auth-form">
               {visibleOrders.map((order) => (
-                <label key={order.id}>
+                <div key={order.id} className="order-row-card">
                   <span><strong>{order.child_name}</strong> - {order.service_date} {order.session}</span>
                   <small>Order: {order.id}</small>
                   <small>Status: {order.status} | Billing: {order.billing_status || '-'} | Delivery: {order.delivery_status || '-'}</small>
                   <small>Total: Rp {Number(order.total_price).toLocaleString('id-ID')}</small>
                   <small>Items: {order.items.map((item) => `${item.item_name_snapshot} x${item.quantity}`).join(', ') || '-'}</small>
-                  <button className="btn btn-outline" type="button" onClick={() => onOpenOrderAsDraft(order, order.service_date, 'edit')} disabled={!order.can_edit || submitting}>Edit Before Cutoff</button>
-                  <button className="btn btn-outline" type="button" onClick={() => onDeleteOrder(order.id)} disabled={!order.can_edit || submitting}>Delete Before Cutoff</button>
-                  <button className="btn btn-outline" type="button" onClick={() => onOpenOrderAsDraft(order, quickReorderDate, 'quick-reorder')} disabled={submitting}>Quick Reorder</button>
+                  <div className="order-row-actions">
+                    <button className="btn btn-outline" type="button" onClick={() => onOpenOrderAsDraft(order, order.service_date, 'edit')} disabled={!order.can_edit || submitting}>Edit Before Cutoff</button>
+                    <button className="btn btn-outline" type="button" onClick={() => onDeleteOrder(order.id)} disabled={!order.can_edit || submitting}>Delete Before Cutoff</button>
+                    <button className="btn btn-outline" type="button" onClick={() => onOpenOrderAsDraft(order, quickReorderDate, 'quick-reorder')} disabled={submitting}>Quick Reorder</button>
+                  </div>
                   {!order.can_edit ? <small>Cutoff passed or order status is not editable.</small> : null}
-                </label>
+                </div>
               ))}
             </div>
           )}
@@ -664,48 +697,53 @@ export default function ParentsPage() {
             <small>{selectedBillingIds.length} bill(s) selected.</small>
           </div>
 
-          <h3>Unpaid Bills (All)</h3>
-          {unpaidBillings.length === 0 ? <p className="auth-help">No unpaid billing records.</p> : (
-            <div className="auth-form">
-              {unpaidBillings.map((b) => (
-                <label key={b.id}>
-                  <strong>{b.service_date} {b.session}</strong>
-                  <small>Order: {b.order_id}</small>
-                  <small>Status: {b.status} | Delivery: {b.delivery_status}</small>
-                  <small>Total: Rp {Number(b.total_price).toLocaleString('id-ID')}</small>
-                  <small>Proof: {b.proof_image_url ? 'Uploaded' : 'Not uploaded'}</small>
-                  {b.admin_note ? <small>Admin Note: {b.admin_note}</small> : null}
-                  <label className="checkbox-inline">
-                    <input
-                      type="checkbox"
-                      checked={selectedBillingIds.includes(b.id)}
-                      onChange={(e) => onToggleBillingSelect(b.id, e.target.checked)}
-                    />
-                    <span>Select for batch proof upload</span>
+          <div className="parent-billing-card parent-billing-card-unpaid">
+            <h3>Unpaid Bills (All)</h3>
+            {unpaidBillings.length === 0 ? <p className="auth-help">No unpaid billing records.</p> : (
+              <div className="auth-form">
+                {unpaidBillings.map((b) => (
+                  <label key={b.id}>
+                    <strong>{b.service_date} {b.session}</strong>
+                    <small>Order: {b.order_id}</small>
+                    <small>Status: {b.status} | Delivery: {b.delivery_status}</small>
+                    <small>Total: Rp {Number(b.total_price).toLocaleString('id-ID')}</small>
+                    <small>Proof: {b.proof_image_url ? 'Uploaded' : 'Not uploaded'}</small>
+                    {b.admin_note ? <small>Admin Note: {b.admin_note}</small> : null}
+                    <label className="checkbox-inline">
+                      <input
+                        type="checkbox"
+                        checked={selectedBillingIds.includes(b.id)}
+                        onChange={(e) => onToggleBillingSelect(b.id, e.target.checked)}
+                      />
+                      <span>Select for batch proof upload</span>
+                    </label>
                   </label>
-                </label>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
 
-          <h3>Paid Bills (Past 30 Days)</h3>
-          {paidBillings.length === 0 ? <p className="auth-help">No paid billing records in last 30 days.</p> : (
-            <div className="auth-form">
-              {paidBillings.map((b) => (
-                <label key={b.id}>
-                  <strong>{b.service_date} {b.session}</strong>
-                  <small>Order: {b.order_id}</small>
-                  <small>Status: {b.status} | Delivery: {b.delivery_status}</small>
-                  <small>Total: Rp {Number(b.total_price).toLocaleString('id-ID')}</small>
-                  <small>Receipt: {b.receipt_number || '-'}</small>
-                  {b.admin_note ? <small>Admin Note: {b.admin_note}</small> : null}
-                  <div className="billing-action-row">
-                    <button className="btn btn-outline" type="button" onClick={() => onOpenReceipt(b.id)}>Open Receipt</button>
-                  </div>
-                </label>
-              ))}
-            </div>
-          )}
+          <div className="parent-billing-card parent-billing-card-paid">
+            <h3>Paid Bills (Past 30 Days)</h3>
+            <p className="auth-help">Proof uploaded bills are listed here while waiting Admin approval/rejection.</p>
+            {paidBillings.length === 0 ? <p className="auth-help">No paid billing records in last 30 days.</p> : (
+              <div className="auth-form">
+                {paidBillings.map((b) => (
+                  <label key={b.id}>
+                    <strong>{b.service_date} {b.session}</strong>
+                    <small>Order: {b.order_id}</small>
+                    <small>Status: {b.status} | Delivery: {b.delivery_status}</small>
+                    <small>Total: Rp {Number(b.total_price).toLocaleString('id-ID')}</small>
+                    <small>Receipt: {b.receipt_number || '-'}</small>
+                    {b.admin_note ? <small>Admin Note: {b.admin_note}</small> : null}
+                    <div className="billing-action-row">
+                      <button className="btn btn-outline" type="button" onClick={() => onOpenReceipt(b.id)}>Open Receipt</button>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="module-section">

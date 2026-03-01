@@ -856,6 +856,47 @@ button:hover,
   max-width: 100%;
 }
 
+.order-row-card {
+  border: 1px solid #e8dcc8;
+  border-radius: 0.6rem;
+  padding: 0.65rem;
+  display: grid;
+  gap: 0.35rem;
+  background: #fffdfa;
+}
+
+.order-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.order-row-actions .btn {
+  flex: 1 1 170px;
+}
+
+.parent-billing-card {
+  border: 2px solid #d8cab1;
+  border-radius: 0.65rem;
+  background: #fffdf8;
+  padding: 0.75rem;
+  margin-top: 0.65rem;
+}
+
+.parent-billing-card h3 {
+  margin: 0 0 0.55rem;
+}
+
+.parent-billing-card-unpaid {
+  border-color: #d6b9b9;
+  background: #fff8f8;
+}
+
+.parent-billing-card-paid {
+  border-color: #b8cfaa;
+  background: #f8fff4;
+}
+
 @media (min-width: 860px) {
   .menu-flow-grid {
     grid-template-columns: 1fr 1fr;
