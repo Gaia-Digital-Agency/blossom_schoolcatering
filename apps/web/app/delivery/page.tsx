@@ -99,6 +99,10 @@ export default function DeliveryPage() {
               <button className="btn btn-outline" type="button" onClick={() => setDate(tomorrow)}>Tomorrow</button>
             </div>
           </div>
+          <label className="delivery-control">
+            Select Date
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </label>
           <button className="btn btn-outline delivery-refresh" type="button" onClick={load} disabled={loading}>
             {loading ? 'Refreshing...' : 'Refresh Assignments'}
           </button>

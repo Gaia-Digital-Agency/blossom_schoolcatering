@@ -245,7 +245,7 @@ export default function AdminBillingPage() {
         {loading ? <p className="auth-help">Loading…</p> : (<>
 
           {/* ── Unpaid ── */}
-          <div className="billing-section">
+          <div className="billing-section billing-section--unpaid">
             <h2>Unpaid / Pending ({unpaidRows.length})</h2>
             {unpaidBySchool.length === 0 ? <p className="auth-help">All clear — no unpaid bills.</p> : (
               <div className="bl-school-list">
@@ -282,7 +282,7 @@ export default function AdminBillingPage() {
           </div>
 
           {/* ── Paid ── */}
-          <div className="billing-section">
+          <div className="billing-section billing-section--paid">
             <h2>Paid / Verified ({paidRows.length})</h2>
             {paidBySchool.length === 0 ? <p className="auth-help">No verified bills yet.</p> : (
               <div className="bl-school-list">
@@ -357,13 +357,33 @@ export default function AdminBillingPage() {
           .bsb-card strong { font-size: 1.05rem; }
 
           /* ── section heading ── */
-          .billing-section { margin-top: 1.25rem; }
+          .billing-section {
+            margin-top: 1.25rem;
+            border: 2px solid var(--border);
+            border-radius: 0.8rem;
+            padding: 0.8rem;
+            background: #fff;
+          }
+          .billing-section--unpaid {
+            border-color: #d08a63;
+            background: #fff7f2;
+          }
+          .billing-section--paid {
+            border-color: #6a9b72;
+            background: #f3fbf4;
+          }
           .billing-section h2 {
             font-size: 0.95rem;
             font-weight: 700;
             margin: 0 0 0.65rem;
             padding-bottom: 0.3rem;
             border-bottom: 1px solid var(--border);
+          }
+          .billing-section--unpaid h2 {
+            border-bottom-color: #d9a381;
+          }
+          .billing-section--paid h2 {
+            border-bottom-color: #8bb693;
           }
 
           /* ── school block ── */
