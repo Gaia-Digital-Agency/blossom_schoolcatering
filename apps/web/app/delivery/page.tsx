@@ -43,6 +43,7 @@ export default function DeliveryPage() {
   const yesterday = dateInMakassar(-1);
   const today = dateInMakassar(0);
   const tomorrow = dateInMakassar(1);
+  const [selectedDate, setSelectedDate] = useState(today);
 
   const load = async () => {
     setLoading(true);
@@ -81,10 +82,10 @@ export default function DeliveryPage() {
   };
 
   const pendingRows = rows.filter(
-    (r) => !r.confirmed_at && [yesterday, today, tomorrow].includes(r.service_date),
+    (r) => !r.confirmed_at && [yesterday, today, tomorrow].includes(r.service_date) && r.service_date === selectedDate,
   );
   const completedRows = rows.filter(
-    (r) => Boolean(r.confirmed_at) && [yesterday, today].includes(r.service_date),
+    (r) => Boolean(r.confirmed_at) && [yesterday, today].includes(r.service_date) && r.service_date === selectedDate,
   );
 
   const pendingBySchool = pendingRows.reduce<Record<string, Assignment[]>>((acc, row) => {
@@ -111,6 +112,29 @@ export default function DeliveryPage() {
         <div className="delivery-controls">
           <div className="delivery-control delivery-window">
             <small><strong>Visible windows:</strong> Pending ({yesterday}, {today}, {tomorrow}) · Completed ({yesterday}, {today})</small>
+            <div className="delivery-window-actions">
+              <button
+                className={`btn ${selectedDate === yesterday ? 'btn-primary' : 'btn-outline'}`}
+                type="button"
+                onClick={() => setSelectedDate(yesterday)}
+              >
+                Yesterday
+              </button>
+              <button
+                className={`btn ${selectedDate === today ? 'btn-primary' : 'btn-outline'}`}
+                type="button"
+                onClick={() => setSelectedDate(today)}
+              >
+                Today
+              </button>
+              <button
+                className={`btn ${selectedDate === tomorrow ? 'btn-primary' : 'btn-outline'}`}
+                type="button"
+                onClick={() => setSelectedDate(tomorrow)}
+              >
+                Tomorrow
+              </button>
+            </div>
           </div>
           <button className="btn btn-outline delivery-refresh" type="button" onClick={load} disabled={loading}>
             {loading ? 'Refreshing...' : 'Refresh Assignments'}
