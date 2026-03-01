@@ -73,11 +73,9 @@ function withinKitchenHours() {
 export default function KitchenDashboard({
   offsetDays,
   title,
-  showOrderBoards = true,
 }: {
   offsetDays: number;
   title: string;
-  showOrderBoards?: boolean;
 }) {
   const [data, setData] = useState<KitchenData | null>(null);
   const [error, setError] = useState('');
@@ -109,10 +107,14 @@ export default function KitchenDashboard({
     setMessage('');
     setSubmittingOrderId(orderId);
     try {
-      await apiFetch(`/kitchen/orders/${orderId}/complete`, {
+      const out = await apiFetch(`/kitchen/orders/${orderId}/complete`, {
         method: 'POST',
-      });
-      setMessage('Order marked kitchen-complete and sent to delivery assignment.');
+      }) as { completed?: boolean; deliveryStatus?: string };
+      if (out?.completed) {
+        setMessage('Order moved to completed and assigned to delivery.');
+      } else {
+        setMessage('Order reverted to pending.');
+      }
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed updating kitchen completion');
@@ -132,7 +134,7 @@ export default function KitchenDashboard({
 
   return (
     <>
-    <main className={`page-auth page-auth-desktop ${showOrderBoards ? '' : 'kitchen-compact-view'}`}>
+    <main className="page-auth page-auth-desktop">
       <section className="auth-panel">
         <h1>{title}</h1>
         <p className="auth-help">Auto refresh every 60 minutes during 05:00-21:00 (Asia/Makassar). Service date: {serviceDate}</p>
@@ -147,114 +149,123 @@ export default function KitchenDashboard({
 
         {data ? (
           <>
-            <h2>Overview</h2>
-            <div className="kitchen-table-wrap">
-              <table className="kitchen-table">
-                <thead>
-                  <tr>
-                    <th>Total Orders</th>
-                    <th>Total Dishes</th>
-                    <th>Lunch</th>
-                    <th>Snack</th>
-                    <th>Breakfast</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>{data.totals.totalOrders}</td>
-                    <td>{data.totals.totalDishes}</td>
-                    <td>{data.totals.lunchOrders}</td>
-                    <td>{data.totals.snackOrders}</td>
-                    <td>{data.totals.breakfastOrders}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <h2>Summary</h2>
-            <div className="kitchen-table-wrap">
-              <table className="kitchen-table">
-                <thead>
-                  <tr>
-                    <th>Dish</th>
-                    <th>Qty</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.dishSummary.length === 0 ? (
-                    <tr><td colSpan={2}>No dishes yet.</td></tr>
-                  ) : data.dishSummary.map((d) => (
-                    <tr key={d.name}>
-                      <td>{d.name}</td>
-                      <td>{d.quantity}</td>
+            <div className="kitchen-section-card">
+              <h2>Overview</h2>
+              <div className="kitchen-table-wrap">
+                <table className="kitchen-table">
+                  <thead>
+                    <tr>
+                      <th>Total Orders</th>
+                      <th>Total Dishes</th>
+                      <th>Lunch</th>
+                      <th>Snack</th>
+                      <th>Breakfast</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>{data.totals.totalOrders}</td>
+                      <td>{data.totals.totalDishes}</td>
+                      <td>{data.totals.lunchOrders}</td>
+                      <td>{data.totals.snackOrders}</td>
+                      <td>{data.totals.breakfastOrders}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
 
-            {showOrderBoards ? (
-              <>
-                <h2>Dietary Alerts</h2>
-                {data.allergenAlerts.length === 0 ? <p className="auth-help">No dietary-alert orders.</p> : (
-                  <div className="kitchen-alert-grid">
-                    {data.allergenAlerts.map((o) => (
-                      <article className="kitchen-alert-card" key={o.id}>
-                        <strong>{o.session} - {o.child_name}</strong>
-                        <small>Parent: {o.parent_name}</small>
-                        <small>Dietary Allergies: {o.allergen_items || '-'}</small>
-                        <small>Dishes: {o.dish_count}</small>
-                      </article>
+            <div className="kitchen-section-card">
+              <h2>Summary</h2>
+              <div className="kitchen-table-wrap">
+                <table className="kitchen-table">
+                  <thead>
+                    <tr>
+                      <th>Dish</th>
+                      <th>Qty</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.dishSummary.length === 0 ? (
+                      <tr><td colSpan={2}>No dishes yet.</td></tr>
+                    ) : data.dishSummary.map((d) => (
+                      <tr key={d.name}>
+                        <td>{d.name}</td>
+                        <td>{d.quantity}</td>
+                      </tr>
                     ))}
-                  </div>
-                )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
 
-                <h2>Orders</h2>
-                {data.orders.length === 0 ? <p className="auth-help">No orders for this day.</p> : (
-                  <div className="kitchen-order-columns">
-                    <section>
-                      <h3>Pending</h3>
-                      {pendingOrders.length === 0 ? <p className="auth-help">No pending orders.</p> : (
-                        <div className="kitchen-order-list">
-                          {pendingOrders.map((o) => (
-                            <button className="kitchen-order-card" key={o.id} type="button" onClick={() => onMarkKitchenComplete(o.id)}>
-                              <strong>{o.session} - {o.child_name}</strong>
-                              <small>School: {o.school_name || '-'}</small>
-                              <small>Parent: {o.parent_name}</small>
-                              <small>Dietary Allergies: {o.allergen_items || '-'}</small>
-                              <small>Status: {o.status} | Delivery: {o.delivery_status}</small>
-                              <small>Dishes: {o.dishes.map((d) => `${d.item_name} x${d.quantity}`).join(', ') || '-'}</small>
-                              <span className="kitchen-card-action">
-                                <span className="btn btn-primary">
-                                  {submittingOrderId === o.id ? 'Updating...' : 'Mark Kitchen Complete'}
-                                </span>
+            <div className="kitchen-section-card">
+              <h2>Dietary Alerts</h2>
+              {data.allergenAlerts.length === 0 ? <p className="auth-help">No dietary-alert orders.</p> : (
+                <div className="kitchen-alert-grid">
+                  {data.allergenAlerts.map((o) => (
+                    <article className="kitchen-alert-card" key={o.id}>
+                      <strong>{o.session} - {o.child_name}</strong>
+                      <small>Parent: {o.parent_name}</small>
+                      <small>Dietary Allergies: {o.allergen_items || '-'}</small>
+                      <small>Dishes: {o.dish_count}</small>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="kitchen-section-card">
+              <h2>Orders</h2>
+              {data.orders.length === 0 ? <p className="auth-help">No orders for this day.</p> : (
+                <div className="kitchen-order-columns">
+                  <section className="kitchen-order-panel">
+                    <h3>Order Pending</h3>
+                    {pendingOrders.length === 0 ? <p className="auth-help">No pending orders.</p> : (
+                      <div className="kitchen-order-list">
+                        {pendingOrders.map((o) => (
+                          <button className="kitchen-order-card" key={o.id} type="button" onClick={() => onMarkKitchenComplete(o.id)}>
+                            <strong>{o.session} - {o.child_name}</strong>
+                            <small>School: {o.school_name || '-'}</small>
+                            <small>Parent: {o.parent_name}</small>
+                            <small>Dietary Allergies: {o.allergen_items || '-'}</small>
+                            <small>Status: {o.status} | Delivery: {o.delivery_status}</small>
+                            <small>Dishes: {o.dishes.map((d) => `${d.item_name} x${d.quantity}`).join(', ') || '-'}</small>
+                            <span className="kitchen-card-action">
+                              <span className="btn btn-primary">
+                                {submittingOrderId === o.id ? 'Updating...' : 'Mark Kitchen Complete'}
                               </span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </section>
-                    <section>
-                      <h3>Completed</h3>
-                      {completedOrders.length === 0 ? <p className="auth-help">No completed orders.</p> : (
-                        <div className="kitchen-order-list">
-                          {completedOrders.map((o) => (
-                            <button className="kitchen-order-card kitchen-order-card-complete" key={o.id} type="button">
-                              <strong>{o.session} - {o.child_name}</strong>
-                              <small>School: {o.school_name || '-'}</small>
-                              <small>Parent: {o.parent_name}</small>
-                              <small>Dietary Allergies: {o.allergen_items || '-'}</small>
-                              <small>Status: {o.status} | Delivery: {o.delivery_status}</small>
-                              <small>Dishes: {o.dishes.map((d) => `${d.item_name} x${d.quantity}`).join(', ') || '-'}</small>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </section>
-                  </div>
-                )}
-              </>
-            ) : null}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                  <section className="kitchen-order-panel">
+                    <h3>Order Completed</h3>
+                    {completedOrders.length === 0 ? <p className="auth-help">No completed orders.</p> : (
+                      <div className="kitchen-order-list">
+                        {completedOrders.map((o) => (
+                          <button className="kitchen-order-card kitchen-order-card-complete" key={o.id} type="button" onClick={() => onMarkKitchenComplete(o.id)}>
+                            <strong>{o.session} - {o.child_name}</strong>
+                            <small>School: {o.school_name || '-'}</small>
+                            <small>Parent: {o.parent_name}</small>
+                            <small>Dietary Allergies: {o.allergen_items || '-'}</small>
+                            <small>Status: {o.status} | Delivery: {o.delivery_status}</small>
+                            <small>Dishes: {o.dishes.map((d) => `${d.item_name} x${d.quantity}`).join(', ') || '-'}</small>
+                            <span className="kitchen-card-action">
+                              <span className="btn btn-outline">
+                                {submittingOrderId === o.id ? 'Updating...' : 'Revert to Pending'}
+                              </span>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                </div>
+              )}
+            </div>
           </>
         ) : null}
       </section>
@@ -275,9 +286,16 @@ export default function KitchenDashboard({
           border-radius: 0.65rem;
           max-width: 100%;
         }
-        .kitchen-compact-view {
-          place-items: start center;
-          padding-top: 1.2rem;
+        .kitchen-section-card {
+          border: 1px solid #ddcfb8;
+          border-radius: 0.8rem;
+          background: #fffaf2;
+          padding: 0.85rem;
+          margin-bottom: 1rem;
+        }
+        .kitchen-section-card h2 {
+          margin-top: 0;
+          margin-bottom: 0.6rem;
         }
         .kitchen-table-wrap {
           overflow-x: hidden;
@@ -323,6 +341,16 @@ export default function KitchenDashboard({
           display: grid;
           grid-template-columns: 1fr;
           gap: 1rem;
+        }
+        .kitchen-order-panel {
+          border: 1px solid #ddcfb8;
+          border-radius: 0.7rem;
+          background: #fff;
+          padding: 0.7rem;
+        }
+        .kitchen-order-panel h3 {
+          margin-top: 0;
+          margin-bottom: 0.5rem;
         }
         .kitchen-order-list {
           display: grid;

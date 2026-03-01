@@ -5375,26 +5375,52 @@ export class CoreService implements OnModuleInit {
     if (!['PLACED', 'LOCKED'].includes(order.status)) {
       throw new BadRequestException('ORDER_NOT_READY_FOR_KITCHEN_COMPLETE');
     }
-    if (order.delivery_status === 'DELIVERED') {
-      return { ok: true, alreadyDelivered: true, deliveryStatus: order.delivery_status };
+    const currentDeliveryStatus = String(order.delivery_status || '').toUpperCase();
+    const isCompleted = ['OUT_FOR_DELIVERY', 'ASSIGNED', 'DELIVERED'].includes(currentDeliveryStatus);
+
+    if (!isCompleted) {
+      await runSql(
+        `UPDATE orders
+         SET delivery_status = 'OUT_FOR_DELIVERY',
+             updated_at = now()
+         WHERE id = $1;`,
+        [order.id],
+      );
+      await runSql(
+        `UPDATE billing_records
+         SET delivery_status = 'OUT_FOR_DELIVERY',
+             updated_at = now()
+         WHERE order_id = $1;`,
+        [order.id],
+      );
+      await this.autoAssignDeliveriesForDate(order.service_date);
+      return { ok: true, completed: true, deliveryStatus: 'OUT_FOR_DELIVERY' };
+    }
+
+    if (currentDeliveryStatus === 'DELIVERED') {
+      throw new BadRequestException('DELIVERED_ORDER_CANNOT_BE_REVERTED');
     }
 
     await runSql(
+      `DELETE FROM delivery_assignments
+       WHERE order_id = $1;`,
+      [order.id],
+    );
+    await runSql(
       `UPDATE orders
-       SET delivery_status = 'OUT_FOR_DELIVERY',
+       SET delivery_status = 'PENDING',
            updated_at = now()
        WHERE id = $1;`,
       [order.id],
     );
     await runSql(
       `UPDATE billing_records
-       SET delivery_status = 'OUT_FOR_DELIVERY',
+       SET delivery_status = 'PENDING',
            updated_at = now()
        WHERE order_id = $1;`,
       [order.id],
     );
-    await this.autoAssignDeliveriesForDate(order.service_date);
-    return { ok: true, deliveryStatus: 'OUT_FOR_DELIVERY' };
+    return { ok: true, completed: false, deliveryStatus: 'PENDING' };
   }
 
   // ─── Schools CRUD ────────────────────────────────────────────────────────
