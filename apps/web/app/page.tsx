@@ -1,18 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import GoogleOAuthButton from './_components/google-oauth-button';
 
 export default function HomePage() {
   const [open, setOpen] = useState(false);
-  const [showTop, setShowTop] = useState(false);
-
-  useEffect(() => {
-    const onScroll = () => setShowTop(window.scrollY > 140);
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
 
   return (
     <>
@@ -68,15 +61,6 @@ export default function HomePage() {
           <p>Visitors: <strong>35</strong> | Location: Bali, Indonesia | Time: 20:00 WITA</p>
         </footer>
       </div>
-
-      <button
-        className={`back-to-top ${showTop ? 'show' : ''}`}
-        type="button"
-        aria-label="Back to top"
-        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-      >
-        Top
-      </button>
     </>
   );
 }

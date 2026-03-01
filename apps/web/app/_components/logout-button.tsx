@@ -55,13 +55,14 @@ export default function LogoutButton() {
       </div>
       <style jsx>{`
         .session-actions {
-          position: fixed;
-          bottom: 1.1rem;
-          left: 1.1rem;
-          z-index: 100;
-          display: inline-flex;
+          position: static;
+          z-index: 1;
+          display: flex;
           align-items: center;
           gap: 0.45rem;
+          justify-content: flex-start;
+          margin: 0.85rem 1rem 1.2rem;
+          flex-wrap: wrap;
         }
         .logout-btn {
           padding: 0.35rem 0.75rem;

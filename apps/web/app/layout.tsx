@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import NetworkActivityIndicator from './_components/network-activity-indicator';
+import BackToTopGlobal from './_components/back-to-top-global';
 
 export const metadata: Metadata = {
   title: 'Blossom School Catering',
@@ -16,6 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="home-page">
         <NetworkActivityIndicator />
         {children}
+        <BackToTopGlobal />
       </body>
     </html>
   );
