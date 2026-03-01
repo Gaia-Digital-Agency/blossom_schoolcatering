@@ -46,7 +46,7 @@ function todayIsoLocal() {
 
 function mapDeliveryAdminError(raw: string) {
   if (raw.includes('Cannot delete delivery user with active assignments')) {
-    return 'Cannot delete delivery user: this user still has active delivery assignments. Reassign or complete those orders first.';
+    return 'user still has active delivery assignments';
   }
   if (raw.includes('maximum 3 active delivery personnel')) {
     return 'Cannot activate assignment: this school already has 3 active delivery personnel.';

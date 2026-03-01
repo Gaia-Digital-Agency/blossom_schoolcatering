@@ -69,13 +69,6 @@ export default function AdminBillingPage() {
 
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
-  const now = useMemo(() => new Date(), []);
-  const paidFromDate = useMemo(() => {
-    const d = new Date(now);
-    d.setUTCDate(d.getUTCDate() - 30);
-    return d.toISOString().slice(0, 10);
-  }, [now]);
-
   const unpaidRows = useMemo(
     () => rows.filter((r) => !(r.status === 'VERIFIED' && Boolean((r.proof_image_url || '').trim()))),
     [rows],
@@ -83,9 +76,9 @@ export default function AdminBillingPage() {
 
   const paidRows = useMemo(
     () => rows
-      .filter((r) => r.status === 'VERIFIED' && Boolean((r.proof_image_url || '').trim()) && String(r.service_date) >= paidFromDate)
+      .filter((r) => r.status === 'VERIFIED' && Boolean((r.proof_image_url || '').trim()))
       .sort((a, b) => String(b.service_date).localeCompare(String(a.service_date))),
-    [rows, paidFromDate],
+    [rows],
   );
 
   const unpaidBySchoolThenParent = useMemo(() => groupBySchoolThenParent(unpaidRows), [unpaidRows]);
@@ -145,17 +138,17 @@ export default function AdminBillingPage() {
 
         <div className="module-section">
           <h2>Paid Summary (Past 30 Days)</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.6rem' }}>
-            <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '0.75rem' }}>
-              <small style={{ opacity: 0.6 }}>Paid Bills</small>
+          <div className="billing-summary-grid">
+            <div className="billing-summary-card">
+              <small>Paid Bills</small>
               <div><strong>{paidSummary.totalBills}</strong></div>
             </div>
-            <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '0.75rem' }}>
-              <small style={{ opacity: 0.6 }}>Paid Amount</small>
+            <div className="billing-summary-card">
+              <small>Paid Amount</small>
               <div><strong>Rp {paidSummary.totalAmount.toLocaleString('id-ID')}</strong></div>
             </div>
-            <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '0.75rem' }}>
-              <small style={{ opacity: 0.6 }}>Parents</small>
+            <div className="billing-summary-card">
+              <small>Parents</small>
               <div><strong>{paidSummary.totalParents}</strong></div>
             </div>
           </div>
@@ -168,42 +161,44 @@ export default function AdminBillingPage() {
             <div className="module-section">
               <h2>Unpaid Bills (Grouped By Parent, Sorted By School)</h2>
               {unpaidBySchoolThenParent.length === 0 ? <p className="auth-help">No unpaid bills.</p> : (
-                <div className="auth-form">
+                <div className="billing-school-stack">
                   {unpaidBySchoolThenParent.map((schoolGroup) => (
-                    <label key={schoolGroup.schoolName}>
-                      <strong>School: {schoolGroup.schoolName}</strong>
-                      <small>Total unpaid bills: {schoolGroup.parents.reduce((acc, parentGroup) => acc + parentGroup.rows.length, 0)}</small>
-                      <small>Total: Rp {schoolGroup.parents.reduce((acc, parentGroup) => (
+                    <div key={schoolGroup.schoolName} className="billing-school-card">
+                      <div className="billing-school-header">
+                        <strong>School: {schoolGroup.schoolName}</strong>
+                        <small>Total unpaid bills: {schoolGroup.parents.reduce((acc, parentGroup) => acc + parentGroup.rows.length, 0)}</small>
+                        <small>Total: Rp {schoolGroup.parents.reduce((acc, parentGroup) => (
                         acc + parentGroup.rows.reduce((sum, row) => sum + Number(row.total_price || 0), 0)
                       ), 0).toLocaleString('id-ID')}</small>
-                      <div className="auth-form">
+                      </div>
+                      <div className="billing-parent-grid">
                         {schoolGroup.parents.map((parentGroup) => (
-                          <label key={`${schoolGroup.schoolName}-${parentGroup.parentName}`}>
+                          <div key={`${schoolGroup.schoolName}-${parentGroup.parentName}`} className="billing-parent-card">
                             <strong>Parent: {parentGroup.parentName}</strong>
                             <small>Total bills: {parentGroup.rows.length}</small>
                             <small>Total: Rp {parentGroup.rows.reduce((sum, row) => sum + Number(row.total_price || 0), 0).toLocaleString('id-ID')}</small>
-                            <div className="auth-form">
+                            <div className="billing-row-stack">
                               {parentGroup.rows.map((row) => (
-                                <label key={row.id}>
+                                <div key={row.id} className="billing-row-card">
                                   <strong>{row.service_date} {row.session}</strong>
                                   <small>Order: {row.order_id}</small>
                                   <small>Status: <strong>{row.status}</strong> · Delivery: <strong>{row.delivery_status}</strong></small>
                                   <small>Total: Rp {Number(row.total_price).toLocaleString('id-ID')}</small>
                                   <small>Proof: {row.proof_image_url ? '✓ Uploaded' : '✗ Not uploaded'}</small>
                                   {row.admin_note ? <small>Admin Note: {row.admin_note}</small> : null}
-                                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+                                  <div className="billing-action-row">
                                     <button className="btn btn-outline" type="button" onClick={() => onReview(row)}>Review</button>
                                     <button className="btn btn-outline" type="button" onClick={() => onReject(row)}>Reject</button>
                                     <button className="btn btn-outline" type="button" onClick={() => onDecision(row.id, 'VERIFIED')}>Approve</button>
                                     <button className="btn btn-outline" type="button" onClick={() => onGenerateReceipt(row.id)}>Generate Receipt</button>
                                   </div>
-                                </label>
+                                </div>
                               ))}
                             </div>
-                          </label>
+                          </div>
                         ))}
                       </div>
-                    </label>
+                    </div>
                   ))}
                 </div>
               )}
@@ -211,48 +206,124 @@ export default function AdminBillingPage() {
 
             <div className="module-section">
               <h2>Paid Bills (Grouped By School, Grouped By Parent)</h2>
-              {paidBySchoolThenParent.length === 0 ? <p className="auth-help">No paid bills in last 30 days.</p> : (
-                <div className="auth-form">
+              {paidBySchoolThenParent.length === 0 ? <p className="auth-help">No paid bills.</p> : (
+                <div className="billing-school-stack">
                   {paidBySchoolThenParent.map((schoolGroup) => (
-                    <label key={schoolGroup.schoolName}>
-                      <strong>School: {schoolGroup.schoolName}</strong>
-                      <small>Total paid bills: {schoolGroup.parents.reduce((acc, parentGroup) => acc + parentGroup.rows.length, 0)}</small>
-                      <small>Total: Rp {schoolGroup.parents.reduce((acc, parentGroup) => (
+                    <div key={schoolGroup.schoolName} className="billing-school-card">
+                      <div className="billing-school-header">
+                        <strong>School: {schoolGroup.schoolName}</strong>
+                        <small>Total paid bills: {schoolGroup.parents.reduce((acc, parentGroup) => acc + parentGroup.rows.length, 0)}</small>
+                        <small>Total: Rp {schoolGroup.parents.reduce((acc, parentGroup) => (
                         acc + parentGroup.rows.reduce((sum, row) => sum + Number(row.total_price || 0), 0)
                       ), 0).toLocaleString('id-ID')}</small>
-                      <div className="auth-form">
+                      </div>
+                      <div className="billing-parent-grid">
                         {schoolGroup.parents.map((parentGroup) => (
-                          <label key={`${schoolGroup.schoolName}-${parentGroup.parentName}`}>
+                          <div key={`${schoolGroup.schoolName}-${parentGroup.parentName}`} className="billing-parent-card">
                             <strong>Parent: {parentGroup.parentName}</strong>
                             <small>Total bills: {parentGroup.rows.length}</small>
                             <small>Total: Rp {parentGroup.rows.reduce((sum, row) => sum + Number(row.total_price || 0), 0).toLocaleString('id-ID')}</small>
-                            <div className="auth-form">
+                            <div className="billing-row-stack">
                               {parentGroup.rows.map((row) => (
-                                <label key={row.id}>
+                                <div key={row.id} className="billing-row-card">
                                   <strong>{row.service_date} {row.session}</strong>
                                   <small>Order: {row.order_id}</small>
                                   <small>Status: <strong>{row.status}</strong> · Delivery: <strong>{row.delivery_status}</strong></small>
                                   <small>Total: Rp {Number(row.total_price).toLocaleString('id-ID')}</small>
                                   <small>Receipt: {row.receipt_number || '—'}</small>
                                   {row.admin_note ? <small>Admin Note: {row.admin_note}</small> : null}
-                                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+                                  <div className="billing-action-row">
                                     <button className="btn btn-outline" type="button" onClick={() => onReview(row)}>Review</button>
                                     {row.pdf_url ? <a className="btn btn-outline" href={row.pdf_url} target="_blank" rel="noreferrer">Open Receipt</a> : null}
                                     <button className="btn btn-outline" type="button" onClick={() => onGenerateReceipt(row.id)}>Generate Receipt</button>
                                   </div>
-                                </label>
+                                </div>
                               ))}
                             </div>
-                          </label>
+                          </div>
                         ))}
                       </div>
-                    </label>
+                    </div>
                   ))}
                 </div>
               )}
             </div>
           </>
         )}
+        <style jsx>{`
+          .billing-summary-grid {
+            display: grid;
+            gap: 0.75rem;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+          }
+          .billing-summary-card {
+            border: 1px solid var(--border);
+            border-radius: 0.6rem;
+            padding: 0.8rem;
+            background: #fffdf9;
+          }
+          .billing-summary-card > small {
+            opacity: 0.65;
+          }
+          .billing-school-stack {
+            display: grid;
+            gap: 0.9rem;
+          }
+          .billing-school-card {
+            border: 1px solid #d9cdb7;
+            border-radius: 0.7rem;
+            padding: 0.8rem;
+            background: #fffaf2;
+          }
+          .billing-school-header {
+            display: grid;
+            gap: 0.3rem;
+            margin-bottom: 0.75rem;
+          }
+          .billing-parent-grid {
+            display: grid;
+            gap: 0.75rem;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+          }
+          .billing-parent-card {
+            border: 1px solid #c9baa0;
+            border-radius: 0.65rem;
+            padding: 0.7rem;
+            background: #fff;
+            display: grid;
+            gap: 0.25rem;
+          }
+          .billing-row-stack {
+            display: grid;
+            gap: 0.55rem;
+            margin-top: 0.35rem;
+          }
+          .billing-row-card {
+            border: 1px dashed #d7cab2;
+            border-radius: 0.55rem;
+            padding: 0.55rem;
+            background: #fffefc;
+            display: grid;
+            gap: 0.2rem;
+          }
+          .billing-action-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.35rem;
+          }
+          .billing-action-row :global(.btn) {
+            min-width: 110px;
+          }
+          @media (max-width: 900px) {
+            .billing-summary-grid {
+              grid-template-columns: 1fr;
+            }
+            .billing-parent-grid {
+              grid-template-columns: 1fr;
+            }
+          }
+        `}</style>
       </section>
     </main>
   );
