@@ -4104,6 +4104,21 @@ export class CoreService implements OnModuleInit {
     );
     if (schoolExists !== 't') throw new BadRequestException('School not found');
 
+    if (isActive) {
+      const activeCountOut = await runSql(
+        `SELECT COUNT(*)::int
+         FROM delivery_school_assignments
+         WHERE school_id = $1
+           AND is_active = true
+           AND delivery_user_id <> $2;`,
+        [schoolId, deliveryUserId],
+      );
+      const activeCount = Number(activeCountOut || 0);
+      if (activeCount >= 2) {
+        throw new BadRequestException('One school can only have maximum 2 active delivery personnel');
+      }
+    }
+
     await runSql(
       `INSERT INTO delivery_school_assignments (delivery_user_id, school_id, is_active, updated_at)
        VALUES ($1, $2, $3, now())
@@ -4111,18 +4126,24 @@ export class CoreService implements OnModuleInit {
        DO UPDATE SET is_active = EXCLUDED.is_active, updated_at = now();`,
       [deliveryUserId, schoolId, isActive],
     );
-    // Keep school->delivery routing deterministic: only one active delivery user per school.
-    if (isActive) {
-      await runSql(
-        `UPDATE delivery_school_assignments
-         SET is_active = false,
-             updated_at = now()
-         WHERE school_id = $1
-           AND delivery_user_id <> $2
-           AND is_active = true;`,
-        [schoolId, deliveryUserId],
-      );
-    }
+    await this.autoAssignDeliveriesForDate(this.makassarTodayIsoDate());
+    return { ok: true };
+  }
+
+  async deleteDeliverySchoolAssignment(actor: AccessUser, deliveryUserId: string, schoolId: string) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    this.assertValidUuid(deliveryUserId, 'deliveryUserId');
+    this.assertValidUuid(schoolId, 'schoolId');
+    await this.ensureDeliverySchoolAssignmentsTable();
+
+    const out = await runSql(
+      `DELETE FROM delivery_school_assignments
+       WHERE delivery_user_id = $1
+         AND school_id = $2
+       RETURNING delivery_user_id;`,
+      [deliveryUserId, schoolId],
+    );
+    if (!out) throw new NotFoundException('Delivery-school assignment not found');
     await this.autoAssignDeliveriesForDate(this.makassarTodayIsoDate());
     return { ok: true };
   }
@@ -5826,6 +5847,51 @@ export class CoreService implements OnModuleInit {
        )
        SELECT row_to_json(updated)::text FROM updated;`,
       params,
+    );
+    if (!out) throw new NotFoundException('Delivery user not found');
+    return { ok: true, user: this.parseJsonLine(out) };
+  }
+
+  async deleteDeliveryUser(actor: AccessUser, targetUserId: string) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    this.assertValidUuid(targetUserId, 'userId');
+
+    const pendingAssignmentExists = await runSql(
+      `SELECT EXISTS (
+         SELECT 1
+         FROM delivery_assignments da
+         JOIN orders o ON o.id = da.order_id
+         WHERE da.delivery_user_id = $1
+           AND o.deleted_at IS NULL
+           AND o.delivery_status <> 'DELIVERED'
+       );`,
+      [targetUserId],
+    );
+    if (pendingAssignmentExists === 't') {
+      throw new BadRequestException('Cannot delete delivery user with active assignments');
+    }
+
+    await this.ensureDeliverySchoolAssignmentsTable();
+    await runSql(
+      `UPDATE delivery_school_assignments
+       SET is_active = false, updated_at = now()
+       WHERE delivery_user_id = $1;`,
+      [targetUserId],
+    );
+
+    const out = await runSql(
+      `WITH updated AS (
+         UPDATE users
+         SET is_active = false,
+             deleted_at = now(),
+             updated_at = now()
+         WHERE id = $1
+           AND role = 'DELIVERY'
+           AND deleted_at IS NULL
+         RETURNING id, username, first_name, last_name
+       )
+       SELECT row_to_json(updated)::text FROM updated;`,
+      [targetUserId],
     );
     if (!out) throw new NotFoundException('Delivery user not found');
     return { ok: true, user: this.parseJsonLine(out) };

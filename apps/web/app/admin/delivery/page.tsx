@@ -68,6 +68,8 @@ export default function AdminDeliveryPage() {
   const [editEmail, setEditEmail] = useState('');
   const [savingUserId, setSavingUserId] = useState('');
   const [togglingUserId, setTogglingUserId] = useState('');
+  const [deletingUserId, setDeletingUserId] = useState('');
+  const [deletingMappingKey, setDeletingMappingKey] = useState('');
 
   const load = async () => {
     const [u, s, m, a] = await Promise.all([
@@ -114,6 +116,26 @@ export default function AdminDeliveryPage() {
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed updating mapping');
+    }
+  };
+
+  const onDeleteMapping = async (row: Mapping) => {
+    const ok = window.confirm(`Delete mapping "${row.school_name}" -> "${row.delivery_name}"?`);
+    if (!ok) return;
+    const key = `${row.delivery_user_id}-${row.school_id}`;
+    setDeletingMappingKey(key);
+    setError('');
+    setMessage('');
+    try {
+      await apiFetch(`/delivery/school-assignments/${row.delivery_user_id}/${row.school_id}`, {
+        method: 'DELETE',
+      });
+      setMessage('Mapping deleted.');
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed deleting mapping');
+    } finally {
+      setDeletingMappingKey('');
     }
   };
 
@@ -221,6 +243,23 @@ export default function AdminDeliveryPage() {
     }
   };
 
+  const onDeleteUser = async (user: DeliveryUser) => {
+    if (!window.confirm(`Delete delivery user "${user.username}"? This cannot be undone.`)) return;
+    setDeletingUserId(user.id);
+    setError('');
+    setMessage('');
+    try {
+      await apiFetch(`/admin/delivery/users/${user.id}`, { method: 'DELETE' });
+      setMessage(`Delivery user deleted: ${user.username}`);
+      if (editingUserId === user.id) setEditingUserId('');
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed deleting delivery user');
+    } finally {
+      setDeletingUserId('');
+    }
+  };
+
   const usersById = useMemo(() => {
     const map = new Map<string, DeliveryUser>();
     for (const u of users) map.set(u.id, u);
@@ -317,9 +356,17 @@ export default function AdminDeliveryPage() {
                           className="btn btn-outline"
                           type="button"
                           onClick={() => onToggleUserActive(u)}
-                          disabled={togglingUserId === u.id}
+                          disabled={togglingUserId === u.id || deletingUserId === u.id}
                         >
                           {togglingUserId === u.id ? 'Updating...' : (u.is_active ? 'Deactivate' : 'Activate')}
+                        </button>
+                        <button
+                          className="btn btn-outline"
+                          type="button"
+                          onClick={() => onDeleteUser(u)}
+                          disabled={deletingUserId === u.id || togglingUserId === u.id || savingUserId === u.id}
+                        >
+                          {deletingUserId === u.id ? 'Deleting...' : 'Delete'}
                         </button>
                       </div>
                     </td>
@@ -332,6 +379,7 @@ export default function AdminDeliveryPage() {
 
         <div className="admin-section-card">
           <h2>Delivery vs School Assignment</h2>
+          <p className="auth-help">One school can have maximum 2 active delivery personnel assignments.</p>
           <div className="auth-form admin-mapping-controls">
             <label>
               School
@@ -385,6 +433,14 @@ export default function AdminDeliveryPage() {
                         {m.is_active
                           ? <button className="btn btn-outline" type="button" onClick={() => onToggleMapping(m, false)}>Deactivate</button>
                           : <button className="btn btn-outline" type="button" onClick={() => onToggleMapping(m, true)}>Activate</button>}
+                        <button
+                          className="btn btn-outline"
+                          type="button"
+                          onClick={() => onDeleteMapping(m)}
+                          disabled={deletingMappingKey === `${m.delivery_user_id}-${m.school_id}`}
+                        >
+                          {deletingMappingKey === `${m.delivery_user_id}-${m.school_id}` ? 'Deleting...' : 'Delete'}
+                        </button>
                       </div>
                     </td>
                   </tr>

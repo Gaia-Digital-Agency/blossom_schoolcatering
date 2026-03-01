@@ -81,6 +81,15 @@ type SpendingDashboard = {
   byChild: Array<{ child_name: string; orders_count: number; total_spend: number }>;
   birthdayHighlights: Array<{ child_name: string; days_until: number }>;
 };
+type DraftSourceContext = {
+  mode: 'edit' | 'quick-reorder';
+  orderId: string;
+  childId: string;
+  childName: string;
+  sourceServiceDate: string;
+  targetServiceDate: string;
+  session: SessionType;
+};
 
 function nextWeekdayIsoDate() {
   const d = new Date();
@@ -182,6 +191,7 @@ export default function ParentsPage() {
   const [batchProofData, setBatchProofData] = useState('');
   const [selectedBillingIds, setSelectedBillingIds] = useState<string[]>([]);
   const [activeBlackout, setActiveBlackout] = useState<ActiveBlackout | null>(null);
+  const [draftSourceContext, setDraftSourceContext] = useState<DraftSourceContext | null>(null);
 
   const [activeSection, setActiveSection] = useState<'order' | 'billing'>('order');
 
@@ -381,6 +391,7 @@ export default function ParentsPage() {
       const order = await apiFetch(`/carts/${cartId}/submit`, { method: 'POST' }) as { id: string; total_price: number };
       setMessage(`Order placed successfully. Order ID: ${order.id}, total: Rp ${order.total_price.toLocaleString('id-ID')}.`);
       setItemQty({}); setDraftCartId(''); setDraftExpiresAt('');
+      setDraftSourceContext(null);
       await Promise.all([loadOrders(), loadBilling()]);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Order placement failed';
@@ -393,17 +404,27 @@ export default function ParentsPage() {
     } finally { setSubmitting(false); }
   };
 
-  const onOpenOrderAsDraft = async (order: ConsolidatedOrder, targetDate: string) => {
+  const onOpenOrderAsDraft = async (order: ConsolidatedOrder, targetDate: string, mode: 'edit' | 'quick-reorder') => {
     setError(''); setMessage('');
     try {
       const out = await apiFetch('/carts/quick-reorder', {
         method: 'POST',
         body: JSON.stringify({ sourceOrderId: order.id, serviceDate: targetDate }),
       }) as { cartId: string; excludedItemIds: string[] };
+      setActiveSection('order');
       setSelectedChildId(order.child_id);
       setServiceDate(targetDate);
       const nextSession = activeSessions.includes(order.session) ? order.session : (activeSessions[0] || 'LUNCH');
       setSession(nextSession);
+      setDraftSourceContext({
+        mode,
+        orderId: order.id,
+        childId: order.child_id,
+        childName: order.child_name,
+        sourceServiceDate: order.service_date,
+        targetServiceDate: targetDate,
+        session: nextSession,
+      });
       const menuData = await apiFetch(`/menus?service_date=${targetDate}&session=${nextSession}`) as { items: MenuItem[] };
       setMenuItems(menuData.items || []);
       await loadDraftItems(out.cartId);
@@ -519,6 +540,18 @@ export default function ParentsPage() {
 
         <div className="module-section">
           <h2>Menu and Cart</h2>
+          {draftSourceContext
+            && selectedChildId === draftSourceContext.childId
+            && serviceDate === draftSourceContext.targetServiceDate
+            && session === draftSourceContext.session ? (
+              <p className="auth-help">
+                {draftSourceContext.mode === 'edit' ? 'Editing order from' : 'Quick reorder from'}: #{draftSourceContext.orderId}
+                {' | '}Youngster: {draftSourceContext.childName}
+                {' | '}Source date: {draftSourceContext.sourceServiceDate}
+                {' | '}Draft date: {draftSourceContext.targetServiceDate}
+                {' | '}Session: {draftSourceContext.session}
+              </p>
+            ) : null}
           <label>Service Date<input type="date" value={serviceDate} min={orderingWindow.earliestServiceDate} onChange={(e) => setServiceDate(e.target.value)} /></label>
           <label>
             Session
@@ -607,9 +640,9 @@ export default function ParentsPage() {
                   <small>Status: {order.status} | Billing: {order.billing_status || '-'} | Delivery: {order.delivery_status || '-'}</small>
                   <small>Total: Rp {Number(order.total_price).toLocaleString('id-ID')}</small>
                   <small>Items: {order.items.map((item) => `${item.item_name_snapshot} x${item.quantity}`).join(', ') || '-'}</small>
-                  <button className="btn btn-outline" type="button" onClick={() => onOpenOrderAsDraft(order, order.service_date)} disabled={!order.can_edit || submitting}>Edit Before Cutoff</button>
+                  <button className="btn btn-outline" type="button" onClick={() => onOpenOrderAsDraft(order, order.service_date, 'edit')} disabled={!order.can_edit || submitting}>Edit Before Cutoff</button>
                   <button className="btn btn-outline" type="button" onClick={() => onDeleteOrder(order.id)} disabled={!order.can_edit || submitting}>Delete Before Cutoff</button>
-                  <button className="btn btn-outline" type="button" onClick={() => onOpenOrderAsDraft(order, quickReorderDate)} disabled={submitting}>Quick Reorder</button>
+                  <button className="btn btn-outline" type="button" onClick={() => onOpenOrderAsDraft(order, quickReorderDate, 'quick-reorder')} disabled={submitting}>Quick Reorder</button>
                   {!order.can_edit ? <small>Cutoff passed or order status is not editable.</small> : null}
                 </label>
               ))}

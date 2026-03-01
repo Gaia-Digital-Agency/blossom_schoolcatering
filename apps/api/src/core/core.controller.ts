@@ -501,6 +501,12 @@ export class CoreController {
     return this.coreService.updateDeliveryUser(req.user, userId, body);
   }
 
+  @Delete('admin/delivery/users/:userId')
+  @Roles('ADMIN')
+  deleteDeliveryUser(@Req() req: AuthRequest, @Param('userId', ParseUUIDPipe) userId: string) {
+    return this.coreService.deleteDeliveryUser(req.user, userId);
+  }
+
   @Get('delivery/school-assignments')
   @Roles('ADMIN')
   getDeliverySchoolAssignments() {
@@ -514,6 +520,16 @@ export class CoreController {
     @Body() body: UpsertDeliveryAssignmentDto,
   ) {
     return this.coreService.upsertDeliverySchoolAssignment(req.user, body);
+  }
+
+  @Delete('delivery/school-assignments/:deliveryUserId/:schoolId')
+  @Roles('ADMIN')
+  deleteDeliverySchoolAssignment(
+    @Req() req: AuthRequest,
+    @Param('deliveryUserId', ParseUUIDPipe) deliveryUserId: string,
+    @Param('schoolId', ParseUUIDPipe) schoolId: string,
+  ) {
+    return this.coreService.deleteDeliverySchoolAssignment(req.user, deliveryUserId, schoolId);
   }
 
   @Post('delivery/auto-assign')
