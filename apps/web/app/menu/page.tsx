@@ -65,7 +65,7 @@ export default function MenuPage() {
       try {
         const res = await fetchWithTimeout(`${getApiBase()}/public/menu`, {
           credentials: 'include',
-          cache: 'no-store',
+          cache: 'no-cache',
         });
         if (!res.ok) throw new Error('Failed loading menu');
         const data = await res.json() as { serviceDate: string; items: PublicMenuItem[] };

@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  OnModuleInit,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -55,13 +56,21 @@ const DISH_CATEGORIES = ['MAIN', 'APPETISER', 'COMPLEMENT', 'DESSERT', 'SIDES', 
 type DishCategory = (typeof DISH_CATEGORIES)[number];
 
 @Injectable()
-export class CoreService {
-  private menuItemExtendedColumnsReady = false;
-  private menuRatingsTableReady = false;
+export class CoreService implements OnModuleInit {
   private parentDietaryRestrictionsReady = false;
-  private childRegistrationSourceColumnsReady = false;
   private deliverySchoolAssignmentsReady = false;
-  private sessionSettingsReady = false;
+  private readonly publicMenuCacheTtlMs = 60_000;
+  private publicMenuCache = new Map<string, {
+    data: { serviceDate: string; session: SessionType | 'ALL'; items: unknown[] };
+    expiresAt: number;
+  }>();
+
+  async onModuleInit() {
+    await this.ensureMenuItemExtendedColumns();
+    await this.ensureSessionSettingsTable();
+    await this.ensureMenuRatingsTable();
+    await this.ensureChildRegistrationSourceColumns();
+  }
 
   private parseJsonLine<T>(line: string): T {
     if (!line) throw new BadRequestException('No data');
@@ -563,7 +572,6 @@ export class CoreService {
   }
 
   private async ensureMenuItemExtendedColumns() {
-    if (this.menuItemExtendedColumnsReady) return;
     await runSql(`
       ALTER TABLE menu_items
       ADD COLUMN IF NOT EXISTS cutlery_required boolean NOT NULL DEFAULT false;
@@ -596,11 +604,9 @@ export class CoreService {
       ALTER TABLE menu_items
       ADD COLUMN IF NOT EXISTS dish_category text NOT NULL DEFAULT 'MAIN';
     `);
-    this.menuItemExtendedColumnsReady = true;
   }
 
   private async ensureMenuRatingsTable() {
-    if (this.menuRatingsTableReady) return;
     await runSql(`
       CREATE TABLE IF NOT EXISTS menu_item_ratings (
         menu_item_id uuid NOT NULL REFERENCES menu_items(id) ON DELETE CASCADE,
@@ -616,7 +622,6 @@ export class CoreService {
       CREATE INDEX IF NOT EXISTS idx_menu_item_ratings_item_stars
       ON menu_item_ratings(menu_item_id, stars);
     `);
-    this.menuRatingsTableReady = true;
   }
 
   private async ensureDeliverySchoolAssignmentsTable() {
@@ -639,7 +644,6 @@ export class CoreService {
   }
 
   private async ensureSessionSettingsTable() {
-    if (this.sessionSettingsReady) return;
     await runSql(`
       CREATE TABLE IF NOT EXISTS session_settings (
         session session_type PRIMARY KEY,
@@ -656,11 +660,9 @@ export class CoreService {
         [session],
       );
     }
-    this.sessionSettingsReady = true;
   }
 
   private async isSessionActive(session: SessionType) {
-    await this.ensureSessionSettingsTable();
     const out = await runSql(
       `SELECT is_active::text
        FROM session_settings
@@ -807,7 +809,6 @@ export class CoreService {
   }
 
   async getSessionSettings() {
-    await this.ensureSessionSettingsTable();
     const out = await runSql(
       `
       SELECT row_to_json(t)::text
@@ -826,7 +827,6 @@ export class CoreService {
     if (session === 'LUNCH' && !isActive) {
       throw new BadRequestException('LUNCH session must remain active');
     }
-    await this.ensureSessionSettingsTable();
     const out = await runSql(
       `WITH updated AS (
          UPDATE session_settings
@@ -840,6 +840,7 @@ export class CoreService {
       [isActive, session],
     );
     if (!out) throw new NotFoundException('Session setting not found');
+    this.clearPublicMenuCache();
     return this.parseJsonLine<{ session: SessionType; is_active: boolean }>(out);
   }
 
@@ -1012,17 +1013,14 @@ export class CoreService {
   }
 
   private async ensureChildRegistrationSourceColumns() {
-    if (this.childRegistrationSourceColumnsReady) return;
     await runSql(`
       ALTER TABLE children
       ADD COLUMN IF NOT EXISTS registration_actor_type varchar(20) NOT NULL DEFAULT 'PARENT',
       ADD COLUMN IF NOT EXISTS registration_actor_teacher_name varchar(50);
     `);
-    this.childRegistrationSourceColumnsReady = true;
   }
 
   async getAdminChildren() {
-    await this.ensureChildRegistrationSourceColumns();
     const out = await runSql(`
       SELECT row_to_json(t)::text
       FROM (
@@ -1071,38 +1069,6 @@ export class CoreService {
     const pastWeekStart = await runSql(`SELECT ($1::date - INTERVAL '6 day')::date::text;`, [date]);
     const pastMonthStart = await runSql(`SELECT ($1::date - INTERVAL '29 day')::date::text;`, [date]);
 
-    const parentsCount = Number(await runSql(`
-      SELECT count(*)::int
-      FROM parents p
-      JOIN users u ON u.id = p.user_id
-      WHERE p.deleted_at IS NULL
-        AND u.is_active = true;
-    `) || 0);
-
-    const youngstersCount = Number(await runSql(`
-      SELECT count(*)::int
-      FROM children c
-      JOIN users u ON u.id = c.user_id
-      WHERE c.is_active = true
-        AND c.deleted_at IS NULL
-        AND u.is_active = true;
-    `) || 0);
-
-    const schoolsCount = Number(await runSql(`
-      SELECT count(*)::int
-      FROM schools
-      WHERE is_active = true
-        AND deleted_at IS NULL;
-    `) || 0);
-
-    const deliveryPersonnelCount = Number(await runSql(`
-      SELECT count(*)::int
-      FROM users
-      WHERE role = 'DELIVERY'
-        AND is_active = true
-        AND deleted_at IS NULL;
-    `) || 0);
-
     const getOrdersAndDishes = async (from: string, to: string) => {
       const out = await runSql(
         `
@@ -1122,109 +1088,6 @@ export class CoreService {
       const row = this.parseJsonLine<{ total_orders: number; total_dishes: number }>(out || '{"total_orders":0,"total_dishes":0}');
       return { totalOrders: Number(row.total_orders || 0), totalDishes: Number(row.total_dishes || 0) };
     };
-
-    const todayDelivery = await getOrdersAndDishes(date, date);
-    const yesterdayDelivery = await getOrdersAndDishes(yesterday, yesterday);
-    const tomorrowDelivery = await getOrdersAndDishes(tomorrow, tomorrow);
-    const pastWeekDelivery = await getOrdersAndDishes(pastWeekStart, date);
-    const pastMonthDelivery = await getOrdersAndDishes(pastMonthStart, date);
-
-    const todayOrdersCount = todayDelivery.totalOrders;
-    const todayTotalDishes = todayDelivery.totalDishes;
-
-    const totalSales = Number(await runSql(`
-      SELECT coalesce(sum(total_price), 0)::numeric
-      FROM orders
-      WHERE deleted_at IS NULL
-        AND status <> 'CANCELLED';
-    `) || 0);
-
-    const yesterdayFailedOrUncheckedDelivery = Number(await runSql(
-      `SELECT count(*)::int
-       FROM orders
-       WHERE service_date = $1::date
-         AND deleted_at IS NULL
-         AND status <> 'CANCELLED'
-         AND delivery_status <> 'DELIVERED';`,
-      [yesterday],
-    ) || 0);
-
-    const failedDeliveryByPersonOut = await runSql(
-      `
-      SELECT row_to_json(t)::text
-      FROM (
-        SELECT COALESCE(da.delivery_user_id::text, 'UNASSIGNED') AS delivery_user_id,
-               COALESCE((u.first_name || ' ' || u.last_name), 'Unassigned') AS delivery_person_name,
-               COUNT(DISTINCT o.id)::int AS orders_count
-        FROM orders o
-        LEFT JOIN delivery_assignments da ON da.order_id = o.id
-        LEFT JOIN users u ON u.id = da.delivery_user_id
-        WHERE o.service_date = $1::date
-          AND o.deleted_at IS NULL
-          AND o.status <> 'CANCELLED'
-          AND (
-            o.delivery_status <> 'DELIVERED'
-            OR da.confirmed_at IS NULL
-          )
-        GROUP BY da.delivery_user_id, u.first_name, u.last_name
-        ORDER BY orders_count DESC, delivery_person_name ASC
-      ) t;
-    `,
-      [yesterday],
-    );
-    const failedDeliveryByPerson = this.parseJsonLines<{
-      delivery_user_id: string;
-      delivery_person_name: string;
-      orders_count: number;
-    }>(failedDeliveryByPersonOut);
-
-    const menuTotalsOut = await runSql(
-      `
-      SELECT row_to_json(t)::text
-      FROM (
-        SELECT COUNT(*)::int AS dishes_total_created,
-               COUNT(*) FILTER (WHERE is_available = true)::int AS dishes_total_active
-        FROM menu_items
-        WHERE deleted_at IS NULL
-      ) t;
-    `,
-    );
-    const menuTotals = this.parseJsonLine<{ dishes_total_created: number; dishes_total_active: number }>(
-      menuTotalsOut || '{"dishes_total_created":0,"dishes_total_active":0}',
-    );
-
-    const upcomingBlackoutsOut = await runSql(
-      `
-      SELECT row_to_json(t)::text
-      FROM (
-        SELECT b.blackout_date::text AS blackout_date,
-               b.type::text AS type,
-               b.reason,
-               (
-                 SELECT COUNT(*)::int
-                 FROM orders o
-                 WHERE o.service_date = b.blackout_date
-                   AND o.deleted_at IS NULL
-                   AND o.status <> 'CANCELLED'
-               )::int AS affected_orders
-        FROM blackout_days b
-        WHERE b.blackout_date >= $1::date
-        ORDER BY b.blackout_date ASC
-        LIMIT 10
-      ) t;
-    `,
-      [date],
-    );
-    const upcomingBlackouts = this.parseJsonLines<{
-      blackout_date: string;
-      type: BlackoutType;
-      reason: string | null;
-      affected_orders: number;
-    }>(upcomingBlackoutsOut);
-    const nextBlackout = upcomingBlackouts[0] || null;
-    const serviceBlockedDatesWithOrders = upcomingBlackouts
-      .filter((row) => ['SERVICE_BLOCK', 'BOTH'].includes(row.type))
-      .filter((row) => Number(row.affected_orders || 0) > 0);
 
     const getKitchenUnfulfilled = async (from: string, to: string) => {
       const out = await runSql(
@@ -1250,8 +1113,6 @@ export class CoreService {
         dishesNotFulfilled: Number(row.dishes_not_fulfilled || 0),
       };
     };
-    const kitchenYesterday = await getKitchenUnfulfilled(yesterday, yesterday);
-    const kitchenPastWeek = await getKitchenUnfulfilled(pastWeekStart, date);
 
     const getBillingPeriodMetrics = async (from: string, to: string) => {
       const out = await runSql(
@@ -1293,28 +1154,187 @@ export class CoreService {
         totalValueUnpaidNoProof: Number(row.total_value_unpaid_no_proof || 0),
       };
     };
-    const billingYesterday = await getBillingPeriodMetrics(yesterday, yesterday);
-    const billingPastWeek = await getBillingPeriodMetrics(pastWeekStart, date);
-    const billingPastMonth = await getBillingPeriodMetrics(pastMonthStart, date);
 
-    const pendingBillingCount = Number(await runSql(`
-      SELECT count(*)::int
-      FROM billing_records
-      WHERE status IN ('UNPAID', 'PENDING_VERIFICATION');
-    `) || 0);
-
-    const birthdaysOut = await runSql(`
-      SELECT row_to_json(t)::text
-      FROM (
-        SELECT c.id AS child_id,
-               (u.first_name || ' ' || u.last_name) AS child_name,
-               c.date_of_birth::text AS date_of_birth
+    const [
+      parentsCountRaw,
+      youngstersCountRaw,
+      schoolsCountRaw,
+      deliveryPersonnelCountRaw,
+      todayDelivery,
+      yesterdayDelivery,
+      tomorrowDelivery,
+      pastWeekDelivery,
+      pastMonthDelivery,
+      totalSalesRaw,
+      yesterdayFailedOrUncheckedDeliveryRaw,
+      failedDeliveryByPersonOut,
+      menuTotalsOut,
+      upcomingBlackoutsOut,
+      kitchenYesterday,
+      kitchenPastWeek,
+      billingYesterday,
+      billingPastWeek,
+      billingPastMonth,
+      pendingBillingCountRaw,
+      birthdaysOut,
+    ] = await Promise.all([
+      runSql(`
+        SELECT count(*)::int
+        FROM parents p
+        JOIN users u ON u.id = p.user_id
+        WHERE p.deleted_at IS NULL
+          AND u.is_active = true;
+      `),
+      runSql(`
+        SELECT count(*)::int
         FROM children c
         JOIN users u ON u.id = c.user_id
         WHERE c.is_active = true
           AND c.deleted_at IS NULL
-      ) t;
-    `);
+          AND u.is_active = true;
+      `),
+      runSql(`
+        SELECT count(*)::int
+        FROM schools
+        WHERE is_active = true
+          AND deleted_at IS NULL;
+      `),
+      runSql(`
+        SELECT count(*)::int
+        FROM users
+        WHERE role = 'DELIVERY'
+          AND is_active = true
+          AND deleted_at IS NULL;
+      `),
+      getOrdersAndDishes(date, date),
+      getOrdersAndDishes(yesterday, yesterday),
+      getOrdersAndDishes(tomorrow, tomorrow),
+      getOrdersAndDishes(pastWeekStart, date),
+      getOrdersAndDishes(pastMonthStart, date),
+      runSql(`
+        SELECT coalesce(sum(total_price), 0)::numeric
+        FROM orders
+        WHERE deleted_at IS NULL
+          AND status <> 'CANCELLED';
+      `),
+      runSql(
+        `SELECT count(*)::int
+         FROM orders
+         WHERE service_date = $1::date
+           AND deleted_at IS NULL
+           AND status <> 'CANCELLED'
+           AND delivery_status <> 'DELIVERED';`,
+        [yesterday],
+      ),
+      runSql(
+        `
+        SELECT row_to_json(t)::text
+        FROM (
+          SELECT COALESCE(da.delivery_user_id::text, 'UNASSIGNED') AS delivery_user_id,
+                 COALESCE((u.first_name || ' ' || u.last_name), 'Unassigned') AS delivery_person_name,
+                 COUNT(DISTINCT o.id)::int AS orders_count
+          FROM orders o
+          LEFT JOIN delivery_assignments da ON da.order_id = o.id
+          LEFT JOIN users u ON u.id = da.delivery_user_id
+          WHERE o.service_date = $1::date
+            AND o.deleted_at IS NULL
+            AND o.status <> 'CANCELLED'
+            AND (
+              o.delivery_status <> 'DELIVERED'
+              OR da.confirmed_at IS NULL
+            )
+          GROUP BY da.delivery_user_id, u.first_name, u.last_name
+          ORDER BY orders_count DESC, delivery_person_name ASC
+        ) t;
+      `,
+        [yesterday],
+      ),
+      runSql(
+        `
+        SELECT row_to_json(t)::text
+        FROM (
+          SELECT COUNT(*)::int AS dishes_total_created,
+                 COUNT(*) FILTER (WHERE is_available = true)::int AS dishes_total_active
+          FROM menu_items
+          WHERE deleted_at IS NULL
+        ) t;
+      `,
+      ),
+      runSql(
+        `
+        SELECT row_to_json(t)::text
+        FROM (
+          SELECT b.blackout_date::text AS blackout_date,
+                 b.type::text AS type,
+                 b.reason,
+                 (
+                   SELECT COUNT(*)::int
+                   FROM orders o
+                   WHERE o.service_date = b.blackout_date
+                     AND o.deleted_at IS NULL
+                     AND o.status <> 'CANCELLED'
+                 )::int AS affected_orders
+          FROM blackout_days b
+          WHERE b.blackout_date >= $1::date
+          ORDER BY b.blackout_date ASC
+          LIMIT 10
+        ) t;
+      `,
+        [date],
+      ),
+      getKitchenUnfulfilled(yesterday, yesterday),
+      getKitchenUnfulfilled(pastWeekStart, date),
+      getBillingPeriodMetrics(yesterday, yesterday),
+      getBillingPeriodMetrics(pastWeekStart, date),
+      getBillingPeriodMetrics(pastMonthStart, date),
+      runSql(`
+        SELECT count(*)::int
+        FROM billing_records
+        WHERE status IN ('UNPAID', 'PENDING_VERIFICATION');
+      `),
+      runSql(`
+        SELECT row_to_json(t)::text
+        FROM (
+          SELECT c.id AS child_id,
+                 (u.first_name || ' ' || u.last_name) AS child_name,
+                 c.date_of_birth::text AS date_of_birth
+          FROM children c
+          JOIN users u ON u.id = c.user_id
+          WHERE c.is_active = true
+            AND c.deleted_at IS NULL
+        ) t;
+      `),
+    ]);
+
+    const parentsCount = Number(parentsCountRaw || 0);
+    const youngstersCount = Number(youngstersCountRaw || 0);
+    const schoolsCount = Number(schoolsCountRaw || 0);
+    const deliveryPersonnelCount = Number(deliveryPersonnelCountRaw || 0);
+    const totalSales = Number(totalSalesRaw || 0);
+    const yesterdayFailedOrUncheckedDelivery = Number(yesterdayFailedOrUncheckedDeliveryRaw || 0);
+    const pendingBillingCount = Number(pendingBillingCountRaw || 0);
+    const todayOrdersCount = todayDelivery.totalOrders;
+    const todayTotalDishes = todayDelivery.totalDishes;
+
+    const failedDeliveryByPerson = this.parseJsonLines<{
+      delivery_user_id: string;
+      delivery_person_name: string;
+      orders_count: number;
+    }>(failedDeliveryByPersonOut);
+    const menuTotals = this.parseJsonLine<{ dishes_total_created: number; dishes_total_active: number }>(
+      menuTotalsOut || '{"dishes_total_created":0,"dishes_total_active":0}',
+    );
+    const upcomingBlackouts = this.parseJsonLines<{
+      blackout_date: string;
+      type: BlackoutType;
+      reason: string | null;
+      affected_orders: number;
+    }>(upcomingBlackoutsOut);
+    const nextBlackout = upcomingBlackouts[0] || null;
+    const serviceBlockedDatesWithOrders = upcomingBlackouts
+      .filter((row) => ['SERVICE_BLOCK', 'BOTH'].includes(row.type))
+      .filter((row) => Number(row.affected_orders || 0) > 0);
+
     const today = new Date(date);
     const birthdayToday = this.parseJsonLines<{ child_id: string; child_name: string; date_of_birth: string }>(birthdaysOut)
       .map((row) => {
@@ -1540,7 +1560,6 @@ export class CoreService {
     allergenExclude?: string;
     favouritesOnly?: string;
   }) {
-    await this.ensureMenuItemExtendedColumns();
     if (!['PARENT', 'YOUNGSTER', 'ADMIN', 'KITCHEN'].includes(actor.role)) {
       throw new ForbiddenException('Role not allowed');
     }
@@ -1558,7 +1577,6 @@ export class CoreService {
     const filters: string[] = [];
     const params: unknown[] = [serviceDate];
     if (['PARENT', 'YOUNGSTER'].includes(actor.role)) {
-      await this.ensureSessionSettingsTable();
       if (session) {
         const active = await this.isSessionActive(session);
         if (!active) {
@@ -1663,20 +1681,26 @@ export class CoreService {
   }
 
   async getPublicActiveMenu(query: { serviceDate?: string; session?: string }) {
-    await this.ensureMenuItemExtendedColumns();
-    await this.ensureSessionSettingsTable();
     const serviceDate = query.serviceDate
       ? this.validateServiceDate(query.serviceDate)
       : this.nextWeekdayIsoDate();
     const session = query.session ? this.normalizeSession(query.session) : null;
+    const cacheKey = this.getPublicMenuCacheKey(serviceDate, session);
+    const cached = this.publicMenuCache.get(cacheKey);
+    if (cached && Date.now() < cached.expiresAt) return cached.data;
     if (session) {
       const active = await this.isSessionActive(session);
       if (!active) {
-        return {
+        const emptyResult = {
           serviceDate,
           session,
           items: [],
         };
+        this.publicMenuCache.set(cacheKey, {
+          data: emptyResult,
+          expiresAt: Date.now() + this.publicMenuCacheTtlMs,
+        });
+        return emptyResult;
       }
     }
     const params: unknown[] = [serviceDate];
@@ -1724,11 +1748,16 @@ export class CoreService {
       params,
     );
 
-    return {
+    const result: { serviceDate: string; session: SessionType | 'ALL'; items: unknown[] } = {
       serviceDate,
-      session: session || 'ALL',
+      session: (session || 'ALL') as SessionType | 'ALL',
       items: this.parseJsonLines(out),
     };
+    this.publicMenuCache.set(cacheKey, {
+      data: result,
+      expiresAt: Date.now() + this.publicMenuCacheTtlMs,
+    });
+    return result;
   }
 
   async getAdminIngredients() {
@@ -1745,7 +1774,6 @@ export class CoreService {
   }
 
   async getAdminMenus(query: { serviceDate?: string; session?: string }) {
-    await this.ensureMenuItemExtendedColumns();
     const serviceDate = this.validateServiceDate(query.serviceDate);
     const session = this.normalizeSession(query.session);
     const out = await runSql(
@@ -1794,7 +1822,6 @@ export class CoreService {
   }
 
   async getAdminMenuRatings(query: { serviceDate?: string; session?: string }) {
-    await this.ensureMenuRatingsTable();
     const serviceDate = this.validateServiceDate(query.serviceDate);
     const session = this.normalizeSession(query.session);
     const out = await runSql(
@@ -1832,7 +1859,6 @@ export class CoreService {
   }
 
   async createOrUpdateMenuRating(actor: AccessUser, input: { menuItemId: string; stars: number }) {
-    await this.ensureMenuRatingsTable();
     if (!['PARENT', 'YOUNGSTER'].includes(actor.role)) {
       throw new ForbiddenException('Role not allowed');
     }
@@ -1906,7 +1932,6 @@ export class CoreService {
     containsPeanut?: boolean;
     dishCategory?: string;
   }) {
-    await this.ensureMenuItemExtendedColumns();
     const serviceDate = this.validateServiceDate(input.serviceDate);
     const session = this.normalizeSession(input.session);
     const name = (input.name || '').trim();
@@ -1982,6 +2007,7 @@ export class CoreService {
       );
     }
 
+    this.clearPublicMenuCache();
     return { ok: true, itemId: item.id, itemName: item.name };
   }
 
@@ -2008,7 +2034,6 @@ export class CoreService {
       dishCategory?: string;
     },
   ) {
-    await this.ensureMenuItemExtendedColumns();
     const currentOut = await runSql(
       `
       SELECT row_to_json(t)::text
@@ -2163,11 +2188,11 @@ export class CoreService {
         [itemId, ingredientId],
       );
     }
+    this.clearPublicMenuCache();
     return { ok: true };
   }
 
   async seedAdminMenuSample(serviceDateRaw?: string) {
-    await this.ensureMenuItemExtendedColumns();
     const serviceDate = this.validateServiceDate(serviceDateRaw);
     const samples = [
       {
@@ -2269,6 +2294,7 @@ export class CoreService {
         [menuId],
       );
     }
+    this.clearPublicMenuCache();
     return { ok: true, serviceDate, createdItemIds: createdIds };
   }
 
@@ -2541,56 +2567,7 @@ export class CoreService {
     await this.assertSessionActiveForOrdering(cart.session);
 
     const dietarySnapshot = await this.getOrderDietarySnapshot(cart.child_id);
-
     const totalPrice = items.reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0);
-
-    let orderOut: string;
-    try {
-      orderOut = await runSql(
-        `WITH inserted AS (
-           INSERT INTO orders (cart_id, child_id, placed_by_user_id, session, service_date, status, total_price, dietary_snapshot)
-           VALUES ($1, $2, $3, $4::session_type, $5::date, 'PLACED', $6, $7)
-           RETURNING id, order_number::text, child_id, session::text AS session, service_date::text AS service_date,
-                     status::text AS status, total_price, dietary_snapshot, placed_at::text AS placed_at
-         )
-         SELECT row_to_json(inserted)::text
-         FROM inserted;`,
-        [
-          cart.id,
-          cart.child_id,
-          actor.uid,
-          cart.session,
-          cart.service_date,
-          Number(totalPrice.toFixed(2)),
-          dietarySnapshot || null,
-        ],
-      );
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes('orders_child_session_date_active_uq') || msg.includes('23505')) {
-        throw new ConflictException('ORDER_ALREADY_EXISTS_FOR_DATE');
-      }
-      throw err;
-    }
-    const order = this.parseJsonLine<{
-      id: string;
-      order_number: string;
-      child_id: string;
-      session: string;
-      service_date: string;
-      status: string;
-      total_price: string | number;
-      dietary_snapshot?: string | null;
-      placed_at: string;
-    }>(orderOut);
-
-    for (const item of items) {
-      await runSql(
-        `INSERT INTO order_items (order_id, menu_item_id, item_name_snapshot, price_snapshot, quantity)
-         VALUES ($1, $2, $3, $4, $5);`,
-        [order.id, item.menu_item_id, item.name, Number(Number(item.price).toFixed(2)), Number(item.quantity)],
-      );
-    }
 
     let billingParentId: string | null = null;
     if (actor.role === 'PARENT') {
@@ -2611,24 +2588,84 @@ export class CoreService {
       throw new BadRequestException('No linked parent for billing');
     }
 
-    await runSql(
-      `INSERT INTO billing_records (order_id, parent_id, status, delivery_status)
-       VALUES ($1, $2, 'UNPAID', 'PENDING');`,
-      [order.id, billingParentId],
-    );
+    const menuItemIds = items.map((item) => item.menu_item_id);
+    const itemNames = items.map((item) => item.name);
+    const itemPrices = items.map((item) => Number(Number(item.price).toFixed(2)));
+    const itemQuantities = items.map((item) => Number(item.quantity));
+    const mutationAfter = JSON.stringify({ cartId: cart.id, totalItems: items.length, totalPrice });
 
-    await runSql(
-      `INSERT INTO order_mutations (order_id, action, actor_user_id, before_json, after_json)
-       VALUES ($1, 'ORDER_PLACED', $2, NULL, $3::jsonb);`,
-      [order.id, actor.uid, JSON.stringify({ cartId: cart.id, totalItems: items.length, totalPrice })],
-    );
-
-    await runSql(
-      `UPDATE order_carts
-       SET status = 'SUBMITTED', updated_at = now()
-       WHERE id = $1;`,
-      [cart.id],
-    );
+    let orderOut: string;
+    try {
+      // Single SQL statement keeps all writes atomic and prevents partial commits.
+      orderOut = await runSql(
+        `
+        WITH inserted_order AS (
+          INSERT INTO orders (cart_id, child_id, placed_by_user_id, session, service_date, status, total_price, dietary_snapshot)
+          VALUES ($1, $2, $3, $4::session_type, $5::date, 'PLACED', $6, $7)
+          RETURNING id, order_number::text, child_id, session::text AS session, service_date::text AS service_date,
+                    status::text AS status, total_price, dietary_snapshot, placed_at::text AS placed_at
+        ),
+        inserted_items AS (
+          INSERT INTO order_items (order_id, menu_item_id, item_name_snapshot, price_snapshot, quantity)
+          SELECT o.id, x.menu_item_id, x.item_name_snapshot, x.price_snapshot, x.quantity
+          FROM inserted_order o
+          JOIN unnest($8::uuid[], $9::text[], $10::numeric[], $11::int[])
+            AS x(menu_item_id, item_name_snapshot, price_snapshot, quantity) ON true
+        ),
+        inserted_billing AS (
+          INSERT INTO billing_records (order_id, parent_id, status, delivery_status)
+          SELECT id, $12::uuid, 'UNPAID', 'PENDING'
+          FROM inserted_order
+        ),
+        inserted_mutation AS (
+          INSERT INTO order_mutations (order_id, action, actor_user_id, before_json, after_json)
+          SELECT id, 'ORDER_PLACED', $13::uuid, NULL, $14::jsonb
+          FROM inserted_order
+        ),
+        updated_cart AS (
+          UPDATE order_carts
+          SET status = 'SUBMITTED', updated_at = now()
+          WHERE id = $15
+        )
+        SELECT row_to_json(inserted_order)::text
+        FROM inserted_order;
+      `,
+        [
+          cart.id,
+          cart.child_id,
+          actor.uid,
+          cart.session,
+          cart.service_date,
+          Number(totalPrice.toFixed(2)),
+          dietarySnapshot || null,
+          menuItemIds,
+          itemNames,
+          itemPrices,
+          itemQuantities,
+          billingParentId,
+          actor.uid,
+          mutationAfter,
+          cart.id,
+        ],
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('orders_child_session_date_active_uq') || msg.includes('23505')) {
+        throw new ConflictException('ORDER_ALREADY_EXISTS_FOR_DATE');
+      }
+      throw err;
+    }
+    const order = this.parseJsonLine<{
+      id: string;
+      order_number: string;
+      child_id: string;
+      session: string;
+      service_date: string;
+      status: string;
+      total_price: string | number;
+      dietary_snapshot?: string | null;
+      placed_at: string;
+    }>(orderOut);
 
     return {
       ...order,
@@ -2761,28 +2798,46 @@ export class CoreService {
       delivery_status?: string | null;
     }>(out);
 
-    const result: Array<Record<string, unknown>> = [];
-    for (const order of orders) {
-      const itemsOut = await runSql(
+    const orderIds = orders.map((order) => order.id);
+    const itemsByOrder = new Map<string, Array<{ menu_item_id: string; item_name_snapshot: string; price_snapshot: string | number; quantity: number }>>();
+    if (orderIds.length > 0) {
+      const allItemsOut = await runSql(
         `
         SELECT row_to_json(t)::text
         FROM (
-          SELECT oi.menu_item_id, oi.item_name_snapshot, oi.price_snapshot, oi.quantity
+          SELECT oi.order_id::text AS order_id, oi.menu_item_id, oi.item_name_snapshot, oi.price_snapshot, oi.quantity
           FROM order_items oi
-          WHERE oi.order_id = $1
-          ORDER BY oi.created_at ASC
+          WHERE oi.order_id = ANY($1::uuid[])
+          ORDER BY oi.order_id ASC, oi.created_at ASC
         ) t;
       `,
-        [order.id],
+        [orderIds],
       );
-      const items = this.parseJsonLines(itemsOut);
-      result.push({
-        ...order,
-        total_price: Number(order.total_price),
-        can_edit: order.status === 'PLACED' && !this.isAfterOrAtMakassarCutoff(order.service_date),
-        items,
-      });
+      const allItems = this.parseJsonLines<{
+        order_id: string;
+        menu_item_id: string;
+        item_name_snapshot: string;
+        price_snapshot: string | number;
+        quantity: number;
+      }>(allItemsOut);
+      for (const item of allItems) {
+        const list = itemsByOrder.get(item.order_id) || [];
+        list.push({
+          menu_item_id: item.menu_item_id,
+          item_name_snapshot: item.item_name_snapshot,
+          price_snapshot: item.price_snapshot,
+          quantity: item.quantity,
+        });
+        itemsByOrder.set(item.order_id, list);
+      }
     }
+
+    const result: Array<Record<string, unknown>> = orders.map((order) => ({
+      ...order,
+      total_price: Number(order.total_price),
+      can_edit: order.status === 'PLACED' && !this.isAfterOrAtMakassarCutoff(order.service_date),
+      items: itemsByOrder.get(order.id) || [],
+    }));
 
     return {
       parentId,
@@ -2840,28 +2895,45 @@ export class CoreService {
       delivery_status?: string | null;
     }>(out);
 
-    const result: Array<Record<string, unknown>> = [];
-    for (const order of orders) {
-      const itemsOut = await runSql(
+    const orderIds = orders.map((order) => order.id);
+    const itemsByOrder = new Map<string, Array<{ menu_item_id: string; item_name_snapshot: string; price_snapshot: string | number; quantity: number }>>();
+    if (orderIds.length > 0) {
+      const allItemsOut = await runSql(
         `
         SELECT row_to_json(t)::text
         FROM (
-          SELECT oi.menu_item_id, oi.item_name_snapshot, oi.price_snapshot, oi.quantity
+          SELECT oi.order_id::text AS order_id, oi.menu_item_id, oi.item_name_snapshot, oi.price_snapshot, oi.quantity
           FROM order_items oi
-          WHERE oi.order_id = $1
-          ORDER BY oi.created_at ASC
+          WHERE oi.order_id = ANY($1::uuid[])
+          ORDER BY oi.order_id ASC, oi.created_at ASC
         ) t;
       `,
-        [order.id],
+        [orderIds],
       );
-      const items = this.parseJsonLines(itemsOut);
-      result.push({
-        ...order,
-        total_price: Number(order.total_price),
-        can_edit: false,
-        items,
-      });
+      const allItems = this.parseJsonLines<{
+        order_id: string;
+        menu_item_id: string;
+        item_name_snapshot: string;
+        price_snapshot: string | number;
+        quantity: number;
+      }>(allItemsOut);
+      for (const item of allItems) {
+        const list = itemsByOrder.get(item.order_id) || [];
+        list.push({
+          menu_item_id: item.menu_item_id,
+          item_name_snapshot: item.item_name_snapshot,
+          price_snapshot: item.price_snapshot,
+          quantity: item.quantity,
+        });
+        itemsByOrder.set(item.order_id, list);
+      }
     }
+    const result: Array<Record<string, unknown>> = orders.map((order) => ({
+      ...order,
+      total_price: Number(order.total_price),
+      can_edit: false,
+      items: itemsByOrder.get(order.id) || [],
+    }));
     return { childId, orders: result };
   }
 
@@ -4283,113 +4355,121 @@ export class CoreService {
     }
     const whereSql = where.join(' AND ');
 
-    const totalsOut = await runSql(
-      `
-      SELECT row_to_json(t)::text
-      FROM (
-        SELECT COUNT(DISTINCT o.id)::int AS total_orders,
-               COALESCE(SUM(o.total_price), 0)::numeric AS total_revenue
-        FROM orders o
-        JOIN children c ON c.id = o.child_id
-        JOIN schools s ON s.id = c.school_id
-        LEFT JOIN delivery_assignments da ON da.order_id = o.id
-        LEFT JOIN parent_children pc ON pc.child_id = c.id
-        LEFT JOIN parents p ON p.id = pc.parent_id
-        LEFT JOIN billing_records br ON br.order_id = o.id
-        WHERE ${whereSql}
-      ) t;
-    `,
-      params,
-    );
+    const [
+      totalsOut,
+      bySchoolOut,
+      bySessionOut,
+      filterSchoolsOut,
+      filterDeliveryOut,
+      filterParentsOut,
+      filterDishesOut,
+    ] = await Promise.all([
+      runSql(
+        `
+        SELECT row_to_json(t)::text
+        FROM (
+          SELECT COUNT(DISTINCT o.id)::int AS total_orders,
+                 COALESCE(SUM(o.total_price), 0)::numeric AS total_revenue
+          FROM orders o
+          JOIN children c ON c.id = o.child_id
+          JOIN schools s ON s.id = c.school_id
+          LEFT JOIN delivery_assignments da ON da.order_id = o.id
+          LEFT JOIN parent_children pc ON pc.child_id = c.id
+          LEFT JOIN parents p ON p.id = pc.parent_id
+          LEFT JOIN billing_records br ON br.order_id = o.id
+          WHERE ${whereSql}
+        ) t;
+      `,
+        params,
+      ),
+      runSql(
+        `
+        SELECT row_to_json(t)::text
+        FROM (
+          SELECT s.id AS school_id,
+                 s.name AS school_name,
+                 COUNT(DISTINCT o.id)::int AS orders_count,
+                 COALESCE(SUM(o.total_price), 0)::numeric AS total_revenue
+          FROM orders o
+          JOIN children c ON c.id = o.child_id
+          JOIN schools s ON s.id = c.school_id
+          LEFT JOIN delivery_assignments da ON da.order_id = o.id
+          LEFT JOIN parent_children pc ON pc.child_id = c.id
+          LEFT JOIN parents p ON p.id = pc.parent_id
+          LEFT JOIN billing_records br ON br.order_id = o.id
+          WHERE ${whereSql}
+          GROUP BY s.id, s.name
+          ORDER BY total_revenue DESC, school_name ASC
+        ) t;
+      `,
+        params,
+      ),
+      runSql(
+        `
+        SELECT row_to_json(t)::text
+        FROM (
+          SELECT o.session::text AS session,
+                 COUNT(DISTINCT o.id)::int AS orders_count,
+                 COALESCE(SUM(o.total_price), 0)::numeric AS total_revenue
+          FROM orders o
+          JOIN children c ON c.id = o.child_id
+          JOIN schools s ON s.id = c.school_id
+          LEFT JOIN delivery_assignments da ON da.order_id = o.id
+          LEFT JOIN parent_children pc ON pc.child_id = c.id
+          LEFT JOIN parents p ON p.id = pc.parent_id
+          LEFT JOIN billing_records br ON br.order_id = o.id
+          WHERE ${whereSql}
+          GROUP BY o.session
+          ORDER BY o.session ASC
+        ) t;
+      `,
+        params,
+      ),
+      runSql(`
+        SELECT row_to_json(t)::text
+        FROM (
+          SELECT id, name
+          FROM schools
+          WHERE deleted_at IS NULL
+          ORDER BY name ASC
+        ) t;
+      `),
+      runSql(`
+        SELECT row_to_json(t)::text
+        FROM (
+          SELECT id AS user_id, (first_name || ' ' || last_name) AS name
+          FROM users
+          WHERE role = 'DELIVERY'
+            AND deleted_at IS NULL
+          ORDER BY first_name ASC, last_name ASC
+        ) t;
+      `),
+      runSql(`
+        SELECT row_to_json(t)::text
+        FROM (
+          SELECT p.id AS parent_id, (u.first_name || ' ' || u.last_name) AS name
+          FROM parents p
+          JOIN users u ON u.id = p.user_id
+          WHERE p.deleted_at IS NULL
+            AND u.deleted_at IS NULL
+          ORDER BY u.first_name ASC, u.last_name ASC
+        ) t;
+      `),
+      runSql(`
+        SELECT row_to_json(t)::text
+        FROM (
+          SELECT DISTINCT oi.item_name_snapshot AS dish_name
+          FROM order_items oi
+          JOIN orders o ON o.id = oi.order_id
+          WHERE o.deleted_at IS NULL
+            AND o.status <> 'CANCELLED'
+          ORDER BY oi.item_name_snapshot ASC
+        ) t;
+      `),
+    ]);
     const totals = this.parseJsonLine<{ total_orders: number; total_revenue: string | number }>(
       totalsOut || '{"total_orders":0,"total_revenue":0}',
     );
-
-    const bySchoolOut = await runSql(
-      `
-      SELECT row_to_json(t)::text
-      FROM (
-        SELECT s.id AS school_id,
-               s.name AS school_name,
-               COUNT(DISTINCT o.id)::int AS orders_count,
-               COALESCE(SUM(o.total_price), 0)::numeric AS total_revenue
-        FROM orders o
-        JOIN children c ON c.id = o.child_id
-        JOIN schools s ON s.id = c.school_id
-        LEFT JOIN delivery_assignments da ON da.order_id = o.id
-        LEFT JOIN parent_children pc ON pc.child_id = c.id
-        LEFT JOIN parents p ON p.id = pc.parent_id
-        LEFT JOIN billing_records br ON br.order_id = o.id
-        WHERE ${whereSql}
-        GROUP BY s.id, s.name
-        ORDER BY total_revenue DESC, school_name ASC
-      ) t;
-    `,
-      params,
-    );
-    const bySessionOut = await runSql(
-      `
-      SELECT row_to_json(t)::text
-      FROM (
-        SELECT o.session::text AS session,
-               COUNT(DISTINCT o.id)::int AS orders_count,
-               COALESCE(SUM(o.total_price), 0)::numeric AS total_revenue
-        FROM orders o
-        JOIN children c ON c.id = o.child_id
-        JOIN schools s ON s.id = c.school_id
-        LEFT JOIN delivery_assignments da ON da.order_id = o.id
-        LEFT JOIN parent_children pc ON pc.child_id = c.id
-        LEFT JOIN parents p ON p.id = pc.parent_id
-        LEFT JOIN billing_records br ON br.order_id = o.id
-        WHERE ${whereSql}
-        GROUP BY o.session
-        ORDER BY o.session ASC
-      ) t;
-    `,
-      params,
-    );
-
-    const filterSchoolsOut = await runSql(`
-      SELECT row_to_json(t)::text
-      FROM (
-        SELECT id, name
-        FROM schools
-        WHERE deleted_at IS NULL
-        ORDER BY name ASC
-      ) t;
-    `);
-    const filterDeliveryOut = await runSql(`
-      SELECT row_to_json(t)::text
-      FROM (
-        SELECT id AS user_id, (first_name || ' ' || last_name) AS name
-        FROM users
-        WHERE role = 'DELIVERY'
-          AND deleted_at IS NULL
-        ORDER BY first_name ASC, last_name ASC
-      ) t;
-    `);
-    const filterParentsOut = await runSql(`
-      SELECT row_to_json(t)::text
-      FROM (
-        SELECT p.id AS parent_id, (u.first_name || ' ' || u.last_name) AS name
-        FROM parents p
-        JOIN users u ON u.id = p.user_id
-        WHERE p.deleted_at IS NULL
-          AND u.deleted_at IS NULL
-        ORDER BY u.first_name ASC, u.last_name ASC
-      ) t;
-    `);
-    const filterDishesOut = await runSql(`
-      SELECT row_to_json(t)::text
-      FROM (
-        SELECT DISTINCT oi.item_name_snapshot AS dish_name
-        FROM order_items oi
-        JOIN orders o ON o.id = oi.order_id
-        WHERE o.deleted_at IS NULL
-          AND o.status <> 'CANCELLED'
-        ORDER BY oi.item_name_snapshot ASC
-      ) t;
-    `);
 
     return {
       fromDate,
@@ -4574,11 +4654,14 @@ export class CoreService {
     const nutritionRows = this.parseJsonLines<{ service_date: string; calories_total: number; tba_items: number }>(nutritionOut);
     const byDate = new Map(nutritionRows.map((r) => [r.service_date, r]));
     const days: Array<{ service_date: string; calories_display: string; tba_items: number }> = [];
+    const weekBase = new Date(`${weekStart}T00:00:00.000Z`);
     for (let i = 0; i < 7; i += 1) {
-      const d = await runSql(`SELECT ($1::date + ($2::text || ' day')::interval)::date::text;`, [weekStart, i]);
-      const row = byDate.get(d);
+      const d = new Date(weekBase);
+      d.setUTCDate(weekBase.getUTCDate() + i);
+      const iso = d.toISOString().slice(0, 10);
+      const row = byDate.get(iso);
       days.push({
-        service_date: d,
+        service_date: iso,
         calories_display: row ? `${Number(row.calories_total || 0)} kcal` : 'TBA',
         tba_items: row ? Number(row.tba_items || 0) : 0,
       });
@@ -4613,19 +4696,31 @@ export class CoreService {
       prev = now;
     }
     const currentMonth = refDate.slice(0, 7);
-    const previousMonth = await runSql(`SELECT to_char(($1::date - INTERVAL '1 month')::date, 'YYYY-MM');`, [refDate]);
+    const refDateObj = new Date(`${refDate}T00:00:00.000Z`);
+    const currentMonthStartDate = new Date(Date.UTC(refDateObj.getUTCFullYear(), refDateObj.getUTCMonth(), 1));
+    const currentMonthEndDate = new Date(Date.UTC(refDateObj.getUTCFullYear(), refDateObj.getUTCMonth() + 1, 0));
+    const previousMonthStartDate = new Date(Date.UTC(refDateObj.getUTCFullYear(), refDateObj.getUTCMonth() - 1, 1));
+    const previousMonthEndDate = new Date(Date.UTC(refDateObj.getUTCFullYear(), refDateObj.getUTCMonth(), 0));
+    const previousMonth = previousMonthStartDate.toISOString().slice(0, 7);
+    const currentMonthStart = currentMonthStartDate.toISOString().slice(0, 10);
+    const currentMonthEnd = currentMonthEndDate.toISOString().slice(0, 10);
+    const previousMonthStart = previousMonthStartDate.toISOString().slice(0, 10);
+    const previousMonthEnd = previousMonthEndDate.toISOString().slice(0, 10);
     const monthRowsOut = await runSql(
       `
       SELECT to_char(service_date, 'YYYY-MM-DD')
       FROM orders
       WHERE child_id = $1
-        AND to_char(service_date, 'YYYY-MM') IN ($2, $3)
+        AND (
+          service_date BETWEEN $2::date AND $3::date
+          OR service_date BETWEEN $4::date AND $5::date
+        )
         AND status <> 'CANCELLED'
         AND deleted_at IS NULL
       GROUP BY service_date
       ORDER BY service_date ASC;
     `,
-      [childId, currentMonth, previousMonth],
+      [childId, currentMonthStart, currentMonthEnd, previousMonthStart, previousMonthEnd],
     );
     const monthDates = monthRowsOut ? monthRowsOut.split('\n').map((x) => x.trim()).filter(Boolean) : [];
     const isoWeek = (d: string) => {
@@ -4747,11 +4842,7 @@ export class CoreService {
                s.name AS school_name,
                (uc.first_name || ' ' || uc.last_name) AS child_name,
                COALESCE((up.first_name || ' ' || up.last_name), '-') AS parent_name,
-               COALESCE((
-                 SELECT SUM(oi2.quantity)::int
-                 FROM order_items oi2
-                 WHERE oi2.order_id = o.id
-               ), 0) AS dish_count,
+               COALESCE(item_counts.dish_count, 0) AS dish_count,
                CASE
                  WHEN COALESCE(trim(o.dietary_snapshot), '') = '' THEN false
                  WHEN lower(o.dietary_snapshot) LIKE '%no allergies%' THEN false
@@ -4777,12 +4868,17 @@ export class CoreService {
         JOIN children c ON c.id = o.child_id
         JOIN schools s ON s.id = c.school_id
         JOIN users uc ON uc.id = c.user_id
+        LEFT JOIN (
+          SELECT oi2.order_id, SUM(oi2.quantity)::int AS dish_count
+          FROM order_items oi2
+          GROUP BY oi2.order_id
+        ) item_counts ON item_counts.order_id = o.id
         LEFT JOIN parent_children pc ON pc.child_id = c.id
         LEFT JOIN parents p ON p.id = pc.parent_id
         LEFT JOIN users up ON up.id = p.user_id
         WHERE o.service_date = $1::date
           AND o.status IN ('PLACED', 'LOCKED')
-        GROUP BY o.id, s.name, uc.first_name, uc.last_name, up.first_name, up.last_name
+        GROUP BY o.id, s.name, uc.first_name, uc.last_name, up.first_name, up.last_name, item_counts.dish_count
         ORDER BY s.name ASC, child_name ASC, o.session ASC
       ) t;
     `,
@@ -5230,6 +5326,7 @@ export class CoreService {
       `UPDATE menu_items SET deleted_at = now(), updated_at = now() WHERE id = $1;`,
       [itemId],
     );
+    this.clearPublicMenuCache();
     return { ok: true };
   }
 
@@ -5359,6 +5456,14 @@ export class CoreService {
     );
     if (!out) throw new NotFoundException('Delivery user not found');
     return { ok: true, user: this.parseJsonLine(out) };
+  }
+
+  private getPublicMenuCacheKey(serviceDate: string, session: SessionType | null) {
+    return `${serviceDate}|${session || 'ALL'}`;
+  }
+
+  private clearPublicMenuCache() {
+    this.publicMenuCache.clear();
   }
 
   // ─── Health check ─────────────────────────────────────────────────────────

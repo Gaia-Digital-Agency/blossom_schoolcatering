@@ -8,6 +8,7 @@ export type Role = 'PARENT' | 'YOUNGSTER' | 'ADMIN' | 'KITCHEN' | 'DELIVERY';
 export const ROLE_OPTIONS: Role[] = ['PARENT', 'YOUNGSTER', 'ADMIN', 'KITCHEN', 'DELIVERY'];
 const API_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS || 20000);
 let pendingRequests = 0;
+let _refreshPromise: Promise<string | null> | null = null;
 
 export function getApiBase() {
   return process.env.NEXT_PUBLIC_API_BASE ?? '/schoolcatering/api/v1';
@@ -62,17 +63,23 @@ export async function fetchWithTimeout(url: string, init: RequestInit) {
 }
 
 export async function refreshAccessToken() {
-  const res = await fetchWithTimeout(`${getApiBase()}/auth/refresh`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({}),
+  if (_refreshPromise) return _refreshPromise;
+  _refreshPromise = (async () => {
+    const res = await fetchWithTimeout(`${getApiBase()}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({}),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    localStorage.setItem(ACCESS_KEY, data.accessToken);
+    document.cookie = `${AUTH_COOKIE}=${data.accessToken}; path=/; max-age=86400; SameSite=Lax`;
+    return data.accessToken as string;
+  })().finally(() => {
+    _refreshPromise = null;
   });
-  if (!res.ok) return null;
-  const data = await res.json();
-  localStorage.setItem(ACCESS_KEY, data.accessToken);
-  document.cookie = `${AUTH_COOKIE}=${data.accessToken}; path=/; max-age=86400; SameSite=Lax`;
-  return data.accessToken as string;
+  return _refreshPromise;
 }
 
 /** Thrown by apiFetch after a redirect has been triggered due to an expired/missing session. */
