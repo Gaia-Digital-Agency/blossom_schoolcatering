@@ -7,8 +7,8 @@ import PasswordInput from '../_components/password-input';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [username, setUsername] = useState('parent');
-  const [password, setPassword] = useState('parent123');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -48,22 +48,25 @@ export default function LoginPage() {
       <section className="auth-panel">
         <h1>Home Login</h1>
         <p className="auth-help">Use this page for Parent and Youngster login.</p>
-        <div className="quick-credentials" aria-label="Quick Credentials">
-          <p><strong>Youngster Register:</strong> url: /register/youngsters (view only)</p>
-          <p><strong>Youngster Login:</strong> url: /youngster/login | user: youngster | pw: youngster123</p>
-          <p><strong>Parent Login:</strong> url: /parent/login | user: parent | pw: parent123</p>
-          <p><strong>Delivery Login:</strong> url: /delivery/login | user: delivery | pw: delivery123</p>
-          <p><strong>Kitchen Login:</strong> url: /kitchen/login | user: kitchen | pw: kitchen123</p>
-          <p><strong>Admin Login:</strong> url: /admin/login | user: admin | pw: admin123</p>
-        </div>
-        <form onSubmit={onSubmit} className="auth-form">
+        <form onSubmit={onSubmit} className="auth-form" autoComplete="off">
           <label>
             Username
-            <input value={username} onChange={(e) => setUsername(e.target.value)} />
+            <input
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              autoComplete="off"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+            />
           </label>
           <label>
             Password
-            <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} />
+            <PasswordInput
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="new-password"
+            />
           </label>
           {error ? <p className="auth-error">{error}</p> : null}
           <button className="btn btn-primary" disabled={loading} type="submit">

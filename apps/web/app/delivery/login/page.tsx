@@ -5,8 +5,6 @@ export default function DeliveryLoginPage() {
     <RoleLoginForm
       role="DELIVERY"
       title="Delivery Login"
-      usernameDefault="delivery"
-      passwordDefault="delivery123"
       redirectPath="/delivery"
     />
   );

@@ -5,8 +5,6 @@ export default function AdminLoginPage() {
     <RoleLoginForm
       role="ADMIN"
       title="Admin Login"
-      usernameDefault="admin"
-      passwordDefault="admin123"
       redirectPath="/admin"
     />
   );

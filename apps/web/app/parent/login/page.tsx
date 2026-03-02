@@ -5,8 +5,6 @@ export default function ParentLoginPage() {
     <RoleLoginForm
       role="PARENT"
       title="Parent Login"
-      usernameDefault="parent"
-      passwordDefault="parent123"
       redirectPath="/parents"
     />
   );

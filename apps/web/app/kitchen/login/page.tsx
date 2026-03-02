@@ -5,8 +5,6 @@ export default function KitchenLoginPage() {
     <RoleLoginForm
       role="KITCHEN"
       title="Kitchen Login"
-      usernameDefault="kitchen"
-      passwordDefault="kitchen123"
       redirectPath="/kitchen"
     />
   );

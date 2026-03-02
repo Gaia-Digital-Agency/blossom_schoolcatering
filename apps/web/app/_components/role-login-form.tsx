@@ -8,21 +8,17 @@ import PasswordInput from './password-input';
 type Props = {
   role: Role;
   title: string;
-  usernameDefault: string;
-  passwordDefault: string;
   redirectPath: string;
 };
 
 export default function RoleLoginForm({
   role,
   title,
-  usernameDefault,
-  passwordDefault,
   redirectPath,
 }: Props) {
   const router = useRouter();
-  const [username, setUsername] = useState(usernameDefault);
-  const [password, setPassword] = useState(passwordDefault);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -54,14 +50,25 @@ export default function RoleLoginForm({
     <main className="page-auth">
       <section className="auth-panel">
         <h1>{title}</h1>
-        <form onSubmit={onSubmit} className="auth-form">
+        <form onSubmit={onSubmit} className="auth-form" autoComplete="off">
           <label>
             Username
-            <input value={username} onChange={(e) => setUsername(e.target.value)} />
+            <input
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              autoComplete="off"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+            />
           </label>
           <label>
             Password
-            <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} />
+            <PasswordInput
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="new-password"
+            />
           </label>
           {error ? <p className="auth-error">{error}</p> : null}
           <button className="btn btn-primary" disabled={loading} type="submit">

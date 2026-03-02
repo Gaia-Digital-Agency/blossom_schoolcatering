@@ -5,8 +5,6 @@ export default function YoungsterLoginPage() {
     <RoleLoginForm
       role="YOUNGSTER"
       title="Youngster Login"
-      usernameDefault="youngster"
-      passwordDefault="youngster123"
       redirectPath="/youngsters"
     />
   );
