@@ -8,6 +8,7 @@ export default function HomePage() {
   const [open, setOpen] = useState(false);
   const [visitCount, setVisitCount] = useState<number>(0);
   const [baliTime, setBaliTime] = useState<string>('--:--');
+  const [baliToday, setBaliToday] = useState<string>('-');
 
   useEffect(() => {
     let alive = true;
@@ -31,12 +32,22 @@ export default function HomePage() {
       hour12: false,
       timeZone: 'Asia/Makassar',
     }).format(new Date());
+    const formatBaliToday = () => new Intl.DateTimeFormat('en-GB', {
+      weekday: 'long',
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'Asia/Makassar',
+    }).format(new Date());
 
     setBaliTime(formatBaliTime());
+    setBaliToday(formatBaliToday());
     const timer = window.setInterval(() => setBaliTime(formatBaliTime()), 1000);
+    const dateTimer = window.setInterval(() => setBaliToday(formatBaliToday()), 60_000);
     return () => {
       alive = false;
       window.clearInterval(timer);
+      window.clearInterval(dateTimer);
     };
   }, []);
 
@@ -92,6 +103,7 @@ export default function HomePage() {
 
         <footer className="footer">
           <p>Copyright (C) 2026, Developed by Gaiada.com</p>
+          <p>Today: {baliToday}</p>
           <p>Visitors: <strong>{visitCount}</strong> | Location: Bali, Indonesia | Time: {baliTime} WITA</p>
         </footer>
       </div>
