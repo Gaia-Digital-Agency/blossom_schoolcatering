@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import LogoutButton from '../../../app/_components/logout-button';
+import { useState } from 'react';
+import { clearAuthState, fetchWithTimeout, getApiBase } from '../../../lib/auth';
 
 const leftLinks = [
   { href: '/admin', label: 'Dashboard' },
@@ -22,10 +23,35 @@ const rightLinks = [
 
 export default function AdminNav() {
   const pathname = usePathname();
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const onLogout = async () => {
+    setLoggingOut(true);
+    await fetchWithTimeout(`${getApiBase()}/auth/logout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({}),
+    }).catch(() => undefined);
+    clearAuthState();
+    window.location.href = '/schoolcatering/admin/login';
+  };
+
   return (
     <>
-    <LogoutButton />
     <div className="admin-nav-shell">
+      <div className="admin-nav-top">
+        <strong>Admin Module</strong>
+        <button
+          type="button"
+          className="admin-logout-btn"
+          onClick={onLogout}
+          disabled={loggingOut}
+          aria-label="Logout admin"
+        >
+          {loggingOut ? 'Logging out...' : 'Logout Admin'}
+        </button>
+      </div>
       <div className="admin-nav-columns">
         <div className="dev-links admin-nav-links">
           {leftLinks.map((link) => (
@@ -60,6 +86,34 @@ export default function AdminNav() {
           border-radius: 0.75rem;
           background: #fffdf8;
           box-shadow: 0 2px 8px rgba(47, 39, 29, 0.06);
+        }
+        .admin-nav-top {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 0.75rem;
+          margin-bottom: 0.65rem;
+        }
+        .admin-nav-top strong {
+          color: #2f271d;
+          font-size: 0.95rem;
+        }
+        .admin-logout-btn {
+          border: 1px solid #7c2d12;
+          background: #9a3412;
+          color: #fff;
+          border-radius: 0.5rem;
+          padding: 0.42rem 0.8rem;
+          font-size: 0.8rem;
+          font-weight: 700;
+          cursor: pointer;
+        }
+        .admin-logout-btn:hover:not(:disabled) {
+          background: #7c2d12;
+        }
+        .admin-logout-btn:disabled {
+          opacity: 0.7;
+          cursor: default;
         }
         .admin-nav-columns {
           display: grid;
