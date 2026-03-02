@@ -88,7 +88,12 @@ export default function MenuPage() {
       byCategory.set(code, list);
     }
     return CATEGORY_GROUPS
-      .map((group) => ({ ...group, items: byCategory.get(group.code) || [] }))
+      .map((group) => ({
+        ...group,
+        items: (byCategory.get(group.code) || [])
+          .slice()
+          .sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { sensitivity: 'base' })),
+      }))
       .filter((group) => group.items.length > 0);
   }, [items]);
 
