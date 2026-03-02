@@ -70,11 +70,24 @@ export class CoreService implements OnModuleInit {
 
   async onModuleInit() {
     await this.ensureMenuItemExtendedColumns();
+    await this.ensureMenuItemNameUniquenessScope();
     await this.ensureSessionSettingsTable();
     await this.ensureMenuRatingsTable();
     await this.ensureChildRegistrationSourceColumns();
     await this.ensureBillingReviewColumns();
     await this.ensureAdminAuditTrailTable();
+  }
+
+  private async ensureMenuItemNameUniquenessScope() {
+    // Historical schema used a global unique index on lower(name), which blocks
+    // valid renames across different menus/dates/sessions.
+    // Current behavior expects uniqueness within a menu context only.
+    await runSql(`DROP INDEX IF EXISTS menu_items_name_ci_uq;`);
+    await runSql(`
+      CREATE UNIQUE INDEX IF NOT EXISTS menu_items_menu_name_ci_active_uq
+      ON menu_items (menu_id, lower(name))
+      WHERE deleted_at IS NULL;
+    `);
   }
 
   private parseJsonLine<T>(line: string): T {
@@ -422,6 +435,19 @@ export class CoreService implements OnModuleInit {
       throw new BadRequestException('service_date must be YYYY-MM-DD');
     }
     return serviceDate;
+  }
+
+  private async resolveCreateMenuServiceDate(session: SessionType) {
+    const latest = await runSql(
+      `SELECT MAX(service_date)::text
+       FROM menus
+       WHERE session = $1::session_type
+         AND deleted_at IS NULL;`,
+      [session],
+    );
+    const trimmed = String(latest || '').trim();
+    if (trimmed && /^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+    return this.nextWeekdayIsoDate();
   }
 
   private nextWeekdayIsoDate() {
@@ -2171,8 +2197,10 @@ export class CoreService implements OnModuleInit {
     containsPeanut?: boolean;
     dishCategory?: string;
   }) {
-    const serviceDate = this.validateServiceDate(input.serviceDate);
     const session = this.normalizeSession(input.session);
+    const serviceDate = input.serviceDate
+      ? this.validateServiceDate(input.serviceDate)
+      : await this.resolveCreateMenuServiceDate(session);
     const name = (input.name || '').trim();
     const description = (input.description || '').trim();
     const nutritionFactsText = (input.nutritionFactsText || '').trim();

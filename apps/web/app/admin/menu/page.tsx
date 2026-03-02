@@ -317,8 +317,7 @@ export default function AdminMenuPage() {
       return;
     }
 
-    const payload = {
-      serviceDate: menuServiceDate,
+    const basePayload = {
       session: menuSession,
       name: itemName,
       dishCategory: itemDishCategory,
@@ -341,9 +340,11 @@ export default function AdminMenuPage() {
     setSavingItem(true);
     try {
       if (editingItemId) {
+        const payload = { ...basePayload, serviceDate: menuServiceDate };
         await apiFetch(`/admin/menu-items/${editingItemId}`, { method: 'PATCH', body: JSON.stringify(payload) }, { skipAutoReload: true });
         setMessage('Dish updated.');
       } else {
+        const payload = { ...basePayload };
         await apiFetch('/admin/menu-items', { method: 'POST', body: JSON.stringify(payload) }, { skipAutoReload: true });
         setMessage('Dish created.');
       }
@@ -448,15 +449,13 @@ export default function AdminMenuPage() {
       const exists = menuItems.find((x) => (
         x.name.trim().toLowerCase() === dish.trim().toLowerCase()
         && (x.session || '') === menuSession
-        && (x.service_date || '') === menuServiceDate
       ));
       if (exists) {
         onEditItem(exists);
-        setMessage('Dish already exists for selected date/session. Loaded into form.');
+        setMessage('Dish already exists for selected session. Loaded into form.');
         return;
       }
       const payload = {
-        serviceDate: menuServiceDate,
         session: menuSession,
         name: dish,
         dishCategory: itemDishCategory,
@@ -600,7 +599,7 @@ export default function AdminMenuPage() {
         {error ? <p className="auth-error">{error}</p> : null}
 
         <div className="auth-form menu-context-form">
-          <label>Service Date<input type="date" value={menuServiceDate} onChange={(e) => setMenuServiceDate(e.target.value)} /></label>
+          <label>Service Date (for ratings/clone only)<input type="date" value={menuServiceDate} onChange={(e) => setMenuServiceDate(e.target.value)} /></label>
           <label>
             Session
             <select value={menuSession} onChange={(e) => setMenuSession(e.target.value as 'LUNCH' | 'SNACK' | 'BREAKFAST')}>
