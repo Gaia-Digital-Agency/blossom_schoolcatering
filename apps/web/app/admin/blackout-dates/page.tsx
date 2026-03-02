@@ -91,7 +91,14 @@ export default function AdminBlackoutDatesPage() {
         <h1>Admin Blackout Dates</h1>
         <AdminNav />
         <p className="auth-help">Manage blackout dates. Order placement checks these rules immediately.</p>
-        <p className="auth-help">Type guide: ORDER_BLOCK = block ordering only, SERVICE_BLOCK = block service date ordering, BOTH = block both order and service.</p>
+        <div className="blackout-type-guide">
+          <strong>Type Guide</strong>
+          <ul>
+            <li><code>ORDER_BLOCK</code> — Parents cannot place new orders on this date</li>
+            <li><code>SERVICE_BLOCK</code> — No meal service on this date (existing orders unaffected for ordering, but no delivery)</li>
+            <li><code>BOTH</code> — No ordering and no service on this date</li>
+          </ul>
+        </div>
 
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
@@ -104,9 +111,9 @@ export default function AdminBlackoutDatesPage() {
           <label>
             Type
             <select value={type} onChange={(e) => setType(e.target.value as 'ORDER_BLOCK' | 'SERVICE_BLOCK' | 'BOTH')}>
-              <option value="ORDER_BLOCK">ORDER_BLOCK</option>
-              <option value="SERVICE_BLOCK">SERVICE_BLOCK</option>
-              <option value="BOTH">BOTH</option>
+              <option value="ORDER_BLOCK">ORDER_BLOCK — Block new orders only</option>
+              <option value="SERVICE_BLOCK">SERVICE_BLOCK — Block meal service only</option>
+              <option value="BOTH">BOTH — Block both orders and service</option>
             </select>
           </label>
           <label>
@@ -145,6 +152,39 @@ export default function AdminBlackoutDatesPage() {
           </div>
         )}
       </section>
+      <style jsx>{`
+        .blackout-type-guide {
+          background: #f8f5f0;
+          border: 1px solid #d4c4a8;
+          border-radius: 7px;
+          padding: 0.6rem 0.9rem;
+          margin-bottom: 0.5rem;
+          font-size: 0.84rem;
+        }
+        .blackout-type-guide strong {
+          display: block;
+          margin-bottom: 0.3rem;
+          font-size: 0.82rem;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          color: #6b4c1e;
+        }
+        .blackout-type-guide ul {
+          margin: 0;
+          padding-left: 1.1rem;
+          display: flex;
+          flex-direction: column;
+          gap: 0.2rem;
+        }
+        .blackout-type-guide code {
+          background: #e8d9c0;
+          border-radius: 4px;
+          padding: 0.05rem 0.35rem;
+          font-size: 0.82rem;
+          font-weight: 700;
+          color: #4a2e0a;
+        }
+      `}</style>
     </main>
   );
 }

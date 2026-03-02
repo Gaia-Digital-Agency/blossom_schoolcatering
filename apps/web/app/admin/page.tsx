@@ -75,7 +75,6 @@ function asCurrency(value: number) {
 }
 
 export default function AdminPage() {
-  const [date, setDate] = useState(todayIsoLocal());
   const [data, setData] = useState<Dashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -89,7 +88,7 @@ export default function AdminPage() {
     setLoading(true);
     setError('');
     try {
-      const result = await apiFetch(`/admin/dashboard?date=${date}`) as Dashboard;
+      const result = await apiFetch(`/admin/dashboard?date=${todayIsoLocal()}`) as Dashboard;
       setData(result);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed loading dashboard');
@@ -156,10 +155,6 @@ export default function AdminPage() {
             </div>
           </div>
           <div className="admin-dashboard-controls">
-            <label>
-              Dashboard Date
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-            </label>
             <button className="btn btn-outline" type="button" onClick={load} disabled={loading}>
               {loading ? 'Refreshing...' : 'Refresh Dashboard'}
             </button>

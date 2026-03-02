@@ -6395,7 +6395,7 @@ export class CoreService implements OnModuleInit {
   }
 
   async updateSiteSettings(actor: AccessUser, chefMessage: string) {
-    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    if (actor.role !== 'ADMIN' && actor.role !== 'KITCHEN') throw new ForbiddenException('Role not allowed');
     if (typeof chefMessage !== 'string') throw new BadRequestException('chef_message must be a string');
     const trimmed = chefMessage.trim();
     if (trimmed.length > 500) throw new BadRequestException('chef_message must be 500 characters or fewer');

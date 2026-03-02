@@ -86,13 +86,13 @@ export class CoreController {
   }
 
   @Get('admin/site-settings')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'KITCHEN')
   getAdminSiteSettings() {
     return this.coreService.getSiteSettings();
   }
 
   @Patch('admin/site-settings')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'KITCHEN')
   updateAdminSiteSettings(@Req() req: AuthRequest, @Body() body: { chef_message: string }) {
     return this.coreService.updateSiteSettings(req.user, body.chef_message ?? '');
   }

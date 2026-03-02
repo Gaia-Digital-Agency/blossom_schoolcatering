@@ -599,7 +599,11 @@ export default function AdminMenuPage() {
         {error ? <p className="auth-error">{error}</p> : null}
 
         <div className="auth-form menu-context-form">
-          <label>Service Date (for ratings/clone only)<input type="date" value={menuServiceDate} onChange={(e) => setMenuServiceDate(e.target.value)} /></label>
+          <p className="menu-context-hint">Set the date and session below to load ratings for that day, or to clone the active menu to a specific date.</p>
+          <label>
+            Service Date
+            <input type="date" value={menuServiceDate} onChange={(e) => setMenuServiceDate(e.target.value)} />
+          </label>
           <label>
             Session
             <select value={menuSession} onChange={(e) => setMenuSession(e.target.value as 'LUNCH' | 'SNACK' | 'BREAKFAST')}>
@@ -861,6 +865,12 @@ export default function AdminMenuPage() {
         }
         .menu-context-form {
           margin-bottom: 0.8rem;
+        }
+        .menu-context-hint {
+          margin: 0 0 0.4rem;
+          font-size: 0.82rem;
+          color: #64748b;
+          font-style: italic;
         }
         .menu-actions-row {
           display: flex;
