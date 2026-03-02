@@ -70,7 +70,7 @@ export default function MenuPage() {
         if (!res.ok) throw new Error('Failed loading menu');
         const data = await res.json() as { serviceDate: string; items: PublicMenuItem[] };
         setServiceDate(data.serviceDate || '');
-        setItems((data.items || []).filter((item) => item.is_available !== false));
+        setItems(data.items || []);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed loading menu');
       }
@@ -96,7 +96,7 @@ export default function MenuPage() {
     <main className="page-auth page-auth-mobile">
       <section className="auth-panel">
         <h1>Menu</h1>
-        <p className="auth-help">Viewing only. Active dishes from Admin configuration.</p>
+        <p className="auth-help">Viewing only. Dishes from Admin configuration (Active and Not Active).</p>
         {serviceDate ? (
           <p className="auth-help">
             {serviceDate === 'ALL_ACTIVE' ? 'Showing all active dishes (not filtered by date).' : `Service Date: ${serviceDate}`}
@@ -129,6 +129,7 @@ export default function MenuPage() {
                         <strong>{item.name}</strong>
                         <small>Rp {Number(item.price || 0).toLocaleString('id-ID')}</small>
                         <small>Dietary: {formatDishDietaryTags(item)}</small>
+                        <small>Status: {item.is_available === false ? 'Not Active' : 'Active'}</small>
                         <small>{item.session}</small>
                       </div>
                     </article>
@@ -159,6 +160,7 @@ export default function MenuPage() {
                             <strong>{item.name}</strong>
                             <small>Rp {Number(item.price || 0).toLocaleString('id-ID')}</small>
                             <small>Dietary: {formatDishDietaryTags(item)}</small>
+                            <small>Status: {item.is_available === false ? 'Not Active' : 'Active'}</small>
                             <small>{item.session}</small>
                           </div>
                         </article>

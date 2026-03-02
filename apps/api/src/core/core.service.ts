@@ -1790,7 +1790,7 @@ export class CoreService implements OnModuleInit {
     if (!['PARENT', 'YOUNGSTER', 'ADMIN', 'KITCHEN'].includes(actor.role)) {
       throw new ForbiddenException('Role not allowed');
     }
-    const serviceDate = query.serviceDate ? this.validateServiceDate(query.serviceDate) : 'ALL_ACTIVE';
+    const serviceDate = this.validateServiceDate(query.serviceDate);
     const session = query.session ? this.normalizeSession(query.session) : null;
     const search = (query.search || '').trim().toLowerCase();
     const priceMin = query.priceMin ? Number(query.priceMin) : null;
@@ -1802,7 +1802,7 @@ export class CoreService implements OnModuleInit {
       .filter(Boolean);
 
     const filters: string[] = [];
-    const params: unknown[] = [];
+    const params: unknown[] = [serviceDate];
     if (['PARENT', 'YOUNGSTER'].includes(actor.role)) {
       if (session) {
         const active = await this.isSessionActive(session);
@@ -1865,73 +1865,36 @@ export class CoreService implements OnModuleInit {
       `
       SELECT row_to_json(t)::text
       FROM (
-        WITH scoped AS (
-          SELECT mi.id,
-                 m.session::text AS session,
-                 m.service_date::text AS service_date,
-                 mi.name,
-                 mi.description,
-                 mi.nutrition_facts_text,
-                 mi.calories_kcal,
-                 mi.price,
-                 mi.dish_category,
-                 mi.image_url,
-                 mi.is_vegetarian,
-                 mi.is_gluten_free,
-                 mi.is_dairy_free,
-                 mi.contains_peanut,
-                 mi.cutlery_required,
-                 mi.packing_requirement,
-                 mi.display_order
-          FROM menus m
-          JOIN menu_items mi ON mi.menu_id = m.id
-          WHERE m.is_published = true
-            AND m.deleted_at IS NULL
-            AND mi.is_available = true
-            AND mi.deleted_at IS NULL
-            ${filterSql}
-        ),
-        dedup AS (
-          SELECT DISTINCT ON (lower(name), session)
-                 id, session, service_date, name, description, nutrition_facts_text,
-                 calories_kcal, price, dish_category, image_url, is_vegetarian,
-                 is_gluten_free, is_dairy_free, contains_peanut, cutlery_required,
-                 packing_requirement, display_order
-          FROM scoped
-          ORDER BY lower(name), session, service_date DESC, id ASC
-        )
-        SELECT d.id,
-               d.session,
-               d.name,
-               d.description,
-               d.nutrition_facts_text,
-               d.calories_kcal,
-               d.price,
-               d.dish_category,
-               d.image_url,
-               d.is_vegetarian,
-               d.is_gluten_free,
-               d.is_dairy_free,
-               d.contains_peanut,
-               d.cutlery_required,
-               d.packing_requirement,
-               d.display_order,
-               COALESCE((
-                 SELECT array_agg(DISTINCT i.name)
-                 FROM menu_item_ingredients mii
-                 JOIN ingredients i ON i.id = mii.ingredient_id
-                 WHERE mii.menu_item_id = d.id
-                   AND i.deleted_at IS NULL
-               ), '{}') AS ingredients,
-               COALESCE((
-                 SELECT bool_or(i.allergen_flag)
-                 FROM menu_item_ingredients mii
-                 JOIN ingredients i ON i.id = mii.ingredient_id
-                 WHERE mii.menu_item_id = d.id
-                   AND i.deleted_at IS NULL
-               ), false) AS has_allergen
-        FROM dedup d
-        ORDER BY d.session ASC, d.display_order ASC, d.name ASC
+        SELECT mi.id,
+               m.session::text AS session,
+               mi.name,
+               mi.description,
+               mi.nutrition_facts_text,
+               mi.calories_kcal,
+               mi.price,
+               mi.dish_category,
+               mi.image_url,
+               mi.is_vegetarian,
+               mi.is_gluten_free,
+               mi.is_dairy_free,
+               mi.contains_peanut,
+               mi.cutlery_required,
+               mi.packing_requirement,
+               mi.display_order,
+               COALESCE(array_agg(DISTINCT i.name) FILTER (WHERE i.id IS NOT NULL), '{}') AS ingredients,
+               COALESCE(bool_or(i.allergen_flag), false) AS has_allergen
+        FROM menus m
+        JOIN menu_items mi ON mi.menu_id = m.id
+        LEFT JOIN menu_item_ingredients mii ON mii.menu_item_id = mi.id
+        LEFT JOIN ingredients i ON i.id = mii.ingredient_id AND i.deleted_at IS NULL
+        WHERE m.service_date = $1::date
+          AND m.is_published = true
+          AND m.deleted_at IS NULL
+          AND mi.is_available = true
+          AND mi.deleted_at IS NULL
+          ${filterSql}
+        GROUP BY mi.id, m.session
+        ORDER BY m.session ASC, mi.display_order ASC, mi.name ASC
       ) t;
     `,
       params,
@@ -1982,54 +1945,27 @@ export class CoreService implements OnModuleInit {
       `
       SELECT row_to_json(t)::text
       FROM (
-        WITH scoped AS (
-          SELECT mi.id,
-                 mi.name,
-                 mi.price,
-                 mi.dish_category,
-                 mi.image_url,
-                 mi.is_available,
-                 mi.is_vegetarian,
-                 mi.is_gluten_free,
-                 mi.is_dairy_free,
-                 mi.contains_peanut,
-                 mi.updated_at::text AS updated_at,
-                 m.session::text AS session,
-                 m.service_date::text AS service_date,
-                 mi.display_order
-          FROM menus m
-          JOIN menu_items mi ON mi.menu_id = m.id
-          WHERE 1=1
-            ${whereSession}
-            ${activeSessionFilter}
-            AND m.is_published = true
-            AND m.deleted_at IS NULL
-            AND mi.is_available = true
-            AND mi.deleted_at IS NULL
-        ),
-        dedup AS (
-          SELECT DISTINCT ON (lower(name), session)
-                 id, name, price, dish_category, image_url, is_available, is_vegetarian,
-                 is_gluten_free, is_dairy_free, contains_peanut, updated_at, session,
-                 service_date, display_order
-          FROM scoped
-          ORDER BY lower(name), session, service_date DESC, id ASC
-        )
-        SELECT id,
-               name,
-               price,
-               dish_category,
-               image_url,
-               is_available,
-               is_vegetarian,
-               is_gluten_free,
-               is_dairy_free,
-               contains_peanut,
-               updated_at,
-               session,
-               service_date
-        FROM dedup
-        ORDER BY session ASC, display_order ASC, name ASC
+        SELECT mi.id,
+               mi.name,
+               mi.price,
+               mi.dish_category,
+               mi.image_url,
+               mi.is_available,
+               mi.is_vegetarian,
+               mi.is_gluten_free,
+               mi.is_dairy_free,
+               mi.contains_peanut,
+               mi.updated_at::text AS updated_at,
+               m.session::text AS session,
+               m.service_date::text AS service_date
+        FROM menus m
+        JOIN menu_items mi ON mi.menu_id = m.id
+        WHERE 1=1
+          ${whereSession}
+          ${activeSessionFilter}
+          AND m.deleted_at IS NULL
+          AND mi.deleted_at IS NULL
+        ORDER BY m.service_date DESC, m.session ASC, mi.display_order ASC, mi.name ASC
       ) t;
       `,
       params,
