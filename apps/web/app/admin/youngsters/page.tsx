@@ -302,6 +302,33 @@ export default function AdminYoungstersPage() {
         </div>
       </section>
       <style jsx>{`
+        .kitchen-table-wrap {
+          overflow-x: auto;
+          max-width: 100%;
+          -webkit-overflow-scrolling: touch;
+        }
+        .kitchen-table {
+          width: 100%;
+          border-collapse: collapse;
+          background: #fff;
+          border: 1px solid #e2d6c2;
+          border-radius: 10px;
+          overflow: hidden;
+        }
+        .kitchen-table th,
+        .kitchen-table td {
+          border-bottom: 1px solid #efe7da;
+          padding: 0.65rem;
+          text-align: left;
+          vertical-align: top;
+          font-size: 0.9rem;
+          line-height: 1.35;
+          overflow-wrap: anywhere;
+          word-break: break-word;
+        }
+        .kitchen-table tbody tr:last-child td {
+          border-bottom: none;
+        }
         .menu-actions-row {
           display: flex;
           flex-wrap: wrap;
@@ -311,10 +338,10 @@ export default function AdminYoungstersPage() {
         .action-col {
           display: grid;
           gap: 0.35rem;
-          min-width: 220px;
         }
         .action-row {
           display: flex;
+          flex-wrap: wrap;
           gap: 0.35rem;
         }
         :global(.registration-note-field) {
@@ -323,6 +350,18 @@ export default function AdminYoungstersPage() {
           border-color: #d8cab1 !important;
           cursor: default;
           font-style: italic;
+        }
+        /* Mobile: hide User ID column */
+        @media (max-width: 680px) {
+          .kitchen-table th:nth-child(2),
+          .kitchen-table td:nth-child(2) {
+            display: none;
+          }
+          .kitchen-table th,
+          .kitchen-table td {
+            font-size: 0.8rem;
+            padding: 0.4rem 0.45rem;
+          }
         }
       `}</style>
     </main>

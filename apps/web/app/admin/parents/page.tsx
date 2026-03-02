@@ -101,12 +101,30 @@ export default function AdminParentsPage() {
         </div>
       </section>
       <style jsx>{`
-        .admin-parents-table th,
-        .admin-parents-table td {
-          vertical-align: top;
+        .kitchen-table-wrap {
+          overflow-x: auto;
+          max-width: 100%;
+          -webkit-overflow-scrolling: touch;
+        }
+        .kitchen-table {
+          width: 100%;
+          border-collapse: collapse;
+          background: #fff;
+          border: 1px solid #e2d6c2;
+          border-radius: 10px;
+          overflow: hidden;
+        }
+        .kitchen-table th,
+        .kitchen-table td {
+          border-bottom: 1px solid #efe7da;
+          padding: 0.65rem;
           text-align: left;
+          vertical-align: top;
           font-size: 0.92rem;
           line-height: 1.35;
+        }
+        .kitchen-table tbody tr:last-child td {
+          border-bottom: none;
         }
         .admin-parents-table th {
           white-space: nowrap;
@@ -116,7 +134,19 @@ export default function AdminParentsPage() {
           word-break: break-all;
         }
         .admin-parents-table :global(.btn) {
-          min-width: 140px;
+          min-width: 120px;
+        }
+        /* Mobile: hide Parent ID column, stack layout */
+        @media (max-width: 680px) {
+          .admin-parents-table th:nth-child(2),
+          .admin-parents-table td:nth-child(2) {
+            display: none;
+          }
+          .kitchen-table th,
+          .kitchen-table td {
+            font-size: 0.82rem;
+            padding: 0.45rem 0.5rem;
+          }
         }
       `}</style>
     </main>

@@ -109,9 +109,12 @@ export default function DeliveryPage() {
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
 
+        <div className="module-guide-card">
+          💡 Mark Assigned deliveries by school. See Assigned Orders yesterday, today, tomorrow.
+        </div>
+
         <div className="delivery-controls">
           <div className="delivery-control delivery-window">
-            <small><strong>Visible windows:</strong> Pending ({yesterday}, {today}, {tomorrow}) · Completed ({yesterday}, {today})</small>
             <div className="delivery-window-actions">
               <button
                 className={`btn ${selectedDate === yesterday ? 'btn-primary' : 'btn-outline'}`}
@@ -205,6 +208,18 @@ export default function DeliveryPage() {
           )}
         </div>
       </section>
+      <style jsx>{`
+        .module-guide-card {
+          background: #fffbf4;
+          border: 1px solid #e8d9c0;
+          border-left: 3px solid #c8a96e;
+          border-radius: 0.6rem;
+          padding: 0.6rem 0.85rem;
+          font-size: 0.82rem;
+          color: #6b5a43;
+          margin-bottom: 1rem;
+        }
+      `}</style>
     </main>
     <LogoutButton />
     </>

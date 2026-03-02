@@ -47,6 +47,14 @@ function renderSqlWithParams(sql: string, params?: unknown[]) {
     if (value === null || value === undefined) return 'NULL';
     if (typeof value === 'number') return Number.isFinite(value) ? String(value) : 'NULL';
     if (typeof value === 'boolean') return value ? 'true' : 'false';
+    if (Array.isArray(value)) {
+      // Render as PostgreSQL array literal: '{element1,element2,...}'
+      const elements = value.map((el) => {
+        if (el === null || el === undefined) return 'NULL';
+        return String(el).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      });
+      return sqlLiteral('{' + elements.join(',') + '}');
+    }
     return sqlLiteral(String(value));
   });
 }

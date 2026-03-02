@@ -172,6 +172,10 @@ export default function MenuPage() {
           </div>
         )}
 
+        <div className="module-guide-card">
+          💡 Log In to order for the Youngsters from Blossom Steakhouse Kitchen.
+        </div>
+
         <div className="dev-links">
           <Link href="/">Back to Home</Link>
           <Link href="/rating">Rating</Link>
@@ -235,6 +239,16 @@ export default function MenuPage() {
         }
         .menu-public-card small {
           color: #5d554b;
+        }
+        .module-guide-card {
+          background: #fffbf4;
+          border: 1px solid #e8d9c0;
+          border-left: 3px solid #c8a96e;
+          border-radius: 0.6rem;
+          padding: 0.6rem 0.85rem;
+          font-size: 0.82rem;
+          color: #6b5a43;
+          margin-top: 1.2rem;
         }
         @media (min-width: 900px) {
           /* Side-by-side: Main (left) | secondary categories (right) */

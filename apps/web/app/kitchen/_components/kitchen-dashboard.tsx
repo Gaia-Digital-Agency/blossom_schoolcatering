@@ -56,19 +56,6 @@ function dateInMakassar(offsetDays = 0) {
   return base.toISOString().slice(0, 10);
 }
 
-function nowMakassarHour() {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Asia/Makassar',
-    hour12: false,
-    hour: '2-digit',
-  }).formatToParts(new Date());
-  return Number(parts.find((p) => p.type === 'hour')?.value || '0');
-}
-
-function withinKitchenHours() {
-  const hour = nowMakassarHour();
-  return hour >= 5 && hour < 21;
-}
 
 export default function KitchenDashboard({
   offsetDays,
@@ -125,10 +112,6 @@ export default function KitchenDashboard({
 
   useEffect(() => {
     load();
-    const everyHour = window.setInterval(() => {
-      if (withinKitchenHours()) load();
-    }, 60 * 60 * 1000);
-    return () => window.clearInterval(everyHour);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serviceDate]);
 
@@ -137,7 +120,9 @@ export default function KitchenDashboard({
     <main className="page-auth page-auth-desktop">
       <section className="auth-panel">
         <h1>{title}</h1>
-        <p className="auth-help">Auto refresh every 60 minutes during 05:00-21:00 (Asia/Makassar). Service date: {serviceDate}</p>
+        <div className="module-guide-card">
+          💡 See Orders and Summary, Allergens, Mark ordered as prepared, print order tags. Press Refresh Button for latest updates.
+        </div>
         <div className="kitchen-top-actions">
           <Link className="btn btn-outline" href="/kitchen/yesterday">Yesterday</Link>
           <Link className="btn btn-outline" href="/kitchen/today">Today</Link>
@@ -270,6 +255,16 @@ export default function KitchenDashboard({
         ) : null}
       </section>
       <style jsx>{`
+        .module-guide-card {
+          background: #fffbf4;
+          border: 1px solid #e8d9c0;
+          border-left: 3px solid #c8a96e;
+          border-radius: 0.6rem;
+          padding: 0.6rem 0.85rem;
+          font-size: 0.82rem;
+          color: #6b5a43;
+          margin-bottom: 0.75rem;
+        }
         .kitchen-top-actions {
           display: flex;
           gap: 0.8rem;

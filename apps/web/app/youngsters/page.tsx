@@ -402,11 +402,9 @@ export default function YoungstersPage() {
           <Link href="/menu">Menu</Link>
           <Link href="/rating">Rating</Link>
         </nav>
-        {youngster ? (
-          <p className="auth-help">
-            {youngster.first_name} {youngster.last_name} - {youngster.school_name} ({youngster.school_grade})
-          </p>
-        ) : null}
+        <div className="module-guide-card">
+          💡 Select Dish and Confirm Meal.
+        </div>
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
 
@@ -518,6 +516,18 @@ export default function YoungstersPage() {
           )}
         </div>
       </section>
+      <style jsx>{`
+        .module-guide-card {
+          background: #fffbf4;
+          border: 1px solid #e8d9c0;
+          border-left: 3px solid #c8a96e;
+          border-radius: 0.6rem;
+          padding: 0.6rem 0.85rem;
+          font-size: 0.82rem;
+          color: #6b5a43;
+          margin-bottom: 0.5rem;
+        }
+      `}</style>
     </main>
     <LogoutButton />
     </>

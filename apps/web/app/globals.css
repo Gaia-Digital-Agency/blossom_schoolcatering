@@ -557,6 +557,75 @@ button:hover,
   line-height: 1.35;
 }
 
+/* Guide page markdown rendering */
+.guide-rendered {
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: #3b332a;
+  padding: 0.5rem 0 0.75rem;
+}
+.guide-rendered h2 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 1rem 0 0.35rem;
+  color: #2c2318;
+  border-bottom: 1px solid #e5d9c8;
+  padding-bottom: 0.2rem;
+}
+.guide-rendered h3 {
+  font-size: 0.97rem;
+  font-weight: 700;
+  margin: 0.85rem 0 0.25rem;
+  color: #3b332a;
+}
+.guide-rendered h4 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin: 0.7rem 0 0.2rem;
+  color: #4b4035;
+}
+.guide-rendered h5 {
+  font-size: 0.87rem;
+  font-weight: 600;
+  margin: 0.6rem 0 0.15rem;
+  color: #5a5048;
+}
+.guide-rendered p {
+  margin: 0.35rem 0 0.6rem;
+}
+.guide-rendered ul,
+.guide-rendered ol {
+  margin: 0.3rem 0 0.7rem 1.3rem;
+  padding: 0;
+}
+.guide-rendered li {
+  margin: 0.2rem 0;
+}
+.guide-rendered strong {
+  font-weight: 700;
+  color: #2c2318;
+}
+.guide-rendered em {
+  font-style: italic;
+}
+.guide-rendered u {
+  text-decoration: underline;
+}
+.guide-rendered code {
+  background: #f3ede4;
+  border: 1px solid #e0d3c0;
+  border-radius: 3px;
+  padding: 0.1em 0.35em;
+  font-size: 0.85em;
+  font-family: monospace;
+  color: #7a4f2a;
+}
+.guide-rendered hr {
+  border: none;
+  border-top: 1px solid #e5d9c8;
+  margin: 0.85rem 0;
+}
+
 .parents-page,
 .youngsters-page,
 .delivery-page,

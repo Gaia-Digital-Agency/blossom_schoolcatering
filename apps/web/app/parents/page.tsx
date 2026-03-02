@@ -550,8 +550,9 @@ export default function ParentsPage() {
           <Link href="/rating">Rating</Link>
           <button type="button" className={activeSection === 'billing' ? 'active' : ''} onClick={() => setActiveSection('billing')}>Billing</button>
         </nav>
-        {parentId ? <p className="auth-help">Parent Profile ID: {parentId}</p> : null}
-        <p className="auth-help">Ordering and billing dashboard for linked youngsters.</p>
+        <div className="module-guide-card">
+          💡 Manage Youngster Order, Pay Invoices. Amend Youngster information.
+        </div>
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
 
@@ -768,6 +769,18 @@ export default function ParentsPage() {
         </div>
         </>)}
       </section>
+      <style jsx>{`
+        .module-guide-card {
+          background: #fffbf4;
+          border: 1px solid #e8d9c0;
+          border-left: 3px solid #c8a96e;
+          border-radius: 0.6rem;
+          padding: 0.6rem 0.85rem;
+          font-size: 0.82rem;
+          color: #6b5a43;
+          margin-bottom: 0.5rem;
+        }
+      `}</style>
     </main>
     <LogoutButton />
     </>

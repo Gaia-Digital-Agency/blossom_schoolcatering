@@ -2,6 +2,100 @@ import { readFile, stat } from 'fs/promises';
 import path from 'path';
 import Link from 'next/link';
 
+function escapeHtml(s: string) {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function inlineFormat(s: string): string {
+  let r = escapeHtml(s);
+  // Bold: **text**
+  r = r.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // Underline: __text__
+  r = r.replace(/__(.+?)__/g, '<u>$1</u>');
+  // Italic: *text* or _text_ (single, not already consumed by bold/underline)
+  r = r.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+  r = r.replace(/_([^_\n]+)_/g, '<em>$1</em>');
+  // Inline code: `code`
+  r = r.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+  return r;
+}
+
+function parseMarkdown(text: string): string {
+  const lines = text.split('\n');
+  const out: string[] = [];
+  let inUl = false;
+  let inOl = false;
+  let inP = false;
+
+  const closeList = () => {
+    if (inUl) { out.push('</ul>'); inUl = false; }
+    if (inOl) { out.push('</ol>'); inOl = false; }
+  };
+  const closePara = () => {
+    if (inP) { out.push('</p>'); inP = false; }
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    if (trimmed === '') {
+      closeList();
+      closePara();
+      continue;
+    }
+
+    if (/^---+$/.test(trimmed) || /^\*\*\*+$/.test(trimmed)) {
+      closeList(); closePara();
+      out.push('<hr />');
+      continue;
+    }
+
+    const h4 = trimmed.match(/^#### (.+)/);
+    const h3 = trimmed.match(/^### (.+)/);
+    const h2 = trimmed.match(/^## (.+)/);
+    const h1 = trimmed.match(/^# (.+)/);
+    const ul = trimmed.match(/^[-*+] (.+)/);
+    const ol = trimmed.match(/^\d+\. (.+)/);
+
+    if (h1 || h2 || h3 || h4) {
+      closeList(); closePara();
+      const match = (h1 || h2 || h3 || h4)!;
+      const tag = h1 ? 'h2' : h2 ? 'h3' : h3 ? 'h4' : 'h5';
+      out.push(`<${tag}>${inlineFormat(match[1])}</${tag}>`);
+      continue;
+    }
+
+    if (ul) {
+      closePara();
+      if (inOl) { out.push('</ol>'); inOl = false; }
+      if (!inUl) { out.push('<ul>'); inUl = true; }
+      out.push(`<li>${inlineFormat(ul[1])}</li>`);
+      continue;
+    }
+
+    if (ol) {
+      closePara();
+      if (inUl) { out.push('</ul>'); inUl = false; }
+      if (!inOl) { out.push('<ol>'); inOl = true; }
+      out.push(`<li>${inlineFormat(ol[1])}</li>`);
+      continue;
+    }
+
+    // Regular paragraph text
+    closeList();
+    if (!inP) { out.push('<p>'); inP = true; } else { out.push('<br />'); }
+    out.push(inlineFormat(trimmed));
+  }
+
+  closeList();
+  closePara();
+  return out.join('\n');
+}
+
 type GuideItem = {
   title: string;
   key: string;
@@ -80,7 +174,10 @@ export default async function GuidePage() {
             <details key={guide.key}>
               <summary>{guide.title}</summary>
               <p className="auth-help">Last updated: {formatUpdatedAt(guide.updatedAt)}</p>
-              <pre className="guide-content">{guide.content}</pre>
+              <div
+                className="guide-content guide-rendered"
+                dangerouslySetInnerHTML={{ __html: parseMarkdown(guide.content) }}
+              />
             </details>
           ))}
         </div>

@@ -164,6 +164,10 @@ export default function RatingPage() {
           </div>
         )}
 
+        <div className="module-guide-card">
+          💡 Log In to rate meals to tell chef to keep on cooking.
+        </div>
+
         <div className="dev-links">
           <button className="btn btn-outline" type="button" onClick={onSaveAndGoHome} disabled={savingItemId === 'all'}>
             {savingItemId === 'all' ? 'Saving...' : 'Back To Home'}
@@ -251,6 +255,16 @@ export default function RatingPage() {
           text-decoration: none;
           font: inherit;
           cursor: pointer;
+        }
+        .module-guide-card {
+          background: #fffbf4;
+          border: 1px solid #e8d9c0;
+          border-left: 3px solid #c8a96e;
+          border-radius: 0.6rem;
+          padding: 0.6rem 0.85rem;
+          font-size: 0.82rem;
+          color: #6b5a43;
+          margin-top: 1.2rem;
         }
         @media (min-width: 900px) {
           .menu-public-grid {

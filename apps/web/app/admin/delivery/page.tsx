@@ -533,6 +533,34 @@ export default function AdminDeliveryPage() {
         </div>
       </section>
       <style jsx>{`
+        .kitchen-table-wrap {
+          overflow-x: auto;
+          max-width: 100%;
+          -webkit-overflow-scrolling: touch;
+        }
+        .kitchen-table {
+          width: 100%;
+          border-collapse: collapse;
+          background: #fff;
+          border: 1px solid #e2d6c2;
+          border-radius: 10px;
+          overflow: hidden;
+          margin-bottom: 0.5rem;
+        }
+        .kitchen-table th,
+        .kitchen-table td {
+          border-bottom: 1px solid #efe7da;
+          padding: 0.6rem;
+          text-align: left;
+          vertical-align: top;
+          font-size: 0.88rem;
+          line-height: 1.35;
+          overflow-wrap: anywhere;
+          word-break: break-word;
+        }
+        .kitchen-table tbody tr:last-child td {
+          border-bottom: none;
+        }
         .admin-delivery-table th,
         .admin-delivery-table td {
           text-align: left;
@@ -571,6 +599,18 @@ export default function AdminDeliveryPage() {
           .auto-assign-controls {
             grid-template-columns: 1fr auto auto auto;
             align-items: end;
+          }
+        }
+        @media (max-width: 680px) {
+          .kitchen-table th,
+          .kitchen-table td {
+            font-size: 0.78rem;
+            padding: 0.38rem 0.4rem;
+          }
+          /* Assignments table: hide Order ID column on mobile */
+          .admin-delivery-table.assignments-table th:nth-child(3),
+          .admin-delivery-table.assignments-table td:nth-child(3) {
+            display: none;
           }
         }
       `}</style>
