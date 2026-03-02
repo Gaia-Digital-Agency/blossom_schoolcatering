@@ -7,8 +7,22 @@ import GoogleOAuthButton from './_components/google-oauth-button';
 export default function HomePage() {
   const [open, setOpen] = useState(false);
   const [visitCount, setVisitCount] = useState<number>(0);
-  const [baliTime, setBaliTime] = useState<string>('--:--');
-  const [baliToday, setBaliToday] = useState<string>('-');
+  const [localTime, setLocalTime] = useState<string>('--:--');
+  const [localToday, setLocalToday] = useState<string>('-');
+  const [localTz, setLocalTz] = useState<string>('-');
+  const [localTzAbbr, setLocalTzAbbr] = useState<string>('');
+  const [chefMessage, setChefMessage] = useState<string>(
+    'Every dish is prepared for school-day energy and balanced nutrition. We keep every meal fresh, consistent, and safe for all youngsters.'
+  );
+
+  useEffect(() => {
+    fetch('/schoolcatering/api/v1/public/site-settings', { credentials: 'include' })
+      .then((res) => res.ok ? res.json() : null)
+      .then((json: { chef_message?: string } | null) => {
+        if (json?.chef_message) setChefMessage(json.chef_message);
+      })
+      .catch(() => { /* keep default */ });
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -26,24 +40,26 @@ export default function HomePage() {
         if (alive) setVisitCount(0);
       });
 
-    const formatBaliTime = () => new Intl.DateTimeFormat('en-GB', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-      timeZone: 'Asia/Makassar',
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    setLocalTz(tz);
+
+    const getTzAbbr = () => {
+      const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'short' }).formatToParts(new Date());
+      return parts.find((p) => p.type === 'timeZoneName')?.value ?? '';
+    };
+    const formatTime = () => new Intl.DateTimeFormat('en-GB', {
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: tz,
     }).format(new Date());
-    const formatBaliToday = () => new Intl.DateTimeFormat('en-GB', {
-      weekday: 'long',
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric',
-      timeZone: 'Asia/Makassar',
+    const formatToday = () => new Intl.DateTimeFormat('en-GB', {
+      weekday: 'long', day: '2-digit', month: 'long', year: 'numeric', timeZone: tz,
     }).format(new Date());
 
-    setBaliTime(formatBaliTime());
-    setBaliToday(formatBaliToday());
-    const timer = window.setInterval(() => setBaliTime(formatBaliTime()), 1000);
-    const dateTimer = window.setInterval(() => setBaliToday(formatBaliToday()), 60_000);
+    setLocalTime(formatTime());
+    setLocalToday(formatToday());
+    setLocalTzAbbr(getTzAbbr());
+
+    const timer = window.setInterval(() => setLocalTime(formatTime()), 1000);
+    const dateTimer = window.setInterval(() => { setLocalToday(formatToday()); setLocalTzAbbr(getTzAbbr()); }, 60_000);
     return () => {
       alive = false;
       window.clearInterval(timer);
@@ -94,16 +110,13 @@ export default function HomePage() {
 
         <section className="chef-message" aria-label="Message from the Chef">
           <h2>Chef Message</h2>
-          <p>
-            "Every dish is prepared for school-day energy and balanced nutrition.
-            We keep every meal fresh, consistent, and safe for all youngsters."
-          </p>
+          <p>"{chefMessage}"</p>
         </section>
 
         <footer className="footer">
           <p>Copyright (C) 2026, Developed by Gaiada.com</p>
-          <p>Today: {baliToday}</p>
-          <p>Visitors: <strong>{visitCount}</strong> | Location: Bali, Indonesia | Time: {baliTime} WITA</p>
+          <p>Today: {localToday}</p>
+          <p>Visitors: <strong>{visitCount}</strong> | Timezone: {localTz} | Time: {localTime} {localTzAbbr}</p>
         </footer>
       </div>
     </>

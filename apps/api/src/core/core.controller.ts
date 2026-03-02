@@ -85,6 +85,18 @@ export class CoreController {
     return this.coreService.deleteSchool(req.user, schoolId);
   }
 
+  @Get('admin/site-settings')
+  @Roles('ADMIN')
+  getAdminSiteSettings() {
+    return this.coreService.getSiteSettings();
+  }
+
+  @Patch('admin/site-settings')
+  @Roles('ADMIN')
+  updateAdminSiteSettings(@Req() req: AuthRequest, @Body() body: { chef_message: string }) {
+    return this.coreService.updateSiteSettings(req.user, body.chef_message ?? '');
+  }
+
   @Get('admin/session-settings')
   @Roles('ADMIN')
   getAdminSessionSettings() {

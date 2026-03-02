@@ -6,6 +6,38 @@ import { runSql } from './auth/db.util';
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
+  private async ensureSiteSettings() {
+    await runSql(`
+      CREATE TABLE IF NOT EXISTS site_settings (
+        setting_key   text PRIMARY KEY,
+        setting_value text NOT NULL DEFAULT '',
+        updated_at    timestamptz NOT NULL DEFAULT now()
+      );
+    `);
+    await runSql(`
+      INSERT INTO site_settings (setting_key, setting_value)
+      VALUES ('chef_message', 'Every dish is prepared for school-day energy and balanced nutrition. We keep every meal fresh, consistent, and safe for all youngsters.')
+      ON CONFLICT (setting_key) DO NOTHING;
+    `);
+  }
+
+  @Get('api/v1/public/site-settings')
+  async getPublicSiteSettings() {
+    await this.ensureSiteSettings();
+    const out = await runSql(`
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT setting_value AS chef_message
+        FROM site_settings
+        WHERE setting_key = 'chef_message'
+        LIMIT 1
+      ) t;
+    `);
+    const line = out.split('\n').map((x: string) => x.trim()).find(Boolean);
+    const data = line ? (JSON.parse(line) as { chef_message?: string }) : {};
+    return { chef_message: data.chef_message ?? '' };
+  }
+
   private async ensurePageVisitCounter() {
     await runSql(`
       CREATE TABLE IF NOT EXISTS site_counters (

@@ -80,6 +80,11 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Chef personal message
+  const [chefMessage, setChefMessage] = useState('');
+  const [chefMessageSaving, setChefMessageSaving] = useState(false);
+  const [chefMessageStatus, setChefMessageStatus] = useState<'idle' | 'saved' | 'error'>('idle');
+
   const load = async () => {
     setLoading(true);
     setError('');
@@ -93,8 +98,32 @@ export default function AdminPage() {
     }
   };
 
+  const loadChefMessage = async () => {
+    try {
+      const result = await apiFetch('/admin/site-settings') as { chef_message: string };
+      setChefMessage(result.chef_message ?? '');
+    } catch {
+      // non-critical, ignore
+    }
+  };
+
+  const saveChefMessage = async () => {
+    setChefMessageSaving(true);
+    setChefMessageStatus('idle');
+    try {
+      await apiFetch('/admin/site-settings', { method: 'PATCH', body: JSON.stringify({ chef_message: chefMessage }) });
+      setChefMessageStatus('saved');
+      setTimeout(() => setChefMessageStatus('idle'), 3000);
+    } catch {
+      setChefMessageStatus('error');
+    } finally {
+      setChefMessageSaving(false);
+    }
+  };
+
   useEffect(() => {
     load();
+    loadChefMessage();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -106,6 +135,26 @@ export default function AdminPage() {
         <AdminNav />
 
         <div className="auth-form admin-controls-card">
+          <div className="chef-message-controls">
+            <label>
+              Chef Personal Message
+              <textarea
+                rows={3}
+                maxLength={500}
+                value={chefMessage}
+                onChange={(e) => { setChefMessage(e.target.value); setChefMessageStatus('idle'); }}
+                placeholder="Write the chef's personal message shown on the homepage…"
+              />
+            </label>
+            <div className="chef-message-footer">
+              <span className="chef-message-count">{chefMessage.length}/500</span>
+              {chefMessageStatus === 'saved' && <span className="chef-message-ok">✓ Saved</span>}
+              {chefMessageStatus === 'error' && <span className="chef-message-err">✗ Failed to save</span>}
+              <button className="btn btn-primary btn-sm" type="button" onClick={saveChefMessage} disabled={chefMessageSaving}>
+                {chefMessageSaving ? 'Saving…' : 'Save Message'}
+              </button>
+            </div>
+          </div>
           <div className="admin-dashboard-controls">
             <label>
               Dashboard Date
@@ -292,6 +341,54 @@ export default function AdminPage() {
         ) : null}
       </section>
       <style jsx>{`
+        .chef-message-controls {
+          display: grid;
+          gap: 0.4rem;
+          padding-bottom: 0.8rem;
+          border-bottom: 1px solid rgba(15,23,42,0.1);
+          margin-bottom: 0.6rem;
+        }
+        .chef-message-controls label {
+          display: grid;
+          gap: 0.25rem;
+          font-size: 0.85rem;
+          font-weight: 600;
+        }
+        .chef-message-controls textarea {
+          resize: vertical;
+          min-height: 5rem;
+          padding: 0.5rem 0.65rem;
+          font-size: 0.88rem;
+          border: 1px solid rgba(15,23,42,0.18);
+          border-radius: 6px;
+          font-family: inherit;
+          line-height: 1.5;
+        }
+        .chef-message-footer {
+          display: flex;
+          align-items: center;
+          gap: 0.6rem;
+          flex-wrap: wrap;
+        }
+        .chef-message-count {
+          font-size: 0.75rem;
+          color: #64748b;
+        }
+        .chef-message-ok {
+          font-size: 0.78rem;
+          color: #16a34a;
+          font-weight: 600;
+        }
+        .chef-message-err {
+          font-size: 0.78rem;
+          color: #dc2626;
+          font-weight: 600;
+        }
+        .btn-sm {
+          padding: 0.3rem 0.8rem;
+          font-size: 0.82rem;
+          min-height: unset;
+        }
         .admin-dashboard-controls {
           display: grid;
           grid-template-columns: minmax(0, 1fr);

@@ -6361,6 +6361,55 @@ export class CoreService implements OnModuleInit {
     }));
   }
 
+  // ─── Site settings (chef message, etc.) ───────────────────────────────────
+
+  private async ensureSiteSettingsTable() {
+    await runSql(`
+      CREATE TABLE IF NOT EXISTS site_settings (
+        setting_key   text PRIMARY KEY,
+        setting_value text NOT NULL DEFAULT '',
+        updated_at    timestamptz NOT NULL DEFAULT now()
+      );
+    `);
+    await runSql(`
+      INSERT INTO site_settings (setting_key, setting_value)
+      VALUES ('chef_message', 'Every dish is prepared for school-day energy and balanced nutrition. We keep every meal fresh, consistent, and safe for all youngsters.')
+      ON CONFLICT (setting_key) DO NOTHING;
+    `);
+  }
+
+  async getSiteSettings() {
+    await this.ensureSiteSettingsTable();
+    const out = await runSql(`
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT setting_value AS chef_message
+        FROM site_settings
+        WHERE setting_key = 'chef_message'
+        LIMIT 1
+      ) t;
+    `);
+    const lines = out.split('\n').map((x: string) => x.trim()).filter(Boolean);
+    const data = lines[0] ? (JSON.parse(lines[0]) as { chef_message?: string }) : {};
+    return { chef_message: data.chef_message ?? '' };
+  }
+
+  async updateSiteSettings(actor: AccessUser, chefMessage: string) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    if (typeof chefMessage !== 'string') throw new BadRequestException('chef_message must be a string');
+    const trimmed = chefMessage.trim();
+    if (trimmed.length > 500) throw new BadRequestException('chef_message must be 500 characters or fewer');
+    await this.ensureSiteSettingsTable();
+    await runSql(
+      `INSERT INTO site_settings (setting_key, setting_value, updated_at)
+       VALUES ('chef_message', $1, now())
+       ON CONFLICT (setting_key)
+       DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = now();`,
+      [trimmed],
+    );
+    return { chef_message: trimmed };
+  }
+
   // ─── Health check ─────────────────────────────────────────────────────────
 
   async healthCheck() {
