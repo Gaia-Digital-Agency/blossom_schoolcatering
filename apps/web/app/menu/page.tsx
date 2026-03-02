@@ -101,12 +101,6 @@ export default function MenuPage() {
     <main className="page-auth page-auth-mobile">
       <section className="auth-panel">
         <h1>Menu</h1>
-        <p className="auth-help">Viewing only. Dishes from Admin configuration (Active and Not Active).</p>
-        {serviceDate ? (
-          <p className="auth-help">
-            {serviceDate === 'ALL_ACTIVE' ? 'Showing all active dishes (not filtered by date).' : `Service Date: ${serviceDate}`}
-          </p>
-        ) : null}
         {error ? <p className="auth-error">{error}</p> : null}
 
         {items.length === 0 ? (
