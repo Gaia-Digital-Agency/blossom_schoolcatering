@@ -205,11 +205,11 @@ export default function YoungsterRegisterPage() {
   };
 
   return (
-    <main className="page-auth youngster-register-page">
-      <section className="auth-panel youngster-register-card">
+    <main className="page-auth">
+      <section className="auth-panel">
         <h1>Youngster Registration</h1>
         <p className="auth-help">Youngster registration also creates/links the parent account in one flow.</p>
-        <form onSubmit={onSubmit} className="auth-form youngster-register-form">
+        <form onSubmit={onSubmit} className="auth-form">
           {isReadonlyRecord ? (
             <p className="auth-help">
               Record view only. To edit registered youngster information, please request Admin.
@@ -228,9 +228,9 @@ export default function YoungsterRegisterPage() {
             </label>
           ) : null}
           <fieldset disabled={isReadonlyRecord}>
-          <fieldset>
+          <fieldset className="registrant-type-fieldset">
             <legend>Are You the Youngster, Parent, Teacher? (required)</legend>
-            <label>
+            <label className="registrant-type-option">
               <input
                 type="radio"
                 name="registrantType"
@@ -241,7 +241,7 @@ export default function YoungsterRegisterPage() {
               />
               Youngster
             </label>
-            <label>
+            <label className="registrant-type-option">
               <input
                 type="radio"
                 name="registrantType"
@@ -252,7 +252,7 @@ export default function YoungsterRegisterPage() {
               />
               Parent
             </label>
-            <label>
+            <label className="registrant-type-option">
               <input
                 type="radio"
                 name="registrantType"
@@ -385,37 +385,26 @@ export default function YoungsterRegisterPage() {
         </form>
       </section>
       <style jsx>{`
-        .youngster-register-card {
-          padding: 0.7rem;
-        }
-        .youngster-register-form {
-          gap: 0.45rem;
-        }
-        .youngster-register-form fieldset {
+        .registrant-type-fieldset {
           margin: 0;
           padding: 0.45rem 0.55rem;
-          border-radius: 0.5rem;
+          border-radius: 0.55rem;
+          display: grid;
+          gap: 0.35rem;
         }
-        .youngster-register-form label {
-          gap: 0.16rem;
-          font-size: 0.84rem;
+        .registrant-type-option {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.42rem;
+          margin: 0;
+          font-size: 0.88rem;
         }
-        .youngster-register-form input,
-        .youngster-register-form select {
-          min-height: 2.05rem;
-          padding: 0.36rem 0.52rem;
-        }
-        .youngster-register-form legend {
-          font-size: 0.8rem;
-          padding-inline: 0.2rem;
-        }
-        @media (min-width: 860px) {
-          .youngster-register-card {
-            padding: 0.85rem;
-          }
-          .youngster-register-form {
-            gap: 0.6rem;
-          }
+        .registrant-type-option input[type='radio'] {
+          width: 1rem;
+          height: 1rem;
+          min-height: 0;
+          margin: 0;
+          padding: 0;
         }
       `}</style>
     </main>
