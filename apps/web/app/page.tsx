@@ -72,8 +72,8 @@ export default function HomePage() {
       <div className="site-wrap">
         <header className="topbar">
           <Link className="brand" href="/">
-            <img className="brand-logo" src="/schoolcatering/assets/logo.svg" alt="Blossom School Catering logo" />
-            <span>Blossom School Catering</span>
+            <img className="brand-logo" src="/schoolcatering/assets/logo.svg" alt="Bali Catering logo" />
+            <span>Bali Catering</span>
           </Link>
           <button className="menu-btn" aria-label="Toggle menu" onClick={() => setOpen(!open)}>
             Menu
@@ -84,13 +84,14 @@ export default function HomePage() {
               Steakhouse
             </a>
             <Link className="nav-guide-link" href="/guide">Guides &amp; T&amp;C</Link>
+            <a className="nav-guide-link" href="https://gaiada.com" target="_blank" rel="noopener noreferrer">App Inquiry</a>
           </nav>
         </header>
 
         <main className="hero">
           <section className="hero-card">
-            <p className="eyebrow">School Catering by Blossom Kitchen</p>
             <h1>Meal Order App</h1>
+            <p className="eyebrow">School Catering by Blossom Kitchen</p>
             <p className="lead">
               Lunch Meal For Youngsters, Up To Five Dishes Per Meal, Register or Log In.
               Click the Menu button for more details.
