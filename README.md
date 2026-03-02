@@ -78,3 +78,33 @@ Expected core variables include:
 - `docs/Features/buttons.md`: UI action and endpoint map
 - `docs/Features/map.md`: merged page/API/DB map
 - `docs/guides/*.md`: end-user guides
+
+## API Notes
+- API app path: `apps/api`
+- Framework: NestJS
+- Build command:
+
+```bash
+npm -C apps/api run build
+```
+
+## DB Migration Guide
+
+This repo keeps historical SQL migrations under `docs/db`.
+
+- Immutable history: `001` to `013` (do not rewrite for existing environments)
+- Fresh-install consolidated path:
+  1. `docs/db/100_baseline_schema_v2.sql`
+  2. `docs/db/003_views_and_reports.sql`
+  3. `docs/db/005_auth_runtime_sessions.sql`
+  4. `docs/db/101_perf_indexes.sql`
+
+- Operational menu seeding (finalized active menu -> future date):
+  - `docs/db/006_runtime_manual_test_seed.sql`
+
+- Full production DB execution steps:
+  - `docs/db/production-runbook.md`
+
+## Packages
+- `packages/types`: shared TypeScript types
+- `packages/config`: shared configuration package placeholder for ESLint/Prettier/TS presets

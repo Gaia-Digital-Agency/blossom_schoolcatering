@@ -493,10 +493,10 @@ export default function AdminMenuPage() {
     setActionLoading(true);
     try {
       await apiFetch('/admin/menus/sample-seed', { method: 'POST', body: JSON.stringify({ serviceDate: menuServiceDate }) }, { skipAutoReload: true });
-      setMessage('Sample menus seeded for selected date.');
+      setMessage('Active menu cloned to selected date.');
       await loadMenuData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed seeding sample menus');
+      setError(err instanceof Error ? err.message : 'Failed cloning active menu');
     } finally {
       setActionLoading(false);
     }
@@ -613,7 +613,7 @@ export default function AdminMenuPage() {
             <button className="btn btn-outline" type="button" onClick={onLoadMenuContext} disabled={savingItem || actionLoading}>
               {actionLoading ? 'Loading...' : 'Load Menu Context'}
             </button>
-            <button className="btn btn-outline" type="button" onClick={onSeed} disabled={savingItem || actionLoading}>Seed Sample Menus</button>
+            <button className="btn btn-outline" type="button" onClick={onSeed} disabled={savingItem || actionLoading}>Clone Active Menu</button>
             <button className="btn btn-primary" type="submit" form="menu-item-form" disabled={savingItem || actionLoading || imageConverting}>
               {savingItem ? 'Saving...' : (imageConverting ? 'Converting Image...' : (editingItemId ? 'Update Dish' : 'Create Dish'))}
             </button>

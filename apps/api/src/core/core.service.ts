@@ -2441,108 +2441,197 @@ export class CoreService implements OnModuleInit {
 
   async seedAdminMenuSample(serviceDateRaw?: string) {
     const serviceDate = this.validateServiceDate(serviceDateRaw);
-    const samples = [
-      {
-        session: 'LUNCH' as SessionType,
-        name: 'Sample Grilled Chicken Bowl',
-        description: 'Grilled chicken, steamed rice, carrot and broccoli.',
-        nutritionFactsText: 'Approx 510 kcal | Protein 34g | Carbs 54g | Fat 12g',
-        caloriesKcal: 510,
-        price: 45000,
-        imageUrl: '/schoolcatering/assets/hero-meal.jpg',
-        cutleryRequired: true,
-        packingRequirement: 'Lunch box sealed + spoon + tissue',
-      },
-      {
-        session: 'SNACK' as SessionType,
-        name: 'Sample Fruit Yogurt Cup',
-        description: 'Low sugar yogurt with mixed fruit topping.',
-        nutritionFactsText: 'Approx 230 kcal | Protein 8g | Carbs 28g | Fat 7g',
-        caloriesKcal: 230,
-        price: 25000,
-        imageUrl: '/schoolcatering/assets/hero-meal.jpg',
-        cutleryRequired: true,
-        packingRequirement: 'Cup with spoon',
-      },
-      {
-        session: 'BREAKFAST' as SessionType,
-        name: 'Sample Egg Fried Rice',
-        description: 'Egg fried rice with vegetables.',
-        nutritionFactsText: 'Approx 390 kcal | Protein 12g | Carbs 58g | Fat 10g',
-        caloriesKcal: 390,
-        price: 32000,
-        imageUrl: '/schoolcatering/assets/hero-meal.jpg',
-        cutleryRequired: true,
-        packingRequirement: 'Warm pack + spoon',
-      },
-    ];
-
-    const ingredientOut = await runSql(`
-      SELECT row_to_json(t)::text
-      FROM (
-        SELECT id, lower(name) AS name
-        FROM ingredients
-        WHERE deleted_at IS NULL
-      ) t;
-    `);
-    const ingredients = this.parseJsonLines<{ id: string; name: string }>(ingredientOut);
-    const byName = new Map(ingredients.map((x) => [x.name, x.id]));
+    const sourceBySessionOut = await runSql(
+      `SELECT row_to_json(t)::text
+       FROM (
+         SELECT m.session::text AS session,
+                MAX(m.service_date)::text AS source_service_date
+         FROM menus m
+         JOIN menu_items mi
+           ON mi.menu_id = m.id
+          AND mi.deleted_at IS NULL
+          AND mi.is_available = true
+         WHERE m.deleted_at IS NULL
+         GROUP BY m.session
+       ) t;`,
+    );
+    const sourceBySession = this.parseJsonLines<{ session: SessionType; source_service_date: string }>(sourceBySessionOut);
+    const sourceDateMap = new Map<SessionType, string>();
+    for (const row of sourceBySession) {
+      sourceDateMap.set(row.session, row.source_service_date);
+    }
 
     const createdIds: string[] = [];
-    for (const sample of samples) {
-      const menuId = await this.ensureMenuForDateSession(serviceDate, sample.session);
-      const existing = await runSql(
-        `SELECT id
-         FROM menu_items
-         WHERE menu_id = $1
-           AND lower(name) = $2
-           AND deleted_at IS NULL
-         LIMIT 1;`,
-        [menuId, sample.name.toLowerCase()],
+    const sourceDatesUsed: Array<{ session: SessionType; sourceServiceDate: string }> = [];
+
+    for (const session of SESSIONS) {
+      const sourceServiceDate = sourceDateMap.get(session);
+      if (!sourceServiceDate) {
+        throw new BadRequestException(`No active dishes found to seed for session: ${session}`);
+      }
+      sourceDatesUsed.push({ session, sourceServiceDate });
+
+      const sourceItemsOut = await runSql(
+        `SELECT row_to_json(t)::text
+         FROM (
+           SELECT mi.name,
+                  mi.description,
+                  mi.nutrition_facts_text,
+                  mi.calories_kcal,
+                  mi.price,
+                  mi.image_url,
+                  mi.is_available,
+                  mi.display_order,
+                  mi.cutlery_required,
+                  mi.packing_requirement,
+                  mi.is_vegetarian,
+                  mi.is_gluten_free,
+                  mi.is_dairy_free,
+                  mi.contains_peanut,
+                  COALESCE(mi.dish_category, 'MAIN') AS dish_category,
+                  COALESCE(
+                    array_agg(DISTINCT mii.ingredient_id::text) FILTER (WHERE mii.ingredient_id IS NOT NULL),
+                    '{}'
+                  ) AS ingredient_ids
+           FROM menu_items mi
+           JOIN menus m ON m.id = mi.menu_id
+           LEFT JOIN menu_item_ingredients mii ON mii.menu_item_id = mi.id
+           WHERE m.session = $1::session_type
+             AND m.service_date = $2::date
+             AND m.deleted_at IS NULL
+             AND mi.deleted_at IS NULL
+             AND mi.is_available = true
+           GROUP BY mi.id
+           ORDER BY mi.display_order ASC, mi.name ASC
+         ) t;`,
+        [session, sourceServiceDate],
       );
-      let itemId = existing;
-      if (!itemId) {
-        itemId = await runSql(
-          `INSERT INTO menu_items (
-             menu_id, name, description, nutrition_facts_text, calories_kcal, price, image_url, is_available, display_order, cutlery_required, packing_requirement
-           )
-           VALUES ($1, $2, $3, $4, $5, $6, $7, true, 1, $8, $9)
-           RETURNING id;`,
-          [
-            menuId,
-            sample.name,
-            sample.description,
-            sample.nutritionFactsText,
-            sample.caloriesKcal,
-            Number(sample.price.toFixed(2)),
-            sample.imageUrl,
-            sample.cutleryRequired,
-            sample.packingRequirement,
-          ],
-        );
+      const sourceItems = this.parseJsonLines<{
+        name: string;
+        description?: string | null;
+        nutrition_facts_text?: string | null;
+        calories_kcal?: number | null;
+        price: string | number;
+        image_url?: string | null;
+        is_available: boolean;
+        display_order: number;
+        cutlery_required: boolean;
+        packing_requirement?: string | null;
+        is_vegetarian?: boolean;
+        is_gluten_free?: boolean;
+        is_dairy_free?: boolean;
+        contains_peanut?: boolean;
+        dish_category?: string | null;
+        ingredient_ids: string[];
+      }>(sourceItemsOut);
+      if (sourceItems.length === 0) {
+        continue;
       }
-      createdIds.push(itemId);
-      await runSql(`DELETE FROM menu_item_ingredients WHERE menu_item_id = $1;`, [itemId]);
-      const names = sample.session === 'SNACK' ? ['milk', 'tomato'] : ['chicken', 'rice', 'egg'];
-      for (const nm of names) {
-        const ingredientId = byName.get(nm);
-        if (!ingredientId) continue;
-        await runSql(
-          `INSERT INTO menu_item_ingredients (menu_item_id, ingredient_id)
-           VALUES ($1, $2)
-           ON CONFLICT (menu_item_id, ingredient_id) DO NOTHING;`,
-          [itemId, ingredientId],
+
+      const targetMenuId = await this.ensureMenuForDateSession(serviceDate, session);
+      for (const sourceItem of sourceItems) {
+        const existing = await runSql(
+          `SELECT id
+           FROM menu_items
+           WHERE menu_id = $1
+             AND lower(name) = lower($2)
+             AND deleted_at IS NULL
+           LIMIT 1;`,
+          [targetMenuId, sourceItem.name],
         );
+
+        const normalizedDishCategory = this.normalizeDishCategory(sourceItem.dish_category || 'MAIN');
+        let itemId = existing;
+        if (itemId) {
+          await runSql(
+            `UPDATE menu_items
+             SET description = $1,
+                 nutrition_facts_text = $2,
+                 calories_kcal = $3,
+                 price = $4,
+                 image_url = $5,
+                 is_available = $6,
+                 display_order = $7,
+                 cutlery_required = $8,
+                 packing_requirement = $9,
+                 is_vegetarian = $10,
+                 is_gluten_free = $11,
+                 is_dairy_free = $12,
+                 contains_peanut = $13,
+                 dish_category = $14,
+                 updated_at = now()
+             WHERE id = $15;`,
+            [
+              sourceItem.description || '',
+              String(sourceItem.nutrition_facts_text || '').trim() || 'TBA',
+              sourceItem.calories_kcal ?? null,
+              Number(Number(sourceItem.price || 0).toFixed(2)),
+              sourceItem.image_url || '/schoolcatering/assets/hero-meal.jpg',
+              Boolean(sourceItem.is_available),
+              Number(sourceItem.display_order || 0),
+              Boolean(sourceItem.cutlery_required),
+              sourceItem.packing_requirement || null,
+              Boolean(sourceItem.is_vegetarian),
+              Boolean(sourceItem.is_gluten_free),
+              Boolean(sourceItem.is_dairy_free),
+              Boolean(sourceItem.contains_peanut),
+              normalizedDishCategory,
+              itemId,
+            ],
+          );
+        } else {
+          itemId = await runSql(
+            `INSERT INTO menu_items (
+               menu_id, name, description, nutrition_facts_text, calories_kcal, price, image_url, is_available, display_order, cutlery_required, packing_requirement,
+               is_vegetarian, is_gluten_free, is_dairy_free, contains_peanut, dish_category
+             )
+             VALUES (
+               $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+               $12, $13, $14, $15, $16
+             )
+             RETURNING id;`,
+            [
+              targetMenuId,
+              sourceItem.name,
+              sourceItem.description || '',
+              String(sourceItem.nutrition_facts_text || '').trim() || 'TBA',
+              sourceItem.calories_kcal ?? null,
+              Number(Number(sourceItem.price || 0).toFixed(2)),
+              sourceItem.image_url || '/schoolcatering/assets/hero-meal.jpg',
+              Boolean(sourceItem.is_available),
+              Number(sourceItem.display_order || 0),
+              Boolean(sourceItem.cutlery_required),
+              sourceItem.packing_requirement || null,
+              Boolean(sourceItem.is_vegetarian),
+              Boolean(sourceItem.is_gluten_free),
+              Boolean(sourceItem.is_dairy_free),
+              Boolean(sourceItem.contains_peanut),
+              normalizedDishCategory,
+            ],
+          );
+        }
+
+        createdIds.push(itemId);
+        await runSql(`DELETE FROM menu_item_ingredients WHERE menu_item_id = $1;`, [itemId]);
+        for (const ingredientId of (sourceItem.ingredient_ids || [])) {
+          await runSql(
+            `INSERT INTO menu_item_ingredients (menu_item_id, ingredient_id)
+             VALUES ($1, $2)
+             ON CONFLICT (menu_item_id, ingredient_id) DO NOTHING;`,
+            [itemId, ingredientId],
+          );
+        }
       }
+
       await runSql(
         `UPDATE menus
          SET is_published = true, updated_at = now()
          WHERE id = $1;`,
-        [menuId],
+        [targetMenuId],
       );
     }
     this.clearPublicMenuCache();
-    return { ok: true, serviceDate, createdItemIds: createdIds };
+    return { ok: true, serviceDate, sourceDatesUsed, createdItemIds: createdIds };
   }
 
   private pickSeedDeliveryUser(

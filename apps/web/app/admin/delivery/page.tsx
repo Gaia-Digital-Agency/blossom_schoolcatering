@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '../../../lib/auth';
 import AdminNav from '../_components/admin-nav';
 import PasswordInput from '../../_components/password-input';
@@ -80,6 +80,7 @@ export default function AdminDeliveryPage() {
   const [togglingUserId, setTogglingUserId] = useState('');
   const [deletingUserId, setDeletingUserId] = useState('');
   const [deletingMappingKey, setDeletingMappingKey] = useState('');
+  const editFirstNameInputRef = useRef<HTMLInputElement | null>(null);
 
   const load = async () => {
     const [u, s, m, a] = await Promise.all([
@@ -209,6 +210,13 @@ export default function AdminDeliveryPage() {
     setEditLastName(user.last_name || '');
     setEditPhoneNumber(user.phone_number || '');
     setEditEmail(user.email || '');
+    // Keep the selected row visible and focus first editable field.
+    window.setTimeout(() => {
+      const row = document.getElementById(`delivery-user-row-${user.id}`);
+      row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      editFirstNameInputRef.current?.focus();
+      editFirstNameInputRef.current?.select();
+    }, 0);
   };
 
   const onSaveUserEdit = async (userId: string) => {
@@ -337,11 +345,11 @@ export default function AdminDeliveryPage() {
                 {users.length === 0 ? (
                   <tr><td colSpan={6}>No delivery users yet.</td></tr>
                 ) : users.map((u) => (
-                  <tr key={u.id}>
+                  <tr id={`delivery-user-row-${u.id}`} key={u.id}>
                     <td>
                       {editingUserId === u.id ? (
                         <div className="edit-grid">
-                          <input value={editFirstName} onChange={(e) => setEditFirstName(e.target.value)} placeholder="First" />
+                          <input ref={editFirstNameInputRef} value={editFirstName} onChange={(e) => setEditFirstName(e.target.value)} placeholder="First" />
                           <input value={editLastName} onChange={(e) => setEditLastName(e.target.value)} placeholder="Last" />
                         </div>
                       ) : `${u.first_name} ${u.last_name}`}

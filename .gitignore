@@ -87,6 +87,8 @@ sites/default/settings.local.php
 
 # DATABASE DUMOS & DATA
 *.sql
+!docs/db/100_baseline_schema_v2.sql
+!docs/db/101_perf_indexes.sql
 *.sql.gz
 *.sqlite
 *.sqlite3

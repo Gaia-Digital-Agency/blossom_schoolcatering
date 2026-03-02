@@ -48,6 +48,14 @@ export default function LoginPage() {
       <section className="auth-panel">
         <h1>Home Login</h1>
         <p className="auth-help">Use this page for Parent and Youngster login.</p>
+        <div className="auth-form" style={{ marginBottom: '0.75rem' }}>
+          <strong>Dev Login Guide (Temporary)</strong>
+          <small>Parent: <code>parent</code> / <code>parent123</code> (or use this page)</small>
+          <small>Youngster: <code>youngster</code> / <code>youngster123</code> (or use this page)</small>
+          <small>Delivery: <code>delivery</code> / <code>delivery123</code> via <code>/delivery/login</code></small>
+          <small>Kitchen: <code>kitchen</code> / <code>kitchen123</code> via <code>/kitchen/login</code></small>
+          <small>Admin: <code>admin</code> / <code>admin123</code> via <code>/admin/login</code></small>
+        </div>
         <form onSubmit={onSubmit} className="auth-form" autoComplete="off">
           <label>
             Username

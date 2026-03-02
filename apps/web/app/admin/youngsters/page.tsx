@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '../../../lib/auth';
 import AdminNav from '../_components/admin-nav';
 
@@ -58,6 +58,7 @@ export default function AdminYoungstersPage() {
   const [schoolGrade, setSchoolGrade] = useState(GRADES[0]);
   const [allergies, setAllergies] = useState('');
   const [registrationNote, setRegistrationNote] = useState('');
+  const firstNameInputRef = useRef<HTMLInputElement | null>(null);
 
   const parentLabelById = useMemo(() => {
     const map = new Map<string, string>();
@@ -116,6 +117,13 @@ export default function AdminYoungstersPage() {
     if ((child.parent_ids || []).length > 0) {
       setSelectedParentId(child.parent_ids[0]);
     }
+    // Bring edit form into view and focus first field for quick updates.
+    window.setTimeout(() => {
+      const formEl = document.getElementById('youngster-edit-form');
+      formEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      firstNameInputRef.current?.focus();
+      firstNameInputRef.current?.select();
+    }, 0);
   };
 
   const onSubmit = async (e: FormEvent) => {
@@ -204,7 +212,7 @@ export default function AdminYoungstersPage() {
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
 
-        <form className="auth-form" onSubmit={onSubmit}>
+        <form id="youngster-edit-form" className="auth-form" onSubmit={onSubmit}>
           <label>
             Parent (Required)
             <select value={selectedParentId} onChange={(e) => setSelectedParentId(e.target.value)} required>
@@ -214,7 +222,7 @@ export default function AdminYoungstersPage() {
               ))}
             </select>
           </label>
-          <label>Youngster First Name<input value={firstName} onChange={(e) => setFirstName(e.target.value)} required /></label>
+          <label>Youngster First Name<input ref={firstNameInputRef} value={firstName} onChange={(e) => setFirstName(e.target.value)} required /></label>
           <label>Youngster Last Name<input value={lastName} onChange={(e) => setLastName(e.target.value)} required /></label>
           <label>Youngster Phone<input value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} required /></label>
           <label>Youngster Email (Optional)<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></label>
