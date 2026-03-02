@@ -11,6 +11,7 @@ import AdminNav from '../_components/admin-nav';
 type Ingredient = { id: string; name: string; allergen_flag: boolean; is_active: boolean };
 type AdminMenuItem = {
   id: string;
+  service_date?: string;
   session?: 'LUNCH' | 'SNACK' | 'BREAKFAST';
   name: string;
   dish_category?: string;
@@ -187,7 +188,7 @@ export default function AdminMenuPage() {
   const loadMenuData = async () => {
     const [ings, menu, ratings] = await Promise.all([
       apiFetch('/admin/ingredients') as Promise<Ingredient[]>,
-      apiFetch(`/admin/menus?service_date=${menuServiceDate}&session=${menuSession}`) as Promise<{ items: AdminMenuItem[] }>,
+      apiFetch(`/admin/menus?session=${menuSession}`) as Promise<{ items: AdminMenuItem[] }>,
       apiFetch(`/admin/menu-ratings?service_date=${menuServiceDate}&session=${menuSession}`) as Promise<{ items: MenuRatingSummary[] }>,
     ]);
     setIngredients(ings);
@@ -443,7 +444,11 @@ export default function AdminMenuPage() {
     setMessage('');
     setActionLoading(true);
     try {
-      const exists = menuItems.find((x) => x.name.trim().toLowerCase() === dish.trim().toLowerCase());
+      const exists = menuItems.find((x) => (
+        x.name.trim().toLowerCase() === dish.trim().toLowerCase()
+        && (x.session || '') === menuSession
+        && (x.service_date || '') === menuServiceDate
+      ));
       if (exists) {
         onEditItem(exists);
         setMessage('Dish already exists for selected date/session. Loaded into form.');
@@ -564,17 +569,13 @@ export default function AdminMenuPage() {
     }
   };
 
-  const sessionScopedItems = useMemo(
-    () => menuItems.filter((x) => !x.session || x.session === menuSession),
-    [menuItems, menuSession],
-  );
   const hasUploadedImage = (imageUrl?: string | null) => {
     const raw = String(imageUrl || '').trim().toLowerCase();
     if (!raw) return false;
     return !raw.includes(DEFAULT_DISH_IMAGE.toLowerCase());
   };
-  const activeMenuItems = useMemo(() => sessionScopedItems.filter((x) => x.is_available), [sessionScopedItems]);
-  const inactiveMenuItems = useMemo(() => sessionScopedItems.filter((x) => !x.is_available), [sessionScopedItems]);
+  const activeMenuItems = useMemo(() => menuItems.filter((x) => x.is_available), [menuItems]);
+  const inactiveMenuItems = useMemo(() => menuItems.filter((x) => !x.is_available), [menuItems]);
 
   useEffect(() => {
     if (activeMenuItems.length > 0 && activeMenuItems.length < 5) {
@@ -763,7 +764,7 @@ export default function AdminMenuPage() {
         </form>
 
         <div className="menu-items-shell">
-          <h2>Menu Items ({menuSession})</h2>
+          <h2>Menu Items ({menuSession}, all dates)</h2>
           <div className="menu-item-columns">
             <div className="menu-list-group">
               <h3 className="menu-list-title">Active Dishes</h3>
@@ -772,6 +773,7 @@ export default function AdminMenuPage() {
                   <article key={item.id} className="menu-item-card">
                     <strong>{item.name}</strong>
                     <small>{item.description}</small>
+                    <small>Date/Session: {item.service_date || '-'} / {item.session || '-'}</small>
                     <small>Image: {hasUploadedImage(item.image_url) ? 'Uploaded' : 'Default image'}</small>
                     <small>Image File: {getImageFileLabel(item.image_url)}</small>
                     <small>Calories: {item.calories_kcal ?? 'TBA'}</small>
@@ -797,6 +799,7 @@ export default function AdminMenuPage() {
                   <article key={item.id} className="menu-item-card">
                     <strong>{item.name}</strong>
                     <small>{item.description}</small>
+                    <small>Date/Session: {item.service_date || '-'} / {item.session || '-'}</small>
                     <small>Image: {hasUploadedImage(item.image_url) ? 'Uploaded' : 'Default image'}</small>
                     <small>Image File: {getImageFileLabel(item.image_url)}</small>
                     <small>Calories: {item.calories_kcal ?? 'TBA'}</small>

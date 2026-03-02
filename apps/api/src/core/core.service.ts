@@ -1893,7 +1893,7 @@ export class CoreService implements OnModuleInit {
           AND mi.is_available = true
           AND mi.deleted_at IS NULL
           ${filterSql}
-        GROUP BY mi.id, m.session
+        GROUP BY mi.id, m.service_date, m.session
         ORDER BY m.session ASC, mi.display_order ASC, mi.name ASC
       ) t;
     `,
@@ -1997,14 +1997,26 @@ export class CoreService implements OnModuleInit {
   }
 
   async getAdminMenus(query: { serviceDate?: string; session?: string }) {
-    const serviceDate = this.validateServiceDate(query.serviceDate);
-    const session = this.normalizeSession(query.session);
+    const serviceDate = query.serviceDate ? this.validateServiceDate(query.serviceDate) : null;
+    const session = query.session ? this.normalizeSession(query.session) : null;
+    const filters: string[] = [];
+    const params: unknown[] = [];
+    if (serviceDate) {
+      params.push(serviceDate);
+      filters.push(`m.service_date = $${params.length}::date`);
+    }
+    if (session) {
+      params.push(session);
+      filters.push(`m.session = $${params.length}::session_type`);
+    }
+    const filterSql = filters.length > 0 ? `AND ${filters.join('\n          AND ')}` : '';
     const out = await runSql(
       `
       SELECT row_to_json(t)::text
       FROM (
         SELECT mi.id,
                mi.menu_id,
+               m.service_date::text AS service_date,
                m.session::text AS session,
                mi.name,
                mi.description,
@@ -2027,19 +2039,19 @@ export class CoreService implements OnModuleInit {
         JOIN menu_items mi ON mi.menu_id = m.id
         LEFT JOIN menu_item_ingredients mii ON mii.menu_item_id = mi.id
         LEFT JOIN ingredients i ON i.id = mii.ingredient_id AND i.deleted_at IS NULL
-        WHERE m.service_date = $1::date
-          AND m.session = $2::session_type
+        WHERE 1 = 1
+          ${filterSql}
           AND m.deleted_at IS NULL
           AND mi.deleted_at IS NULL
-        GROUP BY mi.id, m.session
-        ORDER BY mi.display_order ASC, mi.name ASC
+        GROUP BY mi.id, m.service_date, m.session
+        ORDER BY m.service_date DESC, m.session ASC, mi.display_order ASC, mi.name ASC
       ) t;
     `,
-      [serviceDate, session],
+      params,
     );
     return {
-      serviceDate,
-      session,
+      serviceDate: serviceDate || 'ALL_DATES',
+      session: session || 'ALL',
       items: this.parseJsonLines(out),
     };
   }
