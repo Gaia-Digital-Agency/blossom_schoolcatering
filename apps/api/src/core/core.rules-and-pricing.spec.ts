@@ -1,0 +1,103 @@
+import { BadRequestException } from '@nestjs/common';
+import { CoreService } from './core.service';
+import { runSql } from '../auth/db.util';
+
+jest.mock('../auth/db.util', () => ({
+  runSql: jest.fn(),
+  sqlLiteral: (value: string) => `'${String(value).replace(/'/g, "''")}'`,
+}));
+
+const mockedRunSql = runSql as jest.MockedFunction<typeof runSql>;
+
+describe('CoreService rules, pricing, and badge logic', () => {
+  let service: CoreService;
+
+  beforeEach(() => {
+    service = new CoreService();
+    mockedRunSql.mockReset();
+  });
+
+  it('calculates total price with 2-decimal normalization', () => {
+    const total = (service as any).calculateTotalPrice([
+      { price: '12000', quantity: 2 },
+      { price: '5000.255', quantity: 1 },
+    ]);
+    expect(total).toBe(29000.26);
+  });
+
+  it('blocks weekend ordering', async () => {
+    mockedRunSql.mockResolvedValueOnce('6');
+    await expect((service as any).validateOrderDayRules('2026-03-07')).rejects.toThrow(
+      'ORDER_WEEKEND_SERVICE_BLOCKED',
+    );
+  });
+
+  it('blocks ORDER_BLOCK blackout', async () => {
+    mockedRunSql
+      .mockResolvedValueOnce('3')
+      .mockResolvedValueOnce(JSON.stringify({ blackout_date: '2026-03-18', type: 'ORDER_BLOCK', reason: 'ops' }));
+    await expect((service as any).validateOrderDayRules('2026-03-18')).rejects.toThrow(
+      'ORDER_BLACKOUT_BLOCKED',
+    );
+  });
+
+  it('enforces parent/youngster ordering window', () => {
+    jest.spyOn(service as any, 'getMakassarNowContext').mockReturnValue({ dateIso: '2026-03-02', hour: 7 });
+    expect(() =>
+      (service as any).enforceParentYoungsterOrderingWindow(
+        { uid: 'u', role: 'PARENT', sub: 'x' },
+        '2026-03-03',
+      ),
+    ).toThrow('ORDERING_AVAILABLE_FROM_0800_WITA');
+
+    jest.spyOn(service as any, 'getMakassarNowContext').mockReturnValue({ dateIso: '2026-03-02', hour: 9 });
+    expect(() =>
+      (service as any).enforceParentYoungsterOrderingWindow(
+        { uid: 'u', role: 'YOUNGSTER', sub: 'x' },
+        '2026-03-02',
+      ),
+    ).toThrow('ORDER_TOMORROW_ONWARDS_ONLY');
+  });
+
+  it('computes badge levels from history', () => {
+    const bronze = (service as any).resolveBadgeLevel({
+      maxConsecutiveOrderDays: 5,
+      currentMonthOrders: 2,
+      currentMonthConsecutiveWeeks: 1,
+      previousMonthOrders: 2,
+      previousMonthConsecutiveWeeks: 1,
+    });
+    expect(bronze.level).toBe('BRONZE');
+
+    const silver = (service as any).resolveBadgeLevel({
+      maxConsecutiveOrderDays: 2,
+      currentMonthOrders: 10,
+      currentMonthConsecutiveWeeks: 2,
+      previousMonthOrders: 0,
+      previousMonthConsecutiveWeeks: 0,
+    });
+    expect(silver.level).toBe('SILVER');
+
+    const gold = (service as any).resolveBadgeLevel({
+      maxConsecutiveOrderDays: 2,
+      currentMonthOrders: 21,
+      currentMonthConsecutiveWeeks: 2,
+      previousMonthOrders: 1,
+      previousMonthConsecutiveWeeks: 1,
+    });
+    expect(gold.level).toBe('GOLD');
+
+    const platinum = (service as any).resolveBadgeLevel({
+      maxConsecutiveOrderDays: 2,
+      currentMonthOrders: 12,
+      currentMonthConsecutiveWeeks: 2,
+      previousMonthOrders: 11,
+      previousMonthConsecutiveWeeks: 2,
+    });
+    expect(platinum.level).toBe('PLATINUM');
+  });
+
+  it('rejects invalid UUID values for guarded paths', () => {
+    expect(() => (service as any).assertValidUuid('not-a-uuid', 'billingId')).toThrow(BadRequestException);
+  });
+});

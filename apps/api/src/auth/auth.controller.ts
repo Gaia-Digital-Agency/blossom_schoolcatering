@@ -6,6 +6,7 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 import { Roles } from './roles.decorator';
 import { RolesGuard } from './roles.guard';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { GoogleDevDto } from './dto/google-dev.dto';
 import { GoogleVerifyDto } from './dto/google-verify.dto';
 import { LoginDto } from './dto/login.dto';
@@ -13,6 +14,7 @@ import { OnboardingDto } from './dto/onboarding.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { RegisterDto } from './dto/register.dto';
 import { RegisterYoungsterWithParentDto } from './dto/register-youngster-with-parent.dto';
+import { ResetPasswordWithTokenDto } from './dto/reset-password-with-token.dto';
 import { RoleCheckDto } from './dto/role-check.dto';
 import { UsernameDto } from './dto/username.dto';
 import type { Request, Response } from 'express';
@@ -241,6 +243,18 @@ export class AuthController {
   ) {
     const token = this.extractBearerToken(authorization);
     return this.authService.changePassword(token, body.currentPassword, body.newPassword);
+  }
+
+  @Post('password/forgot')
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  forgotPassword(@Req() req: Request, @Body() body: ForgotPasswordDto) {
+    return this.authService.requestPasswordReset(body.identifier, req.ip, req.headers['user-agent']);
+  }
+
+  @Post('password/reset')
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  resetPasswordWithToken(@Body() body: ResetPasswordWithTokenDto) {
+    return this.authService.resetPasswordWithToken(body.token, body.newPassword);
   }
 
   @Get('admin-ping')

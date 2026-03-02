@@ -14,6 +14,8 @@ module.exports = {
       exp_backoff_restart_delay: 1000,
       watch: false,
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      log_type: 'json',
+      merge_logs: true,
     },
     {
       name: 'schoolcatering-web',
@@ -30,6 +32,8 @@ module.exports = {
       exp_backoff_restart_delay: 1000,
       watch: false,
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      log_type: 'json',
+      merge_logs: true,
     },
   ],
 };

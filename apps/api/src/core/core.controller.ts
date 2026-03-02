@@ -211,6 +211,17 @@ export class CoreController {
     return this.coreService.getAdminPrintReport(date);
   }
 
+  @Get('admin/audit-logs')
+  @Roles('ADMIN')
+  getAdminAuditLogs(
+    @Req() req: AuthRequest,
+    @Query('limit') limit?: string,
+    @Query('action') action?: string,
+    @Query('target_type') targetType?: string,
+  ) {
+    return this.coreService.getAdminAuditLogs(req.user, { limit, action, targetType });
+  }
+
   @Get('blackout-days')
   @Roles('ADMIN', 'PARENT', 'YOUNGSTER', 'KITCHEN')
   getBlackoutDays(@Query('from_date') fromDate?: string, @Query('to_date') toDate?: string) {
@@ -286,22 +297,23 @@ export class CoreController {
 
   @Post('admin/menu-items')
   @Roles('ADMIN')
-  createAdminMenuItem(@Body() body: CreateMenuItemDto) {
-    return this.coreService.createAdminMenuItem(body);
+  createAdminMenuItem(@Req() req: AuthRequest, @Body() body: CreateMenuItemDto) {
+    return this.coreService.createAdminMenuItem(req.user, body);
   }
 
   @Patch('admin/menu-items/:itemId')
   @Roles('ADMIN')
   updateAdminMenuItem(
+    @Req() req: AuthRequest,
     @Param('itemId', ParseUUIDPipe) itemId: string,
     @Body() body: UpdateMenuItemDto,
   ) {
-    return this.coreService.updateAdminMenuItem(itemId, body);
+    return this.coreService.updateAdminMenuItem(req.user, itemId, body);
   }
 
   @Post('admin/menu-images/upload')
   @Roles('ADMIN')
-  @UseInterceptors(FileInterceptor('image', { limits: { fileSize: 10 * 1024 * 1024 } }))
+  @UseInterceptors(FileInterceptor('image', { limits: { fileSize: 5 * 1024 * 1024 } }))
   uploadMenuImage(@UploadedFile() file: any) {
     return this.coreService.uploadMenuImage(file?.buffer, file?.mimetype);
   }

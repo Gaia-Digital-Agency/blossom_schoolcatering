@@ -428,6 +428,22 @@ button:hover,
   color: #1e1208;
 }
 
+@media (max-width: 859px) {
+  .parents-page .module-nav {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.3rem;
+  }
+
+  .parents-page .module-nav a,
+  .parents-page .module-nav button {
+    min-height: 1.85rem;
+    padding: 0.25rem 0.2rem;
+    font-size: 0.72rem;
+    white-space: nowrap;
+  }
+}
+
 .page-auth-mobile .auth-panel {
   width: min(680px, 100%);
   max-width: 100%;

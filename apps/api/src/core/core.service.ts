@@ -10,6 +10,7 @@ import {
 import { readFile } from 'fs/promises';
 import { createSign, randomUUID, scryptSync } from 'crypto';
 import { runSql } from '../auth/db.util';
+import { validatePasswordPolicy } from '../auth/password-policy';
 import { AccessUser, CartItemInput, SessionType } from './core.types';
 
 type DbUserRow = {
@@ -60,6 +61,7 @@ export class CoreService implements OnModuleInit {
   private parentDietaryRestrictionsReady = false;
   private deliverySchoolAssignmentsReady = false;
   private billingReviewColumnsReady = false;
+  private adminAuditTrailReady = false;
   private readonly publicMenuCacheTtlMs = 60_000;
   private publicMenuCache = new Map<string, {
     data: { serviceDate: string; session: SessionType | 'ALL'; items: unknown[] };
@@ -72,6 +74,7 @@ export class CoreService implements OnModuleInit {
     await this.ensureMenuRatingsTable();
     await this.ensureChildRegistrationSourceColumns();
     await this.ensureBillingReviewColumns();
+    await this.ensureAdminAuditTrailTable();
   }
 
   private parseJsonLine<T>(line: string): T {
@@ -244,6 +247,51 @@ export class CoreService implements OnModuleInit {
     return { contentType, data };
   }
 
+  private detectImageMimeFromMagicBytes(data: Buffer) {
+    if (data.length >= 8) {
+      const isPng =
+        data[0] === 0x89 &&
+        data[1] === 0x50 &&
+        data[2] === 0x4e &&
+        data[3] === 0x47 &&
+        data[4] === 0x0d &&
+        data[5] === 0x0a &&
+        data[6] === 0x1a &&
+        data[7] === 0x0a;
+      if (isPng) return 'image/png';
+    }
+    if (data.length >= 3) {
+      const isJpeg = data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff;
+      if (isJpeg) return 'image/jpeg';
+    }
+    if (
+      data.length >= 12 &&
+      data.subarray(0, 4).toString('ascii') === 'RIFF' &&
+      data.subarray(8, 12).toString('ascii') === 'WEBP'
+    ) {
+      return 'image/webp';
+    }
+    return '';
+  }
+
+  private assertSafeImagePayload(input: { contentType: string; data: Buffer; maxBytes: number; label: string }) {
+    const normalizedContentType = String(input.contentType || '').toLowerCase();
+    const allowedTypes = new Set(['image/png', 'image/jpeg', 'image/webp']);
+    if (!allowedTypes.has(normalizedContentType)) {
+      throw new BadRequestException(`${input.label} must be PNG, JPEG, or WEBP`);
+    }
+    if (!input.data?.length) {
+      throw new BadRequestException(`${input.label} payload is empty`);
+    }
+    if (input.data.length > input.maxBytes) {
+      throw new BadRequestException(`${input.label} exceeds size limit`);
+    }
+    const detected = this.detectImageMimeFromMagicBytes(input.data);
+    if (!detected || detected !== normalizedContentType) {
+      throw new BadRequestException(`${input.label} failed file signature validation`);
+    }
+  }
+
   private getFileExtFromContentType(contentType: string) {
     const normalized = contentType.toLowerCase();
     if (normalized.includes('png')) return 'png';
@@ -258,7 +306,19 @@ export class CoreService implements OnModuleInit {
       const parsed = new URL(urlRaw);
       if (!['http:', 'https:'].includes(parsed.protocol)) return false;
       const path = (parsed.pathname || '').toLowerCase();
-      return /\.(png|jpe?g|webp|gif|bmp|avif|heic|heif|svg)$/.test(path);
+      const extAllowed = /\.(png|jpe?g|webp)$/.test(path);
+      if (!extAllowed) return false;
+      const trustedHosts = new Set<string>(['storage.googleapis.com']);
+      const cdnHost = (() => {
+        try {
+          const base = (process.env.CDN_BASE_URL || '').trim();
+          return base ? new URL(base).host : '';
+        } catch {
+          return '';
+        }
+      })();
+      if (cdnHost) trustedHosts.add(cdnHost);
+      return trustedHosts.has(parsed.host);
     } catch {
       return false;
     }
@@ -277,12 +337,12 @@ export class CoreService implements OnModuleInit {
     if (!trimmed) throw new BadRequestException('imageUrl is required');
     if (trimmed.startsWith('data:')) {
       const parsed = this.parseDataUrl(trimmed);
-      if (!parsed.contentType.startsWith('image/')) {
-        throw new BadRequestException('Menu image must be an image');
-      }
-      if (parsed.data.length > 5 * 1024 * 1024) {
-        throw new BadRequestException('Menu image exceeds size limit (5MB)');
-      }
+      this.assertSafeImagePayload({
+        contentType: parsed.contentType,
+        data: parsed.data,
+        maxBytes: 5 * 1024 * 1024,
+        label: 'Menu image',
+      });
       const ext = this.getFileExtFromContentType(parsed.contentType);
       const objectName = `${this.getGcsCategoryFolder('menu-images')}/${this.slugify(menuItemName)}-${Date.now()}.${ext}`;
       try {
@@ -418,6 +478,68 @@ export class CoreService implements OnModuleInit {
     const d = new Date(`${dateIso}T00:00:00.000Z`);
     d.setUTCDate(d.getUTCDate() + days);
     return d.toISOString().slice(0, 10);
+  }
+
+  private calculateTotalPrice(items: Array<{ price: string | number; quantity: number }>) {
+    const total = items.reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0);
+    return Number(total.toFixed(2));
+  }
+
+  private calculateMaxConsecutiveOrderDays(orderDates: string[]) {
+    let maxStreak = 0;
+    let currentStreak = 0;
+    let prev: Date | null = null;
+    for (const raw of orderDates) {
+      const now = new Date(`${raw}T00:00:00.000Z`);
+      if (!prev) currentStreak = 1;
+      else {
+        const diff = Math.round((now.getTime() - prev.getTime()) / (24 * 60 * 60 * 1000));
+        currentStreak = diff === 1 ? currentStreak + 1 : 1;
+      }
+      if (currentStreak > maxStreak) maxStreak = currentStreak;
+      prev = now;
+    }
+    return maxStreak;
+  }
+
+  private getIsoWeek(dateIso: string) {
+    const dt = new Date(`${dateIso}T00:00:00.000Z`);
+    const day = dt.getUTCDay() || 7;
+    dt.setUTCDate(dt.getUTCDate() + 4 - day);
+    const yearStart = new Date(Date.UTC(dt.getUTCFullYear(), 0, 1));
+    return Math.ceil((((dt.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  }
+
+  private calculateMonthOrderStats(monthDates: string[], month: string) {
+    const inMonth = monthDates.filter((d) => d.startsWith(month));
+    const weeks = [...new Set(inMonth.map((d) => this.getIsoWeek(d)))].sort((a, b) => a - b);
+    let longest = 0;
+    let current = 0;
+    let prevWeek: number | null = null;
+    for (const wk of weeks) {
+      current = prevWeek !== null && wk === prevWeek + 1 ? current + 1 : 1;
+      if (current > longest) longest = current;
+      prevWeek = wk;
+    }
+    return { orders: inMonth.length, consecutiveWeeks: longest };
+  }
+
+  private resolveBadgeLevel(input: {
+    maxConsecutiveOrderDays: number;
+    currentMonthOrders: number;
+    currentMonthConsecutiveWeeks: number;
+    previousMonthOrders: number;
+    previousMonthConsecutiveWeeks: number;
+  }) {
+    const isSilver = input.currentMonthOrders >= 10 && input.currentMonthConsecutiveWeeks >= 2;
+    const isGold = input.currentMonthOrders >= 20 && input.currentMonthConsecutiveWeeks >= 2;
+    const prevIsSilverOrGold =
+      (input.previousMonthOrders >= 10 && input.previousMonthConsecutiveWeeks >= 2)
+      || (input.previousMonthOrders >= 20 && input.previousMonthConsecutiveWeeks >= 2);
+    const isPlatinum = prevIsSilverOrGold && (isSilver || isGold);
+    const isBronze = input.maxConsecutiveOrderDays >= 5;
+    const level = isPlatinum ? 'PLATINUM' : isGold ? 'GOLD' : isSilver ? 'SILVER' : isBronze ? 'BRONZE' : 'NONE';
+    return { level, isBronze, isSilver, isGold, isPlatinum };
   }
 
   private isAfterOrAtMakassarCutoff(serviceDate: string) {
@@ -690,6 +812,41 @@ export class CoreService implements OnModuleInit {
     this.deliverySchoolAssignmentsReady = true;
   }
 
+  private async ensureAdminAuditTrailTable() {
+    if (this.adminAuditTrailReady) return;
+    await runSql(`
+      CREATE TABLE IF NOT EXISTS admin_audit_logs (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        actor_user_id uuid NOT NULL REFERENCES users(id),
+        action text NOT NULL,
+        target_type text NOT NULL,
+        target_id text NULL,
+        metadata_json text NULL,
+        created_at timestamptz NOT NULL DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_actor ON admin_audit_logs(actor_user_id, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_action ON admin_audit_logs(action, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_target ON admin_audit_logs(target_type, created_at DESC);
+    `);
+    this.adminAuditTrailReady = true;
+  }
+
+  private async recordAdminAudit(
+    actor: AccessUser,
+    action: string,
+    targetType: string,
+    targetId?: string | null,
+    metadata?: Record<string, unknown>,
+  ) {
+    if (actor.role !== 'ADMIN') return;
+    await this.ensureAdminAuditTrailTable();
+    await runSql(
+      `INSERT INTO admin_audit_logs (actor_user_id, action, target_type, target_id, metadata_json)
+       VALUES ($1, $2, $3, $4, $5);`,
+      [actor.uid, action, targetType, targetId || null, metadata ? JSON.stringify(metadata) : null],
+    );
+  }
+
   private async ensureSessionSettingsTable() {
     await runSql(`
       CREATE TABLE IF NOT EXISTS session_settings (
@@ -852,7 +1009,11 @@ export class CoreService implements OnModuleInit {
       [isActive, id],
     );
     if (!out) throw new NotFoundException('School not found');
-    return this.parseJsonLine(out);
+    const updated = this.parseJsonLine<{ id: string; is_active: boolean }>(out);
+    await this.recordAdminAudit(actor, 'SCHOOL_STATUS_UPDATED', 'school', updated.id, {
+      isActive: updated.is_active,
+    });
+    return updated;
   }
 
   async getSessionSettings() {
@@ -888,7 +1049,11 @@ export class CoreService implements OnModuleInit {
     );
     if (!out) throw new NotFoundException('Session setting not found');
     this.clearPublicMenuCache();
-    return this.parseJsonLine<{ session: SessionType; is_active: boolean }>(out);
+    const updated = this.parseJsonLine<{ session: SessionType; is_active: boolean }>(out);
+    await this.recordAdminAudit(actor, 'SESSION_SETTING_UPDATED', 'session-setting', updated.session, {
+      isActive: updated.is_active,
+    });
+    return updated;
   }
 
   async registerYoungster(
@@ -1509,7 +1674,12 @@ export class CoreService implements OnModuleInit {
        FROM upserted;`,
       [blackoutDate, type, reason || null, actor.uid],
     );
-    return this.parseJsonLine(out);
+    const entry = this.parseJsonLine<{ id: string; blackout_date: string; type: string }>(out);
+    await this.recordAdminAudit(actor, 'BLACKOUT_DAY_UPSERTED', 'blackout-day', entry.id, {
+      blackoutDate: entry.blackout_date,
+      type: entry.type,
+    });
+    return entry;
   }
 
   async deleteBlackoutDay(actor: AccessUser, id: string) {
@@ -1521,6 +1691,7 @@ export class CoreService implements OnModuleInit {
       [id],
     );
     if (!out) throw new NotFoundException('Blackout day not found');
+    await this.recordAdminAudit(actor, 'BLACKOUT_DAY_DELETED', 'blackout-day', id);
     return { ok: true };
   }
 
@@ -1954,8 +2125,12 @@ export class CoreService implements OnModuleInit {
 
   async uploadMenuImage(buffer: Buffer, mimetype: string): Promise<{ url: string }> {
     if (!buffer?.length) throw new BadRequestException('No file data received');
-    if (!mimetype?.startsWith('image/')) throw new BadRequestException('File must be an image');
-    if (buffer.length > 10 * 1024 * 1024) throw new BadRequestException('Image exceeds 10MB size limit');
+    this.assertSafeImagePayload({
+      contentType: mimetype,
+      data: buffer,
+      maxBytes: 5 * 1024 * 1024,
+      label: 'Menu image',
+    });
     const ext = this.getFileExtFromContentType(mimetype);
     const objectName = `${this.getGcsCategoryFolder('menu-images')}/upload-${Date.now()}.${ext}`;
     const uploaded = await this.uploadToGcs({
@@ -1968,7 +2143,7 @@ export class CoreService implements OnModuleInit {
     return { url: this.buildGoogleStoragePublicUrl(uploaded.objectName) };
   }
 
-  async createAdminMenuItem(input: {
+  async createAdminMenuItem(actor: AccessUser, input: {
     serviceDate?: string;
     session?: string;
     name?: string;
@@ -2064,10 +2239,12 @@ export class CoreService implements OnModuleInit {
     }
 
     this.clearPublicMenuCache();
+    await this.recordAdminAudit(actor, 'MENU_ITEM_CREATED', 'menu-item', item.id, { itemName: item.name });
     return { ok: true, itemId: item.id, itemName: item.name };
   }
 
   async updateAdminMenuItem(
+    actor: AccessUser,
     itemId: string,
     input: {
       serviceDate?: string;
@@ -2245,6 +2422,12 @@ export class CoreService implements OnModuleInit {
       );
     }
     this.clearPublicMenuCache();
+    await this.recordAdminAudit(actor, 'MENU_ITEM_UPDATED', 'menu-item', itemId, {
+      serviceDate,
+      session,
+      name,
+      isAvailable,
+    });
     return { ok: true };
   }
 
@@ -2961,7 +3144,7 @@ export class CoreService implements OnModuleInit {
     await this.assertSessionActiveForOrdering(cart.session);
 
     const dietarySnapshot = await this.getOrderDietarySnapshot(cart.child_id);
-    const totalPrice = items.reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0);
+    const totalPrice = this.calculateTotalPrice(items);
 
     let billingParentId: string | null = null;
     if (actor.role === 'PARENT') {
@@ -3030,7 +3213,7 @@ export class CoreService implements OnModuleInit {
           actor.uid,
           cart.session,
           cart.service_date,
-          Number(totalPrice.toFixed(2)),
+          totalPrice,
           dietarySnapshot || null,
           menuItemIds,
           itemNames,
@@ -3765,12 +3948,12 @@ export class CoreService implements OnModuleInit {
     let proofUrl = proof;
     if (proof.startsWith('data:')) {
       const parsed = this.parseDataUrl(proof);
-      if (!parsed.contentType.startsWith('image/')) {
-        throw new BadRequestException('Proof upload must be an image');
-      }
-      if (parsed.data.length > 5 * 1024 * 1024) {
-        throw new BadRequestException('Proof image exceeds size limit (5MB)');
-      }
+      this.assertSafeImagePayload({
+        contentType: parsed.contentType,
+        data: parsed.data,
+        maxBytes: 5 * 1024 * 1024,
+        label: 'Proof image',
+      });
       const ext = this.getFileExtFromContentType(parsed.contentType);
       const objectName = `${this.getGcsCategoryFolder('payment-proofs')}/${parentId}/${billingId}-${Date.now()}.${ext}`;
       const uploaded = await this.uploadToGcs({
@@ -3781,7 +3964,7 @@ export class CoreService implements OnModuleInit {
       });
       proofUrl = uploaded.publicUrl;
     } else if (!this.isAllowedProofImageUrl(proof)) {
-      throw new BadRequestException('proofImageData must be an image data URL or an http(s) image URL (PDF not allowed)');
+      throw new BadRequestException('proofImageData must be a PNG/JPEG/WEBP image data URL or trusted image URL');
     }
 
     await runSql(
@@ -3939,6 +4122,10 @@ export class CoreService implements OnModuleInit {
       [decision, actor.uid, adminNote || null, billingId],
     );
     if (!updatedOut) throw new NotFoundException('Billing record not found');
+    await this.recordAdminAudit(actor, 'BILLING_VERIFIED', 'billing-record', billingId, {
+      decision,
+      note: adminNote || null,
+    });
     return { ok: true, status: decision };
   }
 
@@ -4039,6 +4226,9 @@ export class CoreService implements OnModuleInit {
        DO UPDATE SET receipt_number = EXCLUDED.receipt_number, pdf_url = EXCLUDED.pdf_url, generated_at = now(), generated_by_user_id = EXCLUDED.generated_by_user_id;`,
       [billing.id, receiptNumber, pdfUrl, actor.uid],
     );
+    await this.recordAdminAudit(actor, 'BILLING_RECEIPT_GENERATED', 'billing-record', billingId, {
+      receiptNumber,
+    });
     return { ok: true, receiptNumber, pdfUrl };
   }
 
@@ -4165,6 +4355,11 @@ export class CoreService implements OnModuleInit {
        DO UPDATE SET is_active = EXCLUDED.is_active, updated_at = now();`,
       [deliveryUserId, schoolId, isActive],
     );
+    await this.recordAdminAudit(actor, 'DELIVERY_SCHOOL_ASSIGNMENT_UPSERTED', 'delivery-school-assignment', `${deliveryUserId}:${schoolId}`, {
+      deliveryUserId,
+      schoolId,
+      isActive,
+    });
     await this.autoAssignDeliveriesForDate(this.makassarTodayIsoDate());
     return { ok: true };
   }
@@ -4183,6 +4378,10 @@ export class CoreService implements OnModuleInit {
       [deliveryUserId, schoolId],
     );
     if (!out) throw new NotFoundException('Delivery-school assignment not found');
+    await this.recordAdminAudit(actor, 'DELIVERY_SCHOOL_ASSIGNMENT_DELETED', 'delivery-school-assignment', `${deliveryUserId}:${schoolId}`, {
+      deliveryUserId,
+      schoolId,
+    });
     await this.autoAssignDeliveriesForDate(this.makassarTodayIsoDate());
     return { ok: true };
   }
@@ -5115,19 +5314,7 @@ export class CoreService implements OnModuleInit {
       [childId, refDate],
     );
     const orderDates = orderDatesOut ? orderDatesOut.split('\n').map((x) => x.trim()).filter(Boolean) : [];
-    let maxStreak = 0;
-    let currentStreak = 0;
-    let prev: Date | null = null;
-    for (const raw of orderDates) {
-      const now = new Date(`${raw}T00:00:00.000Z`);
-      if (!prev) currentStreak = 1;
-      else {
-        const diff = Math.round((now.getTime() - prev.getTime()) / (24 * 60 * 60 * 1000));
-        currentStreak = diff === 1 ? currentStreak + 1 : 1;
-      }
-      if (currentStreak > maxStreak) maxStreak = currentStreak;
-      prev = now;
-    }
+    const maxStreak = this.calculateMaxConsecutiveOrderDays(orderDates);
     const currentMonth = refDate.slice(0, 7);
     const refDateObj = new Date(`${refDate}T00:00:00.000Z`);
     const currentMonthStartDate = new Date(Date.UTC(refDateObj.getUTCFullYear(), refDateObj.getUTCMonth(), 1));
@@ -5156,34 +5343,15 @@ export class CoreService implements OnModuleInit {
       [childId, currentMonthStart, currentMonthEnd, previousMonthStart, previousMonthEnd],
     );
     const monthDates = monthRowsOut ? monthRowsOut.split('\n').map((x) => x.trim()).filter(Boolean) : [];
-    const isoWeek = (d: string) => {
-      const dt = new Date(`${d}T00:00:00.000Z`);
-      const day = dt.getUTCDay() || 7;
-      dt.setUTCDate(dt.getUTCDate() + 4 - day);
-      const yearStart = new Date(Date.UTC(dt.getUTCFullYear(), 0, 1));
-      return Math.ceil((((dt.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-    };
-    const buildMonthStats = (month: string) => {
-      const inMonth = monthDates.filter((d) => d.startsWith(month));
-      const weeks = [...new Set(inMonth.map((d) => isoWeek(d)))].sort((a, b) => a - b);
-      let longest = 0;
-      let current = 0;
-      let prevWeek: number | null = null;
-      for (const wk of weeks) {
-        current = prevWeek !== null && wk === prevWeek + 1 ? current + 1 : 1;
-        if (current > longest) longest = current;
-        prevWeek = wk;
-      }
-      return { orders: inMonth.length, consecutiveWeeks: longest };
-    };
-    const cm = buildMonthStats(currentMonth);
-    const pm = buildMonthStats(previousMonth);
-    const isSilver = cm.orders >= 10 && cm.consecutiveWeeks >= 2;
-    const isGold = cm.orders >= 20 && cm.consecutiveWeeks >= 2;
-    const prevIsSilverOrGold = (pm.orders >= 10 && pm.consecutiveWeeks >= 2) || (pm.orders >= 20 && pm.consecutiveWeeks >= 2);
-    const isPlatinum = prevIsSilverOrGold && (isSilver || isGold);
-    const isBronze = maxStreak >= 5;
-    const badge = isPlatinum ? 'PLATINUM' : isGold ? 'GOLD' : isSilver ? 'SILVER' : isBronze ? 'BRONZE' : 'NONE';
+    const cm = this.calculateMonthOrderStats(monthDates, currentMonth);
+    const pm = this.calculateMonthOrderStats(monthDates, previousMonth);
+    const badgeCalc = this.resolveBadgeLevel({
+      maxConsecutiveOrderDays: maxStreak,
+      currentMonthOrders: cm.orders,
+      currentMonthConsecutiveWeeks: cm.consecutiveWeeks,
+      previousMonthOrders: pm.orders,
+      previousMonthConsecutiveWeeks: pm.consecutiveWeeks,
+    });
 
     const me = await this.getYoungsterMe(actor);
     const dob = new Date(me.date_of_birth);
@@ -5222,7 +5390,7 @@ export class CoreService implements OnModuleInit {
         days,
       },
       badge: {
-        level: badge,
+        level: badgeCalc.level,
         maxConsecutiveOrderDays: maxStreak,
         maxConsecutiveOrderWeeks: Math.max(Number(cm.consecutiveWeeks || 0), Number(pm.consecutiveWeeks || 0)),
         currentMonthOrders: cm.orders,
@@ -5454,7 +5622,9 @@ export class CoreService implements OnModuleInit {
       [name, address || null, city || null, contactEmail || null],
     );
     if (!out) throw new BadRequestException('Failed to create school');
-    return this.parseJsonLine(out);
+    const school = this.parseJsonLine<{ id: string; name: string }>(out);
+    await this.recordAdminAudit(actor, 'SCHOOL_CREATED', 'school', school.id, { name: school.name });
+    return school;
   }
 
   async deleteSchool(actor: AccessUser, schoolId: string) {
@@ -5478,6 +5648,7 @@ export class CoreService implements OnModuleInit {
       [schoolId],
     );
     if (!out) throw new NotFoundException('School not found');
+    await this.recordAdminAudit(actor, 'SCHOOL_DELETED', 'school', schoolId);
     return { ok: true };
   }
 
@@ -5509,6 +5680,9 @@ export class CoreService implements OnModuleInit {
     if (input.address) {
       await runSql(`UPDATE parents SET address = $1, updated_at = now() WHERE id = $2;`, [input.address.trim(), targetParentId]);
     }
+    await this.recordAdminAudit(actor, 'PARENT_PROFILE_UPDATED', 'parent', targetParentId, {
+      changedFields: Object.keys(input).filter((k) => Boolean((input as Record<string, unknown>)[k])),
+    });
     return { ok: true };
   }
 
@@ -5526,6 +5700,7 @@ export class CoreService implements OnModuleInit {
     const parent = this.parseJsonLine<{ id: string; user_id: string }>(out);
     await runSql(`UPDATE parents SET deleted_at = now(), updated_at = now() WHERE id = $1;`, [targetParentId]);
     await runSql(`UPDATE users SET is_active = false, deleted_at = now(), updated_at = now() WHERE id = $1;`, [parent.user_id]);
+    await this.recordAdminAudit(actor, 'PARENT_DELETED', 'parent', targetParentId);
     return { ok: true };
   }
 
@@ -5615,6 +5790,9 @@ export class CoreService implements OnModuleInit {
         );
       }
     }
+    await this.recordAdminAudit(actor, 'YOUNGSTER_PROFILE_UPDATED', 'youngster', youngsterId, {
+      changedFields: Object.keys(input).filter((k) => (input as Record<string, unknown>)[k] !== undefined),
+    });
     return { ok: true };
   }
 
@@ -5632,6 +5810,7 @@ export class CoreService implements OnModuleInit {
     const child = this.parseJsonLine<{ id: string; user_id: string }>(out);
     await runSql(`UPDATE children SET deleted_at = now(), is_active = false, updated_at = now() WHERE id = $1;`, [youngsterId]);
     await runSql(`UPDATE users SET is_active = false, deleted_at = now(), updated_at = now() WHERE id = $1;`, [child.user_id]);
+    await this.recordAdminAudit(actor, 'YOUNGSTER_DELETED', 'youngster', youngsterId);
     return { ok: true };
   }
 
@@ -5656,16 +5835,29 @@ export class CoreService implements OnModuleInit {
     if (!['PARENT', 'YOUNGSTER'].includes(target.role)) {
       throw new BadRequestException('Only PARENT and YOUNGSTER password reset is allowed here');
     }
-    const newPassword = (newPasswordRaw || '').trim() || randomUUID().slice(0, 10);
-    if (newPassword.length < 6) throw new BadRequestException('Password too short');
+    const generatedPassword = `Tmp#${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+    const newPassword = (newPasswordRaw || '').trim() || generatedPassword;
+    validatePasswordPolicy(newPassword, 'newPassword');
     const passwordHash = this.hashPassword(newPassword);
     await runSql(
       `UPDATE users
        SET password_hash = $1,
            updated_at = now()
-       WHERE id = $2;`,
+      WHERE id = $2;`,
       [passwordHash, userId],
     );
+    await runSql(
+      `UPDATE auth_refresh_sessions
+       SET revoked_at = now()
+       WHERE user_id = $1
+         AND revoked_at IS NULL;`,
+      [userId],
+    );
+    await this.recordAdminAudit(actor, 'USER_PASSWORD_RESET', 'user', userId, {
+      role: target.role,
+      username: target.username,
+      generated: !newPasswordRaw,
+    });
     return { ok: true, userId, username: target.username, role: target.role, newPassword };
   }
 
@@ -5702,7 +5894,11 @@ export class CoreService implements OnModuleInit {
         [name, allergenFlag, existing.id],
       );
       if (!updateOut) throw new BadRequestException('Failed to update ingredient');
-      return this.parseJsonLine(updateOut);
+      const ingredient = this.parseJsonLine<{ id: string; name: string }>(updateOut);
+      await this.recordAdminAudit(actor, 'INGREDIENT_UPSERTED', 'ingredient', ingredient.id, {
+        name: ingredient.name,
+      });
+      return ingredient;
     }
     const insertOut = await runSql(
       `WITH inserted AS (
@@ -5714,7 +5910,11 @@ export class CoreService implements OnModuleInit {
       [name, allergenFlag],
     );
     if (!insertOut) throw new BadRequestException('Failed to create ingredient');
-    return this.parseJsonLine(insertOut);
+    const ingredient = this.parseJsonLine<{ id: string; name: string }>(insertOut);
+    await this.recordAdminAudit(actor, 'INGREDIENT_CREATED', 'ingredient', ingredient.id, {
+      name: ingredient.name,
+    });
+    return ingredient;
   }
 
   async updateIngredient(actor: AccessUser, ingredientId: string, input: { name?: string; allergenFlag?: boolean; isActive?: boolean }) {
@@ -5738,7 +5938,11 @@ export class CoreService implements OnModuleInit {
       params,
     );
     if (!out) throw new NotFoundException('Ingredient not found');
-    return this.parseJsonLine(out);
+    const ingredient = this.parseJsonLine<{ id: string; name: string }>(out);
+    await this.recordAdminAudit(actor, 'INGREDIENT_UPDATED', 'ingredient', ingredient.id, {
+      name: ingredient.name,
+    });
+    return ingredient;
   }
 
   async deleteIngredient(actor: AccessUser, ingredientId: string) {
@@ -5751,6 +5955,7 @@ export class CoreService implements OnModuleInit {
       [ingredientId],
     );
     if (!out) throw new NotFoundException('Ingredient not found');
+    await this.recordAdminAudit(actor, 'INGREDIENT_DELETED', 'ingredient', ingredientId);
     return { ok: true };
   }
 
@@ -5786,6 +5991,7 @@ export class CoreService implements OnModuleInit {
       [itemId],
     );
     this.clearPublicMenuCache();
+    await this.recordAdminAudit(actor, 'MENU_ITEM_DELETED', 'menu-item', itemId);
     return { ok: true };
   }
 
@@ -5802,9 +6008,8 @@ export class CoreService implements OnModuleInit {
     const lastName = (input.lastName || '').trim();
     const phoneNumber = (input.phoneNumber || '').trim();
     const email = (input.email || '').trim().toLowerCase();
-    if (username.length < 3 || password.length < 6) {
-      throw new BadRequestException('Username or password too short');
-    }
+    if (username.length < 3) throw new BadRequestException('Username too short');
+    validatePasswordPolicy(password, 'password');
     const exists = await runSql(
       `SELECT EXISTS (
          SELECT 1 FROM users
@@ -5831,6 +6036,7 @@ export class CoreService implements OnModuleInit {
        ON CONFLICT (user_id) DO NOTHING;`,
       [user.id],
     );
+    await this.recordAdminAudit(actor, 'DELIVERY_USER_CREATED', 'user', user.id, { username: user.username });
     return user;
   }
 
@@ -5847,7 +6053,9 @@ export class CoreService implements OnModuleInit {
       [targetUserId],
     );
     if (!out) throw new NotFoundException('Delivery user not found');
-    return { ok: true, user: this.parseJsonLine(out) };
+    const user = this.parseJsonLine<{ id: string; username: string }>(out);
+    await this.recordAdminAudit(actor, 'DELIVERY_USER_DEACTIVATED', 'user', user.id, { username: user.username });
+    return { ok: true, user };
   }
 
   async updateDeliveryUser(
@@ -5914,7 +6122,11 @@ export class CoreService implements OnModuleInit {
       params,
     );
     if (!out) throw new NotFoundException('Delivery user not found');
-    return { ok: true, user: this.parseJsonLine(out) };
+    const user = this.parseJsonLine<{ id: string; username: string }>(out);
+    await this.recordAdminAudit(actor, 'DELIVERY_USER_UPDATED', 'user', user.id, {
+      changedFields: Object.keys(input).filter((k) => (input as Record<string, unknown>)[k] !== undefined),
+    });
+    return { ok: true, user };
   }
 
   async deleteDeliveryUser(actor: AccessUser, targetUserId: string) {
@@ -5959,7 +6171,9 @@ export class CoreService implements OnModuleInit {
       [targetUserId],
     );
     if (!out) throw new NotFoundException('Delivery user not found');
-    return { ok: true, user: this.parseJsonLine(out) };
+    const user = this.parseJsonLine<{ id: string; username: string }>(out);
+    await this.recordAdminAudit(actor, 'DELIVERY_USER_DELETED', 'user', user.id, { username: user.username });
+    return { ok: true, user };
   }
 
   private getPublicMenuCacheKey(serviceDate: string, session: SessionType | null) {
@@ -5968,6 +6182,58 @@ export class CoreService implements OnModuleInit {
 
   private clearPublicMenuCache() {
     this.publicMenuCache.clear();
+  }
+
+  async getAdminAuditLogs(actor: AccessUser, input: { limit?: string; action?: string; targetType?: string }) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    await this.ensureAdminAuditTrailTable();
+    const limit = Math.min(Math.max(Number(input.limit || 100) || 100, 1), 500);
+    const action = (input.action || '').trim();
+    const targetType = (input.targetType || '').trim();
+    const params: unknown[] = [];
+    const conditions: string[] = [];
+
+    if (action) {
+      params.push(action);
+      conditions.push(`action = $${params.length}`);
+    }
+    if (targetType) {
+      params.push(targetType);
+      conditions.push(`target_type = $${params.length}`);
+    }
+    params.push(limit);
+
+    const whereSql = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const out = await runSql(
+      `SELECT row_to_json(t)::text
+       FROM (
+         SELECT id,
+                actor_user_id,
+                action,
+                target_type,
+                target_id,
+                metadata_json,
+                created_at::text AS created_at
+         FROM admin_audit_logs
+         ${whereSql}
+         ORDER BY created_at DESC
+         LIMIT $${params.length}
+       ) t;`,
+      params,
+    );
+
+    return this.parseJsonLines<{
+      id: string;
+      actor_user_id: string;
+      action: string;
+      target_type: string;
+      target_id?: string | null;
+      metadata_json?: string | null;
+      created_at: string;
+    }>(out).map((row) => ({
+      ...row,
+      metadata: row.metadata_json ? JSON.parse(row.metadata_json) : null,
+    }));
   }
 
   // ─── Health check ─────────────────────────────────────────────────────────

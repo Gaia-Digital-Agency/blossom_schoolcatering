@@ -24,6 +24,7 @@ export default function HomePage() {
               Steakhouse
             </a>
             <Link className="nav-guide-link" href="/guide">Guides &amp; T&amp;C</Link>
+            <Link className="nav-guide-link" href="/privacy-and-confidentiality">Privacy</Link>
           </nav>
         </header>
 

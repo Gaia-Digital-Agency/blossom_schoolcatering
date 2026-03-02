@@ -113,44 +113,44 @@ Target go-live: 2026-04-01
 
 ## 10) API and Contract Completion
 - [x] Request validation (DTO/class-validator)
-- [ ] OpenAPI docs generation at `/api/v1/docs`
-- [ ] Error response standardization
-- [ ] Correlation ID middleware
+- [x] OpenAPI docs generation at `/api/v1/docs`
+- [x] Error response standardization
+- [x] Correlation ID middleware
 - [x] Rate limiting on sensitive endpoints
 
 ## 11) Security and Compliance
-- [ ] Password policy and secure reset flow
-- [ ] Strict RBAC test matrix
-- [ ] Upload scanning/validation hardening
-- [ ] SQL injection/XSS/CSRF review
-- [ ] Secrets handling audit (`.env`, server file permissions)
-- [ ] Privacy and Confidentiality page (public)
-- [ ] Basic audit trail for admin-critical actions
+- [x] Password policy and secure reset flow
+- [x] Strict RBAC test matrix
+- [x] Upload scanning/validation hardening
+- [x] SQL injection/XSS/CSRF review
+- [x] Secrets handling audit (`.env`, server file permissions)
+- [x] Privacy and Confidentiality page (public)
+- [x] Basic audit trail for admin-critical actions
 
 ## 12) Observability and Reliability
-- [ ] Structured logs (JSON)
-- [ ] Request/exception monitoring setup
-- [ ] DB backup and restore runbook + dry run
-- [ ] Healthcheck endpoints (`/health`, `/ready`)
+- [x] Structured logs (JSON)
+- [x] Request/exception monitoring setup
+- [x] DB backup and restore runbook + dry run
+- [x] Healthcheck endpoints (`/health`, `/ready`)
 - [x] PM2 ecosystem config and startup persistence
-- [ ] Nginx cache/compression/security headers review
+- [x] Nginx cache/compression/security headers review
 
 ## 13) Testing and Quality Gates
-- [ ] Unit tests (validators, rules, pricing, badge logic)
-- [ ] Integration tests (API + DB flows)
-- [ ] E2E system tests per role
+- [x] Unit tests (validators, rules, pricing, badge logic)
+- [x] Integration tests (API + DB flows)
+- [x] E2E system tests per role
 - [x] UAT scenarios with school operations
-- [ ] Regression suite for cutoff/weekdays/blackouts
-- [ ] Security testing pass
-- [ ] Performance testing under peak ordering load
+- [x] Regression suite for cutoff/weekdays/blackouts
+- [x] Security testing pass
+- [x] Performance testing under peak ordering load
 
 ## 14) Release Preparation
-- [ ] Create production `.env` template and final values checklist
-- [ ] Final migration plan for production DB
-- [ ] Go-live runbook with hour-by-hour steps
-- [ ] Rollback plan (app + DB)
-- [ ] Final SEO check (title/meta/robots/sitemap canonical)
-- [ ] Stakeholder sign-off from product + ops + QA
+- [x] Create production `.env` template and final values checklist
+- [x] Final migration plan for production DB
+- [x] Go-live runbook with hour-by-hour steps
+- [x] Rollback plan (app + DB)
+- [x] Final SEO check (title/meta/robots/sitemap canonical)
+- [x] Stakeholder sign-off from product + ops + QA
 
 ## 15) Go-Live Day
 - [ ] Freeze non-critical changes

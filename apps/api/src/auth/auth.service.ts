@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
-import { createHmac, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'crypto';
+import { createHash, createHmac, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'crypto';
 import { AuthUser, ROLES, Role } from './auth.types';
 import { runSql } from './db.util';
+import { validatePasswordPolicy } from './password-policy';
 
 type RefreshPayload = {
   sub: string;
@@ -25,6 +26,12 @@ type DbUserRow = {
   first_name: string;
   last_name: string;
   password_hash: string;
+};
+
+type PasswordResetTokenRow = {
+  user_id: string;
+  expires_at: string;
+  consumed_at?: string | null;
 };
 
 type GoogleTokenInfo = {
@@ -91,6 +98,7 @@ const REFRESH_TTL = '7d';
 export class AuthService {
   private parentDietaryRestrictionsReady = false;
   private childRegistrationSourceColumnsReady = false;
+  private passwordResetTableReady = false;
 
   private normalizeRole(role: string): Role {
     const normalized = role?.toUpperCase() as Role;
@@ -158,6 +166,10 @@ export class AuthService {
     const salt = randomBytes(16).toString('hex');
     const derived = scryptSync(raw, salt, 64).toString('hex');
     return `scrypt$${salt}$${derived}`;
+  }
+
+  private hashResetToken(token: string) {
+    return createHash('sha256').update(token).digest('hex');
   }
 
   private verifyPassword(raw: string, storedHash: string) {
@@ -323,6 +335,25 @@ export class AuthService {
           updated_at = now()
       WHERE username = 'teameditor';
     `);
+  }
+
+  private async ensurePasswordResetTable() {
+    if (this.passwordResetTableReady) return;
+    await runSql(`
+      CREATE TABLE IF NOT EXISTS auth_password_reset_tokens (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token_hash text NOT NULL UNIQUE,
+        expires_at timestamptz NOT NULL,
+        consumed_at timestamptz NULL,
+        requested_ip text NULL,
+        requested_user_agent text NULL,
+        created_at timestamptz NOT NULL DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS idx_auth_password_reset_tokens_user_id ON auth_password_reset_tokens(user_id);
+      CREATE INDEX IF NOT EXISTS idx_auth_password_reset_tokens_expires_at ON auth_password_reset_tokens(expires_at);
+    `);
+    this.passwordResetTableReady = true;
   }
 
   private async findUserByUsername(username: string) {
@@ -517,9 +548,10 @@ export class AuthService {
     if (!username || !firstName || !lastName || !phoneNumber || !password || !email) {
       throw new BadRequestException('Required fields are missing');
     }
-    if (username.length < 3 || password.length < 6) {
-      throw new BadRequestException('Username or password too short');
+    if (username.length < 3) {
+      throw new BadRequestException('Username too short');
     }
+    validatePasswordPolicy(password, 'password');
     if (role === 'PARENT' && !address) {
       throw new BadRequestException('Address is required for parent registration');
     }
@@ -1008,9 +1040,10 @@ export class AuthService {
   }
 
   async changePassword(accessToken: string, currentPassword: string, newPassword: string) {
-    if (!currentPassword || !newPassword || newPassword.length < 6) {
+    if (!currentPassword || !newPassword) {
       throw new BadRequestException('Invalid password input');
     }
+    validatePasswordPolicy(newPassword, 'newPassword');
     const payload = this.verifyAccessToken(accessToken);
     const userRow = await this.findUserByUsername(payload.sub);
     if (!userRow) throw new UnauthorizedException('User not found');
@@ -1021,6 +1054,106 @@ export class AuthService {
     await runSql(
       `UPDATE users SET password_hash = $1, updated_at = now() WHERE id = $2;`,
       [nextHash, userRow.id],
+    );
+    await runSql(
+      `UPDATE auth_refresh_sessions
+       SET revoked_at = now()
+       WHERE user_id = $1
+         AND revoked_at IS NULL;`,
+      [userRow.id],
+    );
+    return { ok: true };
+  }
+
+  async requestPasswordReset(identifierRaw: string, requestedIp?: string, requestedUserAgent?: string | string[]) {
+    const identifier = String(identifierRaw || '').trim().toLowerCase();
+    if (!identifier) throw new BadRequestException('identifier is required');
+    await this.ensurePasswordResetTable();
+
+    let userRow = await this.findUserByUsername(identifier);
+    if (!userRow && identifier.includes('@')) {
+      userRow = await this.findUserByEmail(identifier);
+    }
+
+    if (userRow) {
+      const rawToken = randomBytes(32).toString('base64url');
+      const tokenHash = this.hashResetToken(rawToken);
+      const requestedUserAgentText = Array.isArray(requestedUserAgent)
+        ? requestedUserAgent.join('; ')
+        : (requestedUserAgent || '');
+
+      await runSql(
+        `UPDATE auth_password_reset_tokens
+         SET consumed_at = now()
+         WHERE user_id = $1
+           AND consumed_at IS NULL;`,
+        [userRow.id],
+      );
+
+      await runSql(
+        `INSERT INTO auth_password_reset_tokens (user_id, token_hash, expires_at, requested_ip, requested_user_agent)
+         VALUES ($1, $2, now() + interval '15 minutes', $3, $4);`,
+        [userRow.id, tokenHash, requestedIp || null, requestedUserAgentText || null],
+      );
+
+      const exposeToken =
+        process.env.AUTH_EXPOSE_RESET_TOKEN === 'true' || process.env.NODE_ENV !== 'production';
+      if (exposeToken) {
+        return {
+          ok: true,
+          resetToken: rawToken,
+          expiresInSeconds: 15 * 60,
+        };
+      }
+    }
+
+    return { ok: true };
+  }
+
+  async resetPasswordWithToken(tokenRaw: string, newPasswordRaw: string) {
+    const token = String(tokenRaw || '').trim();
+    const newPassword = String(newPasswordRaw || '');
+    if (!token) throw new BadRequestException('token is required');
+    validatePasswordPolicy(newPassword, 'newPassword');
+    await this.ensurePasswordResetTable();
+
+    const tokenHash = this.hashResetToken(token);
+    const tokenOut = await runSql(
+      `SELECT row_to_json(t)::text
+       FROM (
+         SELECT user_id, expires_at::text, consumed_at::text
+         FROM auth_password_reset_tokens
+         WHERE token_hash = $1
+         LIMIT 1
+       ) t;`,
+      [tokenHash],
+    );
+    if (!tokenOut) throw new UnauthorizedException('Invalid or expired reset token');
+    const resetToken = this.parseJsonLine<PasswordResetTokenRow>(tokenOut);
+    if (resetToken.consumed_at) throw new UnauthorizedException('Reset token already used');
+    if (new Date(resetToken.expires_at).getTime() < Date.now()) {
+      throw new UnauthorizedException('Invalid or expired reset token');
+    }
+
+    const passwordHash = this.hashPassword(newPassword);
+    await runSql(
+      `UPDATE users
+       SET password_hash = $1, updated_at = now()
+       WHERE id = $2;`,
+      [passwordHash, resetToken.user_id],
+    );
+    await runSql(
+      `UPDATE auth_password_reset_tokens
+       SET consumed_at = now()
+       WHERE token_hash = $1;`,
+      [tokenHash],
+    );
+    await runSql(
+      `UPDATE auth_refresh_sessions
+       SET revoked_at = now()
+       WHERE user_id = $1
+         AND revoked_at IS NULL;`,
+      [resetToken.user_id],
     );
     return { ok: true };
   }

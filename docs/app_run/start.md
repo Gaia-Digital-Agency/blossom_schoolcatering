@@ -102,6 +102,8 @@ pm2 restart schoolcatering-web
 ```bash
 pm2 status
 curl -I http://127.0.0.1/schoolcatering
+curl -fsS http://127.0.0.1:3006/health
+curl -fsS http://127.0.0.1:3006/ready
 ```
 
 ### D. Open staging site

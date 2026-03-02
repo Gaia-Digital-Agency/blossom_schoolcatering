@@ -654,7 +654,7 @@ export default function ParentsPage() {
         {activeSection === 'billing' && (<>
         <div className="module-section" id="parent-billing">
           <h2>Linked Youngsters</h2>
-          <p className="auth-help">Youngster registration is done on `/register/youngsters`. Linked youngsters are auto-linked by matching parent and youngster last name.</p>
+          <p className="auth-help">Youngster registration is done on `/register/youngsters`. Linked youngsters are auto-linked during registration and immediately available for Order and Billing.</p>
           <label>Select Youngster<select value={selectedChildId} onChange={(e) => setSelectedChildId(e.target.value)}><option value="">Select...</option>{children.map((child) => <option key={child.id} value={child.id}>{child.first_name} {child.last_name} ({child.school_grade})</option>)}</select></label>
         </div>
 

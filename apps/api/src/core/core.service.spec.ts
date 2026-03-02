@@ -183,6 +183,7 @@ describe('CoreService ownership and cutoff rules', () => {
     jest.spyOn(service as any, 'getParentIdByUserId').mockResolvedValue('parent-1');
     jest.spyOn(service as any, 'ensureParentOwnsChild').mockResolvedValue(undefined);
     jest.spyOn(service as any, 'isAfterOrAtMakassarCutoff').mockReturnValue(false);
+    jest.spyOn(service as any, 'getMakassarNowContext').mockReturnValue({ dateIso: '2099-01-01', hour: 9 });
     jest
       .spyOn(service as any, 'validateOrderDayRules')
       .mockRejectedValue(new BadRequestException('ORDER_SERVICE_BLOCKED'));

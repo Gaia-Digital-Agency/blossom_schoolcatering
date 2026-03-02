@@ -19,6 +19,7 @@ const GUIDE_ITEMS: GuideItem[] = [
   { key: 'menu', title: 'Menu User Guide', file: 'menu.md' },
   { key: 'register', title: 'Registration Guide', file: 'register.md' },
   { key: 'terms', title: 'Terms and Conditions', file: 'terms-and-condition.md' },
+  { key: 'privacy', title: 'Privacy and Confidentiality', file: 'privacy-and-confidentiality.md' },
   { key: 'contact', title: 'Contact Us User Guide', file: 'contact-us.md' },
 ];
 

@@ -205,11 +205,11 @@ export default function YoungsterRegisterPage() {
   };
 
   return (
-    <main className="page-auth">
-      <section className="auth-panel">
+    <main className="page-auth youngster-register-page">
+      <section className="auth-panel youngster-register-card">
         <h1>Youngster Registration</h1>
         <p className="auth-help">Youngster registration also creates/links the parent account in one flow.</p>
-        <form onSubmit={onSubmit} className="auth-form">
+        <form onSubmit={onSubmit} className="auth-form youngster-register-form">
           {isReadonlyRecord ? (
             <p className="auth-help">
               Record view only. To edit registered youngster information, please request Admin.
@@ -384,6 +384,40 @@ export default function YoungsterRegisterPage() {
           ) : null}
         </form>
       </section>
+      <style jsx>{`
+        .youngster-register-card {
+          padding: 0.7rem;
+        }
+        .youngster-register-form {
+          gap: 0.45rem;
+        }
+        .youngster-register-form fieldset {
+          margin: 0;
+          padding: 0.45rem 0.55rem;
+          border-radius: 0.5rem;
+        }
+        .youngster-register-form label {
+          gap: 0.16rem;
+          font-size: 0.84rem;
+        }
+        .youngster-register-form input,
+        .youngster-register-form select {
+          min-height: 2.05rem;
+          padding: 0.36rem 0.52rem;
+        }
+        .youngster-register-form legend {
+          font-size: 0.8rem;
+          padding-inline: 0.2rem;
+        }
+        @media (min-width: 860px) {
+          .youngster-register-card {
+            padding: 0.85rem;
+          }
+          .youngster-register-form {
+            gap: 0.6rem;
+          }
+        }
+      `}</style>
     </main>
   );
 }
