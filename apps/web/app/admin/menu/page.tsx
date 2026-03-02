@@ -124,6 +124,7 @@ export default function AdminMenuPage() {
   const [uploadInputKey, setUploadInputKey] = useState(0);
   const [imageConverting, setImageConverting] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
+  const itemNameInputRef = useRef<HTMLInputElement | null>(null);
   const [savingItem, setSavingItem] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [itemAvailable, setItemAvailable] = useState(true);
@@ -524,6 +525,13 @@ export default function AdminMenuPage() {
     setItemIsDairyFree(Boolean(item.is_dairy_free));
     setItemContainsPeanut(Boolean(item.contains_peanut));
     setItemIngredientIds(item.ingredient_ids || []);
+    // Bring the edit form into view and focus primary field for faster UAT editing.
+    window.setTimeout(() => {
+      const formEl = document.getElementById('menu-item-form');
+      formEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      itemNameInputRef.current?.focus();
+      itemNameInputRef.current?.select();
+    }, 0);
   };
 
   const onSetDishActive = async (item: AdminMenuItem, isAvailable: boolean) => {
@@ -645,7 +653,7 @@ export default function AdminMenuPage() {
 
           <div className="menu-selection-columns menu-full-row">
             <div className="ingredient-selected-box">
-              <label>Dish Name<input value={itemName} onChange={(e) => setItemName(e.target.value)} required /></label>
+              <label>Dish Name<input ref={itemNameInputRef} value={itemName} onChange={(e) => setItemName(e.target.value)} required /></label>
               <div className="menu-add-row">
                 <input
                   value={customDishInput}
