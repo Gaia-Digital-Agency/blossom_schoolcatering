@@ -1,10 +1,26 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Post } from '@nestjs/common';
 import { AppService } from './app.service';
 import { runSql } from './auth/db.util';
 
 @Controller()
 export class AppController {
   constructor(private readonly appService: AppService) {}
+
+  private async ensurePageVisitCounter() {
+    await runSql(`
+      CREATE TABLE IF NOT EXISTS site_counters (
+        counter_key text PRIMARY KEY,
+        counter_value bigint NOT NULL DEFAULT 0,
+        updated_at timestamptz NOT NULL DEFAULT now()
+      );
+    `);
+    // Baseline starts at 100 so the first tracked page hit becomes 101.
+    await runSql(`
+      INSERT INTO site_counters (counter_key, counter_value)
+      VALUES ('global_page_visits', 100)
+      ON CONFLICT (counter_key) DO NOTHING;
+    `);
+  }
 
   @Get()
   getHello(): string {
@@ -51,5 +67,43 @@ export class AppController {
   @Get('api/v1/ready')
   readyV1() {
     return this.ready();
+  }
+
+  @Get('api/v1/public/page-visits')
+  async getGlobalPageVisits() {
+    await this.ensurePageVisitCounter();
+    const out = await runSql(`
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT counter_value::bigint AS count
+        FROM site_counters
+        WHERE counter_key = 'global_page_visits'
+        LIMIT 1
+      ) t;
+    `);
+    const line = out.split('\n').map((x) => x.trim()).find(Boolean);
+    const data = line ? (JSON.parse(line) as { count?: number }) : { count: 100 };
+    return { count: Number(data.count || 100) };
+  }
+
+  @Post('api/v1/public/page-visits/hit')
+  async incrementGlobalPageVisits() {
+    await this.ensurePageVisitCounter();
+    const out = await runSql(`
+      WITH updated AS (
+        INSERT INTO site_counters (counter_key, counter_value, updated_at)
+        VALUES ('global_page_visits', 101, now())
+        ON CONFLICT (counter_key)
+        DO UPDATE
+        SET counter_value = site_counters.counter_value + 1,
+            updated_at = now()
+        RETURNING counter_value::bigint AS count
+      )
+      SELECT row_to_json(updated)::text
+      FROM updated;
+    `);
+    const line = out.split('\n').map((x) => x.trim()).find(Boolean);
+    const data = line ? (JSON.parse(line) as { count?: number }) : { count: 101 };
+    return { count: Number(data.count || 101) };
   }
 }

@@ -1,11 +1,44 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import GoogleOAuthButton from './_components/google-oauth-button';
 
 export default function HomePage() {
   const [open, setOpen] = useState(false);
+  const [visitCount, setVisitCount] = useState<number>(0);
+  const [baliTime, setBaliTime] = useState<string>('--:--');
+
+  useEffect(() => {
+    let alive = true;
+    fetch('/schoolcatering/api/v1/public/page-visits/hit', {
+      method: 'POST',
+      credentials: 'include',
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error('failed');
+        const json = await res.json() as { count?: number };
+        if (alive) setVisitCount(Number(json.count || 0));
+      })
+      .catch(() => {
+        // Keep UI stable even if visit endpoint is temporarily unavailable.
+        if (alive) setVisitCount(0);
+      });
+
+    const formatBaliTime = () => new Intl.DateTimeFormat('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: 'Asia/Makassar',
+    }).format(new Date());
+
+    setBaliTime(formatBaliTime());
+    const timer = window.setInterval(() => setBaliTime(formatBaliTime()), 1000);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   return (
     <>
@@ -59,7 +92,7 @@ export default function HomePage() {
 
         <footer className="footer">
           <p>Copyright (C) 2026, Developed by Gaiada.com</p>
-          <p>Visitors: <strong>35</strong> | Location: Bali, Indonesia | Time: 20:00 WITA</p>
+          <p>Visitors: <strong>{visitCount}</strong> | Location: Bali, Indonesia | Time: {baliTime} WITA</p>
         </footer>
       </div>
     </>
