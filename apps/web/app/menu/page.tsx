@@ -101,6 +101,9 @@ export default function MenuPage() {
     <main className="page-auth page-auth-mobile">
       <section className="auth-panel">
         <h1>Menu</h1>
+        <div className="module-guide-card">
+          💡 Log In to order for the Youngsters from Blossom Steakhouse Kitchen.
+        </div>
         {error ? <p className="auth-error">{error}</p> : null}
 
         {items.length === 0 ? (
@@ -171,10 +174,6 @@ export default function MenuPage() {
             ) : null}
           </div>
         )}
-
-        <div className="module-guide-card">
-          💡 Log In to order for the Youngsters from Blossom Steakhouse Kitchen.
-        </div>
 
         <div className="dev-links">
           <Link href="/">Back to Home</Link>
@@ -248,7 +247,7 @@ export default function MenuPage() {
           padding: 0.6rem 0.85rem;
           font-size: 0.82rem;
           color: #6b5a43;
-          margin-top: 1.2rem;
+          margin-bottom: 0.85rem;
         }
         @media (min-width: 900px) {
           /* Side-by-side: Main (left) | secondary categories (right) */
