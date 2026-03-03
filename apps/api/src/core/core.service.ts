@@ -6330,19 +6330,31 @@ export class CoreService implements OnModuleInit {
 
     params.push(targetUserId);
     const userIdParam = params.length;
-    const out = await runSql(
-      `WITH updated AS (
-         UPDATE users
-         SET ${sets.join(', ')},
-             updated_at = now()
-         WHERE id = $${userIdParam}
-           AND role = 'DELIVERY'
-           AND deleted_at IS NULL
-         RETURNING id, username, first_name, last_name, phone_number, email, is_active
-       )
-       SELECT row_to_json(updated)::text FROM updated;`,
-      params,
-    );
+    let out: string;
+    try {
+      out = await runSql(
+        `WITH updated AS (
+           UPDATE users
+           SET ${sets.join(', ')},
+               updated_at = now()
+           WHERE id = $${userIdParam}
+             AND role = 'DELIVERY'
+             AND deleted_at IS NULL
+           RETURNING id, username, first_name, last_name, phone_number, email, is_active
+         )
+         SELECT row_to_json(updated)::text FROM updated;`,
+        params,
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('users_email_ci_uq') || (msg.includes('duplicate key') && msg.includes('email'))) {
+        throw new ConflictException('That email address is already used by another account');
+      }
+      if (msg.includes('users_username_key') || (msg.includes('duplicate key') && msg.includes('username'))) {
+        throw new ConflictException('That username is already taken');
+      }
+      throw err;
+    }
     if (!out) throw new NotFoundException('Delivery user not found');
     const user = this.parseJsonLine<{ id: string; username: string }>(out);
     await this.recordAdminAudit(actor, 'DELIVERY_USER_UPDATED', 'user', user.id, {
