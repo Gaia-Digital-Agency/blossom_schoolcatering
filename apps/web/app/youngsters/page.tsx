@@ -119,6 +119,13 @@ function todayMakassarIsoDate() {
   return d.toISOString().slice(0, 10);
 }
 
+function getMakassarDateWithOffset(offset: number): string {
+  const today = todayMakassarIsoDate();
+  const d = new Date(today + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + offset);
+  return d.toISOString().slice(0, 10);
+}
+
 function getMakassarOrderingWindow() {
   const now = new Date();
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -174,6 +181,7 @@ export default function YoungstersPage() {
   const [insights, setInsights] = useState<YoungsterInsights | null>(null);
   const [orders, setOrders] = useState<ConsolidatedOrder[]>([]);
   const [activeBlackout, setActiveBlackout] = useState<ActiveBlackout | null>(null);
+  const [confirmedViewOffset, setConfirmedViewOffset] = useState(0);
 
   const selectedCount = useMemo(
     () => Object.values(itemQty).filter((qty) => qty > 0).length,
@@ -194,10 +202,14 @@ export default function YoungstersPage() {
   const hasOpenDraft = Boolean(draftCartId) && draftRemainingMs > 0;
   const placementBlockedByBlackout = Boolean(activeBlackout);
 
-  const todayOrder = useMemo(() => {
-    const today = todayMakassarIsoDate();
-    return orders.find((o) => o.service_date === today && o.status === 'PLACED') || null;
-  }, [orders]);
+  const confirmedViewDate = useMemo(
+    () => getMakassarDateWithOffset(confirmedViewOffset),
+    [confirmedViewOffset],
+  );
+  const confirmedOrders = useMemo(
+    () => orders.filter((o) => o.service_date === confirmedViewDate && o.status === 'PLACED'),
+    [orders, confirmedViewDate],
+  );
 
   const selectedDayOrder = useMemo(
     () => orders.find((o) => o.service_date === serviceDate && o.session === session && o.status === 'PLACED') || null,
@@ -409,17 +421,24 @@ export default function YoungstersPage() {
         {error ? <p className="auth-error">{error}</p> : null}
 
         <div className="module-section" id="youngster-order">
-          <h2>Confirmed Order Of The Day</h2>
-          {todayOrder ? (
+          <h2>Confirmed Orders</h2>
+          <div className="day-toggle-row" role="group" aria-label="View date">
+            <button type="button" className={confirmedViewOffset === -1 ? 'day-btn day-btn-active' : 'day-btn'} onClick={() => setConfirmedViewOffset(-1)}>Yesterday</button>
+            <button type="button" className={confirmedViewOffset === 0 ? 'day-btn day-btn-active' : 'day-btn'} onClick={() => setConfirmedViewOffset(0)}>Today</button>
+            <button type="button" className={confirmedViewOffset === 1 ? 'day-btn day-btn-active' : 'day-btn'} onClick={() => setConfirmedViewOffset(1)}>Tomorrow</button>
+          </div>
+          {confirmedOrders.length > 0 ? (
             <div className="auth-form">
-              <label>
-                <strong>{todayOrder.service_date} {todayOrder.session}</strong>
-                <small>Status: {todayOrder.status} | Billing: {todayOrder.billing_status || '-'} | Delivery: {todayOrder.delivery_status || '-'}</small>
-                <small>Total: Rp {Number(todayOrder.total_price).toLocaleString('id-ID')}</small>
-                <small>Items: {todayOrder.items.map((item) => `${item.item_name_snapshot} x${item.quantity}`).join(', ') || '-'}</small>
-              </label>
+              {confirmedOrders.map((order) => (
+                <label key={order.id}>
+                  <strong>{order.service_date} {order.session}</strong>
+                  <small>Status: {order.status} | Billing: {order.billing_status || '-'} | Delivery: {order.delivery_status || '-'}</small>
+                  <small>Total: Rp {Number(order.total_price).toLocaleString('id-ID')}</small>
+                  <small>Items: {order.items.map((item) => `${item.item_name_snapshot} x${item.quantity}`).join(', ') || '-'}</small>
+                </label>
+              ))}
             </div>
-          ) : <p className="auth-help">No confirmed order found for today.</p>}
+          ) : <p className="auth-help">No confirmed order for {confirmedViewOffset === -1 ? 'yesterday' : confirmedViewOffset === 1 ? 'tomorrow' : 'today'}.</p>}
         </div>
 
         <div className="module-section">
@@ -526,6 +545,33 @@ export default function YoungstersPage() {
           font-size: 0.82rem;
           color: #6b5a43;
           margin-bottom: 0.5rem;
+        }
+        .day-toggle-row {
+          display: flex;
+          gap: 0.4rem;
+          margin-bottom: 0.65rem;
+        }
+        .day-btn {
+          flex: 1;
+          padding: 0.38rem 0.5rem;
+          border: 1px solid #ccbda2;
+          border-radius: 0.45rem;
+          background: #fff;
+          color: #5d4e3a;
+          font: inherit;
+          font-size: 0.82rem;
+          cursor: pointer;
+          transition: background 0.12s, border-color 0.12s;
+        }
+        .day-btn:hover {
+          background: #fff8ec;
+          border-color: #b8860b;
+        }
+        .day-btn-active {
+          background: #fff3d6;
+          border-color: #9a6c1f;
+          color: #6b4a10;
+          font-weight: 600;
         }
       `}</style>
     </main>
