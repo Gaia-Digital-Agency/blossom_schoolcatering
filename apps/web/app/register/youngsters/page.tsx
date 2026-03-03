@@ -166,6 +166,33 @@ export default function YoungsterRegisterPage() {
     if (isReadonlyRecord) return;
     setError('');
     setSuccess(null);
+
+    // ── Client-side validation with clear messages ─────────────────────────
+    if (!registrantType) {
+      setError('Please select who is registering: Youngster, Parent, or Teacher.');
+      return;
+    }
+    if (registrantType === 'TEACHER' && !teacherName.trim()) {
+      setError('Teacher name is required when registering as a Teacher.');
+      return;
+    }
+    if (!youngsterFirstName.trim()) { setError('Youngster first name is required.'); return; }
+    if (!youngsterLastName.trim()) { setError('Youngster last name is required.'); return; }
+    if (!youngsterDateOfBirth) { setError('Youngster date of birth is required.'); return; }
+    if (!youngsterSchoolId) { setError('Please select the youngster\'s school.'); return; }
+    if (!youngsterPhone.trim()) { setError('Youngster phone number is required.'); return; }
+    if (!youngsterAllergies.trim()) { setError('Youngster allergies field is required — type "No Allergies" if none.'); return; }
+    if (!parentFirstName.trim()) { setError('Parent first name is required.'); return; }
+    if (!parentLastName.trim()) { setError('Parent last name is required.'); return; }
+    if (parentLastName.trim().toLowerCase() !== youngsterLastName.trim().toLowerCase()) {
+      setError('Parent last name must match Youngster last name exactly.');
+      return;
+    }
+    if (!parentMobileNumber.trim()) { setError('Parent mobile number is required.'); return; }
+    if (!parentEmail.trim()) { setError('Parent email is required.'); return; }
+    if (!parentEmail.includes('@')) { setError('Parent email must be a valid email address.'); return; }
+    // ──────────────────────────────────────────────────────────────────────
+
     setSubmitting(true);
     try {
       const res = await fetchWithTimeout(`${getApiBase()}/auth/register/youngsters`, {
@@ -192,8 +219,9 @@ export default function YoungsterRegisterPage() {
         }),
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.message || 'Registration failed');
+        const body = await res.json().catch(() => ({})) as { message?: string | string[]; error?: { message?: string; details?: string[] } };
+        const raw = body.message ?? body.error?.message ?? body.error?.details?.join(', ');
+        throw new Error(Array.isArray(raw) ? raw.join(', ') : (raw || 'Registration failed'));
       }
       const data = (await res.json()) as RegisterResponse;
       setSuccess(data);
