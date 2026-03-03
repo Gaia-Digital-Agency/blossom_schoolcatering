@@ -114,8 +114,9 @@ export default function RatingPage() {
     <main className="page-auth page-auth-mobile">
       <section className="auth-panel">
         <h1>Dish Rating</h1>
-        <p className="auth-help">Rate active dishes from 1 to 5 stars.</p>
-        {serviceDate ? <p className="auth-help">Service Date: {serviceDate}</p> : null}
+        <div className="module-guide-card">
+          💡 Rate dishes from 1 to 5 (best) stars to tell chef to keep on cookin&apos;.
+        </div>
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
 
@@ -163,10 +164,6 @@ export default function RatingPage() {
             })}
           </div>
         )}
-
-        <div className="module-guide-card">
-          💡 Log In to rate meals to tell chef to keep on cooking.
-        </div>
 
         <div className="dev-links">
           <button className="btn btn-outline" type="button" onClick={onSaveAndGoHome} disabled={savingItemId === 'all'}>
@@ -264,7 +261,7 @@ export default function RatingPage() {
           padding: 0.6rem 0.85rem;
           font-size: 0.82rem;
           color: #6b5a43;
-          margin-top: 1.2rem;
+          margin-bottom: 0.85rem;
         }
         @media (min-width: 900px) {
           .menu-public-grid {
