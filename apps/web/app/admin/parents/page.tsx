@@ -17,16 +17,19 @@ type ParentRow = {
   schools: string[];
 };
 
-type ResetPasswordResponse = {
-  ok: boolean;
-  newPassword: string;
-  username: string;
+type ShowPassInfo = {
+  parentFirstName: string;
+  parentLastName: string;
+  parentUsername: string;
+  parentNewPassword: string;
+  youngsters: { name: string; school: string }[];
 };
 
 export default function AdminParentsPage() {
   const [parents, setParents] = useState<ParentRow[]>([]);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [showPassInfo, setShowPassInfo] = useState<ShowPassInfo | null>(null);
 
   const load = async () => {
     const p = await apiFetch('/admin/parents') as ParentRow[];
@@ -37,15 +40,25 @@ export default function AdminParentsPage() {
     load().catch((e) => setError(e instanceof Error ? e.message : 'Failed'));
   }, []);
 
-  const onResetPassword = async (userId: string) => {
+  const onShowPassword = async (p: ParentRow) => {
     setError('');
     setMessage('');
     try {
-      const res = await apiFetch(`/admin/users/${userId}/reset-password`, {
-        method: 'PATCH',
-        body: JSON.stringify({}),
-      }) as ResetPasswordResponse;
-      setMessage(`Password reset for ${res.username}: ${res.newPassword}`);
+      const res = await apiFetch(
+        `/admin/users/${p.user_id}/reset-password`,
+        { method: 'PATCH', body: JSON.stringify({}) },
+        { skipAutoReload: true },
+      ) as { ok: boolean; newPassword: string; username: string };
+      setShowPassInfo({
+        parentFirstName: p.first_name,
+        parentLastName: p.last_name,
+        parentUsername: res.username,
+        parentNewPassword: res.newPassword,
+        youngsters: (p.youngsters || []).map((y) => ({
+          name: y.name,
+          school: y.school_name || '—',
+        })),
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed resetting password');
     }
@@ -87,8 +100,8 @@ export default function AdminParentsPage() {
                   </td>
                   <td>{(p.schools || []).join(', ') || '-'}</td>
                   <td>
-                    <button className="btn btn-outline" type="button" onClick={() => onResetPassword(p.user_id)}>
-                      Change Password
+                    <button className="btn btn-outline" type="button" onClick={() => onShowPassword(p)}>
+                      Show Password
                     </button>
                   </td>
                 </tr>
@@ -100,6 +113,50 @@ export default function AdminParentsPage() {
           </table>
         </div>
       </section>
+
+      {/* ── Show Password Modal ─────────────────────────────── */}
+      {showPassInfo ? (
+        <div className="pass-modal-overlay" onClick={() => setShowPassInfo(null)}>
+          <div className="pass-modal-card" onClick={(e) => e.stopPropagation()}>
+            <h2 className="pass-modal-title">Registration Successful Information</h2>
+            <p className="pass-modal-warning">
+              ⚠️ Please take this information down and keep it safely for login.
+            </p>
+            <div className="reg-info-list">
+              <div className="reg-info-row">
+                <span className="reg-info-label">Parent Name</span>
+                <span className="reg-info-val">{showPassInfo.parentFirstName} {showPassInfo.parentLastName}</span>
+              </div>
+              <div className="reg-info-row">
+                <span className="reg-info-label">Parent Username</span>
+                <code className="reg-info-code">{showPassInfo.parentUsername}</code>
+              </div>
+              <div className="reg-info-row">
+                <span className="reg-info-label">Parent New Password</span>
+                <code className="reg-info-code">{showPassInfo.parentNewPassword}</code>
+              </div>
+              {showPassInfo.youngsters.length > 0 ? (
+                <div className="reg-info-row">
+                  <span className="reg-info-label">Youngster(s)</span>
+                  <span className="reg-info-val reg-info-youngsters">
+                    {showPassInfo.youngsters.map((y, i) => (
+                      <span key={i}>{y.name} — {y.school}</span>
+                    ))}
+                  </span>
+                </div>
+              ) : null}
+              <div className="reg-info-row">
+                <span className="reg-info-label">Youngster Password</span>
+                <span className="reg-info-muted">Not changed — use Check Password on Youngsters page</span>
+              </div>
+            </div>
+            <button className="btn btn-primary pass-modal-close" type="button" onClick={() => setShowPassInfo(null)}>
+              Close
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <style jsx>{`
         .kitchen-table-wrap {
           overflow-x: auto;
@@ -136,12 +193,11 @@ export default function AdminParentsPage() {
         .admin-parents-table :global(.btn) {
           min-width: 120px;
         }
-        /* Mobile: no horizontal scroll — hide wide columns, force wrapping */
+        /* Mobile */
         @media (max-width: 680px) {
           .kitchen-table-wrap {
             overflow-x: hidden;
           }
-          /* Hide Parent ID, Youngsters Linked, Schools on mobile */
           .admin-parents-table th:nth-child(2),
           .admin-parents-table td:nth-child(2),
           .admin-parents-table th:nth-child(3),
@@ -165,6 +221,92 @@ export default function AdminParentsPage() {
             min-width: 0;
             width: 100%;
           }
+        }
+        /* ── Modal ── */
+        .pass-modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.45);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          padding: 1rem;
+        }
+        .pass-modal-card {
+          background: #fff;
+          border-radius: 1rem;
+          padding: 1.5rem 1.6rem;
+          max-width: 480px;
+          width: 100%;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
+        }
+        .pass-modal-title {
+          font-size: 1.1rem;
+          font-weight: 700;
+          margin: 0 0 0.5rem;
+        }
+        .pass-modal-warning {
+          font-weight: 600;
+          color: #b45309;
+          font-size: 0.88rem;
+          margin-bottom: 0.9rem;
+        }
+        .reg-info-list {
+          display: flex;
+          flex-direction: column;
+          gap: 0.45rem;
+          background: #f8f8f8;
+          border-radius: 0.65rem;
+          padding: 0.85rem 1rem;
+          margin-bottom: 1.1rem;
+        }
+        .reg-info-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          flex-wrap: wrap;
+          gap: 0.4rem;
+          border-bottom: 1px solid #e5e5e5;
+          padding-bottom: 0.4rem;
+          font-size: 0.86rem;
+        }
+        .reg-info-row:last-child {
+          border-bottom: none;
+          padding-bottom: 0;
+        }
+        .reg-info-label {
+          color: #666;
+          font-weight: 500;
+          flex-shrink: 0;
+        }
+        .reg-info-val {
+          font-weight: 600;
+          text-align: right;
+        }
+        .reg-info-youngsters {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 0.2rem;
+        }
+        .reg-info-code {
+          background: #e8e8e8;
+          padding: 0.12rem 0.42rem;
+          border-radius: 0.3rem;
+          font-weight: 700;
+          font-size: 0.9rem;
+          letter-spacing: 0.03em;
+        }
+        .reg-info-muted {
+          color: #888;
+          font-style: italic;
+          font-size: 0.82rem;
+          text-align: right;
+        }
+        .pass-modal-close {
+          width: 100%;
+          padding: 0.6rem 1.25rem;
         }
       `}</style>
     </main>

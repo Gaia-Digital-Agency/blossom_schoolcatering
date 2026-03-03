@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { apiFetch, fetchWithTimeout, getApiBase, ROLE_KEY, type Role } from '../../../lib/auth';
 
 type School = {
@@ -36,6 +37,7 @@ type RecordChild = {
 const GRADES = Array.from({ length: 12 }, (_v, i) => `Grade ${i + 1}`);
 
 export default function YoungsterRegisterPage() {
+  const router = useRouter();
   const [schools, setSchools] = useState<School[]>([]);
   const [loadingSchools, setLoadingSchools] = useState(true);
   const [registrantType, setRegistrantType] = useState<'' | 'YOUNGSTER' | 'PARENT' | 'TEACHER'>('');
@@ -287,9 +289,13 @@ export default function YoungsterRegisterPage() {
           ) : (
             <>
               <p className="auth-help reg-saved-confirm">✓ Great! You can now proceed to login.</p>
-              <a className="btn btn-primary" href="/login">
+              <button
+                className="btn btn-primary reg-go-login-btn"
+                type="button"
+                onClick={() => router.push('/login')}
+              >
                 Go To Login
-              </a>
+              </button>
             </>
           )}
         <style jsx>{`
@@ -350,6 +356,11 @@ export default function YoungsterRegisterPage() {
             color: var(--green, #15803d);
             font-weight: 600;
             margin-bottom: 0.5rem;
+          }
+          .reg-go-login-btn {
+            width: 100%;
+            padding: 0.65rem 1.25rem;
+            margin-top: 0.25rem;
           }
         `}</style>
         </section>
