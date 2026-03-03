@@ -325,7 +325,8 @@ export default function YoungsterRegisterPage() {
           </label>
           <label>
             Youngster Phone
-            <input value={youngsterPhone} onChange={(e) => setYoungsterPhone(e.target.value)} required />
+            <input value={youngsterPhone} onChange={(e) => setYoungsterPhone(e.target.value)} placeholder="+[country][area][number]" required />
+            <small className="field-hint">Format: + country code + area code + number &nbsp;e.g. +628123456789</small>
           </label>
           <label>
             Youngster Email (Optional)
@@ -350,7 +351,8 @@ export default function YoungsterRegisterPage() {
           </label>
           <label>
             Parent Mobile Number
-            <input value={parentMobileNumber} onChange={(e) => setParentMobileNumber(e.target.value)} required />
+            <input value={parentMobileNumber} onChange={(e) => setParentMobileNumber(e.target.value)} placeholder="+[country][area][number]" required />
+            <small className="field-hint">Format: + country code + area code + number &nbsp;e.g. +628123456789</small>
           </label>
           <label>
             Parent Email

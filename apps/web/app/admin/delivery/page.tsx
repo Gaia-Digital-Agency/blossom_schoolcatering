@@ -83,18 +83,22 @@ export default function AdminDeliveryPage() {
   const editFirstNameInputRef = useRef<HTMLInputElement | null>(null);
 
   const load = async () => {
-    const [u, s, m, a] = await Promise.all([
+    const [rU, rS, rM, rA] = await Promise.allSettled([
       apiFetch('/delivery/users?include_inactive=true') as Promise<DeliveryUser[]>,
       apiFetch('/schools?active=true') as Promise<School[]>,
       apiFetch('/delivery/school-assignments') as Promise<Mapping[]>,
       apiFetch(`/delivery/assignments?date=${encodeURIComponent(assignDate)}`) as Promise<Assignment[]>,
     ]);
-    setUsers(u || []);
-    setSchools(s || []);
-    setMappings(m || []);
-    setAssignments(a || []);
-    if (!selectedDeliveryUserId && u.length) setSelectedDeliveryUserId(u[0].id);
-    if (!selectedSchoolId && s.length) setSelectedSchoolId(s[0].id);
+    const u = rU.status === 'fulfilled' ? (rU.value || []) : null;
+    const s = rS.status === 'fulfilled' ? (rS.value || []) : null;
+    const m = rM.status === 'fulfilled' ? (rM.value || []) : null;
+    const a = rA.status === 'fulfilled' ? (rA.value || []) : null;
+    if (u !== null) { setUsers(u); if (!selectedDeliveryUserId && u.length) setSelectedDeliveryUserId(u[0].id); }
+    if (s !== null) { setSchools(s); if (!selectedSchoolId && s.length) setSelectedSchoolId(s[0].id); }
+    if (m !== null) setMappings(m);
+    if (a !== null) setAssignments(a);
+    const firstErr = [rU, rS, rM, rA].find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined;
+    if (firstErr) throw firstErr.reason;
   };
 
   useEffect(() => { load().catch((e) => setError(e instanceof Error ? e.message : 'Failed')); /* eslint-disable-next-line */ }, [assignDate]);
@@ -107,7 +111,7 @@ export default function AdminDeliveryPage() {
       await apiFetch('/delivery/school-assignments', {
         method: 'POST',
         body: JSON.stringify({ deliveryUserId: selectedDeliveryUserId, schoolId: selectedSchoolId, isActive: true }),
-      });
+      }, { skipAutoReload: true });
       setMessage('School assignment saved.');
       await load();
     } catch (e) {
@@ -122,7 +126,7 @@ export default function AdminDeliveryPage() {
       await apiFetch('/delivery/school-assignments', {
         method: 'POST',
         body: JSON.stringify({ deliveryUserId: row.delivery_user_id, schoolId: row.school_id, isActive }),
-      });
+      }, { skipAutoReload: true });
       setMessage(isActive ? 'Mapping activated.' : 'Mapping deactivated.');
       await load();
     } catch (e) {
@@ -140,7 +144,7 @@ export default function AdminDeliveryPage() {
     try {
       await apiFetch(`/delivery/school-assignments/${row.delivery_user_id}/${row.school_id}`, {
         method: 'DELETE',
-      });
+      }, { skipAutoReload: true });
       setMessage('Mapping deleted.');
       await load();
     } catch (e) {
@@ -157,7 +161,7 @@ export default function AdminDeliveryPage() {
       const out = await apiFetch('/delivery/auto-assign', {
         method: 'POST',
         body: JSON.stringify({ date: assignDate }),
-      }) as { assignedCount: number; skippedOrderIds: string[] };
+      }, { skipAutoReload: true }) as { assignedCount: number; skippedOrderIds: string[] };
       setMessage(
         out.skippedOrderIds.length
           ? `Auto-assigned ${out.assignedCount}. Skipped ${out.skippedOrderIds.length} (missing school mapping).`
@@ -188,7 +192,7 @@ export default function AdminDeliveryPage() {
           phoneNumber: newPhoneNumber.trim(),
           email: newEmail.trim() || undefined,
         }),
-      }) as { username: string };
+      }, { skipAutoReload: true }) as { username: string };
       setMessage(`Delivery user created: ${out.username}`);
       setNewUsername('');
       setNewPassword('');
@@ -232,7 +236,7 @@ export default function AdminDeliveryPage() {
           phoneNumber: editPhoneNumber,
           email: editEmail,
         }),
-      });
+      }, { skipAutoReload: true });
       setEditingUserId('');
       setMessage('Delivery user updated.');
       await load();
@@ -251,7 +255,7 @@ export default function AdminDeliveryPage() {
       await apiFetch(`/admin/delivery/users/${user.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ isActive: !user.is_active }),
-      });
+      }, { skipAutoReload: true });
       setMessage(!user.is_active ? `Delivery user activated: ${user.username}` : `Delivery user deactivated: ${user.username}`);
       await load();
     } catch (e) {
@@ -267,7 +271,7 @@ export default function AdminDeliveryPage() {
     setError('');
     setMessage('');
     try {
-      await apiFetch(`/admin/delivery/users/${user.id}`, { method: 'DELETE' });
+      await apiFetch(`/admin/delivery/users/${user.id}`, { method: 'DELETE' }, { skipAutoReload: true });
       setMessage(`Delivery user deleted: ${user.username}`);
       if (editingUserId === user.id) setEditingUserId('');
       await load();
@@ -306,6 +310,59 @@ export default function AdminDeliveryPage() {
     }).sort((a, b) => b.orderCount - a.orderCount || a.deliveryName.localeCompare(b.deliveryName));
   }, [assignments, usersById]);
 
+  const onDownloadSummary = async () => {
+    setError('');
+    setMessage('');
+    try {
+      const data = await apiFetch(`/delivery/summary?date=${encodeURIComponent(assignDate)}`) as {
+        date: string;
+        deliveries: Array<{
+          deliveryUserId: string;
+          deliveryName: string;
+          schools: Array<{
+            schoolName: string;
+            orderCount: number;
+            dishCount: number;
+            orders: Array<{ orderNumber: string; childLastName: string; youngsterPhone: string | null }>;
+          }>;
+        }>;
+      };
+      if (!data || !data.deliveries || data.deliveries.length === 0) {
+        setMessage('No assignment data for selected date.');
+        return;
+      }
+      const lines: string[] = [];
+      lines.push(`DELIVERY SUMMARY - ${data.date}`);
+      lines.push('');
+      for (const delivery of data.deliveries) {
+        lines.push(`Delivery Person: ${delivery.deliveryName}`);
+        for (const school of delivery.schools) {
+          lines.push(`  School: ${school.schoolName}`);
+          lines.push(`  Total Orders: ${school.orderCount}`);
+          lines.push(`  Total Dishes: ${school.dishCount}`);
+          lines.push(`  Order# | Last Name | Phone`);
+          lines.push(`  -------|-----------|------`);
+          for (const order of school.orders) {
+            lines.push(`  ${order.orderNumber} | ${order.childLastName} | ${order.youngsterPhone || '-'}`);
+          }
+          lines.push('');
+        }
+        lines.push('');
+      }
+      const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `delivery-summary-${data.date}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed downloading summary');
+    }
+  };
+
   return (
     <main className="page-auth page-auth-desktop">
       <section className="auth-panel">
@@ -316,12 +373,12 @@ export default function AdminDeliveryPage() {
 
         <h2>Delivery Registration (Admin Only)</h2>
         <div className="auth-form">
-          <label>Username<input value={newUsername} onChange={(e) => setNewUsername(e.target.value)} /></label>
-          <label>Password<PasswordInput value={newPassword} onChange={(e) => setNewPassword(e.target.value)} /></label>
-          <label>First Name<input value={newFirstName} onChange={(e) => setNewFirstName(e.target.value)} /></label>
-          <label>Last Name<input value={newLastName} onChange={(e) => setNewLastName(e.target.value)} /></label>
-          <label>Phone Number<input value={newPhoneNumber} onChange={(e) => setNewPhoneNumber(e.target.value)} /></label>
-          <label>Email<input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} /></label>
+          <label>Username <span className="req">*</span><input value={newUsername} onChange={(e) => setNewUsername(e.target.value)} /></label>
+          <label>Password <span className="req">*</span><PasswordInput value={newPassword} onChange={(e) => setNewPassword(e.target.value)} /></label>
+          <label>First Name <span className="req">*</span><input value={newFirstName} onChange={(e) => setNewFirstName(e.target.value)} /></label>
+          <label>Last Name <span className="req">*</span><input value={newLastName} onChange={(e) => setNewLastName(e.target.value)} /></label>
+          <label>Phone Number <span className="req">*</span><input value={newPhoneNumber} onChange={(e) => setNewPhoneNumber(e.target.value)} placeholder="+[country][area][number]" /><small className="field-hint">Format: + country code + area code + number &nbsp;e.g. +628123456789</small></label>
+          <label>Email <span className="opt">(Optional)</span><input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} /></label>
           <button className="btn btn-primary" type="button" onClick={onCreateDeliveryUser} disabled={creatingUser}>
             {creatingUser ? 'Creating...' : 'Create Delivery User'}
           </button>
@@ -355,7 +412,7 @@ export default function AdminDeliveryPage() {
                       ) : `${u.first_name} ${u.last_name}`}
                     </td>
                     <td>{u.username}</td>
-                    <td>{editingUserId === u.id ? <input value={editPhoneNumber} onChange={(e) => setEditPhoneNumber(e.target.value)} /> : (u.phone_number || '-')}</td>
+                    <td>{editingUserId === u.id ? <input value={editPhoneNumber} onChange={(e) => setEditPhoneNumber(e.target.value)} placeholder="+[country][area][number]" /> : (u.phone_number || '-')}</td>
                     <td>{editingUserId === u.id ? <input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} /> : (u.email || '-')}</td>
                     <td>{u.is_active ? 'ACTIVE' : 'INACTIVE'}</td>
                     <td>
@@ -477,6 +534,7 @@ export default function AdminDeliveryPage() {
           <button className="btn btn-outline" type="button" onClick={() => setAssignDate(todayIsoLocal())}>Show Today</button>
           <button className="btn btn-primary" type="button" onClick={onAutoAssign}>Auto Assign by School</button>
           <button className="btn btn-outline" type="button" onClick={load}>Refresh</button>
+          <button className="btn btn-outline" type="button" onClick={onDownloadSummary}>Download Summary</button>
         </div>
 
         <div className="kitchen-table-wrap">
@@ -594,10 +652,23 @@ export default function AdminDeliveryPage() {
           display: grid;
           gap: 0.35rem;
         }
+        .req {
+          color: #c0392b;
+          margin-left: 2px;
+        }
+        .opt {
+          color: #7a6652;
+          font-size: 0.78rem;
+          font-weight: normal;
+          margin-left: 4px;
+        }
         @media (min-width: 900px) {
-          .admin-mapping-controls,
-          .auto-assign-controls {
+          .admin-mapping-controls {
             grid-template-columns: 1fr auto auto auto;
+            align-items: end;
+          }
+          .auto-assign-controls {
+            grid-template-columns: 1fr auto auto auto auto;
             align-items: end;
           }
         }

@@ -459,6 +459,14 @@ button:hover,
   margin: 0.35rem 0 1rem;
 }
 
+.field-hint {
+  display: block;
+  font-size: 0.74rem;
+  color: var(--ink-soft);
+  margin-top: 0.2rem;
+  font-weight: normal;
+}
+
 .quick-credentials {
   margin: 0 0 0.9rem;
   padding: 0.55rem 0.7rem;

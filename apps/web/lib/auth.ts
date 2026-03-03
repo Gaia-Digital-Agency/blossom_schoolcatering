@@ -140,8 +140,9 @@ export async function apiFetch(path: string, init?: RequestInit, options?: { ski
   }
 
   if (!res.ok) {
-    const body = await res.json().catch(() => ({})) as { message?: string | string[] };
-    const msg = Array.isArray(body.message) ? body.message.join(', ') : (body.message ?? 'Request failed');
+    const body = await res.json().catch(() => ({})) as { message?: string | string[]; error?: { message?: string; details?: string[] } };
+    const raw = body.message ?? body.error?.message ?? body.error?.details?.join(', ');
+    const msg = Array.isArray(raw) ? raw.join(', ') : (raw ?? 'Request failed');
     throw new Error(msg);
   }
 

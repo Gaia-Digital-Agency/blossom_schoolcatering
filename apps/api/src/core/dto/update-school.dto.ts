@@ -1,6 +1,23 @@
-import { IsBoolean } from 'class-validator';
+import { IsBoolean, IsOptional, IsString } from 'class-validator';
 
 export class UpdateSchoolDto {
+  @IsOptional()
   @IsBoolean()
-  isActive!: boolean;
+  isActive?: boolean;
+
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  @IsOptional()
+  @IsString()
+  contactPhone?: string;
 }

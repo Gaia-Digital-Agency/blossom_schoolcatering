@@ -1007,38 +1007,44 @@ export class CoreService implements OnModuleInit {
       `
       SELECT row_to_json(t)::text
       FROM (
-        SELECT id, name, city, address, is_active
+        SELECT id, name, city, address, contact_phone, is_active
         FROM schools
         WHERE deleted_at IS NULL
           AND is_active = ${active ? 'true' : 'false'}
         ORDER BY name ASC
       ) t;
     `);
-    return this.parseJsonLines<{ id: string; name: string; city: string | null; address: string | null; is_active: boolean }>(out);
+    return this.parseJsonLines<{ id: string; name: string; city: string | null; address: string | null; contact_phone: string | null; is_active: boolean }>(out);
   }
 
-  async updateSchoolActive(actor: AccessUser, schoolId: string, isActive?: boolean) {
+  async updateSchool(actor: AccessUser, schoolId: string, input: { isActive?: boolean; name?: string; city?: string; address?: string; contactPhone?: string }) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     const id = schoolId.trim();
+    const sets: string[] = ['updated_at = now()'];
+    const params: unknown[] = [];
 
+    if (input.isActive !== undefined) { params.push(input.isActive); sets.push(`is_active = $${params.length}`); }
+    if (input.name !== undefined) { params.push(input.name.trim()); sets.push(`name = $${params.length}`); }
+    if (input.city !== undefined) { params.push(input.city.trim()); sets.push(`city = $${params.length}`); }
+    if (input.address !== undefined) { params.push(input.address.trim()); sets.push(`address = $${params.length}`); }
+    if (input.contactPhone !== undefined) { params.push(input.contactPhone.trim()); sets.push(`contact_phone = $${params.length}`); }
+
+    params.push(id);
     const out = await runSql(
       `WITH updated AS (
          UPDATE schools
-         SET is_active = $1,
-             updated_at = now()
-         WHERE id = $2
+         SET ${sets.join(', ')}
+         WHERE id = $${params.length}
            AND deleted_at IS NULL
-         RETURNING id, name, city, address, is_active
+         RETURNING id, name, city, address, contact_phone, is_active
        )
        SELECT row_to_json(updated)::text
        FROM updated;`,
-      [isActive, id],
+      params,
     );
     if (!out) throw new NotFoundException('School not found');
-    const updated = this.parseJsonLine<{ id: string; is_active: boolean }>(out);
-    await this.recordAdminAudit(actor, 'SCHOOL_STATUS_UPDATED', 'school', updated.id, {
-      isActive: updated.is_active,
-    });
+    const updated = this.parseJsonLine<{ id: string; name: string; is_active: boolean }>(out);
+    await this.recordAdminAudit(actor, 'SCHOOL_UPDATED', 'school', updated.id, { name: updated.name, isActive: updated.is_active });
     return updated;
   }
 
@@ -4712,6 +4718,77 @@ export class CoreService implements OnModuleInit {
     return this.parseJsonLines(out);
   }
 
+  async getDeliverySummary(actor: AccessUser, dateRaw?: string) {
+    if (!['DELIVERY', 'ADMIN'].includes(actor.role)) throw new ForbiddenException('Role not allowed');
+    const serviceDate = dateRaw ? this.validateServiceDate(dateRaw) : this.makassarTodayIsoDate();
+    const params: unknown[] = [serviceDate];
+    const roleFilter = actor.role === 'DELIVERY'
+      ? (() => {
+          params.push(actor.uid);
+          return `AND da.delivery_user_id = $${params.length}`;
+        })()
+      : '';
+    const rows = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT da.delivery_user_id,
+               (du.first_name || ' ' || du.last_name) AS delivery_name,
+               s.id AS school_id,
+               s.name AS school_name,
+               o.order_number::text AS order_number,
+               uc.last_name AS child_last_name,
+               COALESCE(NULLIF(TRIM(uc.phone_number), ''), NULLIF(TRIM(up.phone_number), '')) AS youngster_phone,
+               (SELECT COUNT(*) FROM order_items oi WHERE oi.order_id = o.id) AS dish_count
+        FROM delivery_assignments da
+        JOIN orders o ON o.id = da.order_id
+        JOIN children c ON c.id = o.child_id
+        JOIN schools s ON s.id = c.school_id
+        JOIN users uc ON uc.id = c.user_id
+        JOIN users du ON du.id = da.delivery_user_id
+        LEFT JOIN users up ON up.id = o.placed_by_user_id
+        WHERE o.service_date = $1::date
+          ${roleFilter}
+        ORDER BY s.name ASC, o.order_number ASC
+      ) t;
+      `,
+      params,
+    );
+    const detail = this.parseJsonLines<{
+      delivery_user_id: string;
+      delivery_name: string;
+      school_id: string;
+      school_name: string;
+      order_number: string;
+      child_last_name: string;
+      youngster_phone: string | null;
+      dish_count: number;
+    }>(rows);
+
+    // Group by delivery_user_id → school
+    type SchoolGroup = { schoolName: string; orderCount: number; dishCount: number; orders: { orderNumber: string; childLastName: string; youngsterPhone: string | null }[] };
+    type UserGroup = { deliveryName: string; schools: Map<string, SchoolGroup> };
+    const byUser = new Map<string, UserGroup>();
+    for (const row of detail) {
+      if (!byUser.has(row.delivery_user_id)) byUser.set(row.delivery_user_id, { deliveryName: row.delivery_name, schools: new Map() });
+      const ug = byUser.get(row.delivery_user_id)!;
+      if (!ug.schools.has(row.school_id)) ug.schools.set(row.school_id, { schoolName: row.school_name, orderCount: 0, dishCount: 0, orders: [] });
+      const sg = ug.schools.get(row.school_id)!;
+      sg.orderCount += 1;
+      sg.dishCount += Number(row.dish_count) || 0;
+      sg.orders.push({ orderNumber: row.order_number, childLastName: row.child_last_name, youngsterPhone: row.youngster_phone });
+    }
+
+    return {
+      date: serviceDate,
+      deliveries: Array.from(byUser.entries()).map(([uid, ug]) => ({
+        deliveryUserId: uid,
+        deliveryName: ug.deliveryName,
+        schools: Array.from(ug.schools.values()),
+      })),
+    };
+  }
+
   async confirmDelivery(actor: AccessUser, assignmentId: string, note?: string) {
     if (actor.role !== 'DELIVERY') throw new ForbiddenException('Role not allowed');
     const out = await runSql(
@@ -5745,22 +5822,26 @@ export class CoreService implements OnModuleInit {
 
   // ─── Schools CRUD ────────────────────────────────────────────────────────
 
-  async createSchool(actor: AccessUser, input: { name?: string; address?: string; city?: string; contactEmail?: string }) {
+  async createSchool(actor: AccessUser, input: { name?: string; address?: string; city?: string; contactPhone?: string }) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     const name = (input.name || '').trim();
     const address = (input.address || '').trim();
     const city = (input.city || '').trim();
-    const contactEmail = (input.contactEmail || '').trim().toLowerCase();
+    const contactPhone = (input.contactPhone || '').trim();
+    if (!name) throw new BadRequestException('School name is required');
+    if (!city) throw new BadRequestException('City is required');
+    if (!address) throw new BadRequestException('Address is required');
+    if (!contactPhone) throw new BadRequestException('Phone number is required');
     const out = await runSql(
       `
       WITH inserted AS (
-        INSERT INTO schools (name, address, city, contact_email, is_active)
+        INSERT INTO schools (name, address, city, contact_phone, is_active)
         VALUES ($1, $2, $3, $4, true)
-        RETURNING id, name, city, address, is_active
+        RETURNING id, name, city, address, contact_phone, is_active
       )
       SELECT row_to_json(inserted)::text FROM inserted;
     `,
-      [name, address || null, city || null, contactEmail || null],
+      [name, address, city, contactPhone],
     );
     if (!out) throw new BadRequestException('Failed to create school');
     const school = this.parseJsonLine<{ id: string; name: string }>(out);

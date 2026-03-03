@@ -75,8 +75,8 @@ export class CoreController {
 
   @Patch('admin/schools/:schoolId')
   @Roles('ADMIN')
-  updateSchoolActive(@Req() req: AuthRequest, @Param('schoolId', ParseUUIDPipe) schoolId: string, @Body() body: UpdateSchoolDto) {
-    return this.coreService.updateSchoolActive(req.user, schoolId, body.isActive);
+  updateSchool(@Req() req: AuthRequest, @Param('schoolId', ParseUUIDPipe) schoolId: string, @Body() body: UpdateSchoolDto) {
+    return this.coreService.updateSchool(req.user, schoolId, body);
   }
 
   @Delete('admin/schools/:schoolId')
@@ -575,6 +575,12 @@ export class CoreController {
   @Roles('ADMIN', 'DELIVERY')
   getDeliveryAssignments(@Req() req: AuthRequest, @Query('date') date?: string) {
     return this.coreService.getDeliveryAssignments(req.user, date);
+  }
+
+  @Get('delivery/summary')
+  @Roles('ADMIN', 'DELIVERY')
+  getDeliverySummary(@Req() req: AuthRequest, @Query('date') date?: string) {
+    return this.coreService.getDeliverySummary(req.user, date);
   }
 
   @Post('delivery/assignments/:assignmentId/confirm')

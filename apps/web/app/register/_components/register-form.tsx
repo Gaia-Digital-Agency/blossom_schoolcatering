@@ -105,7 +105,8 @@ export default function RegisterForm({ role, allowedRoles, title, subtitle }: Re
           </label>
           <label>
             Phone Number
-            <input value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} required />
+            <input value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="+[country][area][number]" required />
+            <small className="field-hint">Format: + country code + area code + number &nbsp;e.g. +628123456789</small>
           </label>
           <label>
             Email
