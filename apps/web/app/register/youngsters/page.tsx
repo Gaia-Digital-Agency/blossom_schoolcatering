@@ -57,6 +57,7 @@ export default function YoungsterRegisterPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState<RegisterResponse | null>(null);
+  const [savedInfo, setSavedInfo] = useState(false);
   const [recordRole, setRecordRole] = useState<Role | ''>('');
   const [recordChildren, setRecordChildren] = useState<RecordChild[]>([]);
   const [recordChildId, setRecordChildId] = useState('');
@@ -232,6 +233,131 @@ export default function YoungsterRegisterPage() {
     }
   };
 
+  // ── Success screen: replaces the entire form ───────────────────────────
+  if (success) {
+    return (
+      <main className="page-auth">
+        <section className="auth-panel">
+          <h1>Registration Successful</h1>
+          <p className="auth-help reg-save-warning">
+            ⚠️ Please take this information down and keep it safely for login.
+          </p>
+          <div className="reg-success-info">
+            <div className="reg-info-row">
+              <span className="reg-info-label">School</span>
+              <span className="reg-info-value">{selectedSchoolLabel || '-'}</span>
+            </div>
+            <div className="reg-info-row">
+              <span className="reg-info-label">Youngster Full Last Name</span>
+              <span className="reg-info-value">{success.youngster.lastName}</span>
+            </div>
+            <div className="reg-info-row">
+              <span className="reg-info-label">Youngster Username</span>
+              <code className="reg-info-code">{success.youngster.username}</code>
+            </div>
+            <div className="reg-info-row">
+              <span className="reg-info-label">Youngster Password</span>
+              <code className="reg-info-code">{success.youngster.generatedPassword}</code>
+            </div>
+            <div className="reg-info-row">
+              <span className="reg-info-label">Parent Username</span>
+              <code className="reg-info-code">{success.parent.username}</code>
+            </div>
+            <div className="reg-info-row">
+              <span className="reg-info-label">Parent Password</span>
+              <code className="reg-info-code">
+                {success.parent.generatedPassword || 'Existing password retained'}
+              </code>
+            </div>
+            {success.parent.existed ? (
+              <p className="reg-info-note">
+                ℹ️ Parent email already existed — linked to the existing parent account.
+              </p>
+            ) : null}
+          </div>
+
+          {!savedInfo ? (
+            <button
+              className="btn btn-primary reg-save-btn"
+              type="button"
+              onClick={() => setSavedInfo(true)}
+            >
+              Have You Saved Information?
+            </button>
+          ) : (
+            <>
+              <p className="auth-help reg-saved-confirm">✓ Great! You can now proceed to login.</p>
+              <a className="btn btn-primary" href="/login">
+                Go To Login
+              </a>
+            </>
+          )}
+        <style jsx>{`
+          .reg-save-warning {
+            font-weight: 600;
+            color: var(--amber, #b45309);
+          }
+          .reg-success-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.55rem;
+            background: var(--surface-2, #f8f8f8);
+            border-radius: 0.65rem;
+            padding: 1rem 1.1rem;
+            margin: 1rem 0;
+          }
+          .reg-info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            border-bottom: 1px solid var(--border, #e5e5e5);
+            padding-bottom: 0.45rem;
+          }
+          .reg-info-row:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+          }
+          .reg-info-label {
+            font-size: 0.82rem;
+            color: var(--ink-soft, #666);
+            font-weight: 500;
+            flex-shrink: 0;
+          }
+          .reg-info-value {
+            font-weight: 600;
+            text-align: right;
+          }
+          .reg-info-code {
+            background: var(--surface-3, #e8e8e8);
+            padding: 0.15rem 0.45rem;
+            border-radius: 0.3rem;
+            font-size: 0.92rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+          }
+          .reg-info-note {
+            font-size: 0.82rem;
+            color: var(--ink-soft, #666);
+            margin: 0.25rem 0 0;
+          }
+          .reg-save-btn {
+            width: 100%;
+            margin-top: 0.5rem;
+          }
+          .reg-saved-confirm {
+            color: var(--green, #15803d);
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+          }
+        `}</style>
+        </section>
+    </main>
+  );
+  }
+  // ───────────────────────────────────────────────────────────────────────────
+
   return (
     <main className="page-auth">
       <section className="auth-panel">
@@ -392,21 +518,6 @@ export default function YoungsterRegisterPage() {
           </label>
           </fieldset>
           {error ? <p className="auth-error">{error}</p> : null}
-          {success ? (
-            <div className="soft-card">
-              <strong>Registration Successful</strong>
-              <p className="auth-help">School: {selectedSchoolLabel || '-'}</p>
-              <p className="auth-help">Youngster final last name: {success.youngster.lastName}</p>
-              <p className="auth-help">
-                Youngster login: <code>{success.youngster.username}</code> / <code>{success.youngster.generatedPassword}</code>
-              </p>
-              <p className="auth-help">
-                Parent login: <code>{success.parent.username}</code> /{' '}
-                <code>{success.parent.generatedPassword || 'Existing password retained'}</code>
-              </p>
-              {success.parent.existed ? <p className="auth-help">Parent email already existed, linked to existing parent account.</p> : null}
-            </div>
-          ) : null}
           {!isReadonlyRecord ? (
             <button className="btn btn-primary" type="submit" disabled={submitting || loadingSchools || schools.length === 0}>
               {submitting ? 'Creating Accounts...' : 'Register Youngster'}
