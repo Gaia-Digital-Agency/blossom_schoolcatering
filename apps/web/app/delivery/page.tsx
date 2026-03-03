@@ -114,34 +114,12 @@ export default function DeliveryPage() {
         </div>
 
         <div className="delivery-controls">
-          <div className="delivery-control delivery-window">
-            <div className="delivery-window-actions">
-              <button
-                className={`btn ${selectedDate === yesterday ? 'btn-primary' : 'btn-outline'}`}
-                type="button"
-                onClick={() => setSelectedDate(yesterday)}
-              >
-                Yesterday
-              </button>
-              <button
-                className={`btn ${selectedDate === today ? 'btn-primary' : 'btn-outline'}`}
-                type="button"
-                onClick={() => setSelectedDate(today)}
-              >
-                Today
-              </button>
-              <button
-                className={`btn ${selectedDate === tomorrow ? 'btn-primary' : 'btn-outline'}`}
-                type="button"
-                onClick={() => setSelectedDate(tomorrow)}
-              >
-                Tomorrow
-              </button>
-            </div>
+          <div className="delivery-date-row">
+            <button className={`btn ${selectedDate === yesterday ? 'btn-primary' : 'btn-outline'}`} type="button" onClick={() => setSelectedDate(yesterday)}>Yesterday</button>
+            <button className={`btn ${selectedDate === today ? 'btn-primary' : 'btn-outline'}`} type="button" onClick={() => setSelectedDate(today)}>Today</button>
+            <button className={`btn ${selectedDate === tomorrow ? 'btn-primary' : 'btn-outline'}`} type="button" onClick={() => setSelectedDate(tomorrow)}>Tomorrow</button>
+            <button className="btn btn-outline" type="button" onClick={load} disabled={loading}>{loading ? 'Refreshing...' : 'Refresh'}</button>
           </div>
-          <button className="btn btn-outline delivery-refresh" type="button" onClick={load} disabled={loading}>
-            {loading ? 'Refreshing...' : 'Refresh Assignments'}
-          </button>
           <label className="delivery-control delivery-note">
             Confirmation Note (optional)
             <input value={note} onChange={(e) => setNote(e.target.value)} />
@@ -218,6 +196,16 @@ export default function DeliveryPage() {
           font-size: 0.82rem;
           color: #6b5a43;
           margin-bottom: 1rem;
+        }
+        .delivery-date-row {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.4rem;
+          margin-bottom: 0.75rem;
+        }
+        .delivery-date-row .btn {
+          flex: 1;
+          min-width: 0;
         }
       `}</style>
     </main>

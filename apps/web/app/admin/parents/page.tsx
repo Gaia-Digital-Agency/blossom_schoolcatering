@@ -136,16 +136,34 @@ export default function AdminParentsPage() {
         .admin-parents-table :global(.btn) {
           min-width: 120px;
         }
-        /* Mobile: hide Parent ID column, stack layout */
+        /* Mobile: no horizontal scroll — hide wide columns, force wrapping */
         @media (max-width: 680px) {
+          .kitchen-table-wrap {
+            overflow-x: hidden;
+          }
+          /* Hide Parent ID, Youngsters Linked, Schools on mobile */
           .admin-parents-table th:nth-child(2),
-          .admin-parents-table td:nth-child(2) {
+          .admin-parents-table td:nth-child(2),
+          .admin-parents-table th:nth-child(3),
+          .admin-parents-table td:nth-child(3),
+          .admin-parents-table th:nth-child(4),
+          .admin-parents-table td:nth-child(4) {
             display: none;
+          }
+          .kitchen-table {
+            table-layout: fixed;
+            width: 100%;
           }
           .kitchen-table th,
           .kitchen-table td {
             font-size: 0.82rem;
             padding: 0.45rem 0.5rem;
+            word-break: break-word;
+            overflow-wrap: break-word;
+          }
+          .admin-parents-table :global(.btn) {
+            min-width: 0;
+            width: 100%;
           }
         }
       `}</style>

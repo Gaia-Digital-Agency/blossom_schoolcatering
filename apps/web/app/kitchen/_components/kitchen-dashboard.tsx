@@ -127,7 +127,7 @@ export default function KitchenDashboard({
           <Link className="btn btn-outline" href="/kitchen/yesterday">Yesterday</Link>
           <Link className="btn btn-outline" href="/kitchen/today">Today</Link>
           <Link className="btn btn-outline" href="/kitchen/tomorrow">Tomorrow</Link>
-          <button className="btn btn-outline" type="button" onClick={load}>Refresh Now</button>
+          <button className="btn btn-outline" type="button" onClick={load}>Refresh</button>
         </div>
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
