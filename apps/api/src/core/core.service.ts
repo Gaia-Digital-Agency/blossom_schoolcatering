@@ -1816,7 +1816,9 @@ export class CoreService implements OnModuleInit {
     if (!['PARENT', 'YOUNGSTER', 'ADMIN', 'KITCHEN'].includes(actor.role)) {
       throw new ForbiddenException('Role not allowed');
     }
-    const serviceDate = this.validateServiceDate(query.serviceDate);
+    const serviceDate = query.serviceDate && /^\d{4}-\d{2}-\d{2}$/.test(query.serviceDate)
+      ? query.serviceDate
+      : null;
     const session = query.session ? this.normalizeSession(query.session) : null;
     const search = (query.search || '').trim().toLowerCase();
     const priceMin = query.priceMin ? Number(query.priceMin) : null;
@@ -1828,7 +1830,10 @@ export class CoreService implements OnModuleInit {
       .filter(Boolean);
 
     const filters: string[] = [];
-    const params: unknown[] = [serviceDate];
+    const params: unknown[] = [];
+    const dateFilter = serviceDate
+      ? `AND m.service_date = $${params.push(serviceDate)}::date`
+      : '';
     if (['PARENT', 'YOUNGSTER'].includes(actor.role)) {
       if (session) {
         const active = await this.isSessionActive(session);
@@ -1913,7 +1918,8 @@ export class CoreService implements OnModuleInit {
         JOIN menu_items mi ON mi.menu_id = m.id
         LEFT JOIN menu_item_ingredients mii ON mii.menu_item_id = mi.id
         LEFT JOIN ingredients i ON i.id = mii.ingredient_id AND i.deleted_at IS NULL
-        WHERE m.service_date = $1::date
+        WHERE 1=1
+          ${dateFilter}
           AND m.is_published = true
           AND m.deleted_at IS NULL
           AND mi.is_available = true
@@ -2083,8 +2089,17 @@ export class CoreService implements OnModuleInit {
   }
 
   async getAdminMenuRatings(query: { serviceDate?: string; session?: string }) {
-    const serviceDate = this.validateServiceDate(query.serviceDate);
-    const session = this.normalizeSession(query.session);
+    const serviceDate = query.serviceDate && /^\d{4}-\d{2}-\d{2}$/.test(query.serviceDate)
+      ? query.serviceDate
+      : null;
+    const session = query.session ? this.normalizeSession(query.session) : null;
+    const params: unknown[] = [];
+    const dateFilter = serviceDate
+      ? `AND m.service_date = $${params.push(serviceDate)}::date`
+      : '';
+    const sessionFilter = session
+      ? `AND m.session = $${params.push(session)}::session_type`
+      : '';
     const out = await runSql(
       `
       SELECT row_to_json(t)::text
@@ -2102,15 +2117,16 @@ export class CoreService implements OnModuleInit {
         FROM menus m
         JOIN menu_items mi ON mi.menu_id = m.id
         LEFT JOIN menu_item_ratings mir ON mir.menu_item_id = mi.id
-        WHERE m.service_date = $1::date
-          AND m.session = $2::session_type
+        WHERE 1=1
+          ${dateFilter}
+          ${sessionFilter}
           AND m.deleted_at IS NULL
           AND mi.deleted_at IS NULL
         GROUP BY mi.id, mi.name, m.session, m.service_date
-        ORDER BY mi.display_order ASC, mi.name ASC
+        ORDER BY m.service_date DESC, m.session ASC, mi.display_order ASC, mi.name ASC
       ) t;
       `,
-      [serviceDate, session],
+      params,
     );
     return {
       serviceDate,

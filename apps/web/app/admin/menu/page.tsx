@@ -190,7 +190,7 @@ export default function AdminMenuPage() {
     const [ings, menu, ratings] = await Promise.all([
       apiFetch('/admin/ingredients') as Promise<Ingredient[]>,
       apiFetch(`/admin/menus?session=${menuSession}`) as Promise<{ items: AdminMenuItem[] }>,
-      apiFetch(`/admin/menu-ratings?service_date=${menuServiceDate}&session=${menuSession}`) as Promise<{ items: MenuRatingSummary[] }>,
+      apiFetch('/admin/menu-ratings') as Promise<{ items: MenuRatingSummary[] }>,
     ]);
     setIngredients(ings);
     setMenuItems(menu.items || []);

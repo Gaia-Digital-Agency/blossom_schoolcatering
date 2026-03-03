@@ -275,7 +275,7 @@ export default function YoungstersPage() {
 
   const loadMenuAndDraft = async (childId: string) => {
     const [menuData, cartsData, blackoutRows] = await Promise.all([
-      apiFetch(`/menus?service_date=${serviceDate}&session=${session}`) as Promise<{ items: MenuItem[] }>,
+      apiFetch(`/menus?session=${session}`) as Promise<{ items: MenuItem[] }>,
       apiFetch(`/carts?child_id=${childId}&service_date=${serviceDate}&session=${session}`) as Promise<DraftCart[]>,
       apiFetch(`/blackout-days?from_date=${serviceDate}&to_date=${serviceDate}`) as Promise<BlackoutDay[]>,
     ]);
