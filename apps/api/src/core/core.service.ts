@@ -1226,6 +1226,8 @@ export class CoreService implements OnModuleInit {
                u.first_name,
                u.last_name,
                u.email,
+               u.phone_number,
+               p.address,
                count(DISTINCT pc.child_id)::int AS linked_children_count,
                COALESCE(
                  json_agg(
@@ -1249,7 +1251,7 @@ export class CoreService implements OnModuleInit {
         LEFT JOIN schools s ON s.id = c.school_id
         WHERE p.deleted_at IS NULL
           AND u.is_active = true
-        GROUP BY p.id, p.user_id, u.username, u.first_name, u.last_name, u.email
+        GROUP BY p.id, p.user_id, u.username, u.first_name, u.last_name, u.email, u.phone_number, p.address
         ORDER BY u.first_name, u.last_name
       ) t;
     `);
