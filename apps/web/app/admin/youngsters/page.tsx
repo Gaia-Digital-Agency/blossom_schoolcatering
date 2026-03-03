@@ -41,6 +41,15 @@ type CreateResult = {
   lastName: string;
 };
 
+type ShowPassInfo = {
+  youngsterFirstName: string;
+  youngsterLastName: string;
+  youngsterUsername: string;
+  youngsterNewPassword: string;
+  schoolName: string;
+  parentLabel: string;
+};
+
 const GRADES = Array.from({ length: 12 }, (_v, i) => String(i + 1));
 
 export default function AdminYoungstersPage() {
@@ -49,8 +58,10 @@ export default function AdminYoungstersPage() {
   const [children, setChildren] = useState<ChildRow[]>([]);
   const [editingYoungsterId, setEditingYoungsterId] = useState('');
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [createResult, setCreateResult] = useState<CreateResult | null>(null);
+  const [showPassInfo, setShowPassInfo] = useState<ShowPassInfo | null>(null);
 
   // Youngster fields
   const [selectedParentId, setSelectedParentId] = useState('');
@@ -148,6 +159,7 @@ export default function AdminYoungstersPage() {
 
   const onEdit = (child: ChildRow) => {
     setCreateResult(null);
+    setMessage('');
     setError('');
     setEditingYoungsterId(child.id);
     setFirstName(child.first_name || '');
@@ -187,6 +199,7 @@ export default function AdminYoungstersPage() {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
+    setMessage('');
     setCreateResult(null);
     if (!selectedParentId) {
       setError('Parent link is compulsory.');
@@ -224,6 +237,7 @@ export default function AdminYoungstersPage() {
           });
         }
         resetForm();
+        setMessage('Youngster updated successfully.');
         await load();
       } else {
         const created = (await apiFetch('/children/register', {
@@ -258,8 +272,36 @@ export default function AdminYoungstersPage() {
     }
   };
 
+  const onShowPassword = async (child: ChildRow) => {
+    setError('');
+    setMessage('');
+    try {
+      const res = (await apiFetch(
+        `/admin/users/${child.user_id}/reset-password`,
+        { method: 'PATCH', body: JSON.stringify({}) },
+        { skipAutoReload: true },
+      )) as { ok: boolean; newPassword: string; username: string };
+      const parentId = (child.parent_ids || [])[0] || '';
+      const parent = parentById.get(parentId);
+      const parentLabel = parent
+        ? `${parent.first_name} ${parent.last_name} (${parent.username})`
+        : '—';
+      setShowPassInfo({
+        youngsterFirstName: child.first_name,
+        youngsterLastName: child.last_name,
+        youngsterUsername: res.username,
+        youngsterNewPassword: res.newPassword,
+        schoolName: child.school_name,
+        parentLabel,
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed resetting password');
+    }
+  };
+
   const onDelete = async (youngsterId: string) => {
     setError('');
+    setMessage('');
     setCreateResult(null);
     try {
       await apiFetch(`/admin/youngsters/${youngsterId}`, { method: 'DELETE' });
@@ -288,6 +330,7 @@ export default function AdminYoungstersPage() {
         <h1>Admin Youngsters</h1>
         <AdminNav />
 
+        {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
 
         {createResult ? (
@@ -502,6 +545,9 @@ export default function AdminYoungstersPage() {
                       <button className="btn btn-outline" type="button" onClick={() => onDelete(c.id)}>
                         Delete
                       </button>
+                      <button className="btn btn-outline" type="button" onClick={() => onShowPassword(c)}>
+                        Show Password
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -515,6 +561,49 @@ export default function AdminYoungstersPage() {
           </table>
         </div>
       </section>
+
+      {/* ── Show Password Modal ─────────────────────────────── */}
+      {showPassInfo ? (
+        <div className="pass-modal-overlay" onClick={() => setShowPassInfo(null)}>
+          <div className="pass-modal-card" onClick={(e) => e.stopPropagation()}>
+            <h2 className="pass-modal-title">Registration Successful Information</h2>
+            <p className="pass-modal-warning">
+              ⚠️ Please take this information down and keep it safely for login.
+            </p>
+            <div className="reg-info-list">
+              <div className="reg-info-row">
+                <span className="reg-info-label">Youngster Name</span>
+                <span className="reg-info-val">
+                  {showPassInfo.youngsterFirstName} {showPassInfo.youngsterLastName}
+                </span>
+              </div>
+              <div className="reg-info-row">
+                <span className="reg-info-label">Youngster Username</span>
+                <code className="reg-info-code">{showPassInfo.youngsterUsername}</code>
+              </div>
+              <div className="reg-info-row">
+                <span className="reg-info-label">Youngster New Password</span>
+                <code className="reg-info-code">{showPassInfo.youngsterNewPassword}</code>
+              </div>
+              <div className="reg-info-row">
+                <span className="reg-info-label">School</span>
+                <span className="reg-info-val">{showPassInfo.schoolName}</span>
+              </div>
+              <div className="reg-info-row">
+                <span className="reg-info-label">Linked Parent</span>
+                <span className="reg-info-val">{showPassInfo.parentLabel}</span>
+              </div>
+            </div>
+            <button
+              className="btn btn-primary pass-modal-close"
+              type="button"
+              onClick={() => setShowPassInfo(null)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <style jsx>{`
         /* ── Create-result card ────────────────────────────────── */
@@ -641,6 +730,81 @@ export default function AdminYoungstersPage() {
           .crc-grid {
             grid-template-columns: 8rem 1fr;
           }
+        }
+
+        /* ── Show Password Modal ─── */
+        .pass-modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.45);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          padding: 1rem;
+        }
+        .pass-modal-card {
+          background: #fff;
+          border-radius: 1rem;
+          padding: 1.5rem 1.6rem;
+          max-width: 480px;
+          width: 100%;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
+        }
+        .pass-modal-title {
+          font-size: 1.1rem;
+          font-weight: 700;
+          margin: 0 0 0.5rem;
+        }
+        .pass-modal-warning {
+          font-weight: 600;
+          color: #b45309;
+          font-size: 0.88rem;
+          margin-bottom: 0.9rem;
+        }
+        .reg-info-list {
+          display: flex;
+          flex-direction: column;
+          gap: 0.45rem;
+          background: #f8f8f8;
+          border-radius: 0.65rem;
+          padding: 0.85rem 1rem;
+          margin-bottom: 1.1rem;
+        }
+        .reg-info-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          flex-wrap: wrap;
+          gap: 0.4rem;
+          border-bottom: 1px solid #e5e5e5;
+          padding-bottom: 0.4rem;
+          font-size: 0.86rem;
+        }
+        .reg-info-row:last-child {
+          border-bottom: none;
+          padding-bottom: 0;
+        }
+        .reg-info-label {
+          color: #666;
+          font-weight: 500;
+          flex-shrink: 0;
+        }
+        .reg-info-val {
+          font-weight: 600;
+          text-align: right;
+        }
+        .reg-info-code {
+          background: #e8e8e8;
+          padding: 0.12rem 0.42rem;
+          border-radius: 0.3rem;
+          font-weight: 700;
+          font-size: 0.9rem;
+          letter-spacing: 0.03em;
+        }
+        .pass-modal-close {
+          width: 100%;
+          padding: 0.6rem 1.25rem;
         }
       `}</style>
     </main>
