@@ -613,6 +613,11 @@ export default function AdminDeliveryPage() {
           vertical-align: top;
           font-size: 0.88rem;
           line-height: 1.35;
+        }
+        .kitchen-table th {
+          white-space: nowrap;
+        }
+        .kitchen-table td {
           overflow-wrap: anywhere;
           word-break: break-word;
         }
@@ -677,6 +682,9 @@ export default function AdminDeliveryPage() {
           .kitchen-table td {
             font-size: 0.78rem;
             padding: 0.38rem 0.4rem;
+          }
+          .kitchen-table th {
+            white-space: nowrap;
           }
           /* Assignments table: hide Order ID column on mobile */
           .admin-delivery-table.assignments-table th:nth-child(3),

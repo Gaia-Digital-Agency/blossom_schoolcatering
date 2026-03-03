@@ -311,6 +311,11 @@ export default function KitchenDashboard({
           border-bottom: 1px solid #efe7da;
           padding: 0.65rem;
           text-align: left;
+        }
+        .kitchen-table th {
+          white-space: nowrap;
+        }
+        .kitchen-table td {
           overflow-wrap: anywhere;
           word-break: break-word;
         }

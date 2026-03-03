@@ -695,6 +695,11 @@ export default function AdminYoungstersPage() {
           vertical-align: top;
           font-size: 0.9rem;
           line-height: 1.35;
+        }
+        .kitchen-table th {
+          white-space: nowrap;
+        }
+        .kitchen-table td {
           overflow-wrap: anywhere;
           word-break: break-word;
         }
@@ -726,6 +731,9 @@ export default function AdminYoungstersPage() {
           .kitchen-table td {
             font-size: 0.8rem;
             padding: 0.4rem 0.45rem;
+          }
+          .kitchen-table th {
+            white-space: nowrap;
           }
           .crc-grid {
             grid-template-columns: 8rem 1fr;

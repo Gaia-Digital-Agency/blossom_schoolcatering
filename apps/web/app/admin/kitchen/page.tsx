@@ -213,6 +213,9 @@ export default function AdminKitchenPage() {
           padding: 0.65rem;
           text-align: left;
         }
+        .kitchen-table th {
+          white-space: nowrap;
+        }
         .kitchen-table tbody tr:last-child td {
           border-bottom: none;
         }

@@ -214,6 +214,11 @@ export default function AdminParentsPage() {
           .kitchen-table td {
             font-size: 0.82rem;
             padding: 0.45rem 0.5rem;
+          }
+          .kitchen-table th {
+            white-space: nowrap;
+          }
+          .kitchen-table td {
             word-break: break-word;
             overflow-wrap: break-word;
           }
