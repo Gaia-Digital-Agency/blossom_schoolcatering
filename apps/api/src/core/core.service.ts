@@ -3494,7 +3494,8 @@ export class CoreService implements OnModuleInit {
                o.placed_at::text AS placed_at,
                (u.first_name || ' ' || u.last_name) AS child_name,
                br.status::text AS billing_status,
-               br.delivery_status::text AS delivery_status
+               br.delivery_status::text AS delivery_status,
+               CASE WHEN o.placed_by_user_id = c.user_id THEN 'YOUNGSTER' ELSE 'PARENT' END AS placed_by_role
         FROM orders o
         JOIN children c ON c.id = o.child_id
         JOIN users u ON u.id = c.user_id
@@ -3522,6 +3523,7 @@ export class CoreService implements OnModuleInit {
       child_name: string;
       billing_status?: string | null;
       delivery_status?: string | null;
+      placed_by_role?: 'YOUNGSTER' | 'PARENT';
     }>(out);
 
     const orderIds = orders.map((order) => order.id);
@@ -3562,6 +3564,7 @@ export class CoreService implements OnModuleInit {
       ...order,
       total_price: Number(order.total_price),
       can_edit: order.status === 'PLACED' && !this.isAfterOrAtMakassarCutoff(order.service_date),
+      placed_by_role: order.placed_by_role,
       items: itemsByOrder.get(order.id) || [],
     }));
 

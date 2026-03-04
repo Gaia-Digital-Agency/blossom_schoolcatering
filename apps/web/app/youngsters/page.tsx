@@ -82,8 +82,24 @@ type ActiveBlackout = {
   reason: string | null;
 };
 
+function todayMakassarIsoDate() {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Makassar',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now);
+  const yyyy = Number(parts.find((p) => p.type === 'year')?.value || '1970');
+  const mm = Number(parts.find((p) => p.type === 'month')?.value || '01');
+  const dd = Number(parts.find((p) => p.type === 'day')?.value || '01');
+  const d = new Date(Date.UTC(yyyy, mm - 1, dd));
+  return d.toISOString().slice(0, 10);
+}
+
 function nextWeekdayIsoDate() {
-  const d = new Date();
+  const today = todayMakassarIsoDate();
+  const d = new Date(today + 'T00:00:00Z');
   d.setUTCDate(d.getUTCDate() + 1);
   while (d.getUTCDay() === 0 || d.getUTCDay() === 6) {
     d.setUTCDate(d.getUTCDate() + 1);
@@ -102,21 +118,6 @@ function formatRemaining(ms: number) {
   const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
   const seconds = String(totalSeconds % 60).padStart(2, '0');
   return `${hours}:${minutes}:${seconds}`;
-}
-
-function todayMakassarIsoDate() {
-  const now = new Date();
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Makassar',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(now);
-  const yyyy = Number(parts.find((p) => p.type === 'year')?.value || '1970');
-  const mm = Number(parts.find((p) => p.type === 'month')?.value || '01');
-  const dd = Number(parts.find((p) => p.type === 'day')?.value || '01');
-  const d = new Date(Date.UTC(yyyy, mm - 1, dd));
-  return d.toISOString().slice(0, 10);
 }
 
 function getMakassarDateWithOffset(offset: number): string {
@@ -157,16 +158,9 @@ function mapOrderRuleError(raw: string) {
   return raw;
 }
 
-function activeBlackoutMessage(blackout: ActiveBlackout | null) {
-  if (!blackout) return '';
-  if (blackout.type === 'SERVICE_BLOCK') return mapOrderRuleError('ORDER_SERVICE_BLOCKED');
-  return mapOrderRuleError('ORDER_BLACKOUT_BLOCKED');
-}
-
 export default function YoungstersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
 
   const [youngster, setYoungster] = useState<Youngster | null>(null);
   const [serviceDate, setServiceDate] = useState(nextWeekdayIsoDate());
@@ -181,7 +175,12 @@ export default function YoungstersPage() {
   const [insights, setInsights] = useState<YoungsterInsights | null>(null);
   const [orders, setOrders] = useState<ConsolidatedOrder[]>([]);
   const [activeBlackout, setActiveBlackout] = useState<ActiveBlackout | null>(null);
-  const [confirmedViewOffset, setConfirmedViewOffset] = useState(0);
+  const [confirmedViewDate, setConfirmedViewDate] = useState(() => getMakassarDateWithOffset(0));
+
+  // Popups
+  const [showBlackoutModal, setShowBlackoutModal] = useState(false);
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [showDuplicatePopup, setShowDuplicatePopup] = useState(false);
 
   const selectedCount = useMemo(
     () => Object.values(itemQty).filter((qty) => qty > 0).length,
@@ -202,10 +201,11 @@ export default function YoungstersPage() {
   const hasOpenDraft = Boolean(draftCartId) && draftRemainingMs > 0;
   const placementBlockedByBlackout = Boolean(activeBlackout);
 
-  const confirmedViewDate = useMemo(
-    () => getMakassarDateWithOffset(confirmedViewOffset),
-    [confirmedViewOffset],
-  );
+  // Dates for confirmed order buttons
+  const yesterdayDate = getMakassarDateWithOffset(-1);
+  const todayDate = getMakassarDateWithOffset(0);
+  const nextServiceDate = nextWeekdayIsoDate();
+
   const confirmedOrders = useMemo(
     () => orders.filter((o) => o.service_date === confirmedViewDate && o.status === 'PLACED'),
     [orders, confirmedViewDate],
@@ -254,6 +254,11 @@ export default function YoungstersPage() {
     const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  // Auto-show blackout modal when blackout is detected
+  useEffect(() => {
+    if (activeBlackout) setShowBlackoutModal(true);
+  }, [activeBlackout]);
 
   const onAddDraftItem = (menuItemId: string) => {
     const alreadySelected = Object.values(itemQty).filter((qty) => qty > 0).length;
@@ -323,6 +328,12 @@ export default function YoungstersPage() {
       return;
     }
 
+    // Duplicate order check
+    if (selectedDayOrder) {
+      setShowDuplicatePopup(true);
+      return;
+    }
+
     const items = Object.entries(itemQty)
       .filter(([, qty]) => qty > 0)
       .map(([menuItemId, quantity]) => ({ menuItemId, quantity }));
@@ -332,7 +343,8 @@ export default function YoungstersPage() {
       return;
     }
     if (placementBlockedByBlackout) {
-      setError(activeBlackoutMessage(activeBlackout));
+      setError('');
+      setShowBlackoutModal(true);
       return;
     }
     if (!orderingWindow.canOrderNow) {
@@ -354,29 +366,33 @@ export default function YoungstersPage() {
 
     setSubmitting(true);
     setError('');
-    setMessage('');
     try {
-      const cartRes = await apiFetch('/carts', {
-        method: 'POST',
-        body: JSON.stringify({ childId: youngster.id, serviceDate, session }),
-      }) as { id?: string };
-
-      if (!cartRes?.id) throw new Error('Cart creation failed — no cart ID returned.');
-      const cartId = cartRes.id;
+      // Reuse existing open draft cart if available, else create new
+      let cartId: string;
+      if (draftCartId && draftRemainingMs > 0) {
+        cartId = draftCartId;
+      } else {
+        const cartRes = await apiFetch('/carts', {
+          method: 'POST',
+          body: JSON.stringify({ childId: youngster.id, serviceDate, session }),
+        }) as { id?: string };
+        if (!cartRes?.id) throw new Error('Cart creation failed — no cart ID returned.');
+        cartId = cartRes.id;
+      }
 
       await apiFetch(`/carts/${cartId}/items`, {
         method: 'PATCH',
         body: JSON.stringify({ items }),
       });
 
-      const order = await apiFetch(`/carts/${cartId}/submit`, {
+      await apiFetch(`/carts/${cartId}/submit`, {
         method: 'POST',
       }) as { id: string; total_price: number };
 
-      setMessage(`Order placed. Order ID: ${order.id}, total: Rp ${order.total_price.toLocaleString('id-ID')}.`);
       setItemQty({});
       setDraftCartId('');
       setDraftExpiresAt('');
+      setShowSuccessPopup(true);
       apiFetch('/youngsters/me/insights').then((x) => setInsights(x as YoungsterInsights)).catch(() => undefined);
       loadOrders().catch(() => undefined);
     } catch (err) {
@@ -417,15 +433,14 @@ export default function YoungstersPage() {
         <div className="module-guide-card">
           💡 Select Dish and Confirm Meal.
         </div>
-        {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
 
         <div className="module-section" id="youngster-order">
           <h2>Confirmed Orders</h2>
           <div className="day-toggle-row" role="group" aria-label="View date">
-            <button type="button" className={confirmedViewOffset === -1 ? 'day-btn day-btn-active' : 'day-btn'} onClick={() => setConfirmedViewOffset(-1)}>Yesterday</button>
-            <button type="button" className={confirmedViewOffset === 0 ? 'day-btn day-btn-active' : 'day-btn'} onClick={() => setConfirmedViewOffset(0)}>Today</button>
-            <button type="button" className={confirmedViewOffset === 1 ? 'day-btn day-btn-active' : 'day-btn'} onClick={() => setConfirmedViewOffset(1)}>Tomorrow</button>
+            <button type="button" className={confirmedViewDate === yesterdayDate ? 'day-btn day-btn-active' : 'day-btn'} onClick={() => setConfirmedViewDate(yesterdayDate)}>Yesterday</button>
+            <button type="button" className={confirmedViewDate === todayDate ? 'day-btn day-btn-active' : 'day-btn'} onClick={() => setConfirmedViewDate(todayDate)}>Today</button>
+            <button type="button" className={confirmedViewDate === nextServiceDate ? 'day-btn day-btn-active' : 'day-btn'} onClick={() => setConfirmedViewDate(nextServiceDate)}>Tomorrow</button>
           </div>
           {confirmedOrders.length > 0 ? (
             <div className="auth-form">
@@ -438,7 +453,7 @@ export default function YoungstersPage() {
                 </label>
               ))}
             </div>
-          ) : <p className="auth-help">No confirmed order for {confirmedViewOffset === -1 ? 'yesterday' : confirmedViewOffset === 1 ? 'tomorrow' : 'today'}.</p>}
+          ) : <p className="auth-help">No confirmed order for {confirmedViewDate}.</p>}
         </div>
 
         <div className="module-section">
@@ -477,14 +492,7 @@ export default function YoungstersPage() {
           <p className="auth-help">Place-order cutoff countdown: {formatRemaining(cutoffRemainingMs)} (08:00 Asia/Makassar)</p>
           {!orderingWindow.canOrderNow ? <p className="auth-help">Ordering opens at 08:00 Asia/Makassar.</p> : null}
           {serviceDate <= orderingWindow.today ? <p className="auth-help">Select tomorrow or a later date to place an order.</p> : null}
-          {activeBlackout ? (
-            <p className="auth-error">
-              Blackout active on {serviceDate}: {activeBlackout.type}{activeBlackout.reason ? ` - ${activeBlackout.reason}` : ''}.
-            </p>
-          ) : null}
           {draftCartId && hasOpenDraft ? <p className="auth-help">Open draft detected and loaded automatically.</p> : null}
-          {selectedDayOrder ? <p className="auth-help">Confirmed order already exists for selected day/session: {selectedDayOrder.id}</p> : null}
-          <p className="auth-help">Menu is auto-populated from active dishes set by Admin.</p>
 
           {menuItems.length > 0 ? (
             <div className="menu-flow-grid">
@@ -516,7 +524,6 @@ export default function YoungstersPage() {
                         <small>Category: {d.menuItem ? formatDishCategoryLabel(d.menuItem.dish_category) : '-'}</small>
                         <small>Dietary: {d.menuItem ? formatDishDietaryTags(d.menuItem) : '-'}</small>
                         <small>{d.menuItem?.description}</small>
-                        <input type="number" min={0} max={5} value={d.qty} onChange={(e) => setItemQty((prev) => ({ ...prev, [d.id]: Number(e.target.value || 0) }))} />
                         <button className="btn btn-outline" type="button" onClick={() => onRemoveDraftItem(d.id)}>Remove</button>
                       </label>
                     ))}
@@ -535,6 +542,47 @@ export default function YoungstersPage() {
           )}
         </div>
       </section>
+
+      {/* ── Blackout Popup ── */}
+      {showBlackoutModal && activeBlackout ? (
+        <div className="popup-overlay" onClick={() => setShowBlackoutModal(false)}>
+          <div className="popup-card" onClick={(e) => e.stopPropagation()}>
+            <div className="popup-icon">🚫</div>
+            <h3 className="popup-title">Date Blocked</h3>
+            <p className="popup-body">
+              {activeBlackout.type === 'SERVICE_BLOCK'
+                ? 'Service is blocked'
+                : 'Ordering is blocked'} on {serviceDate}{activeBlackout.reason ? `: ${activeBlackout.reason}` : ''}.
+            </p>
+            <button className="btn btn-primary popup-close" type="button" onClick={() => setShowBlackoutModal(false)}>OK</button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* ── Success Popup ── */}
+      {showSuccessPopup ? (
+        <div className="popup-overlay" onClick={() => setShowSuccessPopup(false)}>
+          <div className="popup-card" onClick={(e) => e.stopPropagation()}>
+            <div className="popup-icon">✅</div>
+            <h3 className="popup-title">Changes, Saved and Successful</h3>
+            <p className="popup-body">Your order has been placed successfully.</p>
+            <button className="btn btn-primary popup-close" type="button" onClick={() => setShowSuccessPopup(false)}>OK</button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* ── Duplicate Order Popup ── */}
+      {showDuplicatePopup ? (
+        <div className="popup-overlay" onClick={() => setShowDuplicatePopup(false)}>
+          <div className="popup-card" onClick={(e) => e.stopPropagation()}>
+            <div className="popup-icon">⚠️</div>
+            <h3 className="popup-title">Order Exist For Selected Date</h3>
+            <p className="popup-body">An order already exists for this date and session. Please choose a different date or session.</p>
+            <button className="btn btn-primary popup-close" type="button" onClick={() => setShowDuplicatePopup(false)}>OK</button>
+          </div>
+        </div>
+      ) : null}
+
       <style jsx>{`
         .module-guide-card {
           background: #fffbf4;
@@ -561,6 +609,7 @@ export default function YoungstersPage() {
           font: inherit;
           font-size: 0.82rem;
           cursor: pointer;
+          white-space: nowrap;
           transition: background 0.12s, border-color 0.12s;
         }
         .day-btn:hover {
@@ -572,6 +621,49 @@ export default function YoungstersPage() {
           border-color: #9a6c1f;
           color: #6b4a10;
           font-weight: 600;
+        }
+        /* ── Popups ── */
+        .popup-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.48);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          padding: 1rem;
+        }
+        .popup-card {
+          background: #fff;
+          border-radius: 1rem;
+          padding: 1.75rem 1.6rem;
+          max-width: 360px;
+          width: 100%;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.75rem;
+          text-align: center;
+        }
+        .popup-icon {
+          font-size: 2.4rem;
+          line-height: 1;
+        }
+        .popup-title {
+          margin: 0;
+          font-size: 1.05rem;
+          font-weight: 700;
+          color: #2d2d2d;
+        }
+        .popup-body {
+          margin: 0;
+          font-size: 0.9rem;
+          color: #555;
+        }
+        .popup-close {
+          width: 100%;
+          margin-top: 0.25rem;
         }
       `}</style>
     </main>

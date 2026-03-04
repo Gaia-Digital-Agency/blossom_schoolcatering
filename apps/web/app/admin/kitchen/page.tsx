@@ -73,7 +73,7 @@ export default function AdminKitchenPage() {
   const orders = useMemo(() => data?.orders || [], [data?.orders]);
 
   return (
-    <main className="page-auth page-auth-desktop">
+    <main className="page-auth">
       <section className="auth-panel">
         <h1>Admin Kitchen</h1>
         <AdminNav />
@@ -197,6 +197,9 @@ export default function AdminKitchenPage() {
         }
         .kitchen-table-wrap {
           overflow-x: auto;
+          max-width: 100%;
+          width: 100%;
+          -webkit-overflow-scrolling: touch;
         }
         .kitchen-table {
           width: 100%;

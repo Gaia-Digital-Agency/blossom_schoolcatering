@@ -174,12 +174,15 @@ export default function ParentsBillingPage() {
         <div className="module-section" id="parent-billing">
           <h2>Linked Youngsters</h2>
           <p className="auth-help">Youngster registration is done on `/register/youngsters`. Linked youngsters are auto-linked during registration and immediately available for Order and Billing.</p>
-          <label>Select Youngster
-            <select value={selectedChildId} onChange={(e) => setSelectedChildId(e.target.value)}>
-              <option value="">All</option>
-              {children.map((child) => <option key={child.id} value={child.id}>{child.first_name} {child.last_name} ({child.school_grade})</option>)}
-            </select>
-          </label>
+          {children.length > 1 ? (
+            <label>Select Youngster
+              <select value={selectedChildId} onChange={(e) => setSelectedChildId(e.target.value)}>
+                {children.map((child) => <option key={child.id} value={child.id}>{child.first_name} {child.last_name} ({child.school_grade})</option>)}
+              </select>
+            </label>
+          ) : children.length === 1 ? (
+            <p className="auth-help">Viewing billing for: <strong>{children[0].first_name} {children[0].last_name}</strong></p>
+          ) : null}
         </div>
 
         <div className="module-section">
@@ -196,7 +199,7 @@ export default function ParentsBillingPage() {
           </div>
 
           <div className="parent-billing-card parent-billing-card-unpaid">
-            <h3>Unpaid Bills (All)</h3>
+            <h3>Unpaid Bills</h3>
             {unpaidBillings.length === 0 ? <p className="auth-help">No unpaid billing records.</p> : (
               <div className="auth-form">
                 {unpaidBillings.map((b) => (
