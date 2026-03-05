@@ -3231,9 +3231,8 @@ export class CoreService implements OnModuleInit {
            AND mi.deleted_at IS NULL
            AND m.is_published = true
            AND m.deleted_at IS NULL
-           AND m.service_date = $${ids.length + 1}::date
-           AND m.session = $${ids.length + 2}::session_type;`,
-        [...ids, cart.service_date, cart.session],
+           AND m.session = $${ids.length + 1}::session_type;`,
+        [...ids, cart.session],
       );
       if (Number(validCount || 0) !== ids.length) {
         throw new BadRequestException('CART_MENU_ITEM_UNAVAILABLE');
@@ -4407,6 +4406,32 @@ export class CoreService implements OnModuleInit {
       throw new ForbiddenException('Role not allowed');
     }
     return row;
+  }
+
+  async revertBillingProof(actor: AccessUser, billingId: string) {
+    if (actor.role !== 'PARENT') throw new ForbiddenException('Role not allowed');
+    const parentId = await this.getParentIdByUserId(actor.uid);
+    if (!parentId) throw new BadRequestException('Parent profile not found');
+    const out = await runSql(
+      `SELECT row_to_json(t)::text FROM (SELECT id, status::text AS status FROM billing_records WHERE id = $1 AND parent_id = $2 LIMIT 1) t;`,
+      [billingId, parentId],
+    );
+    const parsed = this.parseJsonLine<{ id: string; status: string }>(out);
+    if (!parsed) throw new NotFoundException('Billing record not found');
+    if (parsed.status !== 'PENDING_VERIFICATION') {
+      throw new BadRequestException('Only PENDING_VERIFICATION bills can be reverted');
+    }
+    await runSql(
+      `UPDATE billing_records
+       SET proof_image_url = NULL,
+           proof_uploaded_at = NULL,
+           status = 'UNPAID',
+           admin_note = NULL,
+           updated_at = now()
+       WHERE id = $1 AND parent_id = $2;`,
+      [billingId, parentId],
+    );
+    return { ok: true };
   }
 
   async getDeliveryUsers(includeInactive = false) {

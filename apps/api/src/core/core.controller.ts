@@ -466,6 +466,12 @@ export class CoreController {
     return this.coreService.getBillingReceipt(req.user, billingId);
   }
 
+  @Post('billing/:billingId/revert-proof')
+  @Roles('PARENT')
+  revertBillingProof(@Req() req: AuthRequest, @Param('billingId', ParseUUIDPipe) billingId: string) {
+    return this.coreService.revertBillingProof(req.user, billingId);
+  }
+
   @Get('admin/billing')
   @Roles('ADMIN')
   getAdminBilling(@Query('status') status?: string) {

@@ -148,6 +148,20 @@ export default function ParentsBillingPage() {
       setError(err instanceof Error ? err.message : 'Failed opening receipt');
     }
   };
+  const onViewProof = (proofImageUrl: string) => {
+    window.open(proofImageUrl, '_blank');
+  };
+  const onRevertProof = async (billingId: string) => {
+    if (!window.confirm('Move this bill back to Unpaid and delete the uploaded proof image?')) return;
+    setError(''); setMessage('');
+    try {
+      await apiFetch(`/billing/${billingId}/revert-proof`, { method: 'POST' });
+      setMessage('Bill moved back to Unpaid Bills. Proof image removed.');
+      await loadBilling();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed reverting proof');
+    }
+  };
 
   if (loading) {
     return <main className="page-auth page-auth-mobile"><section className="auth-panel"><h1>Parent Page</h1><p>Loading...</p></section></main>;
@@ -236,9 +250,18 @@ export default function ParentsBillingPage() {
                     <small>Status: {b.status} | Delivery: {b.delivery_status}</small>
                     <small>Total: Rp {Number(b.total_price).toLocaleString('id-ID')}</small>
                     <small>Receipt: {b.receipt_number || '-'}</small>
+                    <small>Proof File: {b.proof_image_url ? b.proof_image_url.split('/').pop() || '-' : '-'}</small>
                     {b.admin_note ? <small>Admin Note: {b.admin_note}</small> : null}
                     <div className="billing-action-row">
-                      <button className="btn btn-outline" type="button" onClick={() => onOpenReceipt(b.id)}>Open Receipt</button>
+                      {b.proof_image_url ? (
+                        <button className="btn btn-outline" type="button" onClick={() => onViewProof(b.proof_image_url!)}>View Proof Image</button>
+                      ) : null}
+                      {b.receipt_number ? (
+                        <button className="btn btn-outline" type="button" onClick={() => onOpenReceipt(b.id)}>Open Receipt</button>
+                      ) : null}
+                      {b.status === 'PENDING_VERIFICATION' ? (
+                        <button className="btn btn-outline" type="button" onClick={() => onRevertProof(b.id)}>Redo (Move to Unpaid)</button>
+                      ) : null}
                     </div>
                   </label>
                 ))}

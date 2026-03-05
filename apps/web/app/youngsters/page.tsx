@@ -207,7 +207,7 @@ export default function YoungstersPage() {
   const nextServiceDate = nextWeekdayIsoDate();
 
   const confirmedOrders = useMemo(
-    () => orders.filter((o) => o.service_date === confirmedViewDate && o.status === 'PLACED'),
+    () => orders.filter((o) => o.service_date === confirmedViewDate && (o.status === 'PLACED' || o.status === 'LOCKED')),
     [orders, confirmedViewDate],
   );
 

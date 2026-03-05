@@ -161,7 +161,6 @@ export default function ParentsOrdersPage() {
 
   const [draftCartId, setDraftCartId] = useState('');
   const [draftExpiresAt, setDraftExpiresAt] = useState('');
-  const [quickReorderDate, setQuickReorderDate] = useState(nextWeekdayIsoDate());
   const [activeBlackout, setActiveBlackout] = useState<ActiveBlackout | null>(null);
   const [draftSourceContext, setDraftSourceContext] = useState<DraftSourceContext | null>(null);
   const [confirmedViewDate, setConfirmedViewDate] = useState(() => getMakassarDateWithOffset(0));
@@ -196,7 +195,7 @@ export default function ParentsOrdersPage() {
     [orders, selectedChildId],
   );
   const confirmedOrders = useMemo(
-    () => visibleOrders.filter((o) => o.service_date === confirmedViewDate && o.status === 'PLACED'),
+    () => visibleOrders.filter((o) => o.service_date === confirmedViewDate && (o.status === 'PLACED' || o.status === 'LOCKED')),
     [visibleOrders, confirmedViewDate],
   );
   const sortedVisibleOrders = useMemo(
@@ -604,10 +603,6 @@ export default function ParentsOrdersPage() {
         {/* ── 3. Consolidated Orders ── */}
         <div className="module-section">
           <h2>Consolidated Orders</h2>
-          <label>Quick Reorder Target Date
-            <input type="date" value={quickReorderDate} min={orderingWindow.earliestServiceDate}
-              onChange={(e) => setQuickReorderDate(e.target.value)} />
-          </label>
           <button className="btn btn-outline" type="button" onClick={onRefreshOrders} disabled={loadingOrders}>
             {loadingOrders ? 'Refreshing...' : 'Refresh Orders'}
           </button>
@@ -629,11 +624,8 @@ export default function ParentsOrdersPage() {
                     <button className="btn btn-outline" type="button"
                       onClick={() => onDeleteOrder(order.id)}
                       disabled={!order.can_edit || submitting}>Delete Before Cutoff</button>
-                    <button className="btn btn-outline" type="button"
-                      onClick={() => onOpenOrderAsDraft(order, quickReorderDate, 'quick-reorder')}
-                      disabled={submitting}>Quick Reorder</button>
                   </div>
-                  {!order.can_edit ? <small className="muted-note">Cutoff passed or order not editable.</small> : null}
+                  {!order.can_edit ? <small className="muted-note">Cutoff passed — order locked.</small> : null}
                 </div>
               ))}
             </div>
