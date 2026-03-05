@@ -204,8 +204,7 @@ export default function DeliveryPage() {
           margin-bottom: 0.75rem;
         }
         .delivery-date-row .btn {
-          flex: 1;
-          min-width: 0;
+          flex: 1 1 auto;
         }
       `}</style>
     </main>
