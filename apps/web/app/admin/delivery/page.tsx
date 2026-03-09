@@ -564,7 +564,7 @@ export default function AdminDeliveryPage() {
 
         <h2>Assigned Orders ({assignDate})</h2>
         <div className="kitchen-table-wrap">
-          <table className="kitchen-table admin-delivery-table">
+          <table className="kitchen-table admin-delivery-table assignments-table">
             <thead>
               <tr>
                 <th>Date/Session</th>
@@ -593,6 +593,7 @@ export default function AdminDeliveryPage() {
       <style jsx>{`
         .kitchen-table-wrap {
           overflow-x: auto;
+          width: 100%;
           max-width: 100%;
           -webkit-overflow-scrolling: touch;
         }
@@ -642,6 +643,11 @@ export default function AdminDeliveryPage() {
         .admin-delivery-table .count-col {
           text-align: center;
         }
+        .admin-delivery-table td input {
+          width: 100%;
+          min-width: 0;
+          box-sizing: border-box;
+        }
         .action-row {
           display: flex;
           flex-wrap: wrap;
@@ -656,6 +662,11 @@ export default function AdminDeliveryPage() {
         .edit-grid {
           display: grid;
           gap: 0.35rem;
+          min-width: 0;
+        }
+        .edit-grid input {
+          width: 100%;
+          min-width: 0;
         }
         .req {
           color: #c0392b;

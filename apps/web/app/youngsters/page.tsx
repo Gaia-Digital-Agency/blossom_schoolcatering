@@ -389,12 +389,13 @@ export default function YoungstersPage() {
         method: 'POST',
       }) as { id: string; total_price: number };
 
+      await loadOrders();
       setItemQty({});
       setDraftCartId('');
       setDraftExpiresAt('');
+      setConfirmedViewDate(serviceDate);
       setShowSuccessPopup(true);
       apiFetch('/youngsters/me/insights').then((x) => setInsights(x as YoungsterInsights)).catch(() => undefined);
-      loadOrders().catch(() => undefined);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Order placement failed';
       if (msg.includes('ORDER_SESSION_DISABLED') && session !== 'LUNCH') {

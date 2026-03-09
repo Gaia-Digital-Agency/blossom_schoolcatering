@@ -385,6 +385,7 @@ button:hover,
   border-radius: 0.9rem;
   padding: 1rem;
   overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 .auth-panel h1 {
