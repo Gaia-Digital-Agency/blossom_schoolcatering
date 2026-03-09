@@ -84,6 +84,10 @@ export default function ParentsBillingPage() {
     const fullName = `${selected.first_name} ${selected.last_name}`.trim();
     return (spending.byChild || []).filter((row) => row.child_name === fullName);
   }, [spending, selectedChildId, children]);
+  const totalMonthOrders = useMemo(
+    () => (spending?.byChild || []).reduce((sum, row) => sum + Number(row.orders_count || 0), 0),
+    [spending],
+  );
 
   const loadBilling = async () => {
     const data = await apiFetch('/billing/parent/consolidated') as BillingRow[];
@@ -277,14 +281,14 @@ export default function ParentsBillingPage() {
             <div className="auth-form">
               <label>
                 <strong>Month {spending.month}</strong>
-                <small>Total Spend: Rp {Number(spending.totalMonthSpend).toLocaleString('id-ID')}</small>
-                <small>Birthdays in 30 days: {(spending.birthdayHighlights || []).map((b) => `${b.child_name} (${b.days_until}d)`).join(', ') || '-'}</small>
+                <small>Total Month Orders: {totalMonthOrders}</small>
+                <small>Total Monthly Spend: Rp {Number(spending.totalMonthSpend).toLocaleString('id-ID')}</small>
               </label>
               {visibleSpendingByChild.map((row) => (
                 <label key={row.child_name}>
-                  <strong>{row.child_name}</strong>
-                  <small>Orders: {row.orders_count}</small>
-                  <small>Spend: Rp {Number(row.total_spend).toLocaleString('id-ID')}</small>
+                  <strong>ParentLinked ({row.child_name})</strong>
+                  <small>Youngster Month Orders: {row.orders_count}</small>
+                  <small>Youngster Monthly Spend: Rp {Number(row.total_spend).toLocaleString('id-ID')}</small>
                 </label>
               ))}
             </div>
