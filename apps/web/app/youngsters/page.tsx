@@ -473,9 +473,6 @@ export default function YoungstersPage() {
                 <small>Total Calories: {insights.week.totalCalories}</small>
                 <small>Total Orders: {insights.week.totalOrders ?? '-'}</small>
                 <small>Total Dishes: {insights.week.totalDishes ?? '-'}</small>
-                <small>
-                  Daily: {insights.week.days.map((d) => `${d.service_date}: ${d.calories_display}`).join(' | ') || '-'}
-                </small>
               </label>
             </div>
           ) : <p className="auth-help">Insights loading...</p>}
