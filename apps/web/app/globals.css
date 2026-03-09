@@ -756,9 +756,28 @@ button:hover,
 }
 
 .auth-error {
-  color: #9d2c2c;
+  color: #b00020;
+  font-weight: 800;
   margin: 0;
-  font-size: 0.85rem;
+  font-size: 0.92rem;
+  line-height: 1.35;
+  background: #ffe8ec;
+  border: 2px solid #b00020;
+  border-radius: 0.55rem;
+  padding: 0.5rem 0.65rem;
+}
+
+.btn:disabled,
+button:disabled,
+.btn[aria-disabled='true'] {
+  cursor: not-allowed !important;
+  opacity: 1 !important;
+  background: #f7e1e5 !important;
+  border-color: #b00020 !important;
+  color: #8a0017 !important;
+  font-weight: 800;
+  transform: none !important;
+  filter: none !important;
 }
 
 .dev-links {

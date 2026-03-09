@@ -277,7 +277,7 @@ export default function AdminYoungstersPage() {
     setMessage('');
     try {
       const res = (await apiFetch(
-        `/admin/users/${child.user_id}/reset-password`,
+        `/admin/youngsters/${child.id}/reset-password`,
         { method: 'PATCH', body: JSON.stringify({}) },
         { skipAutoReload: true },
       )) as { ok: boolean; newPassword: string; username: string };

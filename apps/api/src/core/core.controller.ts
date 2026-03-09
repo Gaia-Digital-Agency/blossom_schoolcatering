@@ -9,12 +9,14 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Request } from 'express';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -177,6 +179,16 @@ export class CoreController {
     @Body() body: ResetPasswordDto,
   ) {
     return this.coreService.adminResetUserPassword(req.user, userId, body.newPassword);
+  }
+
+  @Patch('admin/youngsters/:youngsterId/reset-password')
+  @Roles('ADMIN')
+  adminResetYoungsterPassword(
+    @Req() req: AuthRequest,
+    @Param('youngsterId', ParseUUIDPipe) youngsterId: string,
+    @Body() body: ResetPasswordDto,
+  ) {
+    return this.coreService.adminResetYoungsterPassword(req.user, youngsterId, body.newPassword);
   }
 
   @Get('admin/dashboard')
@@ -460,6 +472,19 @@ export class CoreController {
     return this.coreService.uploadBillingProofBatch(req.user, body.billingIds, body.proofImageData);
   }
 
+  @Get('billing/:billingId/proof-image')
+  @Roles('PARENT')
+  async getParentBillingProofImage(
+    @Req() req: AuthRequest,
+    @Param('billingId', ParseUUIDPipe) billingId: string,
+    @Res() res: Response,
+  ) {
+    const out = await this.coreService.getBillingProofImage(req.user, billingId);
+    res.setHeader('Content-Type', out.contentType);
+    res.setHeader('Cache-Control', 'private, max-age=60');
+    res.send(out.data);
+  }
+
   @Get('billing/:billingId/receipt')
   @Roles('PARENT', 'ADMIN')
   getBillingReceipt(@Req() req: AuthRequest, @Param('billingId', ParseUUIDPipe) billingId: string) {
@@ -476,6 +501,19 @@ export class CoreController {
   @Roles('ADMIN')
   getAdminBilling(@Query('status') status?: string) {
     return this.coreService.getAdminBilling(status);
+  }
+
+  @Get('admin/billing/:billingId/proof-image')
+  @Roles('ADMIN')
+  async getAdminBillingProofImage(
+    @Req() req: AuthRequest,
+    @Param('billingId', ParseUUIDPipe) billingId: string,
+    @Res() res: Response,
+  ) {
+    const out = await this.coreService.getBillingProofImage(req.user, billingId);
+    res.setHeader('Content-Type', out.contentType);
+    res.setHeader('Cache-Control', 'private, max-age=60');
+    res.send(out.data);
   }
 
   @Post('admin/billing/:billingId/verify')

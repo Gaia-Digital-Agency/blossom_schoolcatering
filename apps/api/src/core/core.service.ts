@@ -337,6 +337,55 @@ export class CoreService implements OnModuleInit {
     }
   }
 
+  private isGoogleStorageHost(hostRaw: string) {
+    const host = String(hostRaw || '').toLowerCase();
+    return host === 'storage.googleapis.com' || host.endsWith('.storage.googleapis.com');
+  }
+
+  private async fetchProofImageBinary(proofImageUrl: string) {
+    let parsed: URL;
+    try {
+      parsed = new URL(proofImageUrl);
+    } catch {
+      throw new BadRequestException('Invalid proof image URL');
+    }
+
+    const performFetch = async (authToken?: string) => fetch(proofImageUrl, {
+      method: 'GET',
+      headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+    });
+
+    let res = await performFetch();
+    if (
+      (res.status === 401 || res.status === 403) &&
+      this.isGoogleStorageHost(parsed.host)
+    ) {
+      try {
+        const accessToken = await this.getGoogleAccessToken(['https://www.googleapis.com/auth/devstorage.read_only']);
+        res = await performFetch(accessToken);
+      } catch {
+        // Continue and let the non-ok response below raise a clear API error.
+      }
+    }
+
+    if (!res.ok) {
+      throw new BadRequestException(`PAYMENT_PROOF_NOT_ACCESSIBLE (${res.status})`);
+    }
+
+    const data = Buffer.from(await res.arrayBuffer());
+    if (!data.length) throw new BadRequestException('PAYMENT_PROOF_EMPTY');
+    if (data.length > 10 * 1024 * 1024) {
+      throw new BadRequestException('PAYMENT_PROOF_TOO_LARGE');
+    }
+
+    const detectedMime = this.detectImageMimeFromMagicBytes(data);
+    if (!detectedMime) {
+      throw new BadRequestException('PAYMENT_PROOF_NOT_IMAGE');
+    }
+
+    return { contentType: detectedMime, data };
+  }
+
   private slugify(value: string) {
     return value
       .toLowerCase()
@@ -4185,6 +4234,54 @@ export class CoreService implements OnModuleInit {
     return { ok: true, updatedCount: billingIds.length };
   }
 
+  async getBillingProofImage(actor: AccessUser, billingId: string) {
+    const targetBillingId = String(billingId || '').trim();
+    this.assertValidUuid(targetBillingId, 'billingId');
+
+    let sql = `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT br.id,
+               COALESCE(NULLIF(TRIM(br.proof_image_url), ''), '') AS proof_image_url
+        FROM billing_records br
+        WHERE br.id = $1
+    `;
+    const params: unknown[] = [targetBillingId];
+
+    if (actor.role === 'PARENT') {
+      const parentId = await this.getParentIdByUserId(actor.uid);
+      if (!parentId) throw new BadRequestException('Parent profile not found');
+      params.push(parentId);
+      sql += ` AND br.parent_id = $2`;
+    } else if (actor.role !== 'ADMIN') {
+      throw new ForbiddenException('Role not allowed');
+    }
+
+    sql += `
+        LIMIT 1
+      ) t;
+    `;
+
+    const out = await runSql(sql, params);
+    if (!out) throw new NotFoundException('Billing record not found');
+    const row = this.parseJsonLine<{ id: string; proof_image_url: string }>(out);
+    const proofImageUrl = String(row.proof_image_url || '').trim();
+    if (!proofImageUrl) throw new BadRequestException('No uploaded proof image for this bill');
+
+    if (proofImageUrl.startsWith('data:')) {
+      const parsed = this.parseDataUrl(proofImageUrl);
+      this.assertSafeImagePayload({
+        contentType: parsed.contentType,
+        data: parsed.data,
+        maxBytes: 10 * 1024 * 1024,
+        label: 'Proof image',
+      });
+      return { contentType: parsed.contentType, data: parsed.data };
+    }
+
+    return this.fetchProofImageBinary(proofImageUrl);
+  }
+
   async getAdminBilling(status?: string) {
     await this.ensureBillingReviewColumns();
     const statusFilter = (status || '').toUpperCase();
@@ -6112,6 +6209,31 @@ export class CoreService implements OnModuleInit {
       generated: !newPasswordRaw,
     });
     return { ok: true, userId, username: target.username, role: target.role, newPassword };
+  }
+
+  async adminResetYoungsterPassword(actor: AccessUser, youngsterId: string, newPasswordRaw?: string) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    this.assertValidUuid(youngsterId, 'youngsterId');
+    const out = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT c.user_id
+        FROM children c
+        JOIN users u ON u.id = c.user_id
+        WHERE c.id = $1
+          AND c.deleted_at IS NULL
+          AND c.is_active = true
+          AND u.deleted_at IS NULL
+          AND u.role = 'YOUNGSTER'
+        LIMIT 1
+      ) t;
+      `,
+      [youngsterId],
+    );
+    if (!out) throw new NotFoundException('Youngster not found');
+    const target = this.parseJsonLine<{ user_id: string }>(out);
+    return this.adminResetUserPassword(actor, target.user_id, newPasswordRaw);
   }
 
   // ─── Ingredients CRUD ────────────────────────────────────────────────────

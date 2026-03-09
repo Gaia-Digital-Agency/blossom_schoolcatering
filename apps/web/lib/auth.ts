@@ -115,6 +115,27 @@ function redirectToLogin(): void {
  * Catch SessionExpiredError to suppress error UI when a redirect has fired.
  */
 export async function apiFetch(path: string, init?: RequestInit, options?: { skipAutoReload?: boolean }): Promise<unknown> {
+  const res = await apiFetchResponse(path, init);
+  const method = String(init?.method || 'GET').toUpperCase();
+  const shouldAutoRefresh =
+    !options?.skipAutoReload &&
+    typeof window !== 'undefined' &&
+    ['POST', 'PATCH', 'PUT', 'DELETE'].includes(method);
+
+  if (res.status === 204) {
+    if (shouldAutoRefresh) {
+      window.setTimeout(() => window.location.reload(), 120);
+    }
+    return null;
+  }
+  const data = await res.json();
+  if (shouldAutoRefresh) {
+    window.setTimeout(() => window.location.reload(), 120);
+  }
+  return data;
+}
+
+export async function apiFetchResponse(path: string, init?: RequestInit): Promise<Response> {
   let token = localStorage.getItem(ACCESS_KEY);
   if (!token) {
     redirectToLogin();
@@ -145,22 +166,5 @@ export async function apiFetch(path: string, init?: RequestInit, options?: { ski
     const msg = Array.isArray(raw) ? raw.join(', ') : (raw ?? 'Request failed');
     throw new Error(msg);
   }
-
-  const method = String(init?.method || 'GET').toUpperCase();
-  const shouldAutoRefresh =
-    !options?.skipAutoReload &&
-    typeof window !== 'undefined' &&
-    ['POST', 'PATCH', 'PUT', 'DELETE'].includes(method);
-
-  if (res.status === 204) {
-    if (shouldAutoRefresh) {
-      window.setTimeout(() => window.location.reload(), 120);
-    }
-    return null;
-  }
-  const data = await res.json();
-  if (shouldAutoRefresh) {
-    window.setTimeout(() => window.location.reload(), 120);
-  }
-  return data;
+  return res;
 }

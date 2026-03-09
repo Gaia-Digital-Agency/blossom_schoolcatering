@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { apiFetch } from '../../../lib/auth';
+import { apiFetch, apiFetchResponse } from '../../../lib/auth';
 import { fileToWebpDataUrl } from '../../../lib/image';
 import LogoutButton from '../../_components/logout-button';
 
@@ -152,8 +152,23 @@ export default function ParentsBillingPage() {
       setError(err instanceof Error ? err.message : 'Failed opening receipt');
     }
   };
-  const onViewProof = (proofImageUrl: string) => {
-    window.open(proofImageUrl, '_blank');
+  const onViewProof = async (billingId: string, fallbackProofUrl?: string | null) => {
+    setError('');
+    setMessage('');
+    try {
+      const res = await apiFetchResponse(`/billing/${billingId}/proof-image`);
+      const blob = await res.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank', 'noopener,noreferrer');
+      window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60_000);
+    } catch (err) {
+      const fallback = String(fallbackProofUrl || '').trim();
+      if (fallback) {
+        window.open(fallback, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      setError(err instanceof Error ? err.message : 'Failed opening proof image');
+    }
   };
   const onRevertProof = async (billingId: string) => {
     if (!window.confirm('Move this bill back to Unpaid and delete the uploaded proof image?')) return;
@@ -258,7 +273,9 @@ export default function ParentsBillingPage() {
                     {b.admin_note ? <small>Admin Note: {b.admin_note}</small> : null}
                     <div className="billing-action-row">
                       {b.proof_image_url ? (
-                        <button className="btn btn-outline" type="button" onClick={() => onViewProof(b.proof_image_url!)}>View Proof Image</button>
+                        <button className="btn btn-outline" type="button" onClick={() => onViewProof(b.id, b.proof_image_url)}>
+                          View Proof Image
+                        </button>
                       ) : null}
                       {b.receipt_number ? (
                         <button className="btn btn-outline" type="button" onClick={() => onOpenReceipt(b.id)}>Open Receipt</button>
