@@ -179,6 +179,20 @@ export default function AdminDeliveryPage() {
     }
   };
 
+  const onShowServiceDate = async () => {
+    setError('');
+    setMessage('');
+    try {
+      const rows = await apiFetch(
+        `/delivery/assignments?date=${encodeURIComponent(assignDate)}`,
+      ) as Assignment[];
+      setAssignments(rows || []);
+      setMessage(`Showing delivery-assigned orders for service date ${assignDate}.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed loading service date assignments');
+    }
+  };
+
   const onCreateDeliveryUser = async () => {
     setError('');
     setMessage('');
@@ -579,7 +593,7 @@ export default function AdminDeliveryPage() {
           </label>
           <button className="btn btn-outline" type="button" onClick={() => setAssignDate(todayIsoLocal())}>Show Today</button>
           <button className="btn btn-primary" type="button" onClick={onAutoAssign}>Auto Assign by School</button>
-          <button className="btn btn-outline" type="button" onClick={load}>Refresh</button>
+          <button className="btn btn-outline" type="button" onClick={onShowServiceDate}>Show Service Date</button>
           <button className="btn btn-outline" type="button" onClick={onDownloadSummary}>Download Summary</button>
         </div>
 
