@@ -289,14 +289,22 @@ export default function AdminDeliveryPage() {
   }, [users]);
 
   const autoAssignmentSummary = useMemo(() => {
-    const grouped = new Map<string, { schools: Set<string>; youngsters: Set<string>; orderCount: number }>();
+    const grouped = new Map<string, {
+      schools: Set<string>;
+      youngsters: Set<string>;
+      orderCount: number;
+      orders: Assignment[];
+    }>();
     for (const row of assignments) {
       const key = row.delivery_user_id || 'UNASSIGNED';
-      if (!grouped.has(key)) grouped.set(key, { schools: new Set<string>(), youngsters: new Set<string>(), orderCount: 0 });
+      if (!grouped.has(key)) {
+        grouped.set(key, { schools: new Set<string>(), youngsters: new Set<string>(), orderCount: 0, orders: [] });
+      }
       const target = grouped.get(key)!;
       if (row.school_name) target.schools.add(row.school_name);
       if (row.child_name) target.youngsters.add(row.child_name);
       target.orderCount += 1;
+      target.orders.push(row);
     }
     return Array.from(grouped.entries()).map(([deliveryUserId, value]) => {
       const u = usersById.get(deliveryUserId);
@@ -306,6 +314,11 @@ export default function AdminDeliveryPage() {
         schools: Array.from(value.schools).sort(),
         youngsterCount: value.youngsters.size,
         orderCount: value.orderCount,
+        orders: value.orders.sort((a, b) =>
+          a.school_name.localeCompare(b.school_name)
+          || a.session.localeCompare(b.session)
+          || a.child_name.localeCompare(b.child_name),
+        ),
       };
     }).sort((a, b) => b.orderCount - a.orderCount || a.deliveryName.localeCompare(b.deliveryName));
   }, [assignments, usersById]);
@@ -545,50 +558,33 @@ export default function AdminDeliveryPage() {
                 <th>Schools</th>
                 <th className="count-col">Number of Youngsters</th>
                 <th className="count-col">Number of Orders</th>
+                <th>Orders Detail</th>
               </tr>
             </thead>
             <tbody>
               {autoAssignmentSummary.length === 0 ? (
-                <tr><td colSpan={4}>No auto-assignment data for selected date.</td></tr>
+                <tr><td colSpan={5}>No auto-assignment data for selected date.</td></tr>
               ) : autoAssignmentSummary.map((row) => (
                 <tr key={row.deliveryUserId}>
                   <td>{row.deliveryName}</td>
                   <td>{row.schools.join(', ') || '-'}</td>
                   <td className="count-col">{row.youngsterCount}</td>
                   <td className="count-col">{row.orderCount}</td>
+                  <td>
+                    <div className="auto-order-list">
+                      {row.orders.map((order) => (
+                        <div key={order.id}>
+                          {order.school_name} | {order.service_date} {order.session} | {order.child_name} / {order.parent_name} | {order.delivery_status} | {order.order_id}
+                        </div>
+                      ))}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
 
-        <h2>Assigned Orders ({assignDate})</h2>
-        <div className="kitchen-table-wrap">
-          <table className="kitchen-table admin-delivery-table assignments-table">
-            <thead>
-              <tr>
-                <th>Date/Session</th>
-                <th>School</th>
-                <th>Order</th>
-                <th>Youngster / Parent</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {assignments.length === 0 ? (
-                <tr><td colSpan={5}>No assignments.</td></tr>
-              ) : assignments.map((a) => (
-                <tr key={a.id}>
-                  <td>{a.service_date} {a.session}</td>
-                  <td>{a.school_name}</td>
-                  <td>{a.order_id}</td>
-                  <td>{a.child_name} / {a.parent_name}</td>
-                  <td>{a.delivery_status} {a.confirmed_at ? `(Confirmed ${a.confirmed_at})` : ''}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </section>
       <style jsx>{`
         .kitchen-table-wrap {
@@ -643,6 +639,12 @@ export default function AdminDeliveryPage() {
         .admin-delivery-table .count-col {
           text-align: center;
         }
+        .auto-order-list {
+          display: grid;
+          gap: 0.2rem;
+          font-size: 0.8rem;
+          line-height: 1.35;
+        }
         .admin-delivery-table td input {
           width: 100%;
           min-width: 0;
@@ -696,11 +698,6 @@ export default function AdminDeliveryPage() {
           }
           .kitchen-table th {
             white-space: nowrap;
-          }
-          /* Assignments table: hide Order ID column on mobile */
-          .admin-delivery-table.assignments-table th:nth-child(3),
-          .admin-delivery-table.assignments-table td:nth-child(3) {
-            display: none;
           }
         }
       `}</style>

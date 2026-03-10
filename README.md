@@ -1,7 +1,7 @@
 # Blossom School Catering
 
 Creation date: 2026-02-24  
-Last updated: 2026-02-28  
+Last updated: 2026-03-09  
 Developed by Gaiada.com (C) 2026  
 Repository: `git@github.com-net1io:Gaia-Digital-Agency/blossom_schoolcatering.git`
 
@@ -20,7 +20,7 @@ Blossom School Catering is a mobile-first school meal ordering app for Bali scho
 - API process: `schoolcatering-api`
 - API base: `/schoolcatering/api/v1`
 
-## Latest Verified State (2026-02-28)
+## Latest Verified State (2026-03-09)
 - Request validation is enforced with DTO + global `ValidationPipe`.
 - Global API throttling is enabled with `ThrottlerModule`.
 - PM2 ecosystem config is committed (`ecosystem.config.cjs`) and used for process restart/persistence.
@@ -34,6 +34,17 @@ Blossom School Catering is a mobile-first school meal ordering app for Bali scho
   - kitchen marks order complete
   - delivery toggles assignment completion
 - Health endpoint available: `GET /api/v1/health`.
+- Billing proof viewing hardened for private GCS objects:
+  - parent image stream: `GET /api/v1/billing/:billingId/proof-image`
+  - admin image stream: `GET /api/v1/admin/billing/:billingId/proof-image`
+- Youngster password reset hardened to youngster-scoped endpoint:
+  - `PATCH /api/v1/admin/youngsters/:youngsterId/reset-password`
+- Global error visibility improved in UI:
+  - inline error blocks now bold red
+  - disabled/unallowed action buttons are styled as bold red state
+- Pre-production seed cleanup scripts added:
+  - `scripts/cleanup_seed_data_before_2025_03_09.sql`
+  - `scripts/cleanup_named_seed_parents_preprod.sh`
 
 ## Monorepo Structure
 - `apps/web`: Next.js frontend
@@ -74,8 +85,8 @@ Expected core variables include:
 - `plan.md`: implementation checklist by phase
 - `progress.md`: dated implementation log
 - `docs/specifications/*`: API/rules/data contracts
-- `docs/Features/full_feature_matrix.md`: complete feature surface
-- `docs/Features/buttons.md`: UI action and endpoint map
+- `docs/Features/feature_matrix.md`: complete feature surface
+- `docs/Features/buttons_api.md`: UI action and endpoint map
 - `docs/Features/map.md`: merged page/API/DB map
 - `docs/guides/*.md`: end-user guides
 

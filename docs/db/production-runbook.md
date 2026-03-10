@@ -53,6 +53,20 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f docs/db/006_runtime_manual_test_seed.
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f docs/db/007_runtime_manual_data_seed.sql
 ```
 
+4. Pre-go-live cleanup helpers (run only when needed):
+
+Delete historical transactional seed rows before 2025-03-09:
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/cleanup_seed_data_before_2025_03_09.sql
+```
+
+Delete named seed parent groups and associated youngster/orders/billing/delivery:
+
+```bash
+DATABASE_URL="$DATABASE_URL" bash scripts/cleanup_named_seed_parents_preprod.sh
+```
+
 ## Existing environments
 
 For environments already using `001` to `013`, keep that history immutable.

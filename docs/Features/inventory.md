@@ -1,6 +1,6 @@
 # Apps Inventory (Latest)
 
-Generated: 2026-02-28
+Generated: 2026-03-09
 Source basis: `git ls-files apps` (excluding `*.md` and `package-lock.json`).
 
 ## Summary
@@ -49,6 +49,6 @@ Source basis: `git ls-files apps` (excluding `*.md` and `package-lock.json`).
 - Asset binary files (`jpg`, `svg`) are counted as files and marked `N/A` for line count.
 - This inventory is repository-based (tracked files), not runtime build-output based.
 - For full implementation behavior, cross-reference:
-  - `docs/Features/full_feature_matrix.md`
-  - `docs/Features/buttons.md`
+  - `docs/Features/feature_matrix.md`
+  - `docs/Features/buttons_api.md`
   - `docs/Features/map.md`

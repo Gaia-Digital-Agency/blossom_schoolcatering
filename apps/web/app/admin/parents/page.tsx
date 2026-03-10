@@ -25,18 +25,11 @@ type ShowPassInfo = {
   youngsters: { name: string; school: string }[];
 };
 
-type ConfirmDeleteInfo = {
-  parentId: string;
-  parentName: string;
-};
-
 export default function AdminParentsPage() {
   const [parents, setParents] = useState<ParentRow[]>([]);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [showPassInfo, setShowPassInfo] = useState<ShowPassInfo | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<ConfirmDeleteInfo | null>(null);
-  const [deleting, setDeleting] = useState(false);
 
   const load = async () => {
     const p = await apiFetch('/admin/parents') as ParentRow[];
@@ -46,33 +39,6 @@ export default function AdminParentsPage() {
   useEffect(() => {
     load().catch((e) => setError(e instanceof Error ? e.message : 'Failed'));
   }, []);
-
-  const onDeleteClick = (p: ParentRow) => {
-    setError('');
-    setMessage('');
-    if ((p.youngsters || []).length > 0) {
-      setError(`Cannot delete "${p.first_name} ${p.last_name}" — delete all linked youngsters first.`);
-      return;
-    }
-    setConfirmDelete({ parentId: p.id, parentName: `${p.first_name} ${p.last_name} (${p.username})` });
-  };
-
-  const onDeleteConfirm = async () => {
-    if (!confirmDelete) return;
-    setDeleting(true);
-    setError('');
-    try {
-      await apiFetch(`/admin/parents/${confirmDelete.parentId}`, { method: 'DELETE' });
-      setMessage(`Parent "${confirmDelete.parentName}" deleted successfully.`);
-      setConfirmDelete(null);
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to delete parent');
-      setConfirmDelete(null);
-    } finally {
-      setDeleting(false);
-    }
-  };
 
   const onShowPassword = async (p: ParentRow) => {
     setError('');
@@ -134,20 +100,9 @@ export default function AdminParentsPage() {
                   </td>
                   <td>{(p.schools || []).join(', ') || '-'}</td>
                   <td>
-                    <div className="action-btns">
-                      <button className="btn btn-outline" type="button" onClick={() => onShowPassword(p)}>
-                        Show Password
-                      </button>
-                      <button
-                        className="btn btn-danger"
-                        type="button"
-                        disabled={(p.youngsters || []).length > 0}
-                        title={(p.youngsters || []).length > 0 ? 'Delete all linked youngsters first' : 'Delete parent'}
-                        onClick={() => onDeleteClick(p)}
-                      >
-                        Delete
-                      </button>
-                    </div>
+                    <button className="btn btn-outline" type="button" onClick={() => onShowPassword(p)}>
+                      Show Password
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -202,28 +157,6 @@ export default function AdminParentsPage() {
         </div>
       ) : null}
 
-      {/* ── Confirm Delete Modal ─────────────────────────────── */}
-      {confirmDelete ? (
-        <div className="pass-modal-overlay" onClick={() => !deleting && setConfirmDelete(null)}>
-          <div className="pass-modal-card" onClick={(e) => e.stopPropagation()}>
-            <h2 className="pass-modal-title">Delete Parent?</h2>
-            <p className="pass-modal-warning">⚠️ This action cannot be undone.</p>
-            <p style={{ fontSize: '0.9rem', marginBottom: '1.1rem' }}>
-              You are about to permanently delete:<br />
-              <strong>{confirmDelete.parentName}</strong>
-            </p>
-            <div style={{ display: 'flex', gap: '0.65rem' }}>
-              <button className="btn btn-outline" type="button" style={{ flex: 1 }} disabled={deleting} onClick={() => setConfirmDelete(null)}>
-                Cancel
-              </button>
-              <button className="btn btn-danger" type="button" style={{ flex: 1 }} disabled={deleting} onClick={onDeleteConfirm}>
-                {deleting ? 'Deleting...' : 'Yes, Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
       <style jsx>{`
         .kitchen-table-wrap {
           overflow-x: auto;
@@ -257,32 +190,8 @@ export default function AdminParentsPage() {
           font-size: 0.78rem;
           word-break: break-all;
         }
-        .action-btns {
-          display: flex;
-          flex-direction: column;
-          gap: 0.4rem;
-        }
         .admin-parents-table :global(.btn) {
           min-width: 120px;
-        }
-        :global(.btn-danger) {
-          background: #dc2626;
-          color: #fff;
-          border: 1px solid #dc2626;
-          border-radius: 0.45rem;
-          padding: 0.38rem 0.85rem;
-          font: inherit;
-          font-size: 0.85rem;
-          cursor: pointer;
-          transition: background 0.12s, border-color 0.12s;
-        }
-        :global(.btn-danger:hover:not(:disabled)) {
-          background: #b91c1c;
-          border-color: #b91c1c;
-        }
-        :global(.btn-danger:disabled) {
-          opacity: 0.4;
-          cursor: not-allowed;
         }
         /* Mobile */
         @media (max-width: 680px) {

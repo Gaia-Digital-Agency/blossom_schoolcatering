@@ -1,6 +1,7 @@
 # Button and Action Inventory (Latest)
 
 Generated from code audit on 2026-02-28.
+Updated with runtime changes on 2026-03-09.
 Scope: `apps/web/app` interactive actions and their backend impact.
 
 ## Legend
@@ -40,7 +41,9 @@ Scope: `apps/web/app` interactive actions and their backend impact.
 | `Quick Reorder` | `POST /carts/quick-reorder` | Write | Clones order to target date draft. |
 | `Refresh Billing` | `GET /billing/parent/consolidated` | Read-only | Reload billing rows. |
 | `Upload Proof For Selected Unpaid Bills` | `POST /billing/proof-upload-batch` | Write | Batch proof upload. |
+| `View Proof Image` | `GET /billing/:billingId/proof-image` | Read-only | Authenticated proof image stream. |
 | `Open Receipt` | `GET /billing/:billingId/receipt` | Read-only | Opens generated receipt URL. |
+| `Redo (Move to Unpaid)` | `POST /billing/:billingId/revert-proof` | Write | Clears proof and returns bill to unpaid. |
 | `Refresh Spending` | `GET /parents/me/spending-dashboard` | Read-only | Reload spending metrics. |
 
 ## Youngster (`/youngsters`)
@@ -80,6 +83,7 @@ Scope: `apps/web/app` interactive actions and their backend impact.
 
 | Action | Endpoint(s) | Type | Notes |
 |---|---|---|---|
+| `View Proof` | `GET /admin/billing/:billingId/proof-image` | Read-only | Authenticated proof image stream. |
 | `Verify` / `Reject` | `POST /admin/billing/:billingId/verify` | Write | Billing proof decision. |
 | `Generate Receipt` / `Regenerate Receipt` | `POST /admin/billing/:billingId/receipt` | Write | Receipt number/PDF generation flow. |
 
@@ -100,7 +104,7 @@ Scope: `apps/web/app` interactive actions and their backend impact.
 | `Create Youngster` | `POST /children/register` | Write | Admin create youngster profile. |
 | `Update Youngster` | `PATCH /admin/youngsters/:youngsterId` | Write | Admin edit youngster profile. |
 | `Delete Youngster` | `DELETE /admin/youngsters/:youngsterId` | Write | Admin delete youngster. |
-| Youngster `Reset Password` | `PATCH /admin/users/:userId/reset-password` | Write | Admin reset youngster account password. |
+| Youngster `Reset Password` | `PATCH /admin/youngsters/:youngsterId/reset-password` | Write | Admin reset youngster account password (youngster-scoped). |
 
 ### Delivery Management
 

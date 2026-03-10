@@ -1,6 +1,6 @@
 # Blossom School Catering Unified Map (Pages, API, DB)
 
-Last synced: 2026-02-28  
+Last synced: 2026-03-09  
 Base URL: `/schoolcatering`  
 API Base: `/schoolcatering/api/v1`
 
@@ -64,6 +64,9 @@ This file is the merged, deduplicated map for:
 - Ordering fields: `serviceDate`, `session`, quantity map per menu item
 - Consolidated order actions: edit-before-cutoff, delete-before-cutoff, quick reorder
 - Billing fields: selected billing IDs, proof image payload
+- Billing actions include:
+  - `View Proof Image` (authenticated stream endpoint)
+  - `Redo (Move to Unpaid)` for pending verification rows
 - Spending dashboard read state
 
 ### `/youngsters`
@@ -133,6 +136,7 @@ This file is the merged, deduplicated map for:
   - `GET /admin/children`
   - `PATCH /admin/youngsters/:youngsterId`
   - `DELETE /admin/youngsters/:youngsterId`
+  - `PATCH /admin/youngsters/:youngsterId/reset-password`
   - `PATCH /admin/users/:userId/reset-password`
   - `GET /children/me`
   - `GET /youngsters/me/insights`
@@ -172,8 +176,11 @@ This file is the merged, deduplicated map for:
   - `GET /billing/parent/consolidated`
   - `POST /billing/:billingId/proof-upload`
   - `POST /billing/proof-upload-batch`
+  - `GET /billing/:billingId/proof-image`
   - `GET /billing/:billingId/receipt`
+  - `POST /billing/:billingId/revert-proof`
   - `GET /admin/billing`
+  - `GET /admin/billing/:billingId/proof-image`
   - `POST /admin/billing/:billingId/verify`
   - `POST /admin/billing/:billingId/receipt`
 - Delivery:

@@ -359,13 +359,12 @@ export default function ParentsOrdersPage() {
         await apiFetch(`/carts/${cartId}/items`, { method: 'PATCH', body: JSON.stringify({ items }) });
         await apiFetch(`/carts/${cartId}/submit`, { method: 'POST' });
       }
-      await loadOrders();
       setItemQty({});
       setDraftCartId('');
       setDraftExpiresAt('');
       setDraftSourceContext(null);
-      setConfirmedViewDate(serviceDate);
       setShowSuccessPopup(true);
+      await loadOrders();
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Order placement failed';
       if (msg.includes('ORDER_SESSION_DISABLED') && session !== 'LUNCH') {

@@ -1,6 +1,6 @@
 # Blossom School Catering - Full Feature Matrix
 
-Last verified from code: 2026-02-28  
+Last verified from code: 2026-03-09  
 Repository: `/Users/rogerwoolie/Documents/gaiada_projects/blossom-schoolcatering`  
 Runtime base path: `/schoolcatering`  
 API base path: `/schoolcatering/api/v1`
@@ -87,6 +87,7 @@ API base path: `/schoolcatering/api/v1`
 - Consolidated orders.
 - Consolidated billing.
 - Batch proof upload for unpaid billing.
+- View uploaded proof image from paid/pending rows.
 - Open receipt for paid rows.
 - Spending dashboard.
 - Shared logout button.
@@ -102,13 +103,14 @@ API base path: `/schoolcatering/api/v1`
 ### Admin (`/admin/*`)
 - Dashboard KPI.
 - Parent list + reset password.
-- Youngster create/edit/delete + reset password.
+- Youngster create/edit/delete + reset password (youngster-scoped endpoint).
 - School create/activate/deactivate/delete.
 - Session setting toggle (Lunch fixed ON).
 - Blackout create/list/delete.
 - Menu management (create/update/delete/toggle/seed/upload image).
 - Ingredient create/update/delete.
 - Billing verify/reject and receipt generation.
+- Billing proof image review uses authenticated proof-image stream endpoint.
 - Delivery user create/edit/activate-deactivate.
 - Delivery-school mapping and auto-assign.
 - Reports and admin kitchen monitoring.
@@ -173,6 +175,7 @@ API base path: `/schoolcatering/api/v1`
   - `GET /admin/children`
   - `PATCH /admin/youngsters/:youngsterId`
   - `DELETE /admin/youngsters/:youngsterId`
+  - `PATCH /admin/youngsters/:youngsterId/reset-password`
   - `PATCH /admin/users/:userId/reset-password`
   - `GET /children/me`
   - `GET /youngsters/me/insights`
@@ -204,8 +207,11 @@ API base path: `/schoolcatering/api/v1`
   - `GET /billing/parent/consolidated`
   - `POST /billing/:billingId/proof-upload`
   - `POST /billing/proof-upload-batch`
+  - `GET /billing/:billingId/proof-image`
   - `GET /billing/:billingId/receipt`
+  - `POST /billing/:billingId/revert-proof`
   - `GET /admin/billing`
+  - `GET /admin/billing/:billingId/proof-image`
   - `POST /admin/billing/:billingId/verify`
   - `POST /admin/billing/:billingId/receipt`
 - Delivery:
@@ -249,6 +255,9 @@ API base path: `/schoolcatering/api/v1`
   - blackout enforcement
   - session availability enforcement
 - Delivery/kitchen status transitions are API-enforced.
+- Error visibility standard:
+  - inline `.auth-error` blocks are high-contrast bold red
+  - disabled/unallowed action buttons are visually marked in red
 
 ## 7) Known In-Progress Areas
 - OpenAPI docs endpoint (`/api/v1/docs`) is not yet wired.

@@ -1,6 +1,6 @@
 # Blossom School Catering Architecture
 
-Last updated: 2026-02-28
+Last updated: 2026-03-09
 
 ## 1) App Architecture (Latest State)
 
@@ -110,11 +110,15 @@ flowchart TB
   - Web route middleware
   - API guards (`JwtAuthGuard`, `RolesGuard`)
 - Access token used by frontend fetch wrapper, refresh token rotated via HttpOnly cookie.
+- Billing proof images are viewed via authenticated API stream endpoints so private GCS objects remain readable without public ACL.
 - Ordering constraints enforced server-side:
   - session activation
   - blackout dates
   - cutoff windows
   - max-item rules
+- Error communication standard on frontend:
+  - inline error messages are high-contrast bold red blocks
+  - disabled/unallowed buttons are shown with red not-allowed state
 
 ## 2) Database Schema ERD (Mermaid)
 

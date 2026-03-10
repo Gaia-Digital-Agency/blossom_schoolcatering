@@ -124,7 +124,9 @@ export default function AdminBillingPage() {
       window.open(blobUrl, '_blank', 'noopener,noreferrer');
       window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60_000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed opening proof image');
+      window.open(proof, '_blank', 'noopener,noreferrer');
+      const msg = err instanceof Error ? err.message : 'Failed opening proof image';
+      setMessage(`Fallback opened raw proof URL (${msg}).`);
     }
   };
 

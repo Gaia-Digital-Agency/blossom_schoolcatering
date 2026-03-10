@@ -1,5 +1,7 @@
 ## Auto Refresh Note
 
+Last reviewed: 2026-03-09
+
 Count of automatic refresh mechanisms (without button click): **2**
 
 1. `apps/web/app/kitchen/_components/kitchen-dashboard.tsx`
@@ -14,3 +16,7 @@ Count of automatic refresh mechanisms (without button click): **2**
 - `apps/web/app/youngsters/page.tsx`
 
 These use 1-second timers only to update on-screen countdown/clock state, not to refresh data from the server.
+
+## Related UX Standard (2026-03-09)
+- Runtime action errors are displayed inline as bold red blocks (`.auth-error`).
+- Disabled/unallowed buttons are visibly marked in red with `not-allowed` cursor.

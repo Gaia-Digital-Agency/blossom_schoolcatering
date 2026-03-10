@@ -28,6 +28,7 @@ type KitchenData = {
   serviceDate: string;
   totals: {
     totalOrders: number;
+    totalOrdersComplete: number;
     totalDishes: number;
     breakfastOrders: number;
     snackOrders: number;
@@ -99,6 +100,7 @@ export default function AdminKitchenPage() {
                 <thead>
                   <tr>
                     <th>Total Orders</th>
+                    <th>Total Orders Complete</th>
                     <th>Total Dishes</th>
                     <th>Lunch</th>
                     <th>Snack</th>
@@ -108,6 +110,7 @@ export default function AdminKitchenPage() {
                 <tbody>
                   <tr>
                     <td>{data.totals.totalOrders}</td>
+                    <td>{data.totals.totalOrdersComplete}</td>
                     <td>{data.totals.totalDishes}</td>
                     <td>{data.totals.lunchOrders}</td>
                     <td>{data.totals.snackOrders}</td>
