@@ -64,6 +64,23 @@ export default function AdminParentsPage() {
     }
   };
 
+  const onDeleteParent = async (p: ParentRow) => {
+    if (p.linked_children_count > 0) {
+      setError('Cannot delete parent with associated youngster(s).');
+      return;
+    }
+    if (!window.confirm(`Delete parent "${p.first_name} ${p.last_name}"? This cannot be undone.`)) return;
+    setError('');
+    setMessage('');
+    try {
+      await apiFetch(`/admin/parents/${p.id}`, { method: 'DELETE' }, { skipAutoReload: true });
+      setMessage(`Parent deleted: ${p.first_name} ${p.last_name}`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed deleting parent');
+    }
+  };
+
   return (
     <main className="page-auth page-auth-desktop">
       <section className="auth-panel">
@@ -100,9 +117,20 @@ export default function AdminParentsPage() {
                   </td>
                   <td>{(p.schools || []).join(', ') || '-'}</td>
                   <td>
-                    <button className="btn btn-outline" type="button" onClick={() => onShowPassword(p)}>
-                      Show Password
-                    </button>
+                    <div className="action-row">
+                      <button className="btn btn-outline" type="button" onClick={() => onShowPassword(p)}>
+                        Show Password
+                      </button>
+                      <button
+                        className="btn btn-outline"
+                        type="button"
+                        onClick={() => onDeleteParent(p)}
+                        disabled={p.linked_children_count > 0}
+                        title={p.linked_children_count > 0 ? 'Cannot delete while parent still has linked youngster(s).' : 'Delete parent'}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -192,6 +220,11 @@ export default function AdminParentsPage() {
         }
         .admin-parents-table :global(.btn) {
           min-width: 120px;
+        }
+        .action-row {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.35rem;
         }
         /* Mobile */
         @media (max-width: 680px) {

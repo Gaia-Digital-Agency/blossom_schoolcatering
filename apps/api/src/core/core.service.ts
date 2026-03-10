@@ -1277,7 +1277,7 @@ export class CoreService implements OnModuleInit {
                u.email,
                u.phone_number,
                p.address,
-               count(DISTINCT pc.child_id)::int AS linked_children_count,
+               count(DISTINCT c.id)::int AS linked_children_count,
                COALESCE(
                  json_agg(
                    DISTINCT jsonb_build_object(
@@ -6047,6 +6047,19 @@ export class CoreService implements OnModuleInit {
   async deleteParent(actor: AccessUser, targetParentId: string) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     this.assertValidUuid(targetParentId, 'parentId');
+    const linkedYoungsterExists = await runSql(
+      `SELECT EXISTS (
+         SELECT 1
+         FROM parent_children pc
+         JOIN children c ON c.id = pc.child_id
+         WHERE pc.parent_id = $1
+           AND c.deleted_at IS NULL
+       );`,
+      [targetParentId],
+    );
+    if (linkedYoungsterExists === 't') {
+      throw new BadRequestException('Cannot delete parent with associated youngster(s)');
+    }
     const out = await runSql(
       `SELECT row_to_json(t)::text FROM (
          SELECT p.id, p.user_id FROM parents p
