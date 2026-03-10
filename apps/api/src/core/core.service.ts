@@ -6190,8 +6190,8 @@ export class CoreService implements OnModuleInit {
     );
     if (!out) throw new NotFoundException('User not found');
     const target = this.parseJsonLine<{ id: string; username: string; role: string }>(out);
-    if (!['PARENT', 'YOUNGSTER'].includes(target.role)) {
-      throw new BadRequestException('Only PARENT and YOUNGSTER password reset is allowed here');
+    if (!['PARENT', 'YOUNGSTER', 'DELIVERY'].includes(target.role)) {
+      throw new BadRequestException('Only PARENT, YOUNGSTER, and DELIVERY password reset is allowed here');
     }
     const generatedPassword = `Tmp#${randomUUID().replace(/-/g, '').slice(0, 12)}`;
     const newPassword = (newPasswordRaw || '').trim() || generatedPassword;
