@@ -64,6 +64,20 @@ export default function DeliveryPage() {
     }
   };
 
+  const onShowSelectedDate = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const dateRows = await apiFetch(`/delivery/assignments?date=${encodeURIComponent(selectedDate)}`) as Assignment[];
+      setRows(dateRows || []);
+      setMessage(`Showing assigned orders for ${selectedDate}.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed loading selected date assignments');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
 
   const onToggleComplete = async (assignmentId: string) => {
@@ -81,12 +95,8 @@ export default function DeliveryPage() {
     }
   };
 
-  const pendingRows = rows.filter(
-    (r) => !r.confirmed_at && [yesterday, today, tomorrow].includes(r.service_date) && r.service_date === selectedDate,
-  );
-  const completedRows = rows.filter(
-    (r) => Boolean(r.confirmed_at) && [yesterday, today].includes(r.service_date) && r.service_date === selectedDate,
-  );
+  const pendingRows = rows.filter((r) => !r.confirmed_at && r.service_date === selectedDate);
+  const completedRows = rows.filter((r) => Boolean(r.confirmed_at) && r.service_date === selectedDate);
 
   const pendingBySchool = pendingRows.reduce<Record<string, Assignment[]>>((acc, row) => {
     const key = row.school_name || 'Unassigned School';
@@ -119,6 +129,15 @@ export default function DeliveryPage() {
             <button className={`btn ${selectedDate === today ? 'btn-primary' : 'btn-outline'}`} type="button" onClick={() => setSelectedDate(today)}>Today</button>
             <button className={`btn ${selectedDate === tomorrow ? 'btn-primary' : 'btn-outline'}`} type="button" onClick={() => setSelectedDate(tomorrow)}>Tomorrow</button>
             <button className="btn btn-outline" type="button" onClick={load} disabled={loading}>{loading ? 'Refreshing...' : 'Refresh'}</button>
+          </div>
+          <div className="delivery-date-picker-row">
+            <label className="delivery-control">
+              Service Date
+              <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
+            </label>
+            <button className="btn btn-outline" type="button" onClick={onShowSelectedDate} disabled={loading}>
+              {loading ? 'Loading...' : 'Show Service Date'}
+            </button>
           </div>
           <label className="delivery-control delivery-note">
             Confirmation Note (optional)
@@ -205,6 +224,21 @@ export default function DeliveryPage() {
         }
         .delivery-date-row .btn {
           flex: 1 1 auto;
+        }
+        .delivery-date-picker-row {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 0.4rem;
+          margin-bottom: 0.75rem;
+        }
+        .delivery-date-picker-row .delivery-control {
+          margin: 0;
+        }
+        @media (min-width: 720px) {
+          .delivery-date-picker-row {
+            grid-template-columns: 1fr auto;
+            align-items: end;
+          }
         }
       `}</style>
     </main>
