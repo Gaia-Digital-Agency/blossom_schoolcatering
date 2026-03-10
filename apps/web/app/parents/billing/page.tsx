@@ -152,7 +152,7 @@ export default function ParentsBillingPage() {
       setError(err instanceof Error ? err.message : 'Failed opening receipt');
     }
   };
-  const onViewProof = async (billingId: string, fallbackProofUrl?: string | null) => {
+  const onViewProof = async (billingId: string) => {
     setError('');
     setMessage('');
     try {
@@ -162,11 +162,6 @@ export default function ParentsBillingPage() {
       window.open(blobUrl, '_blank', 'noopener,noreferrer');
       window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60_000);
     } catch (err) {
-      const fallback = String(fallbackProofUrl || '').trim();
-      if (fallback) {
-        window.open(fallback, '_blank', 'noopener,noreferrer');
-        return;
-      }
       setError(err instanceof Error ? err.message : 'Failed opening proof image');
     }
   };
@@ -273,7 +268,7 @@ export default function ParentsBillingPage() {
                     {b.admin_note ? <small>Admin Note: {b.admin_note}</small> : null}
                     <div className="billing-action-row">
                       {b.proof_image_url ? (
-                        <button className="btn btn-outline" type="button" onClick={() => onViewProof(b.id, b.proof_image_url)}>
+                        <button className="btn btn-outline" type="button" onClick={() => onViewProof(b.id)}>
                           View Proof Image
                         </button>
                       ) : null}

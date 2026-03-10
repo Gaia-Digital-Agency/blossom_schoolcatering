@@ -148,7 +148,16 @@ export class CoreService implements OnModuleInit {
   private buildStoragePublicUrl(objectName: string) {
     const cdnBase = (process.env.CDN_BASE_URL || '').trim().replace(/\/+$/, '');
     const normalizedObject = objectName.replace(/^\/+/, '');
-    if (cdnBase) return `${cdnBase}/${normalizedObject}`;
+    if (cdnBase) {
+      // If CDN_BASE_URL already ends with the GCS root folder, strip that prefix
+      // from objectName to avoid a double-prefix (e.g. ".../blossom/blossom/...").
+      const root = this.getGcsRootFolder();
+      const relativeObject =
+        root && normalizedObject.startsWith(`${root}/`)
+          ? normalizedObject.slice(root.length + 1)
+          : normalizedObject;
+      return `${cdnBase}/${relativeObject}`;
+    }
     return `https://storage.googleapis.com/${this.getGcsBucket()}/${normalizedObject}`;
   }
 
@@ -6048,6 +6057,22 @@ export class CoreService implements OnModuleInit {
     );
     if (!out) throw new NotFoundException('Parent not found');
     const parent = this.parseJsonLine<{ id: string; user_id: string }>(out);
+    // Block deletion if parent still has active linked youngsters
+    const childCountOut = await runSql(
+      `SELECT row_to_json(t)::text FROM (
+         SELECT COUNT(*)::int AS cnt
+         FROM parent_children pc
+         JOIN children c ON c.id = pc.child_id
+         WHERE pc.parent_id = $1 AND c.deleted_at IS NULL
+       ) t;`,
+      [targetParentId],
+    );
+    const { cnt } = this.parseJsonLine<{ cnt: number }>(childCountOut);
+    if (cnt > 0) {
+      throw new BadRequestException(
+        'Cannot delete parent — youngsters are still linked. Delete all youngsters first.',
+      );
+    }
     await runSql(`UPDATE parents SET deleted_at = now(), updated_at = now() WHERE id = $1;`, [targetParentId]);
     await runSql(`UPDATE users SET is_active = false, deleted_at = now(), updated_at = now() WHERE id = $1;`, [parent.user_id]);
     await this.recordAdminAudit(actor, 'PARENT_DELETED', 'parent', targetParentId);
@@ -6182,8 +6207,8 @@ export class CoreService implements OnModuleInit {
     );
     if (!out) throw new NotFoundException('User not found');
     const target = this.parseJsonLine<{ id: string; username: string; role: string }>(out);
-    if (!['PARENT', 'YOUNGSTER'].includes(target.role)) {
-      throw new BadRequestException('Only PARENT and YOUNGSTER password reset is allowed here');
+    if (!['PARENT', 'CHILD'].includes(target.role)) {
+      throw new BadRequestException('Only PARENT and CHILD password reset is allowed here');
     }
     const generatedPassword = `Tmp#${randomUUID().replace(/-/g, '').slice(0, 12)}`;
     const newPassword = (newPasswordRaw || '').trim() || generatedPassword;
@@ -6225,7 +6250,7 @@ export class CoreService implements OnModuleInit {
           AND c.deleted_at IS NULL
           AND c.is_active = true
           AND u.deleted_at IS NULL
-          AND u.role = 'YOUNGSTER'
+          AND u.role = 'CHILD'
         LIMIT 1
       ) t;
       `,
