@@ -5795,6 +5795,7 @@ export class CoreService implements OnModuleInit {
                o.delivery_status::text AS delivery_status,
                s.name AS school_name,
                (uc.first_name || ' ' || uc.last_name) AS child_name,
+               COALESCE(NULLIF(TRIM(uc.phone_number), ''), NULLIF(TRIM(up.phone_number), '')) AS youngster_mobile,
                COALESCE((up.first_name || ' ' || up.last_name), '-') AS parent_name,
                COALESCE(item_counts.dish_count, 0) AS dish_count,
                CASE
@@ -5846,6 +5847,7 @@ export class CoreService implements OnModuleInit {
       delivery_status: string;
       school_name: string;
       child_name: string;
+      youngster_mobile?: string | null;
       parent_name: string;
       dish_count: number;
       has_allergen: boolean;

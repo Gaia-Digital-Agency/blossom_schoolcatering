@@ -19,6 +19,7 @@ type KitchenOrder = {
   delivery_status: string;
   school_name?: string;
   child_name: string;
+  youngster_mobile?: string | null;
   parent_name: string;
   dish_count: number;
   has_allergen: boolean;
@@ -111,6 +112,81 @@ export default function KitchenDashboard({
     }
   };
 
+  const onDownloadPdf = () => {
+    if (!data) return;
+    const allOrders = data.orders || [];
+    if (allOrders.length === 0) {
+      setMessage('No orders available to export.');
+      return;
+    }
+
+    const escapeHtml = (value: string) => value.replace(/[&<>\"']/g, (char) => {
+      const entityMap: Record<string, string> = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        '\'': '&#39;',
+      };
+      return entityMap[char] || char;
+    });
+
+    const formatDishes = (o: KitchenOrder) => o.dishes.map((d) => `${d.item_name} x${d.quantity}`).join(', ') || '-';
+    const perColumn = Math.ceil(allOrders.length / 3);
+    const columns = [
+      allOrders.slice(0, perColumn),
+      allOrders.slice(perColumn, perColumn * 2),
+      allOrders.slice(perColumn * 2),
+    ];
+
+    const renderOrder = (o: KitchenOrder) => `
+      <article class=\"order-card\">
+        <div><strong>Session:</strong> ${escapeHtml(o.session)}</div>
+        <div><strong>Youngster:</strong> ${escapeHtml(o.child_name)}</div>
+        <div><strong>School:</strong> ${escapeHtml(o.school_name || '-')}</div>
+        <div><strong>Phone Number:</strong> ${escapeHtml(o.youngster_mobile || '-')}</div>
+        <div><strong>Dietary Allergies:</strong> ${escapeHtml(o.allergen_items || '-')}</div>
+        <div><strong>Status:</strong> ${escapeHtml(`${o.status} | Delivery: ${o.delivery_status}`)}</div>
+        <div><strong>Dishes:</strong> ${escapeHtml(formatDishes(o))}</div>
+      </article>
+    `;
+
+    const html = `
+      <!doctype html>
+      <html>
+      <head>
+        <meta charset=\"utf-8\" />
+        <title>Kitchen Orders ${escapeHtml(data.serviceDate)}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 16px; color: #2f2418; }
+          h1 { margin: 0 0 12px 0; font-size: 18px; }
+          .three-col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+          .col { display: grid; gap: 8px; align-content: start; }
+          .order-card { border: 1px solid #d8c6aa; border-radius: 8px; padding: 8px; font-size: 12px; line-height: 1.35; }
+          @media print { body { margin: 10mm; } }
+        </style>
+      </head>
+      <body>
+        <h1>Kitchen Orders - ${escapeHtml(data.serviceDate)}</h1>
+        <div class=\"three-col\">
+          ${columns.map((col) => `<section class=\"col\">${col.map(renderOrder).join('')}</section>`).join('')}
+        </div>
+      </body>
+      </html>
+    `;
+
+    const win = window.open('', '_blank', 'noopener,noreferrer');
+    if (!win) {
+      setError('Popup blocked. Please allow popups to export PDF.');
+      return;
+    }
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    win.print();
+  };
+
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -129,6 +205,7 @@ export default function KitchenDashboard({
           <Link className="btn btn-outline" href="/kitchen/today">Today</Link>
           <Link className="btn btn-outline" href="/kitchen/tomorrow">Tomorrow</Link>
           <button className="btn btn-outline" type="button" onClick={load}>Refresh</button>
+          <button className="btn btn-outline" type="button" onClick={onDownloadPdf}>Download PDF</button>
         </div>
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
@@ -213,9 +290,10 @@ export default function KitchenDashboard({
                       <div className="kitchen-order-list">
                         {pendingOrders.map((o) => (
                           <button className="kitchen-order-card" key={o.id} type="button" onClick={() => onMarkKitchenComplete(o.id)}>
-                            <strong>{o.session} - {o.child_name}</strong>
+                            <small>Session: {o.session}</small>
+                            <small>Youngster: {o.child_name}</small>
                             <small>School: {o.school_name || '-'}</small>
-                            <small>Parent: {o.parent_name}</small>
+                            <small>Phone Number: {o.youngster_mobile || '-'}</small>
                             <small>Dietary Allergies: {o.allergen_items || '-'}</small>
                             <small>Status: {o.status} | Delivery: {o.delivery_status}</small>
                             <small>Dishes: {o.dishes.map((d) => `${d.item_name} x${d.quantity}`).join(', ') || '-'}</small>
@@ -235,9 +313,10 @@ export default function KitchenDashboard({
                       <div className="kitchen-order-list">
                         {completedOrders.map((o) => (
                           <button className="kitchen-order-card kitchen-order-card-complete" key={o.id} type="button" onClick={() => onMarkKitchenComplete(o.id)}>
-                            <strong>{o.session} - {o.child_name}</strong>
+                            <small>Session: {o.session}</small>
+                            <small>Youngster: {o.child_name}</small>
                             <small>School: {o.school_name || '-'}</small>
-                            <small>Parent: {o.parent_name}</small>
+                            <small>Phone Number: {o.youngster_mobile || '-'}</small>
                             <small>Dietary Allergies: {o.allergen_items || '-'}</small>
                             <small>Status: {o.status} | Delivery: {o.delivery_status}</small>
                             <small>Dishes: {o.dishes.map((d) => `${d.item_name} x${d.quantity}`).join(', ') || '-'}</small>
