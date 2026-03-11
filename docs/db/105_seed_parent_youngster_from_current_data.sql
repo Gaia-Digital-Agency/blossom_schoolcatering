@@ -23,12 +23,12 @@ BEGIN
     SELECT *
     FROM (
       VALUES
-        ('Parent0A', 'Parent01', 'Youngster0A', 'Parent01', 'Bali Island School', 'azlan@gaiada', '+628176917122'),
-        ('Parent0B', 'Parent02', 'Youngster0B', 'Parent02', 'GMIS', 'azlan@gaiada', '+628176917122'),
-        ('Parent0C', 'Parent02', 'Yougster0C', 'Parent02', 'Garden Early Learning', 'azlan@gaiada', '+628176917122'),
-        ('Parent0D', 'Parent03', 'Yougster0D', 'Parent03', 'Little Star Bali', 'azlan@gaiada', '+628176917122'),
-        ('Parent0E', 'Parent03', 'Yougster0E', 'Parent03', 'Rumah Kecil Learning', 'azlan@gaiada', '+628176917122'),
-        ('Parent0F', 'Parent03', 'Yougster0F', 'Parent03', 'Sanur Indepenent', 'azlan@gaiada', '+628176917122')
+        ('Parent01', 'Parent01', 'Youngster0A', 'Parent01', 'Bali Island School', 'azlan@gaiada', '+628176917122'),
+        ('Parent02', 'Parent02', 'Youngster0B', 'Parent02', 'GMIS', 'azlan@gaiada', '+628176917122'),
+        ('Parent02', 'Parent02', 'Youngster0C', 'Parent02', 'Garden Early Learning', 'azlan@gaiada', '+628176917122'),
+        ('Parent03', 'Parent03', 'Youngster0D', 'Parent03', 'Little Star Bali', 'azlan@gaiada', '+628176917122'),
+        ('Parent03', 'Parent03', 'Youngster0E', 'Parent03', 'Rumah Kecil Learning', 'azlan@gaiada', '+628176917122'),
+        ('Parent03', 'Parent03', 'Youngster0F', 'Parent03', 'Sanur Indepenent', 'azlan@gaiada', '+628176917122')
     ) AS t(parent_first_name, parent_last_name, child_first_name, child_last_name, school_name, email, phone)
   LOOP
     SELECT id INTO v_school_id
@@ -42,18 +42,12 @@ BEGIN
       RETURNING id INTO v_school_id;
     END IF;
 
-    v_parent_name_tag := lower(regexp_replace(rec.parent_first_name, '[^a-zA-Z0-9]+', '', 'g'));
+    v_parent_name_tag := lower(regexp_replace(rec.parent_last_name, '[^a-zA-Z0-9]+', '', 'g'));
     v_child_name_tag := lower(regexp_replace(rec.child_first_name, '[^a-zA-Z0-9]+', '', 'g'));
 
-    v_parent_username := lower(regexp_replace(
-      format('parent_%s_%s', rec.parent_first_name, rec.parent_last_name),
-      '[^a-zA-Z0-9]+', '_', 'g'
-    ));
+    v_parent_username := lower(regexp_replace(rec.parent_last_name, '[^a-zA-Z0-9]+', '', 'g'));
 
-    v_child_username := lower(regexp_replace(
-      format('youngster_%s_%s', rec.child_first_name, rec.child_last_name),
-      '[^a-zA-Z0-9]+', '_', 'g'
-    ));
+    v_child_username := lower(regexp_replace(rec.child_first_name, '[^a-zA-Z0-9]+', '', 'g'));
 
     IF position('@' IN coalesce(rec.email, '')) > 0 THEN
       v_parent_email := format('%s+%s@%s', split_part(rec.email, '@', 1), v_parent_name_tag, split_part(rec.email, '@', 2));
@@ -183,20 +177,17 @@ END $$;
 DO $$
 DECLARE
   v_target_parent_usernames text[] := ARRAY[
-    'parent_parent0a_parent01',
-    'parent_parent0b_parent02',
-    'parent_parent0c_parent02',
-    'parent_parent0d_parent03',
-    'parent_parent0e_parent03',
-    'parent_parent0f_parent03'
+    'parent01',
+    'parent02',
+    'parent03'
   ];
   v_target_child_usernames text[] := ARRAY[
-    'youngster_youngster0a_parent01',
-    'youngster_youngster0b_parent02',
-    'youngster_yougster0c_parent02',
-    'youngster_yougster0d_parent03',
-    'youngster_yougster0e_parent03',
-    'youngster_yougster0f_parent03'
+    'youngster0a',
+    'youngster0b',
+    'youngster0c',
+    'youngster0d',
+    'youngster0e',
+    'youngster0f'
   ];
 BEGIN
   DELETE FROM parent_children

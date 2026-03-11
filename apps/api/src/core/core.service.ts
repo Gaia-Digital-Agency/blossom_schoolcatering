@@ -6684,24 +6684,58 @@ export class CoreService implements OnModuleInit {
     const email = (input.email || '').trim().toLowerCase();
     if (username.length < 3) throw new BadRequestException('Username too short');
     validatePasswordPolicy(password, 'password');
-    const exists = await runSql(
-      `SELECT EXISTS (
-         SELECT 1 FROM users
-         WHERE username = $1
-       );`,
-      [username],
-    );
-    if (exists === 't') throw new ConflictException('Username already exists');
     const passwordHash = this.hashPassword(password);
-    const out = await runSql(
-      `WITH inserted AS (
-         INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email, is_active)
-         VALUES ('DELIVERY', $1, $2, $3, $4, $5, $6, true)
-         RETURNING id, username, first_name, last_name
-       )
-       SELECT row_to_json(inserted)::text FROM inserted;`,
-      [username, passwordHash, firstName, lastName, phoneNumber, email || null],
+    const existingOut = await runSql(
+      `SELECT row_to_json(t)::text
+       FROM (
+         SELECT id, username, email, deleted_at::text AS deleted_at
+         FROM users
+         WHERE username = $1
+            OR ($2 IS NOT NULL AND lower(email) = lower($2))
+         ORDER BY CASE WHEN username = $1 THEN 0 ELSE 1 END
+         LIMIT 1
+       ) t;`,
+      [username, email || null],
     );
+    const existing = this.parseJsonLine<{ id: string; username: string; email?: string | null; deleted_at?: string | null }>(existingOut);
+
+    let out: string | null = null;
+    if (existing && !existing.deleted_at) {
+      if (existing.username === username) throw new ConflictException('Username already exists');
+      throw new ConflictException('Email already exists');
+    }
+
+    if (existing && existing.deleted_at) {
+      out = await runSql(
+        `WITH restored AS (
+           UPDATE users
+           SET role = 'DELIVERY',
+               username = $1,
+               password_hash = $2,
+               first_name = $3,
+               last_name = $4,
+               phone_number = $5,
+               email = $6,
+               is_active = true,
+               deleted_at = NULL,
+               updated_at = now()
+           WHERE id = $7
+           RETURNING id, username, first_name, last_name
+         )
+         SELECT row_to_json(restored)::text FROM restored;`,
+        [username, passwordHash, firstName, lastName, phoneNumber, email || null, existing.id],
+      );
+    } else {
+      out = await runSql(
+        `WITH inserted AS (
+           INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email, is_active)
+           VALUES ('DELIVERY', $1, $2, $3, $4, $5, $6, true)
+           RETURNING id, username, first_name, last_name
+         )
+         SELECT row_to_json(inserted)::text FROM inserted;`,
+        [username, passwordHash, firstName, lastName, phoneNumber, email || null],
+      );
+    }
     if (!out) throw new BadRequestException('Failed to create delivery user');
     const user = this.parseJsonLine<{ id: string; username: string; first_name: string; last_name: string }>(out);
     await runSql(
