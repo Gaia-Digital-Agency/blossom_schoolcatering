@@ -627,6 +627,12 @@ export class CoreController {
     return this.coreService.getDeliverySummary(req.user, date);
   }
 
+  @Post('admin/delivery/send-notification-email')
+  @Roles('ADMIN')
+  sendDeliveryNotificationEmail(@Req() req: AuthRequest) {
+    return this.coreService.sendDeliveryNotificationEmails(req.user);
+  }
+
   @Post('delivery/assignments/:assignmentId/confirm')
   @Roles('DELIVERY')
   confirmDelivery(

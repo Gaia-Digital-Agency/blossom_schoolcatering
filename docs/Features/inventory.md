@@ -1,54 +1,50 @@
 # Apps Inventory (Latest)
 
-Generated: 2026-03-09
+Generated: 2026-03-11  
 Source basis: `git ls-files apps` (excluding `*.md` and `package-lock.json`).
 
 ## Summary
-- Total files: `129`
-- Total text/code lines: `16967`
+- Total files: `148`
+- Total text/code lines: `22933`
 
 ## Files by Category
 
 | Category | Files | Text/Code Lines |
 |---|---:|---:|
-| Backend Config | 5 | 148 |
-| Backend Source | 60 | 8445 |
-| Backend Test | 4 | 147 |
-| Frontend Config | 4 | 53 |
-| Frontend Source | 51 | 8256 |
-| Frontend Static Asset | 5 | 24 |
-| Database Utility | 1 | 81 |
-
-## Notable Growth Since Previous Inventory
-- API source expanded significantly (DTO coverage and core/auth logic growth).
-- Frontend module pages now include richer admin and kitchen/delivery implementations.
-- Shared frontend utilities now include:
-  - `apps/web/lib/dish-tags.ts`
-  - `apps/web/lib/image.ts`
-  - `apps/web/app/_components/logout-button.tsx`
-  - `apps/web/app/_components/network-activity-indicator.tsx`
-- Added runtime page modules:
-  - `apps/web/app/guide/page.tsx`
-  - `apps/web/app/rating/page.tsx`
+| Backend Config | 5 | 150 |
+| Backend Source | 74 | 10999 |
+| Backend Test | 2 | 34 |
+| Frontend Config | 5 | 158 |
+| Frontend Source | 56 | 11527 |
+| Frontend Static Asset | 3 | 58 |
+| Other App Files | 3 | 7 |
 
 ## Largest Runtime Source Files (Current)
 
 | File | Lines |
 |---|---:|
-| `apps/api/src/core/core.service.ts` | 5314 |
-| `apps/api/src/auth/auth.service.ts` | 1027 |
-| `apps/web/app/admin/menu/page.tsx` | 982 |
-| `apps/web/app/globals.css` | 1009 |
-| `apps/web/app/parents/page.tsx` | 615 |
-| `apps/web/app/admin/delivery/page.tsx` | 505 |
-| `apps/web/app/youngsters/page.tsx` | 439 |
-| `apps/web/app/kitchen/_components/kitchen-dashboard.tsx` | 381 |
-| `apps/web/app/register/youngsters/page.tsx` | 389 |
+| `apps/api/src/core/core.service.ts` | 6985 |
+| `apps/web/app/globals.css` | 1203 |
+| `apps/api/src/auth/auth.service.ts` | 1160 |
+| `apps/web/app/admin/menu/page.tsx` | 1002 |
+| `apps/web/app/admin/delivery/page.tsx` | 891 |
+| `apps/web/app/admin/youngsters/page.tsx` | 820 |
+| `apps/web/app/parents/orders/page.tsx` | 751 |
+| `apps/api/src/core/core.controller.ts` | 743 |
+| `apps/web/app/youngsters/page.tsx` | 671 |
+| `apps/web/app/register/youngsters/page.tsx` | 564 |
+
+## Notable Growth Areas
+- `core.service.ts` continues to centralize most business logic (kitchen, delivery, billing, admin CRUD, reporting).
+- `admin/delivery` and `admin/youngsters` pages have become dense operational modules.
+- delivery/kitchen/admin interactions now include additional state-management and guard workflows.
+- Delivery and kitchen now include richer PDF-export workflows (2-column output) and selected-date handling.
+- Admin delivery now includes notification email workflow for today assignments with PDF attachment generation.
 
 ## Inventory Notes
-- Asset binary files (`jpg`, `svg`) are counted as files and marked `N/A` for line count.
-- This inventory is repository-based (tracked files), not runtime build-output based.
-- For full implementation behavior, cross-reference:
+- Binary/static assets are counted as files; line counts for binaries are not semantically meaningful.
+- Inventory is repository-tracked source based, not build-output based.
+- Cross-reference behavior docs:
   - `docs/Features/feature_matrix.md`
   - `docs/Features/buttons_api.md`
   - `docs/Features/map.md`

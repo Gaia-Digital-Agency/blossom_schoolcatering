@@ -178,19 +178,22 @@ export class CoreService implements OnModuleInit {
     return { clientEmail, privateKey };
   }
 
-  private async getGoogleAccessToken(scopes: string[]) {
+  private async getGoogleAccessToken(scopes: string[], delegatedUserEmail?: string) {
     const { clientEmail, privateKey } = await this.getGoogleServiceAccount();
     const iat = Math.floor(Date.now() / 1000);
     const exp = iat + 3600;
     const header = this.toBase64Url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+    const delegated = (delegatedUserEmail || '').trim().toLowerCase();
+    const payloadClaims: Record<string, unknown> = {
+      iss: clientEmail,
+      scope: scopes.join(' '),
+      aud: 'https://oauth2.googleapis.com/token',
+      exp,
+      iat,
+    };
+    if (delegated) payloadClaims.sub = delegated;
     const payload = this.toBase64Url(
-      JSON.stringify({
-        iss: clientEmail,
-        scope: scopes.join(' '),
-        aud: 'https://oauth2.googleapis.com/token',
-        exp,
-        iat,
-      }),
+      JSON.stringify(payloadClaims),
     );
     const unsigned = `${header}.${payload}`;
     const signer = createSign('RSA-SHA256');
@@ -215,6 +218,119 @@ export class CoreService implements OnModuleInit {
     const json = (await res.json()) as { access_token?: string };
     if (!json.access_token) throw new BadRequestException('Google token response missing access_token');
     return json.access_token;
+  }
+
+  private clipText(value: string, max = 72) {
+    const trimmed = String(value || '').trim();
+    if (trimmed.length <= max) return trimmed;
+    return `${trimmed.slice(0, Math.max(0, max - 3))}...`;
+  }
+
+  private buildTwoColumnDeliveryPdfLines(input: {
+    title: string;
+    serviceDate: string;
+    deliveryName: string;
+    orders: Array<{
+      session: string;
+      child_name: string;
+      school_name?: string | null;
+      youngster_mobile?: string | null;
+      allergen_items?: string | null;
+      status: string;
+      delivery_status: string;
+      dishes: Array<{ item_name: string; quantity: number }>;
+    }>;
+  }) {
+    const cards = input.orders.map((order) => {
+      const dishText = (order.dishes || []).map((d) => `${d.item_name} x${d.quantity}`).join(', ') || '-';
+      const allergy = (order.allergen_items || '').trim() || '-';
+      return [
+        `Session: ${this.clipText(order.session, 24)}`,
+        `Youngster Full Name: ${this.clipText(order.child_name, 52)}`,
+        `School: ${this.clipText(order.school_name || '-', 60)}`,
+        `Phone Number: ${this.clipText(order.youngster_mobile || '-', 48)}`,
+        `Dietary Allergies: ${this.clipText(allergy, 48)}`,
+        `Status: ${this.clipText(`${order.status} | Delivery: ${order.delivery_status}`, 52)}`,
+        `Dishes: ${this.clipText(dishText, 60)}`,
+      ];
+    });
+
+    const lines: string[] = [
+      input.title,
+      `Service Date: ${input.serviceDate}`,
+      `Delivery Personnel: ${input.deliveryName}`,
+      `Total Orders: ${cards.length}`,
+      '',
+    ];
+
+    const colWidth = 86;
+    for (let idx = 0; idx < cards.length; idx += 2) {
+      const left = cards[idx];
+      const right = cards[idx + 1] || [];
+      const maxRows = Math.max(left.length, right.length);
+      for (let row = 0; row < maxRows; row += 1) {
+        const l = (left[row] || '').padEnd(colWidth, ' ');
+        const r = right[row] || '';
+        lines.push(`${l} | ${r}`.slice(0, 180));
+      }
+      lines.push('');
+    }
+    return lines;
+  }
+
+  private async sendEmailWithPdfAttachment(input: {
+    to: string;
+    subject: string;
+    bodyText: string;
+    attachmentFileName: string;
+    attachmentData: Buffer;
+  }) {
+    const delegatedUser = (process.env.GOOGLE_GMAIL_DELEGATED_USER || '').trim().toLowerCase();
+    if (!delegatedUser) {
+      throw new BadRequestException('GOOGLE_GMAIL_DELEGATED_USER is required to send notification emails');
+    }
+    const from = (process.env.NOTIFICATION_EMAIL_FROM || delegatedUser).trim();
+    const boundary = `mixed_${randomUUID().replace(/-/g, '')}`;
+    const attachmentBase64 = input.attachmentData.toString('base64');
+    const attachmentChunks = attachmentBase64.match(/.{1,76}/g) || [];
+    const mime = [
+      `From: ${from}`,
+      `To: ${input.to}`,
+      `Subject: ${input.subject}`,
+      'MIME-Version: 1.0',
+      `Content-Type: multipart/mixed; boundary="${boundary}"`,
+      '',
+      `--${boundary}`,
+      'Content-Type: text/plain; charset="UTF-8"',
+      'Content-Transfer-Encoding: 7bit',
+      '',
+      input.bodyText,
+      '',
+      `--${boundary}`,
+      'Content-Type: application/pdf; name="assignment.pdf"',
+      'Content-Transfer-Encoding: base64',
+      `Content-Disposition: attachment; filename="${input.attachmentFileName}"`,
+      '',
+      ...attachmentChunks,
+      '',
+      `--${boundary}--`,
+      '',
+    ].join('\r\n');
+
+    const raw = this.toBase64Url(Buffer.from(mime, 'utf8'));
+    const accessToken = await this.getGoogleAccessToken(['https://www.googleapis.com/auth/gmail.send'], delegatedUser);
+    const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ raw }),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new BadRequestException(`Failed sending notification email: ${text || res.statusText}`);
+    }
   }
 
   private async uploadToGcs(params: {
@@ -4823,12 +4939,29 @@ export class CoreService implements OnModuleInit {
                da.confirmation_note,
                o.service_date::text AS service_date,
                o.session::text AS session,
+               o.status::text AS status,
                o.delivery_status::text AS delivery_status,
                o.total_price,
                s.name AS school_name,
                (uc.first_name || ' ' || uc.last_name) AS child_name,
                (up.first_name || ' ' || up.last_name) AS parent_name,
-               COALESCE(NULLIF(TRIM(uc.phone_number), ''), NULLIF(TRIM(up.phone_number), '')) AS youngster_mobile
+               COALESCE(NULLIF(TRIM(uc.phone_number), ''), NULLIF(TRIM(up.phone_number), '')) AS youngster_mobile,
+               CASE
+                 WHEN COALESCE(trim(o.dietary_snapshot), '') = '' THEN ''
+                 WHEN lower(o.dietary_snapshot) LIKE '%no allergies%' THEN ''
+                 ELSE o.dietary_snapshot
+               END AS allergen_items,
+               COALESCE((
+                 SELECT json_agg(row_to_json(d) ORDER BY d.item_name)
+                 FROM (
+                   SELECT oi2.menu_item_id,
+                          oi2.item_name_snapshot AS item_name,
+                          SUM(oi2.quantity)::int AS quantity
+                   FROM order_items oi2
+                   WHERE oi2.order_id = o.id
+                   GROUP BY oi2.menu_item_id, oi2.item_name_snapshot
+                 ) d
+               ), '[]'::json) AS dishes
         FROM delivery_assignments da
         JOIN orders o ON o.id = da.order_id
         JOIN children c ON c.id = o.child_id
@@ -4844,6 +4977,149 @@ export class CoreService implements OnModuleInit {
       params,
     );
     return this.parseJsonLines(out);
+  }
+
+  async sendDeliveryNotificationEmails(actor: AccessUser) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    const serviceDate = this.makassarTodayIsoDate();
+    const rowsRaw = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT da.delivery_user_id,
+               COALESCE(NULLIF(TRIM(du.email), ''), '') AS delivery_email,
+               (du.first_name || ' ' || du.last_name) AS delivery_name,
+               o.session::text AS session,
+               o.status::text AS status,
+               o.delivery_status::text AS delivery_status,
+               s.name AS school_name,
+               (uc.first_name || ' ' || uc.last_name) AS child_name,
+               COALESCE(NULLIF(TRIM(uc.phone_number), ''), NULLIF(TRIM(up.phone_number), '')) AS youngster_mobile,
+               CASE
+                 WHEN COALESCE(trim(o.dietary_snapshot), '') = '' THEN ''
+                 WHEN lower(o.dietary_snapshot) LIKE '%no allergies%' THEN ''
+                 ELSE o.dietary_snapshot
+               END AS allergen_items,
+               COALESCE((
+                 SELECT json_agg(row_to_json(d) ORDER BY d.item_name)
+                 FROM (
+                   SELECT oi2.menu_item_id,
+                          oi2.item_name_snapshot AS item_name,
+                          SUM(oi2.quantity)::int AS quantity
+                   FROM order_items oi2
+                   WHERE oi2.order_id = o.id
+                   GROUP BY oi2.menu_item_id, oi2.item_name_snapshot
+                 ) d
+               ), '[]'::json) AS dishes
+        FROM delivery_assignments da
+        JOIN users du ON du.id = da.delivery_user_id
+        JOIN orders o ON o.id = da.order_id
+        JOIN children c ON c.id = o.child_id
+        JOIN users uc ON uc.id = c.user_id
+        JOIN schools s ON s.id = c.school_id
+        LEFT JOIN users up ON up.id = o.placed_by_user_id
+        WHERE du.role = 'DELIVERY'
+          AND du.is_active = true
+          AND o.service_date = $1::date
+          AND o.status IN ('PLACED', 'LOCKED')
+          AND o.delivery_status IN ('ASSIGNED', 'OUT_FOR_DELIVERY')
+        ORDER BY delivery_name ASC, school_name ASC, child_name ASC, o.session ASC
+      ) t;
+      `,
+      [serviceDate],
+    );
+
+    const rows = this.parseJsonLines<{
+      delivery_user_id: string;
+      delivery_email: string;
+      delivery_name: string;
+      session: string;
+      status: string;
+      delivery_status: string;
+      school_name: string;
+      child_name: string;
+      youngster_mobile?: string | null;
+      allergen_items?: string | null;
+      dishes: Array<{ item_name: string; quantity: number }>;
+    }>(rowsRaw);
+
+    if (rows.length === 0) {
+      return { ok: true, date: serviceDate, sentCount: 0, skippedCount: 0, failed: [] as string[] };
+    }
+
+    const grouped = new Map<string, {
+      email: string;
+      deliveryName: string;
+      orders: Array<{
+        session: string;
+        child_name: string;
+        school_name?: string | null;
+        youngster_mobile?: string | null;
+        allergen_items?: string | null;
+        status: string;
+        delivery_status: string;
+        dishes: Array<{ item_name: string; quantity: number }>;
+      }>;
+    }>();
+    for (const row of rows) {
+      if (!grouped.has(row.delivery_user_id)) {
+        grouped.set(row.delivery_user_id, {
+          email: row.delivery_email || '',
+          deliveryName: row.delivery_name,
+          orders: [],
+        });
+      }
+      grouped.get(row.delivery_user_id)!.orders.push({
+        session: row.session,
+        child_name: row.child_name,
+        school_name: row.school_name,
+        youngster_mobile: row.youngster_mobile || null,
+        allergen_items: row.allergen_items || '',
+        status: row.status,
+        delivery_status: row.delivery_status,
+        dishes: Array.isArray(row.dishes) ? row.dishes : [],
+      });
+    }
+
+    let sentCount = 0;
+    let skippedCount = 0;
+    const failed: string[] = [];
+    for (const [deliveryUserId, group] of grouped.entries()) {
+      const email = (group.email || '').trim().toLowerCase();
+      if (!email) {
+        skippedCount += 1;
+        failed.push(`${group.deliveryName} (${deliveryUserId}) has no email`);
+        continue;
+      }
+      const pdfLines = this.buildTwoColumnDeliveryPdfLines({
+        title: 'Assigned Orders',
+        serviceDate,
+        deliveryName: group.deliveryName,
+        orders: group.orders,
+      });
+      const pdf = this.buildSimplePdf(pdfLines);
+      try {
+        await this.sendEmailWithPdfAttachment({
+          to: email,
+          subject: `Assigned Orders for ${serviceDate}`,
+          bodyText: `Hello ${group.deliveryName},\n\nAttached is your assigned orders list for ${serviceDate}.\n\nRegards,\nSchool Catering`,
+          attachmentFileName: `assigned-orders-${serviceDate}.pdf`,
+          attachmentData: pdf,
+        });
+        sentCount += 1;
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : 'unknown error';
+        failed.push(`${group.deliveryName} (${email}): ${reason}`);
+      }
+    }
+
+    return {
+      ok: failed.length === 0,
+      date: serviceDate,
+      sentCount,
+      skippedCount,
+      failed,
+    };
   }
 
   async getDeliverySummary(actor: AccessUser, dateRaw?: string) {

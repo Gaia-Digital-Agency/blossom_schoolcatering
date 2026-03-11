@@ -1,64 +1,54 @@
-# How each Youngster Points Insight is calculated (`/youngsters/me/insights`)
+# Youngster Insights Calculation Notes (`/youngsters/me/insights`)
 
-## Clean Plate Club Badges
+Last verified from code: 2026-03-10
 
-- `BRONZE`:
+## 1) Badge Levels
+
+### Clean Plate Club Badge
+- `BRONZE`
   - `maxConsecutiveOrderDays >= 5`
-- `SILVER`:
-  - `currentMonthOrders >= 10` and `currentMonthConsecutiveWeeks >= 2`
-- `GOLD`:
-  - `currentMonthOrders >= 20` and `currentMonthConsecutiveWeeks >= 2`
-- `PLATINUM`:
-  - Previous month met Silver or Gold condition
-  - AND current month meets Silver or Gold condition
+- `SILVER`
+  - `currentMonthOrders >= 10`
+  - and consecutive-week threshold condition met
+- `GOLD`
+  - `currentMonthOrders >= 20`
+  - and consecutive-week threshold condition met
+- `PLATINUM`
+  - previous month qualified at silver/gold tier
+  - and current month also qualifies at silver/gold tier
 
-## Max consecutive order days: 
-
-- Built from unique `service_date` values of non-cancelled orders for the youngster (70-day lookback window).
+## 2) Max Consecutive Order Days
+- Uses unique non-cancelled `service_date` values for the youngster.
 - Sort dates ascending.
-- Longest streak where each next date is exactly +1 day.
+- Longest streak where each subsequent date is exactly +1 day.
 
-## Max consecutive order weeks: 
+## 3) Max Consecutive Order Weeks
+- Build week sets from non-cancelled order dates for current and previous month.
+- Convert to ISO week numbers.
+- Deduplicate and compute longest consecutive ISO-week streak.
+- Output uses max streak across the two month windows.
 
-- Collect order dates (non-cancelled) for current month and previous month.
-- For each month:
-  - Convert each order date to ISO week number.
-  - Deduplicate week numbers.
-  - Compute longest consecutive ISO-week streak.
-- Final value shown:
-  - `max(currentMonthConsecutiveWeeks, previousMonthConsecutiveWeeks)`
+## 4) Current Month Orders
+- Count of non-cancelled order days in current month.
+- This is effectively day-count behavior, not raw order-item count.
 
-## Current month orders: 
+## 5) Birthday Countdown
+- Computes next birthday from DOB and reference date.
+- If birthday already passed this year, uses next year.
+- Returns days until next birthday.
 
-- Count of non-cancelled unique order dates (`service_date`) in current month.
-- This is effectively "ordered days this month", not raw order-item count.
+## 6) Current Week Metrics
+- Week window: Monday to Sunday (ISO-style week window).
 
-## Birthday in: 
+### Total Calories
+- Sum of `order_items.quantity * COALESCE(menu_items.calories_kcal, 0)` for non-cancelled orders in week window.
 
-- Compute next birthday date using youngster DOB and reference date.
-- If this year’s birthday already passed, use next year.
-- Return:
-  - `ceil((nextBirthday - referenceDate) in days)`
+### Total Orders
+- Distinct order count in week window (non-cancelled).
 
-## Current Week
+### Total Dishes
+- Sum of `order_items.quantity` in week window (non-cancelled).
 
-- Week start = Monday of reference date (ISO week).
-- Week end = week start + 6 days.
-
-### Total Calories: 
-
-- For non-cancelled orders in week range:
-  - Sum `order_items.quantity * COALESCE(menu_items.calories_kcal, 0)`
-
-### Total Orders: 
-
-- `COUNT(DISTINCT orders.id)` for youngster in week range, non-cancelled.
-
-### Total Dishes: 
-
-- `SUM(order_items.quantity)` for youngster in week range, non-cancelled.
-
-## Daily calories row
-
-- Generated from per-day week data (`service_date -> calories_display`).
-- UI Hidden for later use
+## 7) Daily Calories Row
+- Daily calories data is prepared from week aggregation.
+- Current UI may hide or simplify this row depending on page presentation.

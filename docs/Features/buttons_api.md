@@ -1,131 +1,138 @@
-# Button and Action Inventory (Latest)
+# Button and Action Inventory
 
-Generated from code audit on 2026-02-28.
-Updated with runtime changes on 2026-03-09.
-Scope: `apps/web/app` interactive actions and their backend impact.
+Generated from code audit on 2026-03-11  
+Scope: `apps/web/app` interactive actions and API impact.
 
 ## Legend
-- `No API`: client-only interaction.
-- `Read-only`: GET/read operation, no state mutation expected.
-- `Write`: endpoint mutates runtime data.
+- `No API`: client-only behavior.
+- `Read-only`: fetch/read operation.
+- `Write`: state mutation endpoint.
 
 ## Global/Common
 
 | File | Action | Endpoint(s) | Type | Notes |
 |---|---|---|---|---|
-| `app/_components/password-input.tsx` | Show/Hide password | No API | No API | UI-only visibility toggle. |
-| `app/_components/role-login-form.tsx` | `Sign In` | `POST /api/v1/auth/login` | Write | Role-specific login pages. |
-| `app/_components/google-oauth-button.tsx` | Google sign-in | `POST /api/v1/auth/google/verify` | Write | Parent/youngster Google login. |
-| `app/_components/dev-page.tsx` | `Update Password` | `POST /api/v1/auth/change-password` | Write | Authenticated password update. |
-| `app/_components/logout-button.tsx` | `Logout` | `POST /api/v1/auth/logout` | Write | Clears session + local auth state. |
+| `app/_components/password-input.tsx` | Show/Hide password | No API | No API | UI visibility toggle only. |
+| `app/_components/role-login-form.tsx` | `Sign In` | `POST /api/v1/auth/login` | Write | Role login pages. |
+| `app/_components/google-oauth-button.tsx` | Google sign-in | `POST /api/v1/auth/google/verify` | Write | OAuth login. |
+| `app/_components/logout-button.tsx` | `Logout` | `POST /api/v1/auth/logout` | Write | Clears session and local state. |
 
 ## Public/Auth
 
 | File | Action | Endpoint(s) | Type | Notes |
 |---|---|---|---|---|
-| `app/page.tsx` | Menu toggle / Back to top | No API | No API | UI behavior only. |
-| `app/login/page.tsx` | `Sign In` | `POST /api/v1/auth/login` | Write | Generic login path. |
-| `app/register/_components/register-form.tsx` | `Create Account` | `POST /api/v1/auth/register` | Write | Role account registration component. |
-| `app/register/youngsters/page.tsx` | `Register Youngster` | `GET /auth/register/schools`, `POST /auth/register/youngsters` | Write | Combined youngster+parent flow with registrant type logic. |
-| `app/rating/page.tsx` | `Submit Review` | `POST /api/v1/ratings` | Write | Persists menu ratings. |
+| `app/login/page.tsx` | `Sign In` | `POST /api/v1/auth/login` | Write | Generic login route. |
+| `app/register/youngsters/page.tsx` | `Register Youngster` | `GET /auth/register/schools`, `POST /auth/register/youngsters` | Write | Combined youngster+parent flow. |
+| `app/rating/page.tsx` | `Submit Review` | `POST /api/v1/ratings` | Write | Dish rating persistence. |
 
 ## Parent (`/parents`)
 
-| Action | Endpoint(s) | Type | Notes |
-|---|---|---|---|
-| Add/Remove draft item | No API | No API | Local cart composition before submit. |
-| `Place Order` | `POST /carts`, `PATCH /carts/:id/items`, `POST /carts/:id/submit` | Write | Creates order + billing record flow. |
-| `Refresh Orders` | `GET /parents/me/orders/consolidated` | Read-only | Reloads consolidated orders. |
-| `Edit Before Cutoff` | `POST /carts/quick-reorder` | Write | Reopens order to editable draft. |
-| `Delete Before Cutoff` | `DELETE /orders/:orderId` | Write | Deletes order when still editable. |
-| `Quick Reorder` | `POST /carts/quick-reorder` | Write | Clones order to target date draft. |
-| `Refresh Billing` | `GET /billing/parent/consolidated` | Read-only | Reload billing rows. |
-| `Upload Proof For Selected Unpaid Bills` | `POST /billing/proof-upload-batch` | Write | Batch proof upload. |
-| `View Proof Image` | `GET /billing/:billingId/proof-image` | Read-only | Authenticated proof image stream. |
-| `Open Receipt` | `GET /billing/:billingId/receipt` | Read-only | Opens generated receipt URL. |
-| `Redo (Move to Unpaid)` | `POST /billing/:billingId/revert-proof` | Write | Clears proof and returns bill to unpaid. |
-| `Refresh Spending` | `GET /parents/me/spending-dashboard` | Read-only | Reload spending metrics. |
+| Action | Endpoint(s) | Type |
+|---|---|---|
+| `Place Order` | `POST /carts`, `PATCH /carts/:id/items`, `POST /carts/:id/submit` | Write |
+| `Refresh Orders` | `GET /parents/me/orders/consolidated` | Read-only |
+| `Edit Before Cutoff` / `Quick Reorder` | `POST /carts/quick-reorder` | Write |
+| `Delete Before Cutoff` | `DELETE /orders/:orderId` | Write |
+| `Refresh Billing` | `GET /billing/parent/consolidated` | Read-only |
+| `Upload Proof (Batch)` | `POST /billing/proof-upload-batch` | Write |
+| `View Proof Image` | `GET /billing/:billingId/proof-image` | Read-only |
+| `Open Receipt` | `GET /billing/:billingId/receipt` | Read-only |
+| `Redo (Move to Unpaid)` | `POST /billing/:billingId/revert-proof` | Write |
+| `Refresh Spending` | `GET /parents/me/spending-dashboard` | Read-only |
 
 ## Youngster (`/youngsters`)
 
-| Action | Endpoint(s) | Type | Notes |
-|---|---|---|---|
-| Add/Remove draft item | No API | No API | Local cart composition before submit. |
-| `Place Order` | `POST /carts`, `PATCH /carts/:id/items`, `POST /carts/:id/submit` | Write | Creates youngster order flow. |
-| Insights reload (page load / post-submit) | `GET /youngsters/me/insights` | Read-only | Badge and nutrition panel. |
-| Orders reload | `GET /youngsters/me/orders/consolidated` | Read-only | Confirmed order views. |
+| Action | Endpoint(s) | Type |
+|---|---|---|
+| `Place Order` | `POST /carts`, `PATCH /carts/:id/items`, `POST /carts/:id/submit` | Write |
+| Insights load/reload | `GET /youngsters/me/insights` | Read-only |
+| Orders load/reload | `GET /youngsters/me/orders/consolidated` | Read-only |
 
 ## Delivery (`/delivery`)
 
 | Action | Endpoint(s) | Type | Notes |
 |---|---|---|---|
-| `Past` / `Today` / `Future` | `GET /delivery/assignments?date=...` | Read-only | Date-window assignment query. |
-| `Refresh Assignments` | `GET /delivery/assignments?date=...` | Read-only | Reload list. |
-| `Mark Complete` / Undo | `PATCH /delivery/assignments/:assignmentId/toggle` | Write | Toggles completion state with optional note. |
+| `Yesterday` / `Today` / `Tomorrow` | Client date selection; uses loaded rows | No API | Works with current loaded dataset. |
+| `Refresh` | `GET /delivery/assignments?date=yesterday|today|tomorrow` | Read-only | Reloads 3-day window and merges rows. |
+| `Show Service Date` | `GET /delivery/assignments?date=...` | Read-only | Explicit arbitrary-date fetch. |
+| `Download PDF` | `GET /delivery/assignments?date=...` | Read-only | Fetches selected-date assignments then opens browser print-to-PDF in 2-column layout. |
+| `Mark Complete` / Undo | `PATCH /delivery/assignments/:assignmentId/toggle` | Write | Optional confirmation note included. |
 
 ## Kitchen (`/kitchen*`)
 
+| Action | Endpoint(s) | Type |
+|---|---|---|
+| `Service Date` picker | `GET /kitchen/daily-summary?date=...` | Read-only |
+| `Refresh` | `GET /kitchen/daily-summary?date=...` | Read-only |
+| `Download PDF` | No API | No API |
+| `Mark Kitchen Complete` / revert | `POST /kitchen/orders/:orderId/complete` | Write |
+
+## Admin Dashboard/Reports
+
+| Action | Endpoint(s) | Type |
+|---|---|---|
+| Dashboard load/refresh | `GET /admin/dashboard?date=...` | Read-only |
+| Reports load/refresh | `GET /admin/revenue?...` | Read-only |
+
+## Admin Billing
+
+| Action | Endpoint(s) | Type |
+|---|---|---|
+| `View Proof` | `GET /admin/billing/:billingId/proof-image` | Read-only |
+| `Verify` / `Reject` | `POST /admin/billing/:billingId/verify` | Write |
+| `Generate/Regenerate Receipt` | `POST /admin/billing/:billingId/receipt` | Write |
+
+## Admin Schools/Session
+
+| Action | Endpoint(s) | Type |
+|---|---|---|
+| `Create School` | `POST /admin/schools` | Write |
+| School `Activate/Deactivate` | `PATCH /admin/schools/:schoolId` | Write |
+| `Delete School` | `DELETE /admin/schools/:schoolId` | Write |
+| Session `Activate/Deactivate` | `PATCH /admin/session-settings/:session` | Write |
+
+## Admin Parents/Youngsters
+
 | Action | Endpoint(s) | Type | Notes |
 |---|---|---|---|
-| `Refresh Now` | `GET /kitchen/daily-summary?date=...` | Read-only | Reloads kitchen dashboard. |
-| `Mark Kitchen Complete` | `POST /kitchen/orders/:orderId/complete` | Write | Marks kitchen stage complete. |
-
-## Admin
-
-### Dashboard and Reports
-
-| Action | Endpoint(s) | Type | Notes |
-|---|---|---|---|
-| Dashboard `Refresh` | `GET /admin/dashboard?date=...` | Read-only | KPI refresh. |
-| Reports `Refresh` | `GET /admin/revenue?...` | Read-only | Revenue filters and metrics. |
-
-### Billing
-
-| Action | Endpoint(s) | Type | Notes |
-|---|---|---|---|
-| `View Proof` | `GET /admin/billing/:billingId/proof-image` | Read-only | Authenticated proof image stream. |
-| `Verify` / `Reject` | `POST /admin/billing/:billingId/verify` | Write | Billing proof decision. |
-| `Generate Receipt` / `Regenerate Receipt` | `POST /admin/billing/:billingId/receipt` | Write | Receipt number/PDF generation flow. |
-
-### Schools and Sessions
-
-| Action | Endpoint(s) | Type | Notes |
-|---|---|---|---|
-| `Create School` | `POST /admin/schools` | Write | Creates school. |
-| `Activate` / `Deactivate` School | `PATCH /admin/schools/:schoolId` | Write | School status toggle. |
-| `Delete` School | `DELETE /admin/schools/:schoolId` | Write | Deletes school. |
-| Session `Activate` / `Deactivate` | `PATCH /admin/session-settings/:session` | Write | Lunch enforced ON server-side. |
-
-### Parents and Youngsters
-
-| Action | Endpoint(s) | Type | Notes |
-|---|---|---|---|
-| Parent `Reset Password` | `PATCH /admin/users/:userId/reset-password` | Write | Admin password reset action. |
+| Parent `Show Password` | `PATCH /admin/users/:userId/reset-password` | Write | Resets parent password and shows new value. |
+| Parent `Delete` | `DELETE /admin/parents/:parentId` | Write | Blocked if linked youngster exists. |
 | `Create Youngster` | `POST /children/register` | Write | Admin create youngster profile. |
 | `Update Youngster` | `PATCH /admin/youngsters/:youngsterId` | Write | Admin edit youngster profile. |
 | `Delete Youngster` | `DELETE /admin/youngsters/:youngsterId` | Write | Admin delete youngster. |
-| Youngster `Reset Password` | `PATCH /admin/youngsters/:youngsterId/reset-password` | Write | Admin reset youngster account password (youngster-scoped). |
+| Youngster `Show Password` | `PATCH /admin/youngsters/:youngsterId/reset-password` | Write | Youngster-scoped reset endpoint. |
 
-### Delivery Management
+## Admin Delivery Management
 
 | Action | Endpoint(s) | Type | Notes |
 |---|---|---|---|
-| `Create Delivery User` | `POST /admin/delivery/users` | Write | Creates delivery account. |
-| User `Edit`/`Save` | `PATCH /admin/delivery/users/:userId` | Write | Update delivery user profile. |
-| User `Activate`/`Deactivate` | `PATCH /admin/delivery/users/:userId` | Write | Active-state toggle from UI. |
+| `Create Delivery User` | `POST /admin/delivery/users` | Write | Delivery account create. |
+| Delivery user `Edit`/`Save` | `PATCH /admin/delivery/users/:userId` | Write | Profile update. |
+| Delivery user `Show Password` | `PATCH /admin/users/:userId/reset-password` | Write | Resets delivery password and shows new value. |
+| Delivery user `Activate/Deactivate` | `PATCH /admin/delivery/users/:userId` | Write | Active-state toggle. |
+| Delivery user `Delete` | `DELETE /admin/delivery/users/:userId` | Write | Prevented with active assignments. |
 | `Save Assignment` | `POST /delivery/school-assignments` | Write | Upsert school mapping. |
-| Mapping `Activate`/`Deactivate` | `POST /delivery/school-assignments` | Write | Mapping state toggle. |
-| `Auto Assign by School` | `POST /delivery/auto-assign` | Write | Auto-create assignments from mappings. |
-| `Refresh` | `GET /delivery/assignments?date=...` (+ support reads) | Read-only | Refresh admin delivery overview. |
+| Mapping `Activate/Deactivate` | `POST /delivery/school-assignments` | Write | Mapping state update. |
+| Mapping `Delete` | `DELETE /delivery/school-assignments/:deliveryUserId/:schoolId` | Write | Remove mapping row. |
+| `Auto Assign by School` | `POST /delivery/auto-assign` | Write | Assigns OUT_FOR_DELIVERY orders by school mapping. |
+| `Show Service Date` | `GET /delivery/assignments?date=...` | Read-only | Loads assigned orders for selected date. |
+| `Download Summary` | `GET /delivery/summary?date=...` | Read-only | Generates client-side text export. |
+| `SEND NOTIFICATION EMAIL` | `POST /admin/delivery/send-notification-email` | Write | Sends today-assigned delivery PDF via email for active delivery users. |
 
-### Menu Management
+## Admin Kitchen
 
-| Action | Endpoint(s) | Type | Notes |
-|---|---|---|---|
-| `Load Menu Context` | `GET /admin/menus`, `GET /admin/ingredients` | Read-only | Context load for date/session. |
-| `Seed Sample Menus` | `POST /admin/menus/sample-seed` | Write | Seeds menu rows. |
-| `Create Dish` / `Update Dish` | `POST /admin/menu-items`, `PATCH /admin/menu-items/:itemId` | Write | Menu item upsert flow. |
-| `Delete Dish` | `DELETE /admin/menu-items/:itemId` | Write | Removes menu item. |
-| `Activate` / `Deactivate` Dish | `PATCH /admin/menu-items/:itemId` | Write | Availability toggle. |
-| Ingredient quick-create (conditional) | `POST /admin/ingredients` | Write | Missing ingredient creation path. |
-| Image upload | `POST /admin/menu-images/upload` | Write | Upload menu image object. |
+| Action | Endpoint(s) | Type |
+|---|---|---|
+| `Refresh` | `GET /kitchen/daily-summary?date=...` | Read-only |
+
+## Admin Menu
+
+| Action | Endpoint(s) | Type |
+|---|---|---|
+| Context load | `GET /admin/menus`, `GET /admin/ingredients` | Read-only |
+| `Seed Sample Menus` | `POST /admin/menus/sample-seed` | Write |
+| Dish create/update | `POST /admin/menu-items`, `PATCH /admin/menu-items/:itemId` | Write |
+| Dish delete | `DELETE /admin/menu-items/:itemId` | Write |
+| Dish availability toggle | `PATCH /admin/menu-items/:itemId` | Write |
+| Ingredient quick create | `POST /admin/ingredients` | Write |
+| Image upload | `POST /admin/menu-images/upload` | Write |

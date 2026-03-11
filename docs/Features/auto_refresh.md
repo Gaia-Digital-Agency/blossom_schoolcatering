@@ -1,22 +1,25 @@
-## Auto Refresh Note
+# Auto Refresh Note
 
-Last reviewed: 2026-03-09
+Last reviewed: 2026-03-10
 
-Count of automatic refresh mechanisms (without button click): **2**
+## Count of true automatic refresh mechanisms (without explicit button click): **1**
 
-1. `apps/web/app/kitchen/_components/kitchen-dashboard.tsx`
-   - Auto loads kitchen data every 60 minutes (only during 05:00-21:00 Asia/Makassar).
+1. `apps/web/lib/auth.ts`
+   - `apiFetch()` auto-triggers `window.location.reload()` after successful `POST/PATCH/PUT/DELETE` calls
+   - bypassed only when `skipAutoReload: true` is passed
 
-2. `apps/web/lib/auth.ts`
-   - Auto triggers `window.location.reload()` after successful `POST/PATCH/PUT/DELETE` API calls (unless `skipAutoReload` is enabled).
+## Not counted as automatic refresh
 
-### Not counted as auto refresh
+- `apps/web/app/kitchen/_components/kitchen-dashboard.tsx`
+  - loads on mount/date switch, then manual `Refresh` button
+  - no periodic interval polling in current code
+- `apps/web/app/delivery/page.tsx`
+  - loads on mount and on explicit actions (`Refresh`, `Show Service Date`, toggle complete)
+- `apps/web/app/admin/delivery/page.tsx`
+  - loads on date change and explicit actions (`Show Service Date`, auto assign, CRUD actions)
+- countdown/clock timers in role pages (if present)
+  - UI state updates only, not server data refresh
 
-- `apps/web/app/parents/page.tsx`
-- `apps/web/app/youngsters/page.tsx`
-
-These use 1-second timers only to update on-screen countdown/clock state, not to refresh data from the server.
-
-## Related UX Standard (2026-03-09)
-- Runtime action errors are displayed inline as bold red blocks (`.auth-error`).
-- Disabled/unallowed buttons are visibly marked in red with `not-allowed` cursor.
+## Related UX Standard
+- Runtime action errors displayed inline as `.auth-error`
+- Disabled/unallowed actions are clearly styled

@@ -1,6 +1,6 @@
-# Blossom School Catering - Full Feature Matrix
+# Blossom School Catering - Feature Matrix
 
-Last verified from code: 2026-03-09  
+Last verified from code: 2026-03-11  
 Repository: `/Users/rogerwoolie/Documents/gaiada_projects/blossom-schoolcatering`  
 Runtime base path: `/schoolcatering`  
 API base path: `/schoolcatering/api/v1`
@@ -15,128 +15,107 @@ API base path: `/schoolcatering/api/v1`
 - `DELIVERY`
 
 ### Public Routes
-- `/`
-- `/home`
-- `/menu`
-- `/guide`
-- `/login`
-- `/register`
-- `/register/youngsters`
-- `/register/parent` (redirects to `/register/youngsters`)
-- `/register/delivery` (redirects to `/register`)
-- `/admin/login`
-- `/kitchen/login`
-- `/delivery/login`
-- `/parent/login`
-- `/youngster/login`
+- `/`, `/home`, `/menu`, `/guide`, `/privacy-and-confidentiality`
+- `/login`, `/register`, `/register/youngsters`, `/register/parent`, `/register/delivery`
+- `/admin/login`, `/kitchen/login`, `/delivery/login`, `/parent/login`, `/youngster/login`
 
 ### Protected Routes
-- Parent: `/parents`, `/parent`, `/parent/*`
-- Youngster: `/youngsters`, `/youngster`, `/youngster/*`
+- Parent: `/parents`, `/parent`, `/parents/*`
+- Youngster: `/youngsters`, `/youngster`, `/youngsters/*`
 - Admin: `/admin`, `/admin/*`
 - Kitchen: `/kitchen`, `/kitchen/*`
 - Delivery: `/delivery`, `/delivery/*`
 
 ### Middleware Behavior
-- Missing token on protected route redirects to matching role login.
+- Missing token on protected route redirects to role login.
 - Wrong role on protected route redirects to matching role login.
-- Authenticated user opening their own role-login route is redirected to role home.
-- `/rating` is auth-required but not role-restricted.
+- Authenticated role-login access redirects to role home.
 
 ## 2) Public and Entry Features
 
 ### Home (`/`)
-- Brand header with mobile menu toggle.
-- Links: Menu, external Steakhouse site, Guides/T&C.
-- Calls to action: `Log In`, `Register`, Google OAuth button.
-- Hero image, chef message, footer, back-to-top button.
+- Mobile-first landing surface with CTA to login/register.
+- Includes guide/menu navigation and supporting content sections.
 
 ### Login (`/login`)
-- Username/password form.
-- On success redirects:
-  - `PARENT` -> `/parents`
-  - `YOUNGSTER` -> `/youngsters`
-  - other roles -> `/dashboard`
+- Username/password auth; redirects based on role.
 
-### Youngster Registration (`/register/youngsters`)
-- Combined youngster + parent registration flow.
-- Required registrant selector: `YOUNGSTER`, `PARENT`, `TEACHER`.
-- Teacher flow requires `teacherName` (max 50 chars).
-- School options loaded from `GET /auth/register/schools`.
-- Record mode (`?mode=record`) for parent/youngster is read-only.
+### Register (`/register/youngsters`)
+- Combined youngster + parent registration.
+- Registrant type enforced: `YOUNGSTER | PARENT | TEACHER`.
+- Teacher mode enforces `teacherName` max 50 chars.
 
 ### Guides (`/guide`)
-- Dynamically reads markdown files from `docs/guides/*`.
-- Shows file-based `Last updated` timestamps.
+- Renders markdown from `docs/guides/*`.
 
 ### Public Menu (`/menu`)
-- Public menu browsing via `GET /public/menu`.
+- Read-only menu display from public API.
 
 ### Rating (`/rating`)
-- Auth-required dish rating page.
-- Submits ratings via `POST /ratings`.
+- Auth-required dish rating submission.
 
 ## 3) Role Feature Matrix
 
 ### Parent (`/parents`)
-- Linked youngster selection.
-- Menu and draft cart management.
-- Place order flow (create cart -> patch items -> submit cart).
-- Quick reorder and edit-before-cutoff.
-- Delete-before-cutoff.
-- Consolidated orders.
-- Consolidated billing.
-- Batch proof upload for unpaid billing.
-- View uploaded proof image from paid/pending rows.
-- Open receipt for paid rows.
+- Child-linked ordering with session/date selection.
+- Cart -> submit -> order flow.
+- Edit/delete before cutoff (rule-gated).
+- Quick reorder flow.
+- Consolidated billing and proof upload/batch upload.
+- Authenticated billing proof image view.
+- Receipt view and proof revert workflow.
 - Spending dashboard.
-- Shared logout button.
 
 ### Youngster (`/youngsters`)
-- Profile summary.
-- Weekly nutrition and badge insight.
-- Menu and draft cart management.
-- Place order flow.
-- Consolidated own orders.
-- Shared logout button.
-
-### Admin (`/admin/*`)
-- Dashboard KPI.
-- Parent list + reset password.
-- Youngster create/edit/delete + reset password (youngster-scoped endpoint).
-- School create/activate/deactivate/delete.
-- Session setting toggle (Lunch fixed ON).
-- Blackout create/list/delete.
-- Menu management (create/update/delete/toggle/seed/upload image).
-- Ingredient create/update/delete.
-- Billing verify/reject and receipt generation.
-- Billing proof image review uses authenticated proof-image stream endpoint.
-- Delivery user create/edit/activate-deactivate.
-- Delivery-school mapping and auto-assign.
-- Reports and admin kitchen monitoring.
-
-### Kitchen (`/kitchen*`)
-- Date-specific dashboards (`yesterday`, `today`, `tomorrow`).
-- Overview and summary tables.
-- Dietary alert section (today view).
-- Order board with `Mark Kitchen Complete`.
-- Hourly refresh within operational window.
+- Weekly nutrition/insight panel.
+- Badge/points calculations.
+- Ordering flow and consolidated order history.
 
 ### Delivery (`/delivery`)
-- Assignment list by selected date.
-- Date quick actions: `Past`, `Today`, `Future`.
-- Completion toggle per assignment.
-- Optional confirmation note payload.
+- Assignment views grouped into pending/completed.
+- Quick date filters: Yesterday/Today/Tomorrow.
+- Manual service date picker + `Show Service Date` for arbitrary dates.
+- `Download PDF` for selected service date (2-column output).
+- Delivery order cards now include: Session, Youngster Full Name, School, Phone Number, Dietary Allergies, Status, Dishes.
+- Assignment completion toggle with optional note.
+
+### Kitchen (`/kitchen*`)
+- Day-specific dashboards (`yesterday`, `today`, `tomorrow`).
+- Overview, dish summary, dietary alerts, pending/completed order columns.
+- `Total Orders Complete` shown in overview.
+- Manual date picker on kitchen page now loads selected service date immediately.
+- `Download PDF` now renders 2-column output.
+- Toggle kitchen completion per order.
+
+### Admin (`/admin/*`)
+- Dashboard, reports, schools, sessions, blackout dates, menu, ingredients, billing, kitchen monitor.
+- Parents:
+  - show password action
+  - delete parent action (blocked when linked youngster exists)
+- Youngsters:
+  - create/edit/delete
+  - youngster password reset
+- Delivery management:
+  - delivery user CRUD + active/inactive toggle
+  - show password action for delivery users (admin reset)
+  - school mapping CRUD + activate/deactivate
+  - `SEND NOTIFICATION EMAIL` action in Delivery vs School Assignment card
+  - auto assignment by school
+  - `Auto Assignment` includes per-order detailed rows
+  - `Show Service Date` loads assigned orders for selected date
+- Admin kitchen overview includes `Total Orders Complete`.
 
 ## 4) Authentication and Session Features
-- JWT access token + refresh rotation.
-- Refresh token stored in secure HttpOnly cookie.
-- Access token mirrored in local storage/cookie for middleware checks.
-- Silent refresh on `401` in shared fetch helper.
-- Logout invalidates server refresh session and clears local auth state.
-- Role-based guards in backend (`JwtAuthGuard`, `RolesGuard`).
+- Access token + refresh token model.
+- Refresh token in HttpOnly cookie.
+- Silent refresh path on API 401.
+- Role guards in middleware and backend.
+- Admin reset-password endpoint supports:
+  - `PARENT`
+  - `YOUNGSTER`
+  - `DELIVERY`
 
-## 5) API Surface (Implemented)
+## 5) API Surface (Current)
 
 ### Auth (`/api/v1/auth`)
 - `POST /login`
@@ -153,21 +132,25 @@ API base path: `/schoolcatering/api/v1`
 - `POST /role-check`
 - `POST /logout`
 - `POST /change-password`
+- `POST /password/forgot`
+- `POST /password/reset`
 - `GET /admin-ping`
 
 ### Public (`/api/v1/public`)
 - `GET /menu`
 
 ### Core (`/api/v1`)
-- Schools/session:
+- Schools/session/site settings:
   - `GET /schools`
   - `POST /admin/schools`
   - `PATCH /admin/schools/:schoolId`
   - `DELETE /admin/schools/:schoolId`
+  - `GET /admin/site-settings`
+  - `PATCH /admin/site-settings`
   - `GET /admin/session-settings`
   - `GET /session-settings`
   - `PATCH /admin/session-settings/:session`
-- Parent/youngster/admin management:
+- Parent/youngster management:
   - `POST /children/register`
   - `GET /admin/parents`
   - `PATCH /admin/parents/:parentId`
@@ -175,23 +158,23 @@ API base path: `/schoolcatering/api/v1`
   - `GET /admin/children`
   - `PATCH /admin/youngsters/:youngsterId`
   - `DELETE /admin/youngsters/:youngsterId`
-  - `PATCH /admin/youngsters/:youngsterId/reset-password`
   - `PATCH /admin/users/:userId/reset-password`
+  - `PATCH /admin/youngsters/:youngsterId/reset-password`
   - `GET /children/me`
   - `GET /youngsters/me/insights`
   - `GET /youngsters/me/orders/consolidated`
   - `GET /parents/me/children/pages`
   - `POST /parents/:parentId/children/:childId/link`
-- Menu, favourites, ordering acceleration:
-  - `GET /menus`
-  - `GET /favourites`
-  - `POST /favourites`
-  - `DELETE /favourites/:favouriteId`
-  - `POST /favourites/:favouriteId/apply`
-  - `POST /carts/quick-reorder`
-  - `POST /meal-plans/wizard`
-  - `POST /ratings`
-- Admin menu/ingredient:
+- Dashboard/reports:
+  - `GET /admin/dashboard`
+  - `GET /admin/revenue`
+  - `GET /admin/reports`
+  - `GET /admin/audit-logs`
+- Blackout:
+  - `GET /blackout-days`
+  - `POST /blackout-days`
+  - `DELETE /blackout-days/:id`
+- Ingredients/menu/ratings:
   - `GET /admin/ingredients`
   - `POST /admin/ingredients`
   - `PATCH /admin/ingredients/:ingredientId`
@@ -199,10 +182,31 @@ API base path: `/schoolcatering/api/v1`
   - `GET /admin/menus`
   - `GET /admin/menu-ratings`
   - `POST /admin/menus/sample-seed`
+  - `POST /admin/orders/sample-seed`
   - `POST /admin/menu-items`
   - `PATCH /admin/menu-items/:itemId`
   - `DELETE /admin/menu-items/:itemId`
   - `POST /admin/menu-images/upload`
+  - `POST /ratings`
+- Menus/favourites/carts/orders:
+  - `GET /menus`
+  - `GET /favourites`
+  - `POST /favourites`
+  - `DELETE /favourites/:favouriteId`
+  - `POST /favourites/:favouriteId/apply`
+  - `POST /carts/quick-reorder`
+  - `POST /meal-plans/wizard`
+  - `GET /carts`
+  - `POST /carts`
+  - `GET /carts/:cartId`
+  - `PATCH /carts/:cartId/items`
+  - `DELETE /carts/:cartId`
+  - `POST /carts/:cartId/submit`
+  - `GET /orders/:orderId`
+  - `PATCH /orders/:orderId`
+  - `DELETE /orders/:orderId`
+  - `GET /parents/me/orders/consolidated`
+  - `GET /parents/me/spending-dashboard`
 - Billing:
   - `GET /billing/parent/consolidated`
   - `POST /billing/:billingId/proof-upload`
@@ -219,48 +223,28 @@ API base path: `/schoolcatering/api/v1`
   - `POST /admin/delivery/users`
   - `PATCH /admin/delivery/users/:userId/deactivate`
   - `PATCH /admin/delivery/users/:userId`
+  - `DELETE /admin/delivery/users/:userId`
+  - `POST /admin/delivery/send-notification-email`
   - `GET /delivery/school-assignments`
   - `POST /delivery/school-assignments`
+  - `DELETE /delivery/school-assignments/:deliveryUserId/:schoolId`
   - `POST /delivery/auto-assign`
   - `POST /delivery/assign`
   - `GET /delivery/assignments`
+  - `GET /delivery/summary`
   - `POST /delivery/assignments/:assignmentId/confirm`
   - `PATCH /delivery/assignments/:assignmentId/toggle`
-- Cart/order:
-  - `GET /carts`
-  - `POST /carts`
-  - `GET /carts/:cartId`
-  - `PATCH /carts/:cartId/items`
-  - `DELETE /carts/:cartId`
-  - `POST /carts/:cartId/submit`
-  - `GET /orders/:orderId`
-  - `GET /parents/me/orders/consolidated`
-  - `GET /parents/me/spending-dashboard`
-  - `PATCH /orders/:orderId`
-  - `DELETE /orders/:orderId`
 - Kitchen:
   - `GET /kitchen/daily-summary`
   - `POST /kitchen/orders/:orderId/complete`
 
 ### System
+- `GET /health`
+- `GET /ready`
 - `GET /api/v1/health`
+- `GET /api/v1/ready`
 
 ## 6) Enforcement and Quality
-- Request validation via class-validator DTOs + global ValidationPipe.
-- Global throttling via Throttler guard/module.
-- UUID path parameter validation on mutation/detail endpoints.
-- Parent/youngster order constraints:
-  - max 5 distinct items
-  - cutoff enforcement
-  - blackout enforcement
-  - session availability enforcement
-- Delivery/kitchen status transitions are API-enforced.
-- Error visibility standard:
-  - inline `.auth-error` blocks are high-contrast bold red
-  - disabled/unallowed action buttons are visually marked in red
-
-## 7) Known In-Progress Areas
-- OpenAPI docs endpoint (`/api/v1/docs`) is not yet wired.
-- Correlation ID middleware is not yet wired.
-- Structured JSON logging stack is not yet finalized.
-- CSV import module is still pending.
+- Server-side enforcement for cutoff/session/blackout/order-state transitions.
+- Role and token checks at middleware + API guard layers.
+- Error and disabled-state conventions are consistent across operational pages.

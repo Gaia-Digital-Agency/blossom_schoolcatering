@@ -34,8 +34,12 @@ type Assignment = {
   delivery_user_id: string;
   service_date: string;
   session: string;
+  status: string;
   school_name: string;
   child_name: string;
+  youngster_mobile?: string | null;
+  allergen_items?: string | null;
+  dishes: Array<{ item_name: string; quantity: number }>;
   parent_name: string;
   delivery_status: string;
   confirmed_at?: string | null;
@@ -190,6 +194,30 @@ export default function AdminDeliveryPage() {
       setMessage(`Showing delivery-assigned orders for service date ${assignDate}.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed loading service date assignments');
+    }
+  };
+
+  const onSendNotificationEmail = async () => {
+    setError('');
+    setMessage('');
+    try {
+      const out = await apiFetch('/admin/delivery/send-notification-email', {
+        method: 'POST',
+      }, { skipAutoReload: true }) as {
+        ok: boolean;
+        date: string;
+        sentCount: number;
+        skippedCount: number;
+        failed: string[];
+      };
+      if (out.failed?.length) {
+        setMessage(`Sent ${out.sentCount} notification emails for ${out.date}. Skipped ${out.skippedCount}. Failed ${out.failed.length}.`);
+        setError(out.failed.slice(0, 3).join(' | '));
+      } else {
+        setMessage(`Sent ${out.sentCount} notification emails for ${out.date}.`);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed sending notification emails');
     }
   };
 
@@ -515,6 +543,11 @@ export default function AdminDeliveryPage() {
         <div className="admin-section-card">
           <h2>Delivery vs School Assignment</h2>
           <p className="auth-help">One school can have maximum 3 active delivery personnel assignments.</p>
+          <div className="assignment-notification-row">
+            <button className="btn btn-outline" type="button" onClick={onSendNotificationEmail}>
+              SEND NOTIFICATION EMAIL
+            </button>
+          </div>
           <div className="auth-form admin-mapping-controls">
             <label>
               School
@@ -743,6 +776,11 @@ export default function AdminDeliveryPage() {
         .edit-grid input {
           width: 100%;
           min-width: 0;
+        }
+        .assignment-notification-row {
+          margin-bottom: 0.65rem;
+          display: flex;
+          justify-content: flex-start;
         }
         .req {
           color: #c0392b;

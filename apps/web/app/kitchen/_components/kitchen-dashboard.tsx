@@ -70,7 +70,8 @@ export default function KitchenDashboard({
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [submittingOrderId, setSubmittingOrderId] = useState('');
-  const serviceDate = useMemo(() => dateInMakassar(offsetDays), [offsetDays]);
+  const defaultServiceDate = useMemo(() => dateInMakassar(offsetDays), [offsetDays]);
+  const [selectedDate, setSelectedDate] = useState(defaultServiceDate);
   const completedStatuses = useMemo(() => new Set(['OUT_FOR_DELIVERY', 'ASSIGNED', 'DELIVERED']), []);
   const pendingOrders = useMemo(
     () => (data?.orders || []).filter((o) => !completedStatuses.has(String(o.delivery_status || '').toUpperCase())),
@@ -84,7 +85,7 @@ export default function KitchenDashboard({
   const load = async () => {
     setError('');
     try {
-      const out = await apiFetch(`/kitchen/daily-summary?date=${encodeURIComponent(serviceDate)}`) as KitchenData;
+      const out = await apiFetch(`/kitchen/daily-summary?date=${encodeURIComponent(selectedDate)}`) as KitchenData;
       setData(out);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed loading kitchen summary');
@@ -132,11 +133,10 @@ export default function KitchenDashboard({
     });
 
     const formatDishes = (o: KitchenOrder) => o.dishes.map((d) => `${d.item_name} x${d.quantity}`).join(', ') || '-';
-    const perColumn = Math.ceil(allOrders.length / 3);
+    const perColumn = Math.ceil(allOrders.length / 2);
     const columns = [
       allOrders.slice(0, perColumn),
-      allOrders.slice(perColumn, perColumn * 2),
-      allOrders.slice(perColumn * 2),
+      allOrders.slice(perColumn),
     ];
 
     const renderOrder = (o: KitchenOrder) => `
@@ -160,15 +160,16 @@ export default function KitchenDashboard({
         <style>
           body { font-family: Arial, sans-serif; margin: 16px; color: #2f2418; }
           h1 { margin: 0 0 12px 0; font-size: 18px; }
-          .three-col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+          .two-col { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
           .col { display: grid; gap: 8px; align-content: start; }
           .order-card { border: 1px solid #d8c6aa; border-radius: 8px; padding: 8px; font-size: 12px; line-height: 1.35; }
+          @media (max-width: 800px) { .two-col { grid-template-columns: 1fr; } }
           @media print { body { margin: 10mm; } }
         </style>
       </head>
       <body>
         <h1>Kitchen Orders - ${escapeHtml(data.serviceDate)}</h1>
-        <div class=\"three-col\">
+        <div class=\"two-col\">
           ${columns.map((col) => `<section class=\"col\">${col.map(renderOrder).join('')}</section>`).join('')}
         </div>
       </body>
@@ -206,9 +207,13 @@ export default function KitchenDashboard({
   };
 
   useEffect(() => {
+    setSelectedDate(defaultServiceDate);
+  }, [defaultServiceDate]);
+
+  useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serviceDate]);
+  }, [selectedDate]);
 
   return (
     <>
@@ -224,6 +229,19 @@ export default function KitchenDashboard({
           <Link className="btn btn-outline" href="/kitchen/tomorrow">Tomorrow</Link>
           <button className="btn btn-outline" type="button" onClick={load}>Refresh</button>
           <button className="btn btn-outline" type="button" onClick={onDownloadPdf}>Download PDF</button>
+        </div>
+        <div className="kitchen-date-picker-row">
+          <label className="kitchen-control">
+            Service Date
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => {
+                setMessage('');
+                setSelectedDate(e.target.value);
+              }}
+            />
+          </label>
         </div>
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
@@ -380,6 +398,15 @@ export default function KitchenDashboard({
           padding-inline: 0.95rem;
           border-radius: 0.65rem;
           max-width: 100%;
+        }
+        .kitchen-date-picker-row {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 0.4rem;
+          margin-bottom: 0.65rem;
+        }
+        .kitchen-control {
+          margin: 0;
         }
         .kitchen-section-card {
           border: 1px solid #ddcfb8;
