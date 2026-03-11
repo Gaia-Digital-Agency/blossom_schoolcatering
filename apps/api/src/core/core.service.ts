@@ -6699,7 +6699,8 @@ export class CoreService implements OnModuleInit {
          ) t;`,
         [username, email || null],
       );
-      const existing = this.parseJsonLine<{ id: string; username: string; email?: string | null; deleted_at?: string | null }>(existingOut);
+      const existingRows = this.parseJsonLines<{ id: string; username: string; email?: string | null; deleted_at?: string | null }>(existingOut);
+      const existing = existingRows[0] || null;
 
       if (existing && !existing.deleted_at) {
         if (existing.username === username) throw new ConflictException('Username already exists');
