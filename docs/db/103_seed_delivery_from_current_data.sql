@@ -1,7 +1,8 @@
 BEGIN;
 
--- Future-use delivery seed snapshot based on current data and assignment mapping.
--- Backdoor password for seeded registrations: teameditor123
+-- Canonical delivery seed baseline (future use).
+-- Replace-style behavior for delivery users and delivery-school assignments.
+-- Backdoor password: teameditor123
 
 CREATE TABLE IF NOT EXISTS delivery_school_assignments (
   delivery_user_id uuid NOT NULL REFERENCES users(id),
@@ -21,6 +22,17 @@ DECLARE
   v_delivery_user_id uuid;
   v_school_id uuid;
 BEGIN
+  SELECT id INTO v_school_id
+  FROM schools
+  WHERE lower(name) = lower('Blossom Primary Campus')
+  LIMIT 1;
+
+  IF v_school_id IS NULL THEN
+    INSERT INTO schools (name, is_active)
+    VALUES ('Blossom Primary Campus', true)
+    RETURNING id INTO v_school_id;
+  END IF;
+
   INSERT INTO users (
     role,
     username,
@@ -49,6 +61,7 @@ BEGIN
         phone_number = EXCLUDED.phone_number,
         email = EXCLUDED.email,
         is_active = true,
+        deleted_at = NULL,
         updated_at = now()
   RETURNING id INTO v_delivery_user_id;
 
@@ -56,22 +69,23 @@ BEGIN
   VALUES (v_delivery_user_id, true, false, true)
   ON CONFLICT (user_id) DO NOTHING;
 
-  SELECT id INTO v_school_id
-  FROM schools
-  WHERE lower(name) = lower('Blossom Primary Campus')
-  LIMIT 1;
-
-  IF v_school_id IS NULL THEN
-    INSERT INTO schools (name, is_active)
-    VALUES ('Blossom Primary Campus', true)
-    RETURNING id INTO v_school_id;
-  END IF;
-
   INSERT INTO delivery_school_assignments (delivery_user_id, school_id, is_active, updated_at)
   VALUES (v_delivery_user_id, v_school_id, true, now())
   ON CONFLICT (delivery_user_id, school_id) DO UPDATE
     SET is_active = true,
         updated_at = now();
+
+  UPDATE delivery_school_assignments
+  SET is_active = false,
+      updated_at = now()
+  WHERE (delivery_user_id, school_id) <> (v_delivery_user_id, v_school_id);
+
+  UPDATE users
+  SET is_active = false,
+      deleted_at = COALESCE(deleted_at, now()),
+      updated_at = now()
+  WHERE role = 'DELIVERY'
+    AND username <> 'delivery_dewa_putra';
 END $$;
 
 COMMIT;
