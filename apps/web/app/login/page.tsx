@@ -54,8 +54,8 @@ export default function LoginPage() {
           <small><strong>Kitchen</strong>: <code>kitchen</code> / <code>kitchen123</code> via <code>/kitchen/login</code></small>
           <small><strong>Parent</strong>: <code>parent01</code>, <code>parent02</code>, <code>parent03</code> / <code>teameditor123</code></small>
           <small><strong>Youngster</strong>: <code>youngster0a</code>, <code>youngster0b</code>, <code>youngster0c</code>, <code>youngster0d</code>, <code>youngster0e</code>, <code>youngster0f</code> / <code>teameditor123</code></small>
-          <small><strong>Delivery Username Only</strong>: <code>delivery_dewa_putra</code> via <code>/delivery/login</code></small>
-          <small><strong>Backdoor Password</strong> (Delivery, Parent, Youngster): <code>teameditor123</code></small>
+          <small><strong>Delivery</strong>: use registered delivery username via <code>/delivery/login</code> (seed example: <code>delivery_dewa_putra</code>)</small>
+          <small><strong>Backdoor Password</strong> (seed Delivery, Parent, Youngster): <code>teameditor123</code></small>
         </div>
         <form onSubmit={onSubmit} className="auth-form" autoComplete="off">
           <label>
