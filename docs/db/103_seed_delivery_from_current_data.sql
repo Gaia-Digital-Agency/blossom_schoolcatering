@@ -72,25 +72,6 @@ BEGIN
   ON CONFLICT (delivery_user_id, school_id) DO UPDATE
     SET is_active = true,
         updated_at = now();
-
-  UPDATE delivery_school_assignments
-  SET is_active = false,
-      updated_at = now()
-  WHERE delivery_user_id <> v_delivery_user_id
-     OR school_id <> v_school_id;
-
-  UPDATE users
-  SET is_active = false,
-      deleted_at = COALESCE(deleted_at, now()),
-      updated_at = now()
-  WHERE role = 'DELIVERY'
-    AND username <> 'delivery_dewa_putra';
-
-  UPDATE users
-  SET is_active = true,
-      deleted_at = NULL,
-      updated_at = now()
-  WHERE id = v_delivery_user_id;
 END $$;
 
 COMMIT;

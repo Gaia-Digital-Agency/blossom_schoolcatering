@@ -104,30 +104,6 @@ BEGIN
       FROM menu_item_ingredients mi
       WHERE mi.menu_item_id = v_menu_item_id AND mi.ingredient_id = i.id
     );
-
-  UPDATE menu_items
-  SET is_available = false,
-      deleted_at = COALESCE(deleted_at, now()),
-      updated_at = now()
-  WHERE id <> v_menu_item_id;
-
-  UPDATE menu_items
-  SET is_available = true,
-      deleted_at = NULL,
-      updated_at = now()
-  WHERE id = v_menu_item_id;
-
-  UPDATE menus
-  SET is_published = false,
-      deleted_at = COALESCE(deleted_at, now()),
-      updated_at = now()
-  WHERE id <> v_menu_id;
-
-  UPDATE menus
-  SET is_published = true,
-      deleted_at = NULL,
-      updated_at = now()
-  WHERE id = v_menu_id;
 END $$;
 
 COMMIT;
