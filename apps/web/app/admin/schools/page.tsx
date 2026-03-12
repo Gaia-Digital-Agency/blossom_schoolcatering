@@ -57,7 +57,7 @@ export default function AdminSchoolsPage() {
       await apiFetch(`/admin/schools/${school.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ isActive }),
-      });
+      }, { skipAutoReload: true });
       setMessage(`School ${isActive ? 'activated' : 'deactivated'}: ${school.name}`);
       await load();
     } catch (e) {
@@ -84,7 +84,7 @@ export default function AdminSchoolsPage() {
           address: newSchoolAddress.trim(),
           contactPhone: newSchoolPhone.trim(),
         }),
-      });
+      }, { skipAutoReload: true });
       setNewSchoolName('');
       setNewSchoolCity('');
       setNewSchoolAddress('');
@@ -103,7 +103,7 @@ export default function AdminSchoolsPage() {
     setMessage('');
     setDeletingSchoolId(school.id);
     try {
-      await apiFetch(`/admin/schools/${school.id}`, { method: 'DELETE' });
+      await apiFetch(`/admin/schools/${school.id}`, { method: 'DELETE' }, { skipAutoReload: true });
       setMessage(`School deleted: ${school.name}`);
       await load();
     } catch (e) {
@@ -138,7 +138,7 @@ export default function AdminSchoolsPage() {
           address: editAddress.trim(),
           contactPhone: editPhone.trim(),
         }),
-      });
+      }, { skipAutoReload: true });
       setEditingSchoolId('');
       setMessage(`School updated: ${editName.trim()}`);
       await load();
@@ -158,7 +158,7 @@ export default function AdminSchoolsPage() {
       await apiFetch(`/admin/session-settings/${session.session}`, {
         method: 'PATCH',
         body: JSON.stringify({ isActive }),
-      });
+      }, { skipAutoReload: true });
       setMessage(`Session updated: ${session.session} ${isActive ? 'ON' : 'OFF'}`);
       await load();
     } catch (e) {

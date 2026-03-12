@@ -1,7 +1,7 @@
 BEGIN;
 
 -- Canonical parent + youngster seed baseline (future use).
--- Replace-style behavior for parent/youngster accounts.
+-- Keep only 3 parent + 6 youngster accounts and hard-delete non-target rows when unreferenced.
 -- Backdoor password: teameditor123
 
 DO $$
@@ -21,11 +21,11 @@ BEGIN
     FROM (
       VALUES
         ('parent01', 'Parent01', 'Parent01', 'youngster0a', 'Youngster0A', 'Parent01', 'Bali Island School', 'azlan@gaiada', '+628176917122'),
-        ('parent02', 'Parent02', 'Parent02', 'youngster0b', 'Youngster0B', 'Parent02', 'GMIS', 'azlan@gaiada', '+628176917122'),
-        ('parent02', 'Parent02', 'Parent02', 'youngster0c', 'Youngster0C', 'Parent02', 'Garden Early Learning', 'azlan@gaiada', '+628176917122'),
-        ('parent03', 'Parent03', 'Parent03', 'youngster0d', 'Youngster0D', 'Parent03', 'Little Star Bali', 'azlan@gaiada', '+628176917122'),
-        ('parent03', 'Parent03', 'Parent03', 'youngster0e', 'Youngster0E', 'Parent03', 'Rumah Kecil Learning', 'azlan@gaiada', '+628176917122'),
-        ('parent03', 'Parent03', 'Parent03', 'youngster0f', 'Youngster0F', 'Parent03', 'Sanur Indepenent', 'azlan@gaiada', '+628176917122')
+        ('parent02', 'Parent02', 'Parent02', 'youngster0b', 'Youngster0B', 'Parent02', 'Gandhi Memorial Intercontinental School (GMIS)', 'azlan@gaiada', '+628176917122'),
+        ('parent02', 'Parent02', 'Parent02', 'youngster0c', 'Youngster0C', 'Parent02', 'Garden Early Learning Center', 'azlan@gaiada', '+628176917122'),
+        ('parent03', 'Parent03', 'Parent03', 'youngster0d', 'Youngster0D', 'Parent03', 'Little Stars Bali Learning Kindergarten', 'azlan@gaiada', '+628176917122'),
+        ('parent03', 'Parent03', 'Parent03', 'youngster0e', 'Youngster0E', 'Parent03', 'Rumah Kecil Learning Centre', 'azlan@gaiada', '+628176917122'),
+        ('parent03', 'Parent03', 'Parent03', 'youngster0f', 'Youngster0F', 'Parent03', 'Sanur Independent School', 'azlan@gaiada', '+628176917122')
     ) AS t(parent_username, parent_first_name, parent_last_name, child_username, child_first_name, child_last_name, school_name, base_email, phone)
   LOOP
     SELECT id INTO v_school_id
@@ -147,29 +147,55 @@ BEGIN
       AND u.username <> ALL(v_target_parent_usernames)
   );
 
-  UPDATE children c
-  SET is_active = false,
-      deleted_at = COALESCE(c.deleted_at, now()),
-      updated_at = now()
-  FROM users u
+  DELETE FROM children c
+  USING users u
   WHERE c.user_id = u.id
     AND u.role = 'CHILD'
-    AND u.username <> ALL(v_target_child_usernames);
+    AND u.username <> ALL(v_target_child_usernames)
+    AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.child_id = c.id)
+    AND NOT EXISTS (SELECT 1 FROM order_carts oc WHERE oc.child_id = c.id)
+    AND NOT EXISTS (SELECT 1 FROM favourite_meals fm WHERE fm.child_id = c.id);
 
-  UPDATE parents p
-  SET deleted_at = COALESCE(p.deleted_at, now()),
-      updated_at = now()
-  FROM users u
+  DELETE FROM parents p
+  USING users u
   WHERE p.user_id = u.id
     AND u.role = 'PARENT'
-    AND u.username <> ALL(v_target_parent_usernames);
+    AND u.username <> ALL(v_target_parent_usernames)
+    AND NOT EXISTS (SELECT 1 FROM order_carts oc WHERE oc.created_by_user_id = u.id)
+    AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.placed_by_user_id = u.id);
 
-  UPDATE users
-  SET is_active = false,
-      deleted_at = COALESCE(deleted_at, now()),
-      updated_at = now()
-  WHERE (role = 'PARENT' AND username <> ALL(v_target_parent_usernames))
-     OR (role = 'CHILD' AND username <> ALL(v_target_child_usernames));
+  DELETE FROM auth_refresh_sessions ars
+  USING users u
+  WHERE ars.user_id = u.id
+    AND ((u.role = 'PARENT' AND u.username <> ALL(v_target_parent_usernames))
+      OR (u.role = 'CHILD' AND u.username <> ALL(v_target_child_usernames)));
+
+  DELETE FROM user_identities ui
+  USING users u
+  WHERE ui.user_id = u.id
+    AND ((u.role = 'PARENT' AND u.username <> ALL(v_target_parent_usernames))
+      OR (u.role = 'CHILD' AND u.username <> ALL(v_target_child_usernames)));
+
+  DELETE FROM user_preferences up
+  USING users u
+  WHERE up.user_id = u.id
+    AND ((u.role = 'PARENT' AND u.username <> ALL(v_target_parent_usernames))
+      OR (u.role = 'CHILD' AND u.username <> ALL(v_target_child_usernames)));
+
+  DELETE FROM users u
+  WHERE ((u.role = 'PARENT' AND u.username <> ALL(v_target_parent_usernames))
+      OR (u.role = 'CHILD' AND u.username <> ALL(v_target_child_usernames)))
+    AND NOT EXISTS (SELECT 1 FROM parents p WHERE p.user_id = u.id)
+    AND NOT EXISTS (SELECT 1 FROM children c WHERE c.user_id = u.id)
+    AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.placed_by_user_id = u.id OR o.delivered_by_user_id = u.id)
+    AND NOT EXISTS (SELECT 1 FROM order_carts oc WHERE oc.created_by_user_id = u.id)
+    AND NOT EXISTS (SELECT 1 FROM order_mutations om WHERE om.actor_user_id = u.id)
+    AND NOT EXISTS (SELECT 1 FROM billing_records br WHERE br.verified_by = u.id)
+    AND NOT EXISTS (SELECT 1 FROM digital_receipts dr WHERE dr.generated_by_user_id = u.id)
+    AND NOT EXISTS (SELECT 1 FROM favourite_meals fm WHERE fm.created_by_user_id = u.id)
+    AND NOT EXISTS (SELECT 1 FROM menu_item_ratings mir WHERE mir.user_id = u.id)
+    AND NOT EXISTS (SELECT 1 FROM blackout_days bd WHERE bd.created_by = u.id)
+    AND NOT EXISTS (SELECT 1 FROM admin_audit_logs aal WHERE aal.actor_user_id = u.id);
 END $$;
 
 COMMIT;

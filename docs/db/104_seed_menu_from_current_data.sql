@@ -1,121 +1,118 @@
 BEGIN;
 
 -- Canonical menu seed baseline (future use).
--- Replace-style behavior for menu/menu-item snapshots.
+-- Enforce current baseline:
+-- 1) Keep only active LUNCH dishes.
+-- 2) Hard-delete SNACK and BREAKFAST dishes.
+-- 3) Hard-delete all non-active dishes.
 
 DO $$
-DECLARE
-  v_service_date date;
-  v_menu_id uuid;
-  v_menu_item_id uuid;
 BEGIN
-  -- Next Monday; if today is Monday use next week's Monday.
-  v_service_date := (current_date + ((8 - extract(isodow FROM current_date)::int) % 7))::date;
-  IF v_service_date = current_date THEN
-    v_service_date := current_date + 7;
-  END IF;
+  -- Hard-delete non-LUNCH or non-active dishes and all dependent rows.
+  WITH doomed AS (
+    SELECT mi.id
+    FROM menu_items mi
+    JOIN menus m ON m.id = mi.menu_id
+    WHERE m.session IN ('SNACK', 'BREAKFAST')
+       OR mi.deleted_at IS NOT NULL
+       OR mi.is_available = false
+  )
+  DELETE FROM analytics_daily_agg a
+  USING doomed d
+  WHERE a.menu_item_id = d.id;
 
-  INSERT INTO menus (session, service_date, is_published)
-  VALUES ('LUNCH', v_service_date, true)
-  ON CONFLICT (session, service_date) DO UPDATE
-    SET is_published = true,
-        deleted_at = NULL,
-        updated_at = now()
-  RETURNING id INTO v_menu_id;
+  WITH doomed AS (
+    SELECT mi.id
+    FROM menu_items mi
+    JOIN menus m ON m.id = mi.menu_id
+    WHERE m.session IN ('SNACK', 'BREAKFAST')
+       OR mi.deleted_at IS NOT NULL
+       OR mi.is_available = false
+  )
+  DELETE FROM menu_item_ratings r
+  USING doomed d
+  WHERE r.menu_item_id = d.id;
 
-  IF v_menu_id IS NULL THEN
-    SELECT id INTO v_menu_id
-    FROM menus
-    WHERE session = 'LUNCH' AND service_date = v_service_date
-    LIMIT 1;
-  END IF;
+  WITH doomed AS (
+    SELECT mi.id
+    FROM menu_items mi
+    JOIN menus m ON m.id = mi.menu_id
+    WHERE m.session IN ('SNACK', 'BREAKFAST')
+       OR mi.deleted_at IS NOT NULL
+       OR mi.is_available = false
+  )
+  DELETE FROM menu_item_ingredients i
+  USING doomed d
+  WHERE i.menu_item_id = d.id;
 
-  INSERT INTO ingredients (name, is_active, allergen_flag)
-  SELECT i.name, true, i.allergen
-  FROM (
-    VALUES
-      ('Chicken', false),
-      ('Rice', false),
-      ('Soy Sauce', true)
-  ) AS i(name, allergen)
-  WHERE NOT EXISTS (SELECT 1 FROM ingredients x WHERE lower(x.name) = lower(i.name));
+  WITH doomed AS (
+    SELECT mi.id
+    FROM menu_items mi
+    JOIN menus m ON m.id = mi.menu_id
+    WHERE m.session IN ('SNACK', 'BREAKFAST')
+       OR mi.deleted_at IS NOT NULL
+       OR mi.is_available = false
+  )
+  DELETE FROM favourite_meal_items f
+  USING doomed d
+  WHERE f.menu_item_id = d.id;
 
-  SELECT id INTO v_menu_item_id
-  FROM menu_items
-  WHERE lower(name) = lower('Chicken Teriyaki Rice Bowl')
-  LIMIT 1;
+  WITH doomed AS (
+    SELECT mi.id
+    FROM menu_items mi
+    JOIN menus m ON m.id = mi.menu_id
+    WHERE m.session IN ('SNACK', 'BREAKFAST')
+       OR mi.deleted_at IS NOT NULL
+       OR mi.is_available = false
+  )
+  DELETE FROM cart_items c
+  USING doomed d
+  WHERE c.menu_item_id = d.id;
 
-  IF v_menu_item_id IS NULL THEN
-    INSERT INTO menu_items (
-      menu_id,
-      name,
-      description,
-      nutrition_facts_text,
-      price,
-      image_url,
-      is_available,
-      display_order,
-      dish_category,
-      is_vegetarian,
-      is_gluten_free,
-      is_dairy_free,
-      contains_peanut
-    )
-    VALUES (
-      v_menu_id,
-      'Chicken Teriyaki Rice Bowl',
-      'Low sugar option available',
-      'Allergen tags: soy',
-      25000.00,
-      '/menu/shawarma.webp',
-      true,
-      1,
-      'MAIN',
-      false,
-      false,
-      true,
-      false
-    )
-    RETURNING id INTO v_menu_item_id;
-  ELSE
-    UPDATE menu_items
-    SET menu_id = v_menu_id,
-        description = 'Low sugar option available',
-        nutrition_facts_text = 'Allergen tags: soy',
-        price = 25000.00,
-        image_url = '/menu/shawarma.webp',
-        is_available = true,
-        deleted_at = NULL,
-        display_order = 1,
-        dish_category = 'MAIN',
-        is_vegetarian = false,
-        is_gluten_free = false,
-        is_dairy_free = true,
-        contains_peanut = false,
-        updated_at = now()
-    WHERE id = v_menu_item_id;
-  END IF;
+  WITH doomed AS (
+    SELECT mi.id
+    FROM menu_items mi
+    JOIN menus m ON m.id = mi.menu_id
+    WHERE m.session IN ('SNACK', 'BREAKFAST')
+       OR mi.deleted_at IS NOT NULL
+       OR mi.is_available = false
+  )
+  DELETE FROM order_items o
+  USING doomed d
+  WHERE o.menu_item_id = d.id;
 
-  INSERT INTO menu_item_ingredients (menu_item_id, ingredient_id)
-  SELECT v_menu_item_id, i.id
-  FROM ingredients i
-  WHERE lower(i.name) IN (lower('Chicken'), lower('Rice'), lower('Soy Sauce'))
+  WITH doomed AS (
+    SELECT mi.id
+    FROM menu_items mi
+    JOIN menus m ON m.id = mi.menu_id
+    WHERE m.session IN ('SNACK', 'BREAKFAST')
+       OR mi.deleted_at IS NOT NULL
+       OR mi.is_available = false
+  )
+  DELETE FROM menu_items mi
+  USING doomed d
+  WHERE mi.id = d.id;
+
+  -- Hard-delete empty SNACK/BREAKFAST menus.
+  DELETE FROM menus m
+  WHERE m.session IN ('SNACK', 'BREAKFAST')
     AND NOT EXISTS (
-      SELECT 1 FROM menu_item_ingredients mi
-      WHERE mi.menu_item_id = v_menu_item_id AND mi.ingredient_id = i.id
+      SELECT 1 FROM menu_items mi WHERE mi.menu_id = m.id
     );
 
-  UPDATE menu_items
-  SET is_available = false,
-      deleted_at = COALESCE(deleted_at, now()),
+  -- Keep only LUNCH menus with at least one active dish published and visible.
+  UPDATE menus m
+  SET is_published = true,
+      deleted_at = NULL,
       updated_at = now()
-  WHERE id <> v_menu_item_id;
-
-  UPDATE menus
-  SET is_published = false,
-      deleted_at = COALESCE(deleted_at, now()),
-      updated_at = now()
-  WHERE id <> v_menu_id;
+  WHERE m.session = 'LUNCH'
+    AND EXISTS (
+      SELECT 1
+      FROM menu_items mi
+      WHERE mi.menu_id = m.id
+        AND mi.deleted_at IS NULL
+        AND mi.is_available = true
+    );
 END $$;
 
 COMMIT;
