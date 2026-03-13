@@ -14,6 +14,10 @@ export function getApiBase() {
   return process.env.NEXT_PUBLIC_API_BASE ?? '/schoolcatering/api/v1';
 }
 
+export function getAppBase() {
+  return getApiBase().replace('/api/v1', '');
+}
+
 export function setAuthState(accessToken: string, role: Role) {
   localStorage.setItem(ACCESS_KEY, accessToken);
   localStorage.setItem(ROLE_KEY, role);
@@ -93,7 +97,7 @@ export class SessionExpiredError extends Error {
 function redirectToLogin(): void {
   const role = localStorage.getItem(ROLE_KEY);
   clearAuthState();
-  const base = getApiBase().replace('/api/v1', '');
+  const base = getAppBase();
   const paths: Record<string, string> = {
     ADMIN:     `${base}/admin/login`,
     KITCHEN:   `${base}/kitchen/login`,
@@ -102,6 +106,16 @@ function redirectToLogin(): void {
     YOUNGSTER: `${base}/youngster/login`,
   };
   window.location.href = paths[role ?? ''] ?? `${base}/login`;
+}
+
+export async function clearBrowserSession() {
+  await fetchWithTimeout(`${getApiBase()}/auth/logout`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({}),
+  }).catch(() => undefined);
+  clearAuthState();
 }
 
 /**

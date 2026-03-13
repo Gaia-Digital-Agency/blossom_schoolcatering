@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { apiFetch, clearAuthState, fetchWithTimeout, getApiBase } from '../../lib/auth';
+import { apiFetch, clearBrowserSession, fetchWithTimeout, getApiBase, ROLE_KEY, type Role } from '../../lib/auth';
 import { formatDishCategoryLabel, formatDishDietaryTags } from '../../lib/dish-tags';
 
 type PublicMenuItem = {
@@ -53,8 +53,20 @@ export default function RatingPage() {
   const [message, setMessage] = useState('');
   const [savingItemId, setSavingItemId] = useState('');
   const [selectedStars, setSelectedStars] = useState<Record<string, number>>({});
+  const [roleReady, setRoleReady] = useState(false);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const role = localStorage.getItem(ROLE_KEY) as Role | null;
+    if (role !== 'PARENT' && role !== 'YOUNGSTER') {
+      router.replace('/login');
+      return;
+    }
+    setRoleReady(true);
+  }, [router]);
+
+  useEffect(() => {
+    if (!roleReady) return;
     const load = async () => {
       try {
         const res = await fetchWithTimeout(`${getApiBase()}/public/menu`, {
@@ -70,7 +82,7 @@ export default function RatingPage() {
       }
     };
     load().catch(() => undefined);
-  }, []);
+  }, [roleReady]);
 
   const starOptions = useMemo(() => [1, 2, 3, 4, 5], []);
 
@@ -78,7 +90,14 @@ export default function RatingPage() {
     setSelectedStars((prev) => ({ ...prev, [menuItemId]: stars }));
   };
 
-  const onSaveAndGoHome = async () => {
+  const onBackToHome = async () => {
+    setError('');
+    setMessage('');
+    await clearBrowserSession();
+    router.push('/');
+  };
+
+  const onSubmitReview = async () => {
     setError('');
     setMessage('');
     const entries = Object.entries(selectedStars);
@@ -100,15 +119,13 @@ export default function RatingPage() {
       }
       setSavingItemId('');
     }
-    await fetchWithTimeout(`${getApiBase()}/auth/logout`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({}),
-    }).catch(() => undefined);
-    clearAuthState();
+    await clearBrowserSession();
     router.push('/');
   };
+
+  if (!roleReady) {
+    return null;
+  }
 
   return (
     <main className="page-auth page-auth-mobile">
@@ -166,10 +183,10 @@ export default function RatingPage() {
         )}
 
         <div className="dev-links">
-          <button className="btn btn-outline" type="button" onClick={onSaveAndGoHome} disabled={savingItemId === 'all'}>
-            {savingItemId === 'all' ? 'Saving...' : 'Back To Home'}
+          <button className="btn btn-outline" type="button" onClick={() => void onBackToHome()} disabled={savingItemId === 'all'}>
+            Back To Home
           </button>
-          <button className="btn btn-primary" type="button" onClick={onSaveAndGoHome} disabled={savingItemId === 'all'}>
+          <button className="btn btn-primary" type="button" onClick={() => void onSubmitReview()} disabled={savingItemId === 'all'}>
             {savingItemId === 'all' ? 'Saving...' : 'Submit Review'}
           </button>
         </div>

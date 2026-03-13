@@ -55,8 +55,21 @@ export function middleware(request: NextRequest) {
     normalizedPath === '/parent/login' ||
     normalizedPath === '/youngster/login';
 
-  if (isRatingPath && !hasToken) {
-    return NextResponse.redirect(new URL(`${BASE_PATH}/youngster/login`, request.url));
+  if (isRatingPath) {
+    if (!hasToken) {
+      return NextResponse.redirect(new URL(`${BASE_PATH}/login`, request.url));
+    }
+    if (role !== 'PARENT' && role !== 'YOUNGSTER') {
+      const destination = role === 'ADMIN'
+        ? '/admin'
+        : role === 'KITCHEN'
+          ? '/kitchen'
+          : role === 'DELIVERY'
+            ? '/delivery'
+            : '/login';
+      return NextResponse.redirect(new URL(`${BASE_PATH}${destination}`, request.url));
+    }
+    return NextResponse.next();
   }
 
   if (requiredRole && normalizedPath === roleLoginPath(requiredRole)) {

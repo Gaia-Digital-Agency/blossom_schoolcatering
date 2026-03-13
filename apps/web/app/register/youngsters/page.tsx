@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { apiFetch, fetchWithTimeout, getApiBase, ROLE_KEY, type Role } from '../../../lib/auth';
+import { apiFetch, clearBrowserSession, fetchWithTimeout, getApiBase, ROLE_KEY, type Role } from '../../../lib/auth';
 
 type School = {
   id: string;
@@ -164,6 +164,16 @@ export default function YoungsterRegisterPage() {
     return found.city ? `${found.name} (${found.city})` : found.name;
   }, [schools, youngsterSchoolId]);
 
+  useEffect(() => {
+    if (!success) return;
+    void clearBrowserSession();
+  }, [success]);
+
+  const goToPublicHome = async () => {
+    await clearBrowserSession();
+    router.replace('/');
+  };
+
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (isReadonlyRecord) return;
@@ -292,9 +302,9 @@ export default function YoungsterRegisterPage() {
               <button
                 className="btn btn-primary reg-go-login-btn"
                 type="button"
-                onClick={() => router.push('/login')}
+                onClick={() => void goToPublicHome()}
               >
-                Go To Login
+                Back To Homepage
               </button>
             </>
           )}

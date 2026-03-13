@@ -6,6 +6,8 @@ import { apiFetch } from '../../../lib/auth';
 import { formatDishCategoryLabel, formatDishDietaryTags } from '../../../lib/dish-tags';
 import LogoutButton from '../../_components/logout-button';
 
+const ORDER_SUCCESS_POPUP_KEY = 'blossom_parent_order_success_popup';
+
 type Child = {
   id: string;
   first_name: string;
@@ -253,6 +255,14 @@ export default function ParentsOrdersPage() {
   };
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const shouldShowPopup = window.sessionStorage.getItem(ORDER_SUCCESS_POPUP_KEY) === '1';
+    if (!shouldShowPopup) return;
+    window.sessionStorage.removeItem(ORDER_SUCCESS_POPUP_KEY);
+    setShowSuccessPopup(true);
+  }, []);
+
+  useEffect(() => {
     loadBaseData().catch((err) => setError(err instanceof Error ? err.message : 'Failed loading data')).finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -342,7 +352,7 @@ export default function ParentsOrdersPage() {
         await apiFetch(`/orders/${draftSourceContext.orderId}`, {
           method: 'PATCH',
           body: JSON.stringify({ items }),
-        });
+        }, { skipAutoReload: true });
       } else {
         // New order: reuse existing open cart if available, else create one
         let cartId: string;
@@ -352,17 +362,22 @@ export default function ParentsOrdersPage() {
           const cartRes = await apiFetch('/carts', {
             method: 'POST',
             body: JSON.stringify({ childId: selectedChildId, serviceDate, session }),
-          }) as { id?: string };
+          }, { skipAutoReload: true }) as { id?: string };
           if (!cartRes?.id) throw new Error('Cart creation failed — no cart ID returned.');
           cartId = cartRes.id;
         }
-        await apiFetch(`/carts/${cartId}/items`, { method: 'PATCH', body: JSON.stringify({ items }) });
-        await apiFetch(`/carts/${cartId}/submit`, { method: 'POST' });
+        await apiFetch(`/carts/${cartId}/items`, { method: 'PATCH', body: JSON.stringify({ items }) }, { skipAutoReload: true });
+        await apiFetch(`/carts/${cartId}/submit`, { method: 'POST' }, { skipAutoReload: true });
       }
       setItemQty({});
       setDraftCartId('');
       setDraftExpiresAt('');
       setDraftSourceContext(null);
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.setItem(ORDER_SUCCESS_POPUP_KEY, '1');
+        window.location.reload();
+        return;
+      }
       setShowSuccessPopup(true);
       await loadOrders();
     } catch (err) {
@@ -638,8 +653,8 @@ export default function ParentsOrdersPage() {
         <div className="popup-overlay" onClick={() => setShowSuccessPopup(false)}>
           <div className="popup-card" onClick={(e) => e.stopPropagation()}>
             <div className="popup-icon">✅</div>
-            <h3 className="popup-title">Changes, Saved and Successful</h3>
-            <p className="popup-body">Your order has been placed successfully.</p>
+            <h3 className="popup-title">Order Is Successful</h3>
+            <p className="popup-body">Go To Billing To Make Payment.</p>
             <button className="btn btn-primary popup-close" type="button" onClick={() => setShowSuccessPopup(false)}>OK</button>
           </div>
         </div>
