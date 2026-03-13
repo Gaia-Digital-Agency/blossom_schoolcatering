@@ -1,5 +1,19 @@
 # Progress Update
 
+## 2026-03-13 (App Beta Version checkpoint)
+- Marked this state as the App Beta Version.
+- Synced local workspace, GitHub branch, and staging deploy target to the same release line.
+- Included latest admin-facing fixes:
+  - `/admin/delivery`
+    - selected service-date assignment loading corrected
+    - heading renamed to `Delivery Assignments`
+  - `/admin/menu`
+    - removed date-specific helper text
+    - removed `Service Date` control
+    - kept menu management scoped by session only
+- Beta checkpoint release identifier:
+  - changelog version `v2026.03.13-beta`
+
 ## 2026-03-10 (Admin delivery and delivery-date operations rollout)
 - Added `Total Orders Complete` metric into Kitchen overview surfaces:
   - `/kitchen` (`apps/web/app/kitchen/_components/kitchen-dashboard.tsx`)
