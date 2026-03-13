@@ -229,22 +229,7 @@ export class CoreController {
     });
   }
 
-  @Get('admin/reports')
-  @Roles('ADMIN')
-  getAdminReports(@Query('date') date?: string) {
-    return this.coreService.getAdminPrintReport(date);
-  }
-
-  @Get('admin/audit-logs')
-  @Roles('ADMIN')
-  getAdminAuditLogs(
-    @Req() req: AuthRequest,
-    @Query('limit') limit?: string,
-    @Query('action') action?: string,
-    @Query('target_type') targetType?: string,
-  ) {
-    return this.coreService.getAdminAuditLogs(req.user, { limit, action, targetType });
-  }
+  // GET admin/reports and GET admin/audit-logs moved to archived.controller.ts
 
   @Get('blackout-days')
   @Roles('ADMIN', 'PARENT', 'YOUNGSTER', 'KITCHEN')
@@ -428,14 +413,7 @@ export class CoreController {
     return this.coreService.quickReorder(req.user, body);
   }
 
-  @Post('meal-plans/wizard')
-  @Roles('PARENT', 'YOUNGSTER')
-  mealPlanWizard(
-    @Req() req: AuthRequest,
-    @Body() body: MealPlanWizardDto,
-  ) {
-    return this.coreService.mealPlanWizard(req.user, body);
-  }
+  // POST meal-plans/wizard moved to archived.controller.ts
 
   @Post('favourites/:favouriteId/apply')
   @Roles('PARENT', 'YOUNGSTER')
@@ -453,15 +431,7 @@ export class CoreController {
     return this.coreService.getParentConsolidatedBilling(req.user);
   }
 
-  @Post('billing/:billingId/proof-upload')
-  @Roles('PARENT')
-  uploadBillingProof(
-    @Req() req: AuthRequest,
-    @Param('billingId', ParseUUIDPipe) billingId: string,
-    @Body() body: UploadBillingProofDto,
-  ) {
-    return this.coreService.uploadBillingProof(req.user, billingId, body.proofImageData);
-  }
+  // POST billing/:billingId/proof-upload moved to archived.controller.ts
 
   @Post('billing/proof-upload-batch')
   @Roles('PARENT')
@@ -633,15 +603,7 @@ export class CoreController {
     return this.coreService.sendDeliveryNotificationEmails(req.user);
   }
 
-  @Post('delivery/assignments/:assignmentId/confirm')
-  @Roles('DELIVERY')
-  confirmDelivery(
-    @Req() req: AuthRequest,
-    @Param('assignmentId', ParseUUIDPipe) assignmentId: string,
-    @Body() body: NoteDto,
-  ) {
-    return this.coreService.confirmDelivery(req.user, assignmentId, body.note);
-  }
+  // POST delivery/assignments/:assignmentId/confirm moved to archived.controller.ts
 
   @Patch('delivery/assignments/:assignmentId/toggle')
   @Roles('DELIVERY')

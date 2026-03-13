@@ -4273,13 +4273,18 @@ export class CoreService implements OnModuleInit {
       });
       const ext = this.getFileExtFromContentType(parsed.contentType);
       const objectName = `${this.getGcsCategoryFolder('payment-proofs')}/${parentId}/${billingId}-${Date.now()}.${ext}`;
-      const uploaded = await this.uploadToGcs({
-        objectName,
-        contentType: parsed.contentType,
-        data: parsed.data,
-        cacheControl: 'private, max-age=0, no-cache',
-      });
-      proofUrl = uploaded.publicUrl;
+      try {
+        const uploaded = await this.uploadToGcs({
+          objectName,
+          contentType: parsed.contentType,
+          data: parsed.data,
+          cacheControl: 'private, max-age=0, no-cache',
+        });
+        proofUrl = uploaded.publicUrl;
+      } catch (err) {
+        // Keep parent proof upload working even if GCS credentials/bucket config is unavailable.
+        proofUrl = proof;
+      }
     } else if (!this.isAllowedProofImageUrl(proof)) {
       throw new BadRequestException('proofImageData must be a PNG/JPEG/WEBP image data URL or trusted image URL');
     }
