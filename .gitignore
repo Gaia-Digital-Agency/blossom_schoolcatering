@@ -89,6 +89,10 @@ sites/default/settings.local.php
 *.sql
 !docs/db/100_baseline_schema_v2.sql
 !docs/db/101_perf_indexes.sql
+!docs/db/102_seed_schools_from_current_data.sql
+!docs/db/103_seed_delivery_from_current_data.sql
+!docs/db/104_seed_menu_from_current_data.sql
+!docs/db/105_seed_parent_youngster_from_current_data.sql
 *.sql.gz
 *.sqlite
 *.sqlite3
@@ -113,3 +117,8 @@ database/cPanel.txt
 ./claude
 /claude
 docs/gda-viceroy-17373de6d690.json
+
+# SECRETS / CREDENTIALS
+secure/
+*.json.key
+*service-account*.json

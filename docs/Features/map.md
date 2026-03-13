@@ -1,30 +1,25 @@
 # Blossom School Catering Unified Map (Pages, API, DB)
 
-Last synced: 2026-02-28  
+Last synced: 2026-03-10  
 Base URL: `/schoolcatering`  
 API Base: `/schoolcatering/api/v1`
-
-This file is the merged, deduplicated map for:
-- navigation and pages
-- form/input fields
-- API endpoints
-- runtime DB model
 
 ## 1) Navigation and Page Map
 
 ### Public and Entry
 | Page | Purpose | Notes |
 |---|---|---|
-| `/` | Landing page | Home hero, links, login/register CTA |
-| `/home` | Home alias | Re-exports `/` |
-| `/menu` | Public menu | Read-only menu view |
-| `/guide` | Guides and T&C | Loads markdown from `docs/guides/*` |
-| `/login` | Generic login | Parent/Youngster focused, accepts returned role |
-| `/register` | Registration entry | Points to youngster flow |
-| `/register/youngsters` | Combined youngster+parent registration | Includes required registrant type and teacher conditional field |
-| `/register/parent` | Legacy parent entry | Redirects to `/register/youngsters` |
-| `/register/delivery` | Legacy delivery entry | Redirects to `/register` |
-| `/rating` | Dish rating page | Auth-required |
+| `/` | Landing page | Home content and auth CTAs |
+| `/home` | Home alias | Additional home entry |
+| `/menu` | Public menu | Read-only menu |
+| `/guide` | Guides | Loads markdown docs |
+| `/privacy-and-confidentiality` | Privacy page | Static content |
+| `/login` | Generic login | Multi-role signin entry |
+| `/register` | Register entry | Routes to youngster flow |
+| `/register/youngsters` | Combined youngster+parent registration | Includes registrant type/teacher mode |
+| `/register/parent` | Legacy parent entry | Redirects to youngster register |
+| `/register/delivery` | Legacy delivery entry | Redirects to register entry |
+| `/rating` | Ratings page | Auth-required |
 
 ### Role Login Pages
 - `/admin/login`
@@ -34,8 +29,8 @@ This file is the merged, deduplicated map for:
 - `/youngster/login`
 
 ### Protected Modules
-- Parent: `/parents` (alias: `/parent`)
-- Youngster: `/youngsters` (alias: `/youngster`)
+- Parent: `/parents`, `/parent`, `/parents/orders`, `/parents/billing`
+- Youngster: `/youngsters`, `/youngster`
 - Delivery: `/delivery`
 - Kitchen: `/kitchen`, `/kitchen/yesterday`, `/kitchen/today`, `/kitchen/tomorrow`
 - Admin:
@@ -45,54 +40,39 @@ This file is the merged, deduplicated map for:
   - `/admin/youngsters`
   - `/admin/schools`
   - `/admin/blackout-dates`
+  - `/admin/backout-dates` (alias info page)
   - `/admin/billing`
   - `/admin/delivery`
   - `/admin/reports`
   - `/admin/kitchen`
-  - `/admin/backout-dates` (placeholder page)
 
-## 2) Key Page Field Map
-
-### `/register/youngsters`
-- `registrantType` (required): `YOUNGSTER | PARENT | TEACHER`
-- `teacherName` (required when teacher, max 50)
-- Youngster profile fields (name, gender, DOB, school, grade, phone, email optional, allergies)
-- Parent profile fields (name, phone, email, address optional)
-
-### `/parents`
-- Child selector (`selectedChildId`)
-- Ordering fields: `serviceDate`, `session`, quantity map per menu item
-- Consolidated order actions: edit-before-cutoff, delete-before-cutoff, quick reorder
-- Billing fields: selected billing IDs, proof image payload
-- Spending dashboard read state
-
-### `/youngsters`
-- Profile summary + allergy display
-- Weekly insight display (badge, calories, counts)
-- Ordering fields: `serviceDate`, `session`, quantity map per menu item
-
-### `/delivery`
-- `date`
-- `note` (optional)
-- assignment toggle action per row
-
-### `/admin/schools`
-- New school form (`name`, `city`, `address`, `contactEmail`)
-- School active toggle and delete
-- Session setting toggle
-
-### `/admin/menu`
-- Context fields: `serviceDate`, `session`
-- Menu item upsert fields:
-  - `name`, `description`, `nutritionFactsText`, `caloriesKcal`, `price`
-  - `imageUrl` or uploaded image
-  - `ingredientIds[]`
-  - `isAvailable`, `displayOrder`, `cutleryRequired`, `packingRequirement`
+## 2) Key UI Field/Action Map
 
 ### `/admin/delivery`
-- Delivery user create/edit fields
-- School-delivery assignment fields (`deliveryUserId`, `schoolId`, `isActive`)
-- Auto-assign date
+- Delivery user CRUD controls
+- Delivery user `Show Password` (admin reset-password flow)
+- School-delivery mapping CRUD/activation
+- `Auto Assignment` by selected date
+- `Show Service Date` loads assigned delivery orders for selected date
+- Per-delivery order detail list rendered inside auto-assignment table
+
+### `/delivery`
+- Quick date buttons: Yesterday/Today/Tomorrow
+- Manual `Service Date` picker + `Show Service Date`
+- Pending/completed assignment groups
+- Toggle completion with optional note
+
+### `/admin/parents`
+- `Show Password` action
+- `Delete` action only when no active linked youngster
+
+### `/kitchen` and `/admin/kitchen`
+- Overview includes:
+  - Total Orders
+  - Total Orders Complete
+  - Total Dishes
+  - Session counts
+- Kitchen order completion toggle
 
 ## 3) API Map (Implemented)
 
@@ -111,17 +91,21 @@ This file is the merged, deduplicated map for:
 - `POST /role-check`
 - `POST /logout`
 - `POST /change-password`
+- `POST /password/forgot`
+- `POST /password/reset`
 - `GET /admin-ping`
 
 ## Public (`/api/v1/public`)
 - `GET /menu`
 
 ## Core (`/api/v1`)
-- Schools/session:
+- Schools/session/site settings:
   - `GET /schools`
   - `POST /admin/schools`
   - `PATCH /admin/schools/:schoolId`
   - `DELETE /admin/schools/:schoolId`
+  - `GET /admin/site-settings`
+  - `PATCH /admin/site-settings`
   - `GET /admin/session-settings`
   - `GET /session-settings`
   - `PATCH /admin/session-settings/:session`
@@ -134,20 +118,22 @@ This file is the merged, deduplicated map for:
   - `PATCH /admin/youngsters/:youngsterId`
   - `DELETE /admin/youngsters/:youngsterId`
   - `PATCH /admin/users/:userId/reset-password`
+  - `PATCH /admin/youngsters/:youngsterId/reset-password`
   - `GET /children/me`
   - `GET /youngsters/me/insights`
   - `GET /youngsters/me/orders/consolidated`
   - `GET /parents/me/children/pages`
   - `POST /parents/:parentId/children/:childId/link`
-- Admin dashboard/reports:
+- Dashboard/reports/audit:
   - `GET /admin/dashboard`
   - `GET /admin/revenue`
   - `GET /admin/reports`
+  - `GET /admin/audit-logs`
 - Blackout:
   - `GET /blackout-days`
   - `POST /blackout-days`
   - `DELETE /blackout-days/:id`
-- Ingredient/menu/menu ratings:
+- Ingredients/menu/menu ratings:
   - `GET /admin/ingredients`
   - `POST /admin/ingredients`
   - `PATCH /admin/ingredients/:ingredientId`
@@ -155,11 +141,13 @@ This file is the merged, deduplicated map for:
   - `GET /admin/menus`
   - `GET /admin/menu-ratings`
   - `POST /admin/menus/sample-seed`
+  - `POST /admin/orders/sample-seed`
   - `POST /admin/menu-items`
   - `PATCH /admin/menu-items/:itemId`
   - `DELETE /admin/menu-items/:itemId`
   - `POST /admin/menu-images/upload`
-- Menu/order acceleration:
+  - `POST /ratings`
+- Menus/favourites/carts/orders:
   - `GET /menus`
   - `GET /favourites`
   - `POST /favourites`
@@ -167,28 +155,6 @@ This file is the merged, deduplicated map for:
   - `POST /favourites/:favouriteId/apply`
   - `POST /carts/quick-reorder`
   - `POST /meal-plans/wizard`
-  - `POST /ratings`
-- Billing:
-  - `GET /billing/parent/consolidated`
-  - `POST /billing/:billingId/proof-upload`
-  - `POST /billing/proof-upload-batch`
-  - `GET /billing/:billingId/receipt`
-  - `GET /admin/billing`
-  - `POST /admin/billing/:billingId/verify`
-  - `POST /admin/billing/:billingId/receipt`
-- Delivery:
-  - `GET /delivery/users`
-  - `POST /admin/delivery/users`
-  - `PATCH /admin/delivery/users/:userId/deactivate`
-  - `PATCH /admin/delivery/users/:userId`
-  - `GET /delivery/school-assignments`
-  - `POST /delivery/school-assignments`
-  - `POST /delivery/auto-assign`
-  - `POST /delivery/assign`
-  - `GET /delivery/assignments`
-  - `POST /delivery/assignments/:assignmentId/confirm`
-  - `PATCH /delivery/assignments/:assignmentId/toggle`
-- Cart/order:
   - `GET /carts`
   - `POST /carts`
   - `GET /carts/:cartId`
@@ -196,69 +162,63 @@ This file is the merged, deduplicated map for:
   - `DELETE /carts/:cartId`
   - `POST /carts/:cartId/submit`
   - `GET /orders/:orderId`
-  - `GET /parents/me/orders/consolidated`
-  - `GET /parents/me/spending-dashboard`
   - `PATCH /orders/:orderId`
   - `DELETE /orders/:orderId`
+  - `GET /parents/me/orders/consolidated`
+  - `GET /parents/me/spending-dashboard`
+- Billing:
+  - `GET /billing/parent/consolidated`
+  - `POST /billing/:billingId/proof-upload`
+  - `POST /billing/proof-upload-batch`
+  - `GET /billing/:billingId/proof-image`
+  - `GET /billing/:billingId/receipt`
+  - `POST /billing/:billingId/revert-proof`
+  - `GET /admin/billing`
+  - `GET /admin/billing/:billingId/proof-image`
+  - `POST /admin/billing/:billingId/verify`
+  - `POST /admin/billing/:billingId/receipt`
+- Delivery:
+  - `GET /delivery/users`
+  - `POST /admin/delivery/users`
+  - `PATCH /admin/delivery/users/:userId/deactivate`
+  - `PATCH /admin/delivery/users/:userId`
+  - `DELETE /admin/delivery/users/:userId`
+  - `GET /delivery/school-assignments`
+  - `POST /delivery/school-assignments`
+  - `DELETE /delivery/school-assignments/:deliveryUserId/:schoolId`
+  - `POST /delivery/auto-assign`
+  - `POST /delivery/assign`
+  - `GET /delivery/assignments`
+  - `GET /delivery/summary`
+  - `POST /delivery/assignments/:assignmentId/confirm`
+  - `PATCH /delivery/assignments/:assignmentId/toggle`
 - Kitchen:
   - `GET /kitchen/daily-summary`
   - `POST /kitchen/orders/:orderId/complete`
 
-## System Endpoint
+## System Endpoints
+- `GET /health`
+- `GET /ready`
 - `GET /api/v1/health`
+- `GET /api/v1/ready`
 
-## 4) Runtime DB Map
+## 4) Runtime DB Map (High-Level)
 
-### Identity and Profile
-- `users`
-- `user_preferences`
-- `user_identities`
-- `auth_refresh_sessions`
-- `parents`
-- `children`
-  - includes registration metadata:
-    - `registration_actor_type`
-    - `registration_actor_teacher_name`
-- `parent_children`
+### Identity/Profile
+- `users`, `user_preferences`, `user_identities`, `auth_refresh_sessions`
+- `parents`, `children`, `parent_children`
 
-### School and Calendar
-- `schools`
-- `academic_years`
-- `academic_terms`
-- `session_settings`
-- `blackout_days`
+### School/Calendar
+- `schools`, `session_settings`, `blackout_days`
 
-### Menu and Ingredients
-- `menus`
-- `menu_items`
-- `ingredients`
-- `menu_item_ingredients`
+### Menu/Ordering
+- `menus`, `menu_items`, `ingredients`, `menu_item_ingredients`
+- `order_carts`, `cart_items`, `orders`, `order_items`, `order_mutations`
+- `favourite_meals`, `favourite_meal_items`
 
-### Ordering and Favourites
-- `order_carts`
-- `cart_items`
-- `orders`
-- `order_items`
-- `order_mutations`
-- `favourite_meals`
-- `favourite_meal_items`
-
-### Billing and Delivery
-- `billing_records`
-- `digital_receipts`
-- `delivery_users`
-- `delivery_assignments`
-- `delivery_school_assignments`
+### Billing/Delivery
+- `billing_records`, `digital_receipts`
+- `delivery_assignments`, `delivery_school_assignments`
 
 ### Analytics/Gamification
-- `child_badges`
-- `analytics_daily_agg`
-
-## 5) Core Relationship Summary
-- `users` 1:1 `parents` and `children` by role-linked entities.
-- `parents` N:M `children` through `parent_children`.
-- `schools` 1:N `children` and supports delivery mapping.
-- `menus` 1:N `menu_items`; `menu_items` N:M `ingredients`.
-- `order_carts` -> `cart_items` -> submitted `orders` -> `order_items`.
-- `orders` 1:1 billing (`billing_records`) and 1:1 delivery assignment.
-- `billing_records` upsert to `digital_receipts`.
+- `child_badges`, `analytics_daily_agg`

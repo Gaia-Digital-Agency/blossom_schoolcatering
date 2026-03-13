@@ -1,46 +1,56 @@
 # Blossom School Catering
 
 Creation date: 2026-02-24  
-Last updated: 2026-02-28  
+Last updated: 2026-03-10  
 Developed by Gaiada.com (C) 2026  
 Repository: `git@github.com-net1io:Gaia-Digital-Agency/blossom_schoolcatering.git`
 
 ## Overview
-Blossom School Catering is a mobile-first school meal ordering app for Bali school operations.
+Blossom School Catering is a role-based school meal ordering platform for Bali operations.
 
-- Roles: Parent, Youngster, Admin, Kitchen, Delivery
-- Youngster registration actor: `YOUNGSTER`, `PARENT`, `TEACHER`
+- Roles: `PARENT`, `YOUNGSTER`, `ADMIN`, `KITCHEN`, `DELIVERY`
 - Sessions: `LUNCH`, `SNACK`, `BREAKFAST`
-- Core rule: one active order per youngster/session/service date
-- Runtime target: GCP VM with Nginx + PM2 + PostgreSQL + GCS assets
+- Core ordering rule: one active order per youngster/session/service date
+- Runtime stack: Next.js + NestJS + PostgreSQL + PM2 + Nginx + GCS
 
 ## Current Runtime
 - Staging URL: `http://34.124.244.233/schoolcatering`
 - Frontend process: `schoolcatering-web`
 - API process: `schoolcatering-api`
 - API base: `/schoolcatering/api/v1`
+- Current deployed branch (staging): `codex/phase1-stack-upgrade`
 
-## Latest Verified State (2026-02-28)
-- Request validation is enforced with DTO + global `ValidationPipe`.
-- Global API throttling is enabled with `ThrottlerModule`.
-- PM2 ecosystem config is committed (`ecosystem.config.cjs`) and used for process restart/persistence.
-- Youngster registration supports teacher-assisted flow:
-  - required registrant selector (`Youngster`, `Parent`, `Teacher`)
-  - required `Teacher Name` (max 50 chars) when registrant is teacher
-  - registration metadata persisted in `children` (`registration_actor_type`, `registration_actor_teacher_name`)
-- Parent and Youngster ordering flows are active with cart resume, cutoff countdown, blackout/session enforcement.
-- Admin modules are active for schools, menu, blackout dates, billing, delivery, reports, kitchen monitor.
-- Delivery and kitchen operational flows are active:
-  - kitchen marks order complete
-  - delivery toggles assignment completion
-- Health endpoint available: `GET /api/v1/health`.
+## Latest Verified State (2026-03-10)
+- Request validation enforced via DTO + global `ValidationPipe`.
+- Global API throttling enabled (`ThrottlerModule` + guard).
+- Health endpoints live:
+  - `GET /api/v1/health`
+  - `GET /api/v1/ready`
+- Billing proof image viewing uses authenticated stream endpoints (parent/admin) for private GCS objects.
+- Kitchen flow:
+  - marks order complete via `POST /kitchen/orders/:orderId/complete`
+  - kitchen and admin-kitchen overview include `Total Orders Complete`
+- Delivery flow:
+  - auto-assignment by school mapping
+  - assignment toggle complete/undo
+  - delivery page supports manual service-date picker (`Show Service Date`) in addition to Yesterday/Today/Tomorrow
+- Admin delivery flow:
+  - `Auto Assignment` kept as single source of truth (duplicate assigned-orders section removed)
+  - per-delivery detailed order list shown in auto-assignment table
+  - `Show Password` action for delivery users (resets password and shows new value)
+- Admin parent flow:
+  - `Delete` action available
+  - deletion blocked when parent still has active linked youngster(s)
+- UI error standard:
+  - inline `.auth-error` remains high-contrast red
+  - disabled/unallowed actions visibly marked
 
 ## Monorepo Structure
 - `apps/web`: Next.js frontend
 - `apps/api`: NestJS backend
-- `packages/types`: shared types
+- `packages/types`: shared TypeScript types
 - `packages/config`: shared config placeholder
-- `docs/*`: specifications, runbooks, guides, planning
+- `docs/*`: architecture, feature, runbook, and guide docs
 
 ## Local Build and Run
 ```bash
@@ -50,11 +60,15 @@ npm run dev:web
 npm run dev:api
 ```
 
+Local URLs:
+- Web: `http://127.0.0.1:5173/schoolcatering`
+- API: `http://127.0.0.1:3000/api/v1`
+
 ## Typical Server Deploy
 ```bash
 ssh -i ~/.ssh/gda-ce01 azlan@34.124.244.233
 cd /var/www/schoolcatering
-git pull origin main
+git pull origin codex/phase1-stack-upgrade
 npm run build:api
 npm run build:web
 pm2 restart schoolcatering-api
@@ -71,16 +85,16 @@ Expected core variables include:
 - GCS variables (`GCS_BUCKET`, folder vars, and credentials)
 
 ## Key Documentation
-- `plan.md`: implementation checklist by phase
-- `progress.md`: dated implementation log
+- `progress.md`: dated implementation/deploy log
+- `docs/improvements/plan.md`: implementation checklist
 - `docs/specifications/*`: API/rules/data contracts
-- `docs/Features/full_feature_matrix.md`: complete feature surface
-- `docs/Features/buttons.md`: UI action and endpoint map
-- `docs/Features/map.md`: merged page/API/DB map
-- `docs/guides/*.md`: end-user guides
+- `docs/Features/feature_matrix.md`: current feature surface
+- `docs/Features/buttons_api.md`: UI action to API mapping
+- `docs/Features/map.md`: unified page/API/DB map
+- `docs/guides/*.md`: role and functional guides
 
 ## API Notes
-- API app path: `apps/api`
+- API path: `apps/api`
 - Framework: NestJS
 - Build command:
 
@@ -89,22 +103,17 @@ npm -C apps/api run build
 ```
 
 ## DB Migration Guide
+Historical SQL migrations live under `docs/db`.
 
-This repo keeps historical SQL migrations under `docs/db`.
+Fresh-install consolidated path:
+1. `docs/db/100_baseline_schema_v2.sql`
+2. `docs/db/003_views_and_reports.sql`
+3. `docs/db/005_auth_runtime_sessions.sql`
+4. `docs/db/101_perf_indexes.sql`
 
-- Immutable history: `001` to `013` (do not rewrite for existing environments)
-- Fresh-install consolidated path:
-  1. `docs/db/100_baseline_schema_v2.sql`
-  2. `docs/db/003_views_and_reports.sql`
-  3. `docs/db/005_auth_runtime_sessions.sql`
-  4. `docs/db/101_perf_indexes.sql`
-
-- Operational menu seeding (finalized active menu -> future date):
-  - `docs/db/006_runtime_manual_test_seed.sql`
-
-- Full production DB execution steps:
-  - `docs/db/production-runbook.md`
+Production DB execution runbook:
+- `docs/db/production-runbook.md`
 
 ## Packages
 - `packages/types`: shared TypeScript types
-- `packages/config`: shared configuration package placeholder for ESLint/Prettier/TS presets
+- `packages/config`: shared configuration package placeholder

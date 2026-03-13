@@ -14,6 +14,11 @@ type DeliveryUser = {
   email?: string | null;
   is_active: boolean;
 };
+type ShowPassInfo = {
+  deliveryName: string;
+  deliveryUsername: string;
+  deliveryNewPassword: string;
+};
 type School = { id: string; name: string };
 type Mapping = {
   delivery_user_id: string;
@@ -29,8 +34,12 @@ type Assignment = {
   delivery_user_id: string;
   service_date: string;
   session: string;
+  status: string;
   school_name: string;
   child_name: string;
+  youngster_mobile?: string | null;
+  allergen_items?: string | null;
+  dishes: Array<{ item_name: string; quantity: number }>;
   parent_name: string;
   delivery_status: string;
   confirmed_at?: string | null;
@@ -80,21 +89,26 @@ export default function AdminDeliveryPage() {
   const [togglingUserId, setTogglingUserId] = useState('');
   const [deletingUserId, setDeletingUserId] = useState('');
   const [deletingMappingKey, setDeletingMappingKey] = useState('');
+  const [showPassInfo, setShowPassInfo] = useState<ShowPassInfo | null>(null);
   const editFirstNameInputRef = useRef<HTMLInputElement | null>(null);
 
   const load = async () => {
-    const [u, s, m, a] = await Promise.all([
+    const [rU, rS, rM, rA] = await Promise.allSettled([
       apiFetch('/delivery/users?include_inactive=true') as Promise<DeliveryUser[]>,
       apiFetch('/schools?active=true') as Promise<School[]>,
       apiFetch('/delivery/school-assignments') as Promise<Mapping[]>,
       apiFetch(`/delivery/assignments?date=${encodeURIComponent(assignDate)}`) as Promise<Assignment[]>,
     ]);
-    setUsers(u || []);
-    setSchools(s || []);
-    setMappings(m || []);
-    setAssignments(a || []);
-    if (!selectedDeliveryUserId && u.length) setSelectedDeliveryUserId(u[0].id);
-    if (!selectedSchoolId && s.length) setSelectedSchoolId(s[0].id);
+    const u = rU.status === 'fulfilled' ? (rU.value || []) : null;
+    const s = rS.status === 'fulfilled' ? (rS.value || []) : null;
+    const m = rM.status === 'fulfilled' ? (rM.value || []) : null;
+    const a = rA.status === 'fulfilled' ? (rA.value || []) : null;
+    if (u !== null) { setUsers(u); if (!selectedDeliveryUserId && u.length) setSelectedDeliveryUserId(u[0].id); }
+    if (s !== null) { setSchools(s); if (!selectedSchoolId && s.length) setSelectedSchoolId(s[0].id); }
+    if (m !== null) setMappings(m);
+    if (a !== null) setAssignments(a);
+    const firstErr = [rU, rS, rM, rA].find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined;
+    if (firstErr) throw firstErr.reason;
   };
 
   useEffect(() => { load().catch((e) => setError(e instanceof Error ? e.message : 'Failed')); /* eslint-disable-next-line */ }, [assignDate]);
@@ -107,7 +121,7 @@ export default function AdminDeliveryPage() {
       await apiFetch('/delivery/school-assignments', {
         method: 'POST',
         body: JSON.stringify({ deliveryUserId: selectedDeliveryUserId, schoolId: selectedSchoolId, isActive: true }),
-      });
+      }, { skipAutoReload: true });
       setMessage('School assignment saved.');
       await load();
     } catch (e) {
@@ -122,7 +136,7 @@ export default function AdminDeliveryPage() {
       await apiFetch('/delivery/school-assignments', {
         method: 'POST',
         body: JSON.stringify({ deliveryUserId: row.delivery_user_id, schoolId: row.school_id, isActive }),
-      });
+      }, { skipAutoReload: true });
       setMessage(isActive ? 'Mapping activated.' : 'Mapping deactivated.');
       await load();
     } catch (e) {
@@ -140,7 +154,7 @@ export default function AdminDeliveryPage() {
     try {
       await apiFetch(`/delivery/school-assignments/${row.delivery_user_id}/${row.school_id}`, {
         method: 'DELETE',
-      });
+      }, { skipAutoReload: true });
       setMessage('Mapping deleted.');
       await load();
     } catch (e) {
@@ -157,7 +171,7 @@ export default function AdminDeliveryPage() {
       const out = await apiFetch('/delivery/auto-assign', {
         method: 'POST',
         body: JSON.stringify({ date: assignDate }),
-      }) as { assignedCount: number; skippedOrderIds: string[] };
+      }, { skipAutoReload: true }) as { assignedCount: number; skippedOrderIds: string[] };
       setMessage(
         out.skippedOrderIds.length
           ? `Auto-assigned ${out.assignedCount}. Skipped ${out.skippedOrderIds.length} (missing school mapping).`
@@ -166,6 +180,44 @@ export default function AdminDeliveryPage() {
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed auto-assignment');
+    }
+  };
+
+  const onShowServiceDate = async () => {
+    setError('');
+    setMessage('');
+    try {
+      const rows = await apiFetch(
+        `/delivery/assignments?date=${encodeURIComponent(assignDate)}`,
+      ) as Assignment[];
+      setAssignments(rows || []);
+      setMessage(`Showing delivery-assigned orders for service date ${assignDate}.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed loading service date assignments');
+    }
+  };
+
+  const onSendNotificationEmail = async () => {
+    setError('');
+    setMessage('');
+    try {
+      const out = await apiFetch('/admin/delivery/send-notification-email', {
+        method: 'POST',
+      }, { skipAutoReload: true }) as {
+        ok: boolean;
+        date: string;
+        sentCount: number;
+        skippedCount: number;
+        failed: string[];
+      };
+      if (out.failed?.length) {
+        setMessage(`Sent ${out.sentCount} notification emails for ${out.date}. Skipped ${out.skippedCount}. Failed ${out.failed.length}.`);
+        setError(out.failed.slice(0, 3).join(' | '));
+      } else {
+        setMessage(`Sent ${out.sentCount} notification emails for ${out.date}.`);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed sending notification emails');
     }
   };
 
@@ -188,7 +240,7 @@ export default function AdminDeliveryPage() {
           phoneNumber: newPhoneNumber.trim(),
           email: newEmail.trim() || undefined,
         }),
-      }) as { username: string };
+      }, { skipAutoReload: true }) as { username: string };
       setMessage(`Delivery user created: ${out.username}`);
       setNewUsername('');
       setNewPassword('');
@@ -232,7 +284,7 @@ export default function AdminDeliveryPage() {
           phoneNumber: editPhoneNumber,
           email: editEmail,
         }),
-      });
+      }, { skipAutoReload: true });
       setEditingUserId('');
       setMessage('Delivery user updated.');
       await load();
@@ -251,7 +303,7 @@ export default function AdminDeliveryPage() {
       await apiFetch(`/admin/delivery/users/${user.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ isActive: !user.is_active }),
-      });
+      }, { skipAutoReload: true });
       setMessage(!user.is_active ? `Delivery user activated: ${user.username}` : `Delivery user deactivated: ${user.username}`);
       await load();
     } catch (e) {
@@ -267,7 +319,7 @@ export default function AdminDeliveryPage() {
     setError('');
     setMessage('');
     try {
-      await apiFetch(`/admin/delivery/users/${user.id}`, { method: 'DELETE' });
+      await apiFetch(`/admin/delivery/users/${user.id}`, { method: 'DELETE' }, { skipAutoReload: true });
       setMessage(`Delivery user deleted: ${user.username}`);
       if (editingUserId === user.id) setEditingUserId('');
       await load();
@@ -278,6 +330,25 @@ export default function AdminDeliveryPage() {
     }
   };
 
+  const onShowPassword = async (user: DeliveryUser) => {
+    setError('');
+    setMessage('');
+    try {
+      const res = await apiFetch(
+        `/admin/users/${user.id}/reset-password`,
+        { method: 'PATCH', body: JSON.stringify({}) },
+        { skipAutoReload: true },
+      ) as { ok: boolean; newPassword: string; username: string };
+      setShowPassInfo({
+        deliveryName: `${user.first_name} ${user.last_name}`,
+        deliveryUsername: res.username,
+        deliveryNewPassword: res.newPassword,
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed resetting password');
+    }
+  };
+
   const usersById = useMemo(() => {
     const map = new Map<string, DeliveryUser>();
     for (const u of users) map.set(u.id, u);
@@ -285,14 +356,22 @@ export default function AdminDeliveryPage() {
   }, [users]);
 
   const autoAssignmentSummary = useMemo(() => {
-    const grouped = new Map<string, { schools: Set<string>; youngsters: Set<string>; orderCount: number }>();
+    const grouped = new Map<string, {
+      schools: Set<string>;
+      youngsters: Set<string>;
+      orderCount: number;
+      orders: Assignment[];
+    }>();
     for (const row of assignments) {
       const key = row.delivery_user_id || 'UNASSIGNED';
-      if (!grouped.has(key)) grouped.set(key, { schools: new Set<string>(), youngsters: new Set<string>(), orderCount: 0 });
+      if (!grouped.has(key)) {
+        grouped.set(key, { schools: new Set<string>(), youngsters: new Set<string>(), orderCount: 0, orders: [] });
+      }
       const target = grouped.get(key)!;
       if (row.school_name) target.schools.add(row.school_name);
       if (row.child_name) target.youngsters.add(row.child_name);
       target.orderCount += 1;
+      target.orders.push(row);
     }
     return Array.from(grouped.entries()).map(([deliveryUserId, value]) => {
       const u = usersById.get(deliveryUserId);
@@ -302,9 +381,67 @@ export default function AdminDeliveryPage() {
         schools: Array.from(value.schools).sort(),
         youngsterCount: value.youngsters.size,
         orderCount: value.orderCount,
+        orders: value.orders.sort((a, b) =>
+          a.school_name.localeCompare(b.school_name)
+          || a.session.localeCompare(b.session)
+          || a.child_name.localeCompare(b.child_name),
+        ),
       };
     }).sort((a, b) => b.orderCount - a.orderCount || a.deliveryName.localeCompare(b.deliveryName));
   }, [assignments, usersById]);
+
+  const onDownloadSummary = async () => {
+    setError('');
+    setMessage('');
+    try {
+      const data = await apiFetch(`/delivery/summary?date=${encodeURIComponent(assignDate)}`) as {
+        date: string;
+        deliveries: Array<{
+          deliveryUserId: string;
+          deliveryName: string;
+          schools: Array<{
+            schoolName: string;
+            orderCount: number;
+            dishCount: number;
+            orders: Array<{ orderNumber: string; childLastName: string; youngsterPhone: string | null }>;
+          }>;
+        }>;
+      };
+      if (!data || !data.deliveries || data.deliveries.length === 0) {
+        setMessage('No assignment data for selected date.');
+        return;
+      }
+      const lines: string[] = [];
+      lines.push(`DELIVERY SUMMARY - ${data.date}`);
+      lines.push('');
+      for (const delivery of data.deliveries) {
+        lines.push(`Delivery Person: ${delivery.deliveryName}`);
+        for (const school of delivery.schools) {
+          lines.push(`  School: ${school.schoolName}`);
+          lines.push(`  Total Orders: ${school.orderCount}`);
+          lines.push(`  Total Dishes: ${school.dishCount}`);
+          lines.push(`  Order# | Last Name | Phone`);
+          lines.push(`  -------|-----------|------`);
+          for (const order of school.orders) {
+            lines.push(`  ${order.orderNumber} | ${order.childLastName} | ${order.youngsterPhone || '-'}`);
+          }
+          lines.push('');
+        }
+        lines.push('');
+      }
+      const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `delivery-summary-${data.date}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed downloading summary');
+    }
+  };
 
   return (
     <main className="page-auth page-auth-desktop">
@@ -316,12 +453,12 @@ export default function AdminDeliveryPage() {
 
         <h2>Delivery Registration (Admin Only)</h2>
         <div className="auth-form">
-          <label>Username<input value={newUsername} onChange={(e) => setNewUsername(e.target.value)} /></label>
-          <label>Password<PasswordInput value={newPassword} onChange={(e) => setNewPassword(e.target.value)} /></label>
-          <label>First Name<input value={newFirstName} onChange={(e) => setNewFirstName(e.target.value)} /></label>
-          <label>Last Name<input value={newLastName} onChange={(e) => setNewLastName(e.target.value)} /></label>
-          <label>Phone Number<input value={newPhoneNumber} onChange={(e) => setNewPhoneNumber(e.target.value)} /></label>
-          <label>Email<input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} /></label>
+          <label>Username <span className="req">*</span><input value={newUsername} onChange={(e) => setNewUsername(e.target.value)} /></label>
+          <label>Password <span className="req">*</span><PasswordInput value={newPassword} onChange={(e) => setNewPassword(e.target.value)} /></label>
+          <label>First Name <span className="req">*</span><input value={newFirstName} onChange={(e) => setNewFirstName(e.target.value)} /></label>
+          <label>Last Name <span className="req">*</span><input value={newLastName} onChange={(e) => setNewLastName(e.target.value)} /></label>
+          <label>Phone Number <span className="req">*</span><input value={newPhoneNumber} onChange={(e) => setNewPhoneNumber(e.target.value)} placeholder="+[country][area][number]" /><small className="field-hint">Format: + country code + area code + number &nbsp;e.g. +628123456789</small></label>
+          <label>Email <span className="opt">(Optional)</span><input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} /></label>
           <button className="btn btn-primary" type="button" onClick={onCreateDeliveryUser} disabled={creatingUser}>
             {creatingUser ? 'Creating...' : 'Create Delivery User'}
           </button>
@@ -355,7 +492,7 @@ export default function AdminDeliveryPage() {
                       ) : `${u.first_name} ${u.last_name}`}
                     </td>
                     <td>{u.username}</td>
-                    <td>{editingUserId === u.id ? <input value={editPhoneNumber} onChange={(e) => setEditPhoneNumber(e.target.value)} /> : (u.phone_number || '-')}</td>
+                    <td>{editingUserId === u.id ? <input value={editPhoneNumber} onChange={(e) => setEditPhoneNumber(e.target.value)} placeholder="+[country][area][number]" /> : (u.phone_number || '-')}</td>
                     <td>{editingUserId === u.id ? <input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} /> : (u.email || '-')}</td>
                     <td>{u.is_active ? 'ACTIVE' : 'INACTIVE'}</td>
                     <td>
@@ -370,6 +507,14 @@ export default function AdminDeliveryPage() {
                         ) : (
                           <button className="btn btn-outline" type="button" onClick={() => beginEditUser(u)}>Edit</button>
                         )}
+                        <button
+                          className="btn btn-outline"
+                          type="button"
+                          onClick={() => onShowPassword(u)}
+                          disabled={deletingUserId === u.id || togglingUserId === u.id || savingUserId === u.id}
+                        >
+                          Show Password
+                        </button>
                         <button
                           className="btn btn-outline"
                           type="button"
@@ -398,6 +543,11 @@ export default function AdminDeliveryPage() {
         <div className="admin-section-card">
           <h2>Delivery vs School Assignment</h2>
           <p className="auth-help">One school can have maximum 3 active delivery personnel assignments.</p>
+          <div className="assignment-notification-row">
+            <button className="btn btn-outline" type="button" onClick={onSendNotificationEmail}>
+              SEND NOTIFICATION EMAIL
+            </button>
+          </div>
           <div className="auth-form admin-mapping-controls">
             <label>
               School
@@ -468,7 +618,7 @@ export default function AdminDeliveryPage() {
           </div>
         </div>
 
-        <h2>Auto Assignment ({assignDate})</h2>
+        <h2>Delivery Assignments ({assignDate})</h2>
         <div className="auth-form auto-assign-controls">
           <label>
             Service Date
@@ -476,7 +626,8 @@ export default function AdminDeliveryPage() {
           </label>
           <button className="btn btn-outline" type="button" onClick={() => setAssignDate(todayIsoLocal())}>Show Today</button>
           <button className="btn btn-primary" type="button" onClick={onAutoAssign}>Auto Assign by School</button>
-          <button className="btn btn-outline" type="button" onClick={load}>Refresh</button>
+          <button className="btn btn-outline" type="button" onClick={onShowServiceDate}>Show Service Date</button>
+          <button className="btn btn-outline" type="button" onClick={onDownloadSummary}>Download Summary</button>
         </div>
 
         <div className="kitchen-table-wrap">
@@ -487,52 +638,96 @@ export default function AdminDeliveryPage() {
                 <th>Schools</th>
                 <th className="count-col">Number of Youngsters</th>
                 <th className="count-col">Number of Orders</th>
+                <th>Orders Detail</th>
               </tr>
             </thead>
             <tbody>
               {autoAssignmentSummary.length === 0 ? (
-                <tr><td colSpan={4}>No auto-assignment data for selected date.</td></tr>
+                <tr><td colSpan={5}>No auto-assignment data for selected date.</td></tr>
               ) : autoAssignmentSummary.map((row) => (
                 <tr key={row.deliveryUserId}>
                   <td>{row.deliveryName}</td>
                   <td>{row.schools.join(', ') || '-'}</td>
                   <td className="count-col">{row.youngsterCount}</td>
                   <td className="count-col">{row.orderCount}</td>
+                  <td>
+                    <div className="auto-order-list">
+                      {row.orders.map((order) => (
+                        <div key={order.id}>
+                          {order.school_name} | {order.service_date} {order.session} | {order.child_name} / {order.parent_name} | {order.delivery_status} | {order.order_id}
+                        </div>
+                      ))}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
 
-        <h2>Assigned Orders ({assignDate})</h2>
-        <div className="kitchen-table-wrap">
-          <table className="kitchen-table admin-delivery-table">
-            <thead>
-              <tr>
-                <th>Date/Session</th>
-                <th>School</th>
-                <th>Order</th>
-                <th>Youngster / Parent</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {assignments.length === 0 ? (
-                <tr><td colSpan={5}>No assignments.</td></tr>
-              ) : assignments.map((a) => (
-                <tr key={a.id}>
-                  <td>{a.service_date} {a.session}</td>
-                  <td>{a.school_name}</td>
-                  <td>{a.order_id}</td>
-                  <td>{a.child_name} / {a.parent_name}</td>
-                  <td>{a.delivery_status} {a.confirmed_at ? `(Confirmed ${a.confirmed_at})` : ''}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </section>
+      {showPassInfo ? (
+        <div className="pass-modal-overlay" onClick={() => setShowPassInfo(null)}>
+          <div className="pass-modal-card" onClick={(e) => e.stopPropagation()}>
+            <h2 className="pass-modal-title">Delivery Password Information</h2>
+            <p className="pass-modal-warning">
+              This action resets password. Save it before closing.
+            </p>
+            <div className="reg-info-list">
+              <div className="reg-info-row">
+                <span className="reg-info-label">Delivery Name</span>
+                <span className="reg-info-val">{showPassInfo.deliveryName}</span>
+              </div>
+              <div className="reg-info-row">
+                <span className="reg-info-label">Delivery Username</span>
+                <code className="reg-info-code">{showPassInfo.deliveryUsername}</code>
+              </div>
+              <div className="reg-info-row">
+                <span className="reg-info-label">Delivery New Password</span>
+                <code className="reg-info-code">{showPassInfo.deliveryNewPassword}</code>
+              </div>
+            </div>
+            <button className="btn btn-primary pass-modal-close" type="button" onClick={() => setShowPassInfo(null)}>
+              Close
+            </button>
+          </div>
+        </div>
+      ) : null}
       <style jsx>{`
+        .kitchen-table-wrap {
+          overflow-x: auto;
+          width: 100%;
+          max-width: 100%;
+          -webkit-overflow-scrolling: touch;
+        }
+        .kitchen-table {
+          width: 100%;
+          border-collapse: collapse;
+          background: #fff;
+          border: 1px solid #e2d6c2;
+          border-radius: 10px;
+          overflow: hidden;
+          margin-bottom: 0.5rem;
+        }
+        .kitchen-table th,
+        .kitchen-table td {
+          border-bottom: 1px solid #efe7da;
+          padding: 0.6rem;
+          text-align: left;
+          vertical-align: top;
+          font-size: 0.88rem;
+          line-height: 1.35;
+        }
+        .kitchen-table th {
+          white-space: nowrap;
+        }
+        .kitchen-table td {
+          overflow-wrap: anywhere;
+          word-break: break-word;
+        }
+        .kitchen-table tbody tr:last-child td {
+          border-bottom: none;
+        }
         .admin-delivery-table th,
         .admin-delivery-table td {
           text-align: left;
@@ -551,6 +746,17 @@ export default function AdminDeliveryPage() {
         .admin-delivery-table .count-col {
           text-align: center;
         }
+        .auto-order-list {
+          display: grid;
+          gap: 0.2rem;
+          font-size: 0.8rem;
+          line-height: 1.35;
+        }
+        .admin-delivery-table td input {
+          width: 100%;
+          min-width: 0;
+          box-sizing: border-box;
+        }
         .action-row {
           display: flex;
           flex-wrap: wrap;
@@ -565,13 +771,119 @@ export default function AdminDeliveryPage() {
         .edit-grid {
           display: grid;
           gap: 0.35rem;
+          min-width: 0;
+        }
+        .edit-grid input {
+          width: 100%;
+          min-width: 0;
+        }
+        .assignment-notification-row {
+          margin-bottom: 0.65rem;
+          display: flex;
+          justify-content: flex-start;
+        }
+        .req {
+          color: #c0392b;
+          margin-left: 2px;
+        }
+        .opt {
+          color: #7a6652;
+          font-size: 0.78rem;
+          font-weight: normal;
+          margin-left: 4px;
         }
         @media (min-width: 900px) {
-          .admin-mapping-controls,
-          .auto-assign-controls {
+          .admin-mapping-controls {
             grid-template-columns: 1fr auto auto auto;
             align-items: end;
           }
+          .auto-assign-controls {
+            grid-template-columns: 1fr auto auto auto auto;
+            align-items: end;
+          }
+        }
+        @media (max-width: 680px) {
+          .kitchen-table th,
+          .kitchen-table td {
+            font-size: 0.78rem;
+            padding: 0.38rem 0.4rem;
+          }
+          .kitchen-table th {
+            white-space: nowrap;
+          }
+        }
+        .pass-modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.45);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          padding: 1rem;
+        }
+        .pass-modal-card {
+          background: #fff;
+          border-radius: 1rem;
+          padding: 1.5rem 1.6rem;
+          max-width: 480px;
+          width: 100%;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
+        }
+        .pass-modal-title {
+          font-size: 1.1rem;
+          font-weight: 700;
+          margin: 0 0 0.5rem;
+        }
+        .pass-modal-warning {
+          font-weight: 600;
+          color: #b45309;
+          font-size: 0.88rem;
+          margin-bottom: 0.9rem;
+        }
+        .reg-info-list {
+          display: flex;
+          flex-direction: column;
+          gap: 0.45rem;
+          background: #f8f8f8;
+          border-radius: 0.65rem;
+          padding: 0.85rem 1rem;
+          margin-bottom: 1.1rem;
+        }
+        .reg-info-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          flex-wrap: wrap;
+          gap: 0.4rem;
+          border-bottom: 1px solid #e5e5e5;
+          padding-bottom: 0.4rem;
+          font-size: 0.86rem;
+        }
+        .reg-info-row:last-child {
+          border-bottom: none;
+          padding-bottom: 0;
+        }
+        .reg-info-label {
+          color: #666;
+          font-weight: 500;
+          flex-shrink: 0;
+        }
+        .reg-info-val {
+          font-weight: 600;
+          text-align: right;
+        }
+        .reg-info-code {
+          background: #e8e8e8;
+          padding: 0.12rem 0.42rem;
+          border-radius: 0.3rem;
+          font-weight: 700;
+          font-size: 0.9rem;
+          letter-spacing: 0.03em;
+        }
+        .pass-modal-close {
+          width: 100%;
+          padding: 0.6rem 1.25rem;
         }
       `}</style>
     </main>

@@ -178,19 +178,22 @@ export class CoreService implements OnModuleInit {
     return { clientEmail, privateKey };
   }
 
-  private async getGoogleAccessToken(scopes: string[]) {
+  private async getGoogleAccessToken(scopes: string[], delegatedUserEmail?: string) {
     const { clientEmail, privateKey } = await this.getGoogleServiceAccount();
     const iat = Math.floor(Date.now() / 1000);
     const exp = iat + 3600;
     const header = this.toBase64Url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+    const delegated = (delegatedUserEmail || '').trim().toLowerCase();
+    const payloadClaims: Record<string, unknown> = {
+      iss: clientEmail,
+      scope: scopes.join(' '),
+      aud: 'https://oauth2.googleapis.com/token',
+      exp,
+      iat,
+    };
+    if (delegated) payloadClaims.sub = delegated;
     const payload = this.toBase64Url(
-      JSON.stringify({
-        iss: clientEmail,
-        scope: scopes.join(' '),
-        aud: 'https://oauth2.googleapis.com/token',
-        exp,
-        iat,
-      }),
+      JSON.stringify(payloadClaims),
     );
     const unsigned = `${header}.${payload}`;
     const signer = createSign('RSA-SHA256');
@@ -215,6 +218,119 @@ export class CoreService implements OnModuleInit {
     const json = (await res.json()) as { access_token?: string };
     if (!json.access_token) throw new BadRequestException('Google token response missing access_token');
     return json.access_token;
+  }
+
+  private clipText(value: string, max = 72) {
+    const trimmed = String(value || '').trim();
+    if (trimmed.length <= max) return trimmed;
+    return `${trimmed.slice(0, Math.max(0, max - 3))}...`;
+  }
+
+  private buildTwoColumnDeliveryPdfLines(input: {
+    title: string;
+    serviceDate: string;
+    deliveryName: string;
+    orders: Array<{
+      session: string;
+      child_name: string;
+      school_name?: string | null;
+      youngster_mobile?: string | null;
+      allergen_items?: string | null;
+      status: string;
+      delivery_status: string;
+      dishes: Array<{ item_name: string; quantity: number }>;
+    }>;
+  }) {
+    const cards = input.orders.map((order) => {
+      const dishText = (order.dishes || []).map((d) => `${d.item_name} x${d.quantity}`).join(', ') || '-';
+      const allergy = (order.allergen_items || '').trim() || '-';
+      return [
+        `Session: ${this.clipText(order.session, 24)}`,
+        `Youngster Full Name: ${this.clipText(order.child_name, 52)}`,
+        `School: ${this.clipText(order.school_name || '-', 60)}`,
+        `Phone Number: ${this.clipText(order.youngster_mobile || '-', 48)}`,
+        `Dietary Allergies: ${this.clipText(allergy, 48)}`,
+        `Status: ${this.clipText(`${order.status} | Delivery: ${order.delivery_status}`, 52)}`,
+        `Dishes: ${this.clipText(dishText, 60)}`,
+      ];
+    });
+
+    const lines: string[] = [
+      input.title,
+      `Service Date: ${input.serviceDate}`,
+      `Delivery Personnel: ${input.deliveryName}`,
+      `Total Orders: ${cards.length}`,
+      '',
+    ];
+
+    const colWidth = 86;
+    for (let idx = 0; idx < cards.length; idx += 2) {
+      const left = cards[idx];
+      const right = cards[idx + 1] || [];
+      const maxRows = Math.max(left.length, right.length);
+      for (let row = 0; row < maxRows; row += 1) {
+        const l = (left[row] || '').padEnd(colWidth, ' ');
+        const r = right[row] || '';
+        lines.push(`${l} | ${r}`.slice(0, 180));
+      }
+      lines.push('');
+    }
+    return lines;
+  }
+
+  private async sendEmailWithPdfAttachment(input: {
+    to: string;
+    subject: string;
+    bodyText: string;
+    attachmentFileName: string;
+    attachmentData: Buffer;
+  }) {
+    const delegatedUser = (process.env.GOOGLE_GMAIL_DELEGATED_USER || '').trim().toLowerCase();
+    if (!delegatedUser) {
+      throw new BadRequestException('GOOGLE_GMAIL_DELEGATED_USER is required to send notification emails');
+    }
+    const from = (process.env.NOTIFICATION_EMAIL_FROM || delegatedUser).trim();
+    const boundary = `mixed_${randomUUID().replace(/-/g, '')}`;
+    const attachmentBase64 = input.attachmentData.toString('base64');
+    const attachmentChunks = attachmentBase64.match(/.{1,76}/g) || [];
+    const mime = [
+      `From: ${from}`,
+      `To: ${input.to}`,
+      `Subject: ${input.subject}`,
+      'MIME-Version: 1.0',
+      `Content-Type: multipart/mixed; boundary="${boundary}"`,
+      '',
+      `--${boundary}`,
+      'Content-Type: text/plain; charset="UTF-8"',
+      'Content-Transfer-Encoding: 7bit',
+      '',
+      input.bodyText,
+      '',
+      `--${boundary}`,
+      'Content-Type: application/pdf; name="assignment.pdf"',
+      'Content-Transfer-Encoding: base64',
+      `Content-Disposition: attachment; filename="${input.attachmentFileName}"`,
+      '',
+      ...attachmentChunks,
+      '',
+      `--${boundary}--`,
+      '',
+    ].join('\r\n');
+
+    const raw = this.toBase64Url(Buffer.from(mime, 'utf8'));
+    const accessToken = await this.getGoogleAccessToken(['https://www.googleapis.com/auth/gmail.send'], delegatedUser);
+    const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ raw }),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new BadRequestException(`Failed sending notification email: ${text || res.statusText}`);
+    }
   }
 
   private async uploadToGcs(params: {
@@ -335,6 +451,55 @@ export class CoreService implements OnModuleInit {
     } catch {
       return false;
     }
+  }
+
+  private isGoogleStorageHost(hostRaw: string) {
+    const host = String(hostRaw || '').toLowerCase();
+    return host === 'storage.googleapis.com' || host.endsWith('.storage.googleapis.com');
+  }
+
+  private async fetchProofImageBinary(proofImageUrl: string) {
+    let parsed: URL;
+    try {
+      parsed = new URL(proofImageUrl);
+    } catch {
+      throw new BadRequestException('Invalid proof image URL');
+    }
+
+    const performFetch = async (authToken?: string) => fetch(proofImageUrl, {
+      method: 'GET',
+      headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+    });
+
+    let res = await performFetch();
+    if (
+      (res.status === 401 || res.status === 403) &&
+      this.isGoogleStorageHost(parsed.host)
+    ) {
+      try {
+        const accessToken = await this.getGoogleAccessToken(['https://www.googleapis.com/auth/devstorage.read_only']);
+        res = await performFetch(accessToken);
+      } catch {
+        // Continue and let the non-ok response below raise a clear API error.
+      }
+    }
+
+    if (!res.ok) {
+      throw new BadRequestException(`PAYMENT_PROOF_NOT_ACCESSIBLE (${res.status})`);
+    }
+
+    const data = Buffer.from(await res.arrayBuffer());
+    if (!data.length) throw new BadRequestException('PAYMENT_PROOF_EMPTY');
+    if (data.length > 10 * 1024 * 1024) {
+      throw new BadRequestException('PAYMENT_PROOF_TOO_LARGE');
+    }
+
+    const detectedMime = this.detectImageMimeFromMagicBytes(data);
+    if (!detectedMime) {
+      throw new BadRequestException('PAYMENT_PROOF_NOT_IMAGE');
+    }
+
+    return { contentType: detectedMime, data };
   }
 
   private slugify(value: string) {
@@ -1007,38 +1172,44 @@ export class CoreService implements OnModuleInit {
       `
       SELECT row_to_json(t)::text
       FROM (
-        SELECT id, name, city, address, is_active
+        SELECT id, name, city, address, contact_phone, is_active
         FROM schools
         WHERE deleted_at IS NULL
           AND is_active = ${active ? 'true' : 'false'}
         ORDER BY name ASC
       ) t;
     `);
-    return this.parseJsonLines<{ id: string; name: string; city: string | null; address: string | null; is_active: boolean }>(out);
+    return this.parseJsonLines<{ id: string; name: string; city: string | null; address: string | null; contact_phone: string | null; is_active: boolean }>(out);
   }
 
-  async updateSchoolActive(actor: AccessUser, schoolId: string, isActive?: boolean) {
+  async updateSchool(actor: AccessUser, schoolId: string, input: { isActive?: boolean; name?: string; city?: string; address?: string; contactPhone?: string }) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     const id = schoolId.trim();
+    const sets: string[] = ['updated_at = now()'];
+    const params: unknown[] = [];
 
+    if (input.isActive !== undefined) { params.push(input.isActive); sets.push(`is_active = $${params.length}`); }
+    if (input.name !== undefined) { params.push(input.name.trim()); sets.push(`name = $${params.length}`); }
+    if (input.city !== undefined) { params.push(input.city.trim()); sets.push(`city = $${params.length}`); }
+    if (input.address !== undefined) { params.push(input.address.trim()); sets.push(`address = $${params.length}`); }
+    if (input.contactPhone !== undefined) { params.push(input.contactPhone.trim()); sets.push(`contact_phone = $${params.length}`); }
+
+    params.push(id);
     const out = await runSql(
       `WITH updated AS (
          UPDATE schools
-         SET is_active = $1,
-             updated_at = now()
-         WHERE id = $2
+         SET ${sets.join(', ')}
+         WHERE id = $${params.length}
            AND deleted_at IS NULL
-         RETURNING id, name, city, address, is_active
+         RETURNING id, name, city, address, contact_phone, is_active
        )
        SELECT row_to_json(updated)::text
        FROM updated;`,
-      [isActive, id],
+      params,
     );
     if (!out) throw new NotFoundException('School not found');
-    const updated = this.parseJsonLine<{ id: string; is_active: boolean }>(out);
-    await this.recordAdminAudit(actor, 'SCHOOL_STATUS_UPDATED', 'school', updated.id, {
-      isActive: updated.is_active,
-    });
+    const updated = this.parseJsonLine<{ id: string; name: string; is_active: boolean }>(out);
+    await this.recordAdminAudit(actor, 'SCHOOL_UPDATED', 'school', updated.id, { name: updated.name, isActive: updated.is_active });
     return updated;
   }
 
@@ -1220,7 +1391,9 @@ export class CoreService implements OnModuleInit {
                u.first_name,
                u.last_name,
                u.email,
-               count(DISTINCT pc.child_id)::int AS linked_children_count,
+               u.phone_number,
+               p.address,
+               count(DISTINCT c.id)::int AS linked_children_count,
                COALESCE(
                  json_agg(
                    DISTINCT jsonb_build_object(
@@ -1243,7 +1416,7 @@ export class CoreService implements OnModuleInit {
         LEFT JOIN schools s ON s.id = c.school_id
         WHERE p.deleted_at IS NULL
           AND u.is_active = true
-        GROUP BY p.id, p.user_id, u.username, u.first_name, u.last_name, u.email
+        GROUP BY p.id, p.user_id, u.username, u.first_name, u.last_name, u.email, u.phone_number, p.address
         ORDER BY u.first_name, u.last_name
       ) t;
     `);
@@ -1816,7 +1989,9 @@ export class CoreService implements OnModuleInit {
     if (!['PARENT', 'YOUNGSTER', 'ADMIN', 'KITCHEN'].includes(actor.role)) {
       throw new ForbiddenException('Role not allowed');
     }
-    const serviceDate = this.validateServiceDate(query.serviceDate);
+    const serviceDate = query.serviceDate && /^\d{4}-\d{2}-\d{2}$/.test(query.serviceDate)
+      ? query.serviceDate
+      : null;
     const session = query.session ? this.normalizeSession(query.session) : null;
     const search = (query.search || '').trim().toLowerCase();
     const priceMin = query.priceMin ? Number(query.priceMin) : null;
@@ -1828,7 +2003,10 @@ export class CoreService implements OnModuleInit {
       .filter(Boolean);
 
     const filters: string[] = [];
-    const params: unknown[] = [serviceDate];
+    const params: unknown[] = [];
+    const dateFilter = serviceDate
+      ? `AND m.service_date = $${params.push(serviceDate)}::date`
+      : '';
     if (['PARENT', 'YOUNGSTER'].includes(actor.role)) {
       if (session) {
         const active = await this.isSessionActive(session);
@@ -1913,7 +2091,8 @@ export class CoreService implements OnModuleInit {
         JOIN menu_items mi ON mi.menu_id = m.id
         LEFT JOIN menu_item_ingredients mii ON mii.menu_item_id = mi.id
         LEFT JOIN ingredients i ON i.id = mii.ingredient_id AND i.deleted_at IS NULL
-        WHERE m.service_date = $1::date
+        WHERE 1=1
+          ${dateFilter}
           AND m.is_published = true
           AND m.deleted_at IS NULL
           AND mi.is_available = true
@@ -1991,6 +2170,7 @@ export class CoreService implements OnModuleInit {
           ${activeSessionFilter}
           AND m.deleted_at IS NULL
           AND mi.deleted_at IS NULL
+          AND mi.is_available = true
         ORDER BY m.service_date DESC, m.session ASC, mi.display_order ASC, mi.name ASC
       ) t;
       `,
@@ -2083,8 +2263,17 @@ export class CoreService implements OnModuleInit {
   }
 
   async getAdminMenuRatings(query: { serviceDate?: string; session?: string }) {
-    const serviceDate = this.validateServiceDate(query.serviceDate);
-    const session = this.normalizeSession(query.session);
+    const serviceDate = query.serviceDate && /^\d{4}-\d{2}-\d{2}$/.test(query.serviceDate)
+      ? query.serviceDate
+      : null;
+    const session = query.session ? this.normalizeSession(query.session) : null;
+    const params: unknown[] = [];
+    const dateFilter = serviceDate
+      ? `AND m.service_date = $${params.push(serviceDate)}::date`
+      : '';
+    const sessionFilter = session
+      ? `AND m.session = $${params.push(session)}::session_type`
+      : '';
     const out = await runSql(
       `
       SELECT row_to_json(t)::text
@@ -2102,15 +2291,16 @@ export class CoreService implements OnModuleInit {
         FROM menus m
         JOIN menu_items mi ON mi.menu_id = m.id
         LEFT JOIN menu_item_ratings mir ON mir.menu_item_id = mi.id
-        WHERE m.service_date = $1::date
-          AND m.session = $2::session_type
+        WHERE 1=1
+          ${dateFilter}
+          ${sessionFilter}
           AND m.deleted_at IS NULL
           AND mi.deleted_at IS NULL
         GROUP BY mi.id, mi.name, m.session, m.service_date
-        ORDER BY mi.display_order ASC, mi.name ASC
+        ORDER BY m.service_date DESC, m.session ASC, mi.display_order ASC, mi.name ASC
       ) t;
       `,
-      [serviceDate, session],
+      params,
     );
     return {
       serviceDate,
@@ -3207,9 +3397,8 @@ export class CoreService implements OnModuleInit {
            AND mi.deleted_at IS NULL
            AND m.is_published = true
            AND m.deleted_at IS NULL
-           AND m.service_date = $${ids.length + 1}::date
-           AND m.session = $${ids.length + 2}::session_type;`,
-        [...ids, cart.service_date, cart.session],
+           AND m.session = $${ids.length + 1}::session_type;`,
+        [...ids, cart.session],
       );
       if (Number(validCount || 0) !== ids.length) {
         throw new BadRequestException('CART_MENU_ITEM_UNAVAILABLE');
@@ -3470,7 +3659,8 @@ export class CoreService implements OnModuleInit {
                o.placed_at::text AS placed_at,
                (u.first_name || ' ' || u.last_name) AS child_name,
                br.status::text AS billing_status,
-               br.delivery_status::text AS delivery_status
+               br.delivery_status::text AS delivery_status,
+               CASE WHEN o.placed_by_user_id = c.user_id THEN 'YOUNGSTER' ELSE 'PARENT' END AS placed_by_role
         FROM orders o
         JOIN children c ON c.id = o.child_id
         JOIN users u ON u.id = c.user_id
@@ -3498,6 +3688,7 @@ export class CoreService implements OnModuleInit {
       child_name: string;
       billing_status?: string | null;
       delivery_status?: string | null;
+      placed_by_role?: 'YOUNGSTER' | 'PARENT';
     }>(out);
 
     const orderIds = orders.map((order) => order.id);
@@ -3538,6 +3729,7 @@ export class CoreService implements OnModuleInit {
       ...order,
       total_price: Number(order.total_price),
       can_edit: order.status === 'PLACED' && !this.isAfterOrAtMakassarCutoff(order.service_date),
+      placed_by_role: order.placed_by_role,
       items: itemsByOrder.get(order.id) || [],
     }));
 
@@ -4081,13 +4273,18 @@ export class CoreService implements OnModuleInit {
       });
       const ext = this.getFileExtFromContentType(parsed.contentType);
       const objectName = `${this.getGcsCategoryFolder('payment-proofs')}/${parentId}/${billingId}-${Date.now()}.${ext}`;
-      const uploaded = await this.uploadToGcs({
-        objectName,
-        contentType: parsed.contentType,
-        data: parsed.data,
-        cacheControl: 'private, max-age=0, no-cache',
-      });
-      proofUrl = uploaded.publicUrl;
+      try {
+        const uploaded = await this.uploadToGcs({
+          objectName,
+          contentType: parsed.contentType,
+          data: parsed.data,
+          cacheControl: 'private, max-age=0, no-cache',
+        });
+        proofUrl = uploaded.publicUrl;
+      } catch (err) {
+        // Keep parent proof upload working even if GCS credentials/bucket config is unavailable.
+        proofUrl = proof;
+      }
     } else if (!this.isAllowedProofImageUrl(proof)) {
       throw new BadRequestException('proofImageData must be a PNG/JPEG/WEBP image data URL or trusted image URL');
     }
@@ -4156,6 +4353,54 @@ export class CoreService implements OnModuleInit {
       [proofUrl, ...restIds, parentId],
     );
     return { ok: true, updatedCount: billingIds.length };
+  }
+
+  async getBillingProofImage(actor: AccessUser, billingId: string) {
+    const targetBillingId = String(billingId || '').trim();
+    this.assertValidUuid(targetBillingId, 'billingId');
+
+    let sql = `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT br.id,
+               COALESCE(NULLIF(TRIM(br.proof_image_url), ''), '') AS proof_image_url
+        FROM billing_records br
+        WHERE br.id = $1
+    `;
+    const params: unknown[] = [targetBillingId];
+
+    if (actor.role === 'PARENT') {
+      const parentId = await this.getParentIdByUserId(actor.uid);
+      if (!parentId) throw new BadRequestException('Parent profile not found');
+      params.push(parentId);
+      sql += ` AND br.parent_id = $2`;
+    } else if (actor.role !== 'ADMIN') {
+      throw new ForbiddenException('Role not allowed');
+    }
+
+    sql += `
+        LIMIT 1
+      ) t;
+    `;
+
+    const out = await runSql(sql, params);
+    if (!out) throw new NotFoundException('Billing record not found');
+    const row = this.parseJsonLine<{ id: string; proof_image_url: string }>(out);
+    const proofImageUrl = String(row.proof_image_url || '').trim();
+    if (!proofImageUrl) throw new BadRequestException('No uploaded proof image for this bill');
+
+    if (proofImageUrl.startsWith('data:')) {
+      const parsed = this.parseDataUrl(proofImageUrl);
+      this.assertSafeImagePayload({
+        contentType: parsed.contentType,
+        data: parsed.data,
+        maxBytes: 10 * 1024 * 1024,
+        label: 'Proof image',
+      });
+      return { contentType: parsed.contentType, data: parsed.data };
+    }
+
+    return this.fetchProofImageBinary(proofImageUrl);
   }
 
   async getAdminBilling(status?: string) {
@@ -4382,6 +4627,32 @@ export class CoreService implements OnModuleInit {
     return row;
   }
 
+  async revertBillingProof(actor: AccessUser, billingId: string) {
+    if (actor.role !== 'PARENT') throw new ForbiddenException('Role not allowed');
+    const parentId = await this.getParentIdByUserId(actor.uid);
+    if (!parentId) throw new BadRequestException('Parent profile not found');
+    const out = await runSql(
+      `SELECT row_to_json(t)::text FROM (SELECT id, status::text AS status FROM billing_records WHERE id = $1 AND parent_id = $2 LIMIT 1) t;`,
+      [billingId, parentId],
+    );
+    const parsed = this.parseJsonLine<{ id: string; status: string }>(out);
+    if (!parsed) throw new NotFoundException('Billing record not found');
+    if (parsed.status !== 'PENDING_VERIFICATION') {
+      throw new BadRequestException('Only PENDING_VERIFICATION bills can be reverted');
+    }
+    await runSql(
+      `UPDATE billing_records
+       SET proof_image_url = NULL,
+           proof_uploaded_at = NULL,
+           status = 'UNPAID',
+           admin_note = NULL,
+           updated_at = now()
+       WHERE id = $1 AND parent_id = $2;`,
+      [billingId, parentId],
+    );
+    return { ok: true };
+  }
+
   async getDeliveryUsers(includeInactive = false) {
     const out = await runSql(
       `
@@ -4520,9 +4791,11 @@ export class CoreService implements OnModuleInit {
         SELECT o.id AS order_id, c.school_id
         FROM orders o
         JOIN children c ON c.id = o.child_id
+        LEFT JOIN delivery_assignments da ON da.order_id = o.id
         WHERE o.service_date = $1::date
           AND o.status IN ('PLACED', 'LOCKED')
-          AND o.delivery_status = 'OUT_FOR_DELIVERY'
+          AND o.delivery_status IN ('PENDING', 'ASSIGNED', 'OUT_FOR_DELIVERY')
+          AND da.order_id IS NULL
       ) t;
     `,
       [serviceDate],
@@ -4673,12 +4946,29 @@ export class CoreService implements OnModuleInit {
                da.confirmation_note,
                o.service_date::text AS service_date,
                o.session::text AS session,
+               o.status::text AS status,
                o.delivery_status::text AS delivery_status,
                o.total_price,
                s.name AS school_name,
                (uc.first_name || ' ' || uc.last_name) AS child_name,
                (up.first_name || ' ' || up.last_name) AS parent_name,
-               COALESCE(NULLIF(TRIM(uc.phone_number), ''), NULLIF(TRIM(up.phone_number), '')) AS youngster_mobile
+               COALESCE(NULLIF(TRIM(uc.phone_number), ''), NULLIF(TRIM(up.phone_number), '')) AS youngster_mobile,
+               CASE
+                 WHEN COALESCE(trim(o.dietary_snapshot), '') = '' THEN ''
+                 WHEN lower(o.dietary_snapshot) LIKE '%no allergies%' THEN ''
+                 ELSE o.dietary_snapshot
+               END AS allergen_items,
+               COALESCE((
+                 SELECT json_agg(row_to_json(d) ORDER BY d.item_name)
+                 FROM (
+                   SELECT oi2.menu_item_id,
+                          oi2.item_name_snapshot AS item_name,
+                          SUM(oi2.quantity)::int AS quantity
+                   FROM order_items oi2
+                   WHERE oi2.order_id = o.id
+                   GROUP BY oi2.menu_item_id, oi2.item_name_snapshot
+                 ) d
+               ), '[]'::json) AS dishes
         FROM delivery_assignments da
         JOIN orders o ON o.id = da.order_id
         JOIN children c ON c.id = o.child_id
@@ -4694,6 +4984,220 @@ export class CoreService implements OnModuleInit {
       params,
     );
     return this.parseJsonLines(out);
+  }
+
+  async sendDeliveryNotificationEmails(actor: AccessUser) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    const serviceDate = this.makassarTodayIsoDate();
+    const rowsRaw = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT da.delivery_user_id,
+               COALESCE(NULLIF(TRIM(du.email), ''), '') AS delivery_email,
+               (du.first_name || ' ' || du.last_name) AS delivery_name,
+               o.session::text AS session,
+               o.status::text AS status,
+               o.delivery_status::text AS delivery_status,
+               s.name AS school_name,
+               (uc.first_name || ' ' || uc.last_name) AS child_name,
+               COALESCE(NULLIF(TRIM(uc.phone_number), ''), NULLIF(TRIM(up.phone_number), '')) AS youngster_mobile,
+               CASE
+                 WHEN COALESCE(trim(o.dietary_snapshot), '') = '' THEN ''
+                 WHEN lower(o.dietary_snapshot) LIKE '%no allergies%' THEN ''
+                 ELSE o.dietary_snapshot
+               END AS allergen_items,
+               COALESCE((
+                 SELECT json_agg(row_to_json(d) ORDER BY d.item_name)
+                 FROM (
+                   SELECT oi2.menu_item_id,
+                          oi2.item_name_snapshot AS item_name,
+                          SUM(oi2.quantity)::int AS quantity
+                   FROM order_items oi2
+                   WHERE oi2.order_id = o.id
+                   GROUP BY oi2.menu_item_id, oi2.item_name_snapshot
+                 ) d
+               ), '[]'::json) AS dishes
+        FROM delivery_assignments da
+        JOIN users du ON du.id = da.delivery_user_id
+        JOIN orders o ON o.id = da.order_id
+        JOIN children c ON c.id = o.child_id
+        JOIN users uc ON uc.id = c.user_id
+        JOIN schools s ON s.id = c.school_id
+        LEFT JOIN users up ON up.id = o.placed_by_user_id
+        WHERE du.role = 'DELIVERY'
+          AND du.is_active = true
+          AND o.service_date = $1::date
+          AND o.status IN ('PLACED', 'LOCKED')
+          AND o.delivery_status IN ('ASSIGNED', 'OUT_FOR_DELIVERY')
+        ORDER BY delivery_name ASC, school_name ASC, child_name ASC, o.session ASC
+      ) t;
+      `,
+      [serviceDate],
+    );
+
+    const rows = this.parseJsonLines<{
+      delivery_user_id: string;
+      delivery_email: string;
+      delivery_name: string;
+      session: string;
+      status: string;
+      delivery_status: string;
+      school_name: string;
+      child_name: string;
+      youngster_mobile?: string | null;
+      allergen_items?: string | null;
+      dishes: Array<{ item_name: string; quantity: number }>;
+    }>(rowsRaw);
+
+    if (rows.length === 0) {
+      return { ok: true, date: serviceDate, sentCount: 0, skippedCount: 0, failed: [] as string[] };
+    }
+
+    const grouped = new Map<string, {
+      email: string;
+      deliveryName: string;
+      orders: Array<{
+        session: string;
+        child_name: string;
+        school_name?: string | null;
+        youngster_mobile?: string | null;
+        allergen_items?: string | null;
+        status: string;
+        delivery_status: string;
+        dishes: Array<{ item_name: string; quantity: number }>;
+      }>;
+    }>();
+    for (const row of rows) {
+      if (!grouped.has(row.delivery_user_id)) {
+        grouped.set(row.delivery_user_id, {
+          email: row.delivery_email || '',
+          deliveryName: row.delivery_name,
+          orders: [],
+        });
+      }
+      grouped.get(row.delivery_user_id)!.orders.push({
+        session: row.session,
+        child_name: row.child_name,
+        school_name: row.school_name,
+        youngster_mobile: row.youngster_mobile || null,
+        allergen_items: row.allergen_items || '',
+        status: row.status,
+        delivery_status: row.delivery_status,
+        dishes: Array.isArray(row.dishes) ? row.dishes : [],
+      });
+    }
+
+    let sentCount = 0;
+    let skippedCount = 0;
+    const failed: string[] = [];
+    for (const [deliveryUserId, group] of grouped.entries()) {
+      const email = (group.email || '').trim().toLowerCase();
+      if (!email) {
+        skippedCount += 1;
+        failed.push(`${group.deliveryName} (${deliveryUserId}) has no email`);
+        continue;
+      }
+      const pdfLines = this.buildTwoColumnDeliveryPdfLines({
+        title: 'Assigned Orders',
+        serviceDate,
+        deliveryName: group.deliveryName,
+        orders: group.orders,
+      });
+      const pdf = this.buildSimplePdf(pdfLines);
+      try {
+        await this.sendEmailWithPdfAttachment({
+          to: email,
+          subject: `Assigned Orders for ${serviceDate}`,
+          bodyText: `Hello ${group.deliveryName},\n\nAttached is your assigned orders list for ${serviceDate}.\n\nRegards,\nSchool Catering`,
+          attachmentFileName: `assigned-orders-${serviceDate}.pdf`,
+          attachmentData: pdf,
+        });
+        sentCount += 1;
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : 'unknown error';
+        failed.push(`${group.deliveryName} (${email}): ${reason}`);
+      }
+    }
+
+    return {
+      ok: failed.length === 0,
+      date: serviceDate,
+      sentCount,
+      skippedCount,
+      failed,
+    };
+  }
+
+  async getDeliverySummary(actor: AccessUser, dateRaw?: string) {
+    if (!['DELIVERY', 'ADMIN'].includes(actor.role)) throw new ForbiddenException('Role not allowed');
+    const serviceDate = dateRaw ? this.validateServiceDate(dateRaw) : this.makassarTodayIsoDate();
+    const params: unknown[] = [serviceDate];
+    const roleFilter = actor.role === 'DELIVERY'
+      ? (() => {
+          params.push(actor.uid);
+          return `AND da.delivery_user_id = $${params.length}`;
+        })()
+      : '';
+    const rows = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT da.delivery_user_id,
+               (du.first_name || ' ' || du.last_name) AS delivery_name,
+               s.id AS school_id,
+               s.name AS school_name,
+               o.order_number::text AS order_number,
+               uc.last_name AS child_last_name,
+               COALESCE(NULLIF(TRIM(uc.phone_number), ''), NULLIF(TRIM(up.phone_number), '')) AS youngster_phone,
+               (SELECT COUNT(*) FROM order_items oi WHERE oi.order_id = o.id) AS dish_count
+        FROM delivery_assignments da
+        JOIN orders o ON o.id = da.order_id
+        JOIN children c ON c.id = o.child_id
+        JOIN schools s ON s.id = c.school_id
+        JOIN users uc ON uc.id = c.user_id
+        JOIN users du ON du.id = da.delivery_user_id
+        LEFT JOIN users up ON up.id = o.placed_by_user_id
+        WHERE o.service_date = $1::date
+          ${roleFilter}
+        ORDER BY s.name ASC, o.order_number ASC
+      ) t;
+      `,
+      params,
+    );
+    const detail = this.parseJsonLines<{
+      delivery_user_id: string;
+      delivery_name: string;
+      school_id: string;
+      school_name: string;
+      order_number: string;
+      child_last_name: string;
+      youngster_phone: string | null;
+      dish_count: number;
+    }>(rows);
+
+    // Group by delivery_user_id → school
+    type SchoolGroup = { schoolName: string; orderCount: number; dishCount: number; orders: { orderNumber: string; childLastName: string; youngsterPhone: string | null }[] };
+    type UserGroup = { deliveryName: string; schools: Map<string, SchoolGroup> };
+    const byUser = new Map<string, UserGroup>();
+    for (const row of detail) {
+      if (!byUser.has(row.delivery_user_id)) byUser.set(row.delivery_user_id, { deliveryName: row.delivery_name, schools: new Map() });
+      const ug = byUser.get(row.delivery_user_id)!;
+      if (!ug.schools.has(row.school_id)) ug.schools.set(row.school_id, { schoolName: row.school_name, orderCount: 0, dishCount: 0, orders: [] });
+      const sg = ug.schools.get(row.school_id)!;
+      sg.orderCount += 1;
+      sg.dishCount += Number(row.dish_count) || 0;
+      sg.orders.push({ orderNumber: row.order_number, childLastName: row.child_last_name, youngsterPhone: row.youngster_phone });
+    }
+
+    return {
+      date: serviceDate,
+      deliveries: Array.from(byUser.entries()).map(([uid, ug]) => ({
+        deliveryUserId: uid,
+        deliveryName: ug.deliveryName,
+        schools: Array.from(ug.schools.values()),
+      })),
+    };
   }
 
   async confirmDelivery(actor: AccessUser, assignmentId: string, note?: string) {
@@ -5536,6 +6040,9 @@ export class CoreService implements OnModuleInit {
       SELECT row_to_json(t)::text
       FROM (
         SELECT COUNT(*)::int AS total_orders,
+               COUNT(*) FILTER (
+                 WHERE o.delivery_status IN ('OUT_FOR_DELIVERY', 'ASSIGNED', 'DELIVERED')
+               )::int AS total_orders_complete,
                COALESCE(SUM(oi.quantity), 0)::int AS total_dishes,
                COUNT(*) FILTER (WHERE o.session = 'BREAKFAST')::int AS breakfast_orders,
                COUNT(*) FILTER (WHERE o.session = 'SNACK')::int AS snack_orders,
@@ -5550,11 +6057,15 @@ export class CoreService implements OnModuleInit {
     );
     const totals = this.parseJsonLine<{
       total_orders: number;
+      total_orders_complete: number;
       total_dishes: number;
       breakfast_orders: number;
       snack_orders: number;
       lunch_orders: number;
-    }>(totalsOut || '{"total_orders":0,"total_dishes":0,"breakfast_orders":0,"snack_orders":0,"lunch_orders":0}');
+    }>(
+      totalsOut
+      || '{"total_orders":0,"total_orders_complete":0,"total_dishes":0,"breakfast_orders":0,"snack_orders":0,"lunch_orders":0}',
+    );
 
     const ordersOut = await runSql(
       `
@@ -5567,6 +6078,7 @@ export class CoreService implements OnModuleInit {
                o.delivery_status::text AS delivery_status,
                s.name AS school_name,
                (uc.first_name || ' ' || uc.last_name) AS child_name,
+               COALESCE(NULLIF(TRIM(uc.phone_number), ''), NULLIF(TRIM(up.phone_number), '')) AS youngster_mobile,
                COALESCE((up.first_name || ' ' || up.last_name), '-') AS parent_name,
                COALESCE(item_counts.dish_count, 0) AS dish_count,
                CASE
@@ -5604,7 +6116,7 @@ export class CoreService implements OnModuleInit {
         LEFT JOIN users up ON up.id = p.user_id
         WHERE o.service_date = $1::date
           AND o.status IN ('PLACED', 'LOCKED')
-        GROUP BY o.id, s.name, uc.first_name, uc.last_name, up.first_name, up.last_name, item_counts.dish_count
+        GROUP BY o.id, s.name, uc.first_name, uc.last_name, uc.phone_number, up.first_name, up.last_name, up.phone_number, item_counts.dish_count
         ORDER BY s.name ASC, child_name ASC, o.session ASC
       ) t;
     `,
@@ -5618,6 +6130,7 @@ export class CoreService implements OnModuleInit {
       delivery_status: string;
       school_name: string;
       child_name: string;
+      youngster_mobile?: string | null;
       parent_name: string;
       dish_count: number;
       has_allergen: boolean;
@@ -5650,6 +6163,7 @@ export class CoreService implements OnModuleInit {
       blackoutReason: blackout?.reason || null,
       totals: {
         totalOrders: Number(totals.total_orders || 0),
+        totalOrdersComplete: Number(totals.total_orders_complete || 0),
         totalDishes: Number(totals.total_dishes || 0),
         breakfastOrders: Number(totals.breakfast_orders || 0),
         snackOrders: Number(totals.snack_orders || 0),
@@ -5729,22 +6243,26 @@ export class CoreService implements OnModuleInit {
 
   // ─── Schools CRUD ────────────────────────────────────────────────────────
 
-  async createSchool(actor: AccessUser, input: { name?: string; address?: string; city?: string; contactEmail?: string }) {
+  async createSchool(actor: AccessUser, input: { name?: string; address?: string; city?: string; contactPhone?: string }) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     const name = (input.name || '').trim();
     const address = (input.address || '').trim();
     const city = (input.city || '').trim();
-    const contactEmail = (input.contactEmail || '').trim().toLowerCase();
+    const contactPhone = (input.contactPhone || '').trim();
+    if (!name) throw new BadRequestException('School name is required');
+    if (!city) throw new BadRequestException('City is required');
+    if (!address) throw new BadRequestException('Address is required');
+    if (!contactPhone) throw new BadRequestException('Phone number is required');
     const out = await runSql(
       `
       WITH inserted AS (
-        INSERT INTO schools (name, address, city, contact_email, is_active)
+        INSERT INTO schools (name, address, city, contact_phone, is_active)
         VALUES ($1, $2, $3, $4, true)
-        RETURNING id, name, city, address, is_active
+        RETURNING id, name, city, address, contact_phone, is_active
       )
       SELECT row_to_json(inserted)::text FROM inserted;
     `,
-      [name, address || null, city || null, contactEmail || null],
+      [name, address, city, contactPhone],
     );
     if (!out) throw new BadRequestException('Failed to create school');
     const school = this.parseJsonLine<{ id: string; name: string }>(out);
@@ -5814,6 +6332,19 @@ export class CoreService implements OnModuleInit {
   async deleteParent(actor: AccessUser, targetParentId: string) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     this.assertValidUuid(targetParentId, 'parentId');
+    const linkedYoungsterExists = await runSql(
+      `SELECT EXISTS (
+         SELECT 1
+         FROM parent_children pc
+         JOIN children c ON c.id = pc.child_id
+         WHERE pc.parent_id = $1
+           AND c.deleted_at IS NULL
+       );`,
+      [targetParentId],
+    );
+    if (linkedYoungsterExists === 't') {
+      throw new BadRequestException('Cannot delete parent with associated youngster(s)');
+    }
     const out = await runSql(
       `SELECT row_to_json(t)::text FROM (
          SELECT p.id, p.user_id FROM parents p
@@ -5957,8 +6488,8 @@ export class CoreService implements OnModuleInit {
     );
     if (!out) throw new NotFoundException('User not found');
     const target = this.parseJsonLine<{ id: string; username: string; role: string }>(out);
-    if (!['PARENT', 'YOUNGSTER'].includes(target.role)) {
-      throw new BadRequestException('Only PARENT and YOUNGSTER password reset is allowed here');
+    if (!['PARENT', 'CHILD', 'DELIVERY'].includes(target.role)) {
+      throw new BadRequestException('Only PARENT, CHILD, and DELIVERY password reset is allowed here');
     }
     const generatedPassword = `Tmp#${randomUUID().replace(/-/g, '').slice(0, 12)}`;
     const newPassword = (newPasswordRaw || '').trim() || generatedPassword;
@@ -5984,6 +6515,31 @@ export class CoreService implements OnModuleInit {
       generated: !newPasswordRaw,
     });
     return { ok: true, userId, username: target.username, role: target.role, newPassword };
+  }
+
+  async adminResetYoungsterPassword(actor: AccessUser, youngsterId: string, newPasswordRaw?: string) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    this.assertValidUuid(youngsterId, 'youngsterId');
+    const out = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT c.user_id
+        FROM children c
+        JOIN users u ON u.id = c.user_id
+        WHERE c.id = $1
+          AND c.deleted_at IS NULL
+          AND c.is_active = true
+          AND u.deleted_at IS NULL
+          AND u.role = 'CHILD'
+        LIMIT 1
+      ) t;
+      `,
+      [youngsterId],
+    );
+    if (!out) throw new NotFoundException('Youngster not found');
+    const target = this.parseJsonLine<{ user_id: string }>(out);
+    return this.adminResetUserPassword(actor, target.user_id, newPasswordRaw);
   }
 
   // ─── Ingredients CRUD ────────────────────────────────────────────────────
@@ -6135,24 +6691,71 @@ export class CoreService implements OnModuleInit {
     const email = (input.email || '').trim().toLowerCase();
     if (username.length < 3) throw new BadRequestException('Username too short');
     validatePasswordPolicy(password, 'password');
-    const exists = await runSql(
-      `SELECT EXISTS (
-         SELECT 1 FROM users
-         WHERE username = $1
-       );`,
-      [username],
-    );
-    if (exists === 't') throw new ConflictException('Username already exists');
     const passwordHash = this.hashPassword(password);
-    const out = await runSql(
-      `WITH inserted AS (
-         INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email, is_active)
-         VALUES ('DELIVERY', $1, $2, $3, $4, $5, $6, true)
-         RETURNING id, username, first_name, last_name
-       )
-       SELECT row_to_json(inserted)::text FROM inserted;`,
-      [username, passwordHash, firstName, lastName, phoneNumber, email || null],
-    );
+    let out: string | null = null;
+    try {
+      const existingOut = await runSql(
+        `SELECT row_to_json(t)::text
+         FROM (
+           SELECT id, username, email, deleted_at::text AS deleted_at
+           FROM users
+           WHERE username = $1
+              OR ($2 IS NOT NULL AND lower(email) = lower($2))
+           ORDER BY CASE WHEN username = $1 THEN 0 ELSE 1 END
+           LIMIT 1
+         ) t;`,
+        [username, email || null],
+      );
+      const existingRows = this.parseJsonLines<{ id: string; username: string; email?: string | null; deleted_at?: string | null }>(existingOut);
+      const existing = existingRows[0] || null;
+
+      if (existing && !existing.deleted_at) {
+        if (existing.username === username) throw new ConflictException('Username already exists');
+        throw new ConflictException('Email already exists');
+      }
+
+      if (existing && existing.deleted_at) {
+        out = await runSql(
+          `WITH restored AS (
+             UPDATE users
+             SET role = 'DELIVERY',
+                 username = $1,
+                 password_hash = $2,
+                 first_name = $3,
+                 last_name = $4,
+                 phone_number = $5,
+                 email = $6,
+                 is_active = true,
+                 deleted_at = NULL,
+                 updated_at = now()
+             WHERE id = $7
+             RETURNING id, username, first_name, last_name
+           )
+           SELECT row_to_json(restored)::text FROM restored;`,
+          [username, passwordHash, firstName, lastName, phoneNumber, email || null, existing.id],
+        );
+      } else {
+        out = await runSql(
+          `WITH inserted AS (
+             INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email, is_active)
+             VALUES ('DELIVERY', $1, $2, $3, $4, $5, $6, true)
+             RETURNING id, username, first_name, last_name
+           )
+           SELECT row_to_json(inserted)::text FROM inserted;`,
+          [username, passwordHash, firstName, lastName, phoneNumber, email || null],
+        );
+      }
+    } catch (error) {
+      if (error instanceof ConflictException) throw error;
+      const msg = String((error as Error)?.message || '').toLowerCase();
+      if (msg.includes('users_username_uq') || (msg.includes('duplicate key') && msg.includes('username'))) {
+        throw new ConflictException('Username already exists');
+      }
+      if (msg.includes('users_email_ci_uq') || (msg.includes('duplicate key') && msg.includes('email'))) {
+        throw new ConflictException('Email already exists');
+      }
+      throw error;
+    }
     if (!out) throw new BadRequestException('Failed to create delivery user');
     const user = this.parseJsonLine<{ id: string; username: string; first_name: string; last_name: string }>(out);
     await runSql(
@@ -6233,19 +6836,31 @@ export class CoreService implements OnModuleInit {
 
     params.push(targetUserId);
     const userIdParam = params.length;
-    const out = await runSql(
-      `WITH updated AS (
-         UPDATE users
-         SET ${sets.join(', ')},
-             updated_at = now()
-         WHERE id = $${userIdParam}
-           AND role = 'DELIVERY'
-           AND deleted_at IS NULL
-         RETURNING id, username, first_name, last_name, phone_number, email, is_active
-       )
-       SELECT row_to_json(updated)::text FROM updated;`,
-      params,
-    );
+    let out: string;
+    try {
+      out = await runSql(
+        `WITH updated AS (
+           UPDATE users
+           SET ${sets.join(', ')},
+               updated_at = now()
+           WHERE id = $${userIdParam}
+             AND role = 'DELIVERY'
+             AND deleted_at IS NULL
+           RETURNING id, username, first_name, last_name, phone_number, email, is_active
+         )
+         SELECT row_to_json(updated)::text FROM updated;`,
+        params,
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('users_email_ci_uq') || (msg.includes('duplicate key') && msg.includes('email'))) {
+        throw new ConflictException('That email address is already used by another account');
+      }
+      if (msg.includes('users_username_key') || (msg.includes('duplicate key') && msg.includes('username'))) {
+        throw new ConflictException('That username is already taken');
+      }
+      throw err;
+    }
     if (!out) throw new NotFoundException('Delivery user not found');
     const user = this.parseJsonLine<{ id: string; username: string }>(out);
     await this.recordAdminAudit(actor, 'DELIVERY_USER_UPDATED', 'user', user.id, {
@@ -6359,6 +6974,55 @@ export class CoreService implements OnModuleInit {
       ...row,
       metadata: row.metadata_json ? JSON.parse(row.metadata_json) : null,
     }));
+  }
+
+  // ─── Site settings (chef message, etc.) ───────────────────────────────────
+
+  private async ensureSiteSettingsTable() {
+    await runSql(`
+      CREATE TABLE IF NOT EXISTS site_settings (
+        setting_key   text PRIMARY KEY,
+        setting_value text NOT NULL DEFAULT '',
+        updated_at    timestamptz NOT NULL DEFAULT now()
+      );
+    `);
+    await runSql(`
+      INSERT INTO site_settings (setting_key, setting_value)
+      VALUES ('chef_message', 'Every dish is prepared for school-day energy and balanced nutrition. We keep every meal fresh, consistent, and safe for all youngsters.')
+      ON CONFLICT (setting_key) DO NOTHING;
+    `);
+  }
+
+  async getSiteSettings() {
+    await this.ensureSiteSettingsTable();
+    const out = await runSql(`
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT setting_value AS chef_message
+        FROM site_settings
+        WHERE setting_key = 'chef_message'
+        LIMIT 1
+      ) t;
+    `);
+    const lines = out.split('\n').map((x: string) => x.trim()).filter(Boolean);
+    const data = lines[0] ? (JSON.parse(lines[0]) as { chef_message?: string }) : {};
+    return { chef_message: data.chef_message ?? '' };
+  }
+
+  async updateSiteSettings(actor: AccessUser, chefMessage: string) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    if (typeof chefMessage !== 'string') throw new BadRequestException('chef_message must be a string');
+    const trimmed = chefMessage.trim();
+    if (trimmed.length > 500) throw new BadRequestException('chef_message must be 500 characters or fewer');
+    await this.ensureSiteSettingsTable();
+    await runSql(
+      `INSERT INTO site_settings (setting_key, setting_value, updated_at)
+       VALUES ('chef_message', $1, now())
+       ON CONFLICT (setting_key)
+       DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = now();`,
+      [trimmed],
+    );
+    return { chef_message: trimmed };
   }
 
   // ─── Health check ─────────────────────────────────────────────────────────

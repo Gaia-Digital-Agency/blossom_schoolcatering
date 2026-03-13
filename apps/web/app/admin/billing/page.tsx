@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { apiFetch } from '../../../lib/auth';
+import { apiFetch, apiFetchResponse } from '../../../lib/auth';
 import AdminNav from '../_components/admin-nav';
 
 type BillingRow = {
@@ -111,14 +111,23 @@ export default function AdminBillingPage() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed verify/reject';
       setError(msg);
-      window.alert(`Error: ${msg}`);
     }
   };
 
-  const onReview = (row: BillingRow) => {
+  const onReview = async (row: BillingRow) => {
     const proof = String(row.proof_image_url || '').trim();
     if (!proof) { setError('No uploaded proof image for this bill.'); return; }
-    window.open(proof, '_blank', 'noopener,noreferrer');
+    try {
+      const res = await apiFetchResponse(`/admin/billing/${row.id}/proof-image`);
+      const blob = await res.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank', 'noopener,noreferrer');
+      window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60_000);
+    } catch (err) {
+      window.open(proof, '_blank', 'noopener,noreferrer');
+      const msg = err instanceof Error ? err.message : 'Failed opening proof image';
+      setMessage(`Fallback opened raw proof URL (${msg}).`);
+    }
   };
 
   const onReject = async (row: BillingRow) => {
@@ -130,7 +139,7 @@ export default function AdminBillingPage() {
 
   const onApprove = async (row: BillingRow) => {
     if (!String(row.proof_image_url || '').trim()) {
-      window.alert('Cannot approve: parent has not uploaded a payment proof yet.');
+      setError('Cannot approve: parent has not uploaded a payment proof yet.');
       return;
     }
     if (!window.confirm(`Approve payment for ${row.parent_name} — ${row.service_date} ${row.session}?`)) return;

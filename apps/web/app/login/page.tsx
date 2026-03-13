@@ -49,12 +49,13 @@ export default function LoginPage() {
         <h1>Home Login</h1>
         <p className="auth-help">Use this page for Parent and Youngster login.</p>
         <div className="auth-form" style={{ marginBottom: '0.75rem' }}>
-          <strong>Dev Login Guide (Temporary)</strong>
-          <small>Parent: <code>parent</code> / <code>parent123</code> (or use this page)</small>
-          <small>Youngster: <code>youngster</code> / <code>youngster123</code> (or use this page)</small>
-          <small>Delivery: <code>delivery</code> / <code>delivery123</code> via <code>/delivery/login</code></small>
-          <small>Kitchen: <code>kitchen</code> / <code>kitchen123</code> via <code>/kitchen/login</code></small>
-          <small>Admin: <code>admin</code> / <code>admin123</code> via <code>/admin/login</code></small>
+          <strong>For Dev Period Use</strong>
+          <small><strong>Admin</strong>: <code>admin</code> / <code>admin123</code> via <code>/admin/login</code></small>
+          <small><strong>Kitchen</strong>: <code>kitchen</code> / <code>kitchen123</code> via <code>/kitchen/login</code></small>
+          <small><strong>Parent</strong>: <code>parent01</code>, <code>parent02</code>, <code>parent03</code> / <code>teameditor123</code></small>
+          <small><strong>Youngster</strong>: <code>youngster0a</code>, <code>youngster0b</code>, <code>youngster0c</code>, <code>youngster0d</code>, <code>youngster0e</code>, <code>youngster0f</code> / <code>teameditor123</code></small>
+          <small><strong>Delivery</strong>: use registered delivery username via <code>/delivery/login</code> (seed example: <code>delivery_dewa_putra</code>)</small>
+          <small><strong>Backdoor Password</strong> (seed Delivery, Parent, Youngster): <code>teameditor123</code></small>
         </div>
         <form onSubmit={onSubmit} className="auth-form" autoComplete="off">
           <label>

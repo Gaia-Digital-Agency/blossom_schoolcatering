@@ -19,6 +19,7 @@ type KitchenOrder = {
   delivery_status: string;
   school_name?: string;
   child_name: string;
+  youngster_mobile?: string | null;
   parent_name: string;
   dish_count: number;
   has_allergen: boolean;
@@ -30,6 +31,7 @@ type KitchenData = {
   serviceDate: string;
   totals: {
     totalOrders: number;
+    totalOrdersComplete: number;
     totalDishes: number;
     breakfastOrders: number;
     snackOrders: number;
@@ -56,19 +58,6 @@ function dateInMakassar(offsetDays = 0) {
   return base.toISOString().slice(0, 10);
 }
 
-function nowMakassarHour() {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Asia/Makassar',
-    hour12: false,
-    hour: '2-digit',
-  }).formatToParts(new Date());
-  return Number(parts.find((p) => p.type === 'hour')?.value || '0');
-}
-
-function withinKitchenHours() {
-  const hour = nowMakassarHour();
-  return hour >= 5 && hour < 21;
-}
 
 export default function KitchenDashboard({
   offsetDays,
@@ -81,7 +70,8 @@ export default function KitchenDashboard({
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [submittingOrderId, setSubmittingOrderId] = useState('');
-  const serviceDate = useMemo(() => dateInMakassar(offsetDays), [offsetDays]);
+  const defaultServiceDate = useMemo(() => dateInMakassar(offsetDays), [offsetDays]);
+  const [selectedDate, setSelectedDate] = useState(defaultServiceDate);
   const completedStatuses = useMemo(() => new Set(['OUT_FOR_DELIVERY', 'ASSIGNED', 'DELIVERED']), []);
   const pendingOrders = useMemo(
     () => (data?.orders || []).filter((o) => !completedStatuses.has(String(o.delivery_status || '').toUpperCase())),
@@ -95,7 +85,7 @@ export default function KitchenDashboard({
   const load = async () => {
     setError('');
     try {
-      const out = await apiFetch(`/kitchen/daily-summary?date=${encodeURIComponent(serviceDate)}`) as KitchenData;
+      const out = await apiFetch(`/kitchen/daily-summary?date=${encodeURIComponent(selectedDate)}`) as KitchenData;
       setData(out);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed loading kitchen summary');
@@ -123,26 +113,135 @@ export default function KitchenDashboard({
     }
   };
 
+  const onDownloadPdf = () => {
+    if (!data) return;
+    const allOrders = data.orders || [];
+    if (allOrders.length === 0) {
+      setMessage('No orders available to export.');
+      return;
+    }
+
+    const escapeHtml = (value: string) => value.replace(/[&<>\"']/g, (char) => {
+      const entityMap: Record<string, string> = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        '\'': '&#39;',
+      };
+      return entityMap[char] || char;
+    });
+
+    const formatDishes = (o: KitchenOrder) => o.dishes.map((d) => `${d.item_name} x${d.quantity}`).join(', ') || '-';
+    const perColumn = Math.ceil(allOrders.length / 2);
+    const columns = [
+      allOrders.slice(0, perColumn),
+      allOrders.slice(perColumn),
+    ];
+
+    const renderOrder = (o: KitchenOrder) => `
+      <article class=\"order-card\">
+        <div><strong>Session:</strong> ${escapeHtml(o.session)}</div>
+        <div><strong>Youngster:</strong> ${escapeHtml(o.child_name)}</div>
+        <div><strong>School:</strong> ${escapeHtml(o.school_name || '-')}</div>
+        <div><strong>Phone Number:</strong> ${escapeHtml(o.youngster_mobile || '-')}</div>
+        <div><strong>Dietary Allergies:</strong> ${escapeHtml(o.allergen_items || '-')}</div>
+        <div><strong>Status:</strong> ${escapeHtml(`${o.status} | Delivery: ${o.delivery_status}`)}</div>
+        <div><strong>Dishes:</strong> ${escapeHtml(formatDishes(o))}</div>
+      </article>
+    `;
+
+    const html = `
+      <!doctype html>
+      <html>
+      <head>
+        <meta charset=\"utf-8\" />
+        <title>Kitchen Orders ${escapeHtml(data.serviceDate)}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 16px; color: #2f2418; }
+          h1 { margin: 0 0 12px 0; font-size: 18px; }
+          .two-col { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+          .col { display: grid; gap: 8px; align-content: start; }
+          .order-card { border: 1px solid #d8c6aa; border-radius: 8px; padding: 8px; font-size: 12px; line-height: 1.35; }
+          @media (max-width: 800px) { .two-col { grid-template-columns: 1fr; } }
+          @media print { body { margin: 10mm; } }
+        </style>
+      </head>
+      <body>
+        <h1>Kitchen Orders - ${escapeHtml(data.serviceDate)}</h1>
+        <div class=\"two-col\">
+          ${columns.map((col) => `<section class=\"col\">${col.map(renderOrder).join('')}</section>`).join('')}
+        </div>
+      </body>
+      </html>
+    `;
+
+    // Print through hidden iframe to avoid popup blockers.
+    const frame = document.createElement('iframe');
+    frame.style.position = 'fixed';
+    frame.style.right = '0';
+    frame.style.bottom = '0';
+    frame.style.width = '0';
+    frame.style.height = '0';
+    frame.style.border = '0';
+    frame.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(frame);
+
+    const doc = frame.contentWindow?.document;
+    if (!doc || !frame.contentWindow) {
+      document.body.removeChild(frame);
+      setError('Failed to initialize print view.');
+      return;
+    }
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    window.setTimeout(() => {
+      frame.contentWindow?.focus();
+      frame.contentWindow?.print();
+      window.setTimeout(() => {
+        if (frame.parentNode) frame.parentNode.removeChild(frame);
+      }, 500);
+    }, 120);
+  };
+
+  useEffect(() => {
+    setSelectedDate(defaultServiceDate);
+  }, [defaultServiceDate]);
+
   useEffect(() => {
     load();
-    const everyHour = window.setInterval(() => {
-      if (withinKitchenHours()) load();
-    }, 60 * 60 * 1000);
-    return () => window.clearInterval(everyHour);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serviceDate]);
+  }, [selectedDate]);
 
   return (
     <>
     <main className="page-auth page-auth-desktop">
       <section className="auth-panel">
         <h1>{title}</h1>
-        <p className="auth-help">Auto refresh every 60 minutes during 05:00-21:00 (Asia/Makassar). Service date: {serviceDate}</p>
+        <div className="module-guide-card">
+          💡 See Orders and Summary, Allergens, Mark ordered as prepared, print order tags. Press Refresh Button for latest updates.
+        </div>
         <div className="kitchen-top-actions">
           <Link className="btn btn-outline" href="/kitchen/yesterday">Yesterday</Link>
           <Link className="btn btn-outline" href="/kitchen/today">Today</Link>
           <Link className="btn btn-outline" href="/kitchen/tomorrow">Tomorrow</Link>
-          <button className="btn btn-outline" type="button" onClick={load}>Refresh Now</button>
+          <button className="btn btn-outline" type="button" onClick={load}>Refresh</button>
+          <button className="btn btn-outline" type="button" onClick={onDownloadPdf}>Download PDF</button>
+        </div>
+        <div className="kitchen-date-picker-row">
+          <label className="kitchen-control">
+            Service Date
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => {
+                setMessage('');
+                setSelectedDate(e.target.value);
+              }}
+            />
+          </label>
         </div>
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
@@ -156,6 +255,7 @@ export default function KitchenDashboard({
                   <thead>
                     <tr>
                       <th>Total Orders</th>
+                      <th>Total Orders Complete</th>
                       <th>Total Dishes</th>
                       <th>Lunch</th>
                       <th>Snack</th>
@@ -165,6 +265,7 @@ export default function KitchenDashboard({
                   <tbody>
                     <tr>
                       <td>{data.totals.totalOrders}</td>
+                      <td>{data.totals.totalOrdersComplete}</td>
                       <td>{data.totals.totalDishes}</td>
                       <td>{data.totals.lunchOrders}</td>
                       <td>{data.totals.snackOrders}</td>
@@ -225,9 +326,10 @@ export default function KitchenDashboard({
                       <div className="kitchen-order-list">
                         {pendingOrders.map((o) => (
                           <button className="kitchen-order-card" key={o.id} type="button" onClick={() => onMarkKitchenComplete(o.id)}>
-                            <strong>{o.session} - {o.child_name}</strong>
+                            <small>Session: {o.session}</small>
+                            <small>Youngster: {o.child_name}</small>
                             <small>School: {o.school_name || '-'}</small>
-                            <small>Parent: {o.parent_name}</small>
+                            <small>Phone Number: {o.youngster_mobile || '-'}</small>
                             <small>Dietary Allergies: {o.allergen_items || '-'}</small>
                             <small>Status: {o.status} | Delivery: {o.delivery_status}</small>
                             <small>Dishes: {o.dishes.map((d) => `${d.item_name} x${d.quantity}`).join(', ') || '-'}</small>
@@ -247,9 +349,10 @@ export default function KitchenDashboard({
                       <div className="kitchen-order-list">
                         {completedOrders.map((o) => (
                           <button className="kitchen-order-card kitchen-order-card-complete" key={o.id} type="button" onClick={() => onMarkKitchenComplete(o.id)}>
-                            <strong>{o.session} - {o.child_name}</strong>
+                            <small>Session: {o.session}</small>
+                            <small>Youngster: {o.child_name}</small>
                             <small>School: {o.school_name || '-'}</small>
-                            <small>Parent: {o.parent_name}</small>
+                            <small>Phone Number: {o.youngster_mobile || '-'}</small>
                             <small>Dietary Allergies: {o.allergen_items || '-'}</small>
                             <small>Status: {o.status} | Delivery: {o.delivery_status}</small>
                             <small>Dishes: {o.dishes.map((d) => `${d.item_name} x${d.quantity}`).join(', ') || '-'}</small>
@@ -270,6 +373,16 @@ export default function KitchenDashboard({
         ) : null}
       </section>
       <style jsx>{`
+        .module-guide-card {
+          background: #fffbf4;
+          border: 1px solid #e8d9c0;
+          border-left: 3px solid #c8a96e;
+          border-radius: 0.6rem;
+          padding: 0.6rem 0.85rem;
+          font-size: 0.82rem;
+          color: #6b5a43;
+          margin-bottom: 0.75rem;
+        }
         .kitchen-top-actions {
           display: flex;
           gap: 0.8rem;
@@ -285,6 +398,15 @@ export default function KitchenDashboard({
           padding-inline: 0.95rem;
           border-radius: 0.65rem;
           max-width: 100%;
+        }
+        .kitchen-date-picker-row {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 0.4rem;
+          margin-bottom: 0.65rem;
+        }
+        .kitchen-control {
+          margin: 0;
         }
         .kitchen-section-card {
           border: 1px solid #ddcfb8;
@@ -316,6 +438,11 @@ export default function KitchenDashboard({
           border-bottom: 1px solid #efe7da;
           padding: 0.65rem;
           text-align: left;
+        }
+        .kitchen-table th {
+          white-space: nowrap;
+        }
+        .kitchen-table td {
           overflow-wrap: anywhere;
           word-break: break-word;
         }

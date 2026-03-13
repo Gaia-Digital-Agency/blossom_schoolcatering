@@ -88,7 +88,12 @@ export default function MenuPage() {
       byCategory.set(code, list);
     }
     return CATEGORY_GROUPS
-      .map((group) => ({ ...group, items: byCategory.get(group.code) || [] }))
+      .map((group) => ({
+        ...group,
+        items: (byCategory.get(group.code) || [])
+          .slice()
+          .sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { sensitivity: 'base' })),
+      }))
       .filter((group) => group.items.length > 0);
   }, [items]);
 
@@ -96,12 +101,9 @@ export default function MenuPage() {
     <main className="page-auth page-auth-mobile">
       <section className="auth-panel">
         <h1>Menu</h1>
-        <p className="auth-help">Viewing only. Dishes from Admin configuration (Active and Not Active).</p>
-        {serviceDate ? (
-          <p className="auth-help">
-            {serviceDate === 'ALL_ACTIVE' ? 'Showing all active dishes (not filtered by date).' : `Service Date: ${serviceDate}`}
-          </p>
-        ) : null}
+        <div className="module-guide-card">
+          💡 Log In to order for the Youngsters from Blossom Steakhouse Kitchen.
+        </div>
         {error ? <p className="auth-error">{error}</p> : null}
 
         {items.length === 0 ? (
@@ -236,6 +238,16 @@ export default function MenuPage() {
         }
         .menu-public-card small {
           color: #5d554b;
+        }
+        .module-guide-card {
+          background: #fffbf4;
+          border: 1px solid #e8d9c0;
+          border-left: 3px solid #c8a96e;
+          border-radius: 0.6rem;
+          padding: 0.6rem 0.85rem;
+          font-size: 0.82rem;
+          color: #6b5a43;
+          margin-bottom: 0.85rem;
         }
         @media (min-width: 900px) {
           /* Side-by-side: Main (left) | secondary categories (right) */

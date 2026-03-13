@@ -9,12 +9,14 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Request } from 'express';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -75,14 +77,26 @@ export class CoreController {
 
   @Patch('admin/schools/:schoolId')
   @Roles('ADMIN')
-  updateSchoolActive(@Req() req: AuthRequest, @Param('schoolId', ParseUUIDPipe) schoolId: string, @Body() body: UpdateSchoolDto) {
-    return this.coreService.updateSchoolActive(req.user, schoolId, body.isActive);
+  updateSchool(@Req() req: AuthRequest, @Param('schoolId', ParseUUIDPipe) schoolId: string, @Body() body: UpdateSchoolDto) {
+    return this.coreService.updateSchool(req.user, schoolId, body);
   }
 
   @Delete('admin/schools/:schoolId')
   @Roles('ADMIN')
   deleteSchool(@Req() req: AuthRequest, @Param('schoolId', ParseUUIDPipe) schoolId: string) {
     return this.coreService.deleteSchool(req.user, schoolId);
+  }
+
+  @Get('admin/site-settings')
+  @Roles('ADMIN')
+  getAdminSiteSettings() {
+    return this.coreService.getSiteSettings();
+  }
+
+  @Patch('admin/site-settings')
+  @Roles('ADMIN')
+  updateAdminSiteSettings(@Req() req: AuthRequest, @Body() body: { chef_message: string }) {
+    return this.coreService.updateSiteSettings(req.user, body.chef_message ?? '');
   }
 
   @Get('admin/session-settings')
@@ -167,6 +181,16 @@ export class CoreController {
     return this.coreService.adminResetUserPassword(req.user, userId, body.newPassword);
   }
 
+  @Patch('admin/youngsters/:youngsterId/reset-password')
+  @Roles('ADMIN')
+  adminResetYoungsterPassword(
+    @Req() req: AuthRequest,
+    @Param('youngsterId', ParseUUIDPipe) youngsterId: string,
+    @Body() body: ResetPasswordDto,
+  ) {
+    return this.coreService.adminResetYoungsterPassword(req.user, youngsterId, body.newPassword);
+  }
+
   @Get('admin/dashboard')
   @Roles('ADMIN')
   getAdminDashboard(@Query('date') date?: string) {
@@ -205,22 +229,7 @@ export class CoreController {
     });
   }
 
-  @Get('admin/reports')
-  @Roles('ADMIN')
-  getAdminReports(@Query('date') date?: string) {
-    return this.coreService.getAdminPrintReport(date);
-  }
-
-  @Get('admin/audit-logs')
-  @Roles('ADMIN')
-  getAdminAuditLogs(
-    @Req() req: AuthRequest,
-    @Query('limit') limit?: string,
-    @Query('action') action?: string,
-    @Query('target_type') targetType?: string,
-  ) {
-    return this.coreService.getAdminAuditLogs(req.user, { limit, action, targetType });
-  }
+  // GET admin/reports and GET admin/audit-logs moved to archived.controller.ts
 
   @Get('blackout-days')
   @Roles('ADMIN', 'PARENT', 'YOUNGSTER', 'KITCHEN')
@@ -404,14 +413,7 @@ export class CoreController {
     return this.coreService.quickReorder(req.user, body);
   }
 
-  @Post('meal-plans/wizard')
-  @Roles('PARENT', 'YOUNGSTER')
-  mealPlanWizard(
-    @Req() req: AuthRequest,
-    @Body() body: MealPlanWizardDto,
-  ) {
-    return this.coreService.mealPlanWizard(req.user, body);
-  }
+  // POST meal-plans/wizard moved to archived.controller.ts
 
   @Post('favourites/:favouriteId/apply')
   @Roles('PARENT', 'YOUNGSTER')
@@ -429,15 +431,7 @@ export class CoreController {
     return this.coreService.getParentConsolidatedBilling(req.user);
   }
 
-  @Post('billing/:billingId/proof-upload')
-  @Roles('PARENT')
-  uploadBillingProof(
-    @Req() req: AuthRequest,
-    @Param('billingId', ParseUUIDPipe) billingId: string,
-    @Body() body: UploadBillingProofDto,
-  ) {
-    return this.coreService.uploadBillingProof(req.user, billingId, body.proofImageData);
-  }
+  // POST billing/:billingId/proof-upload moved to archived.controller.ts
 
   @Post('billing/proof-upload-batch')
   @Roles('PARENT')
@@ -448,16 +442,48 @@ export class CoreController {
     return this.coreService.uploadBillingProofBatch(req.user, body.billingIds, body.proofImageData);
   }
 
+  @Get('billing/:billingId/proof-image')
+  @Roles('PARENT')
+  async getParentBillingProofImage(
+    @Req() req: AuthRequest,
+    @Param('billingId', ParseUUIDPipe) billingId: string,
+    @Res() res: Response,
+  ) {
+    const out = await this.coreService.getBillingProofImage(req.user, billingId);
+    res.setHeader('Content-Type', out.contentType);
+    res.setHeader('Cache-Control', 'private, max-age=60');
+    res.send(out.data);
+  }
+
   @Get('billing/:billingId/receipt')
   @Roles('PARENT', 'ADMIN')
   getBillingReceipt(@Req() req: AuthRequest, @Param('billingId', ParseUUIDPipe) billingId: string) {
     return this.coreService.getBillingReceipt(req.user, billingId);
   }
 
+  @Post('billing/:billingId/revert-proof')
+  @Roles('PARENT')
+  revertBillingProof(@Req() req: AuthRequest, @Param('billingId', ParseUUIDPipe) billingId: string) {
+    return this.coreService.revertBillingProof(req.user, billingId);
+  }
+
   @Get('admin/billing')
   @Roles('ADMIN')
   getAdminBilling(@Query('status') status?: string) {
     return this.coreService.getAdminBilling(status);
+  }
+
+  @Get('admin/billing/:billingId/proof-image')
+  @Roles('ADMIN')
+  async getAdminBillingProofImage(
+    @Req() req: AuthRequest,
+    @Param('billingId', ParseUUIDPipe) billingId: string,
+    @Res() res: Response,
+  ) {
+    const out = await this.coreService.getBillingProofImage(req.user, billingId);
+    res.setHeader('Content-Type', out.contentType);
+    res.setHeader('Cache-Control', 'private, max-age=60');
+    res.send(out.data);
   }
 
   @Post('admin/billing/:billingId/verify')
@@ -565,15 +591,19 @@ export class CoreController {
     return this.coreService.getDeliveryAssignments(req.user, date);
   }
 
-  @Post('delivery/assignments/:assignmentId/confirm')
-  @Roles('DELIVERY')
-  confirmDelivery(
-    @Req() req: AuthRequest,
-    @Param('assignmentId', ParseUUIDPipe) assignmentId: string,
-    @Body() body: NoteDto,
-  ) {
-    return this.coreService.confirmDelivery(req.user, assignmentId, body.note);
+  @Get('delivery/summary')
+  @Roles('ADMIN', 'DELIVERY')
+  getDeliverySummary(@Req() req: AuthRequest, @Query('date') date?: string) {
+    return this.coreService.getDeliverySummary(req.user, date);
   }
+
+  @Post('admin/delivery/send-notification-email')
+  @Roles('ADMIN')
+  sendDeliveryNotificationEmail(@Req() req: AuthRequest) {
+    return this.coreService.sendDeliveryNotificationEmails(req.user);
+  }
+
+  // POST delivery/assignments/:assignmentId/confirm moved to archived.controller.ts
 
   @Patch('delivery/assignments/:assignmentId/toggle')
   @Roles('DELIVERY')

@@ -52,8 +52,9 @@ export default function RegisterForm({ role, allowedRoles, title, subtitle }: Re
         }),
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.message || 'Registration failed');
+        const body = await res.json().catch(() => ({})) as { message?: string | string[]; error?: { message?: string; details?: string[] } };
+        const raw = body.message ?? body.error?.message ?? body.error?.details?.join(', ');
+        throw new Error(Array.isArray(raw) ? raw.join(', ') : (raw || 'Registration failed'));
       }
       const data = await res.json();
       setAuthState(data.accessToken, data.user.role);
@@ -105,7 +106,8 @@ export default function RegisterForm({ role, allowedRoles, title, subtitle }: Re
           </label>
           <label>
             Phone Number
-            <input value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} required />
+            <input value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="+[country][area][number]" required />
+            <small className="field-hint">Format: + country code + area code + number &nbsp;e.g. +628123456789</small>
           </label>
           <label>
             Email

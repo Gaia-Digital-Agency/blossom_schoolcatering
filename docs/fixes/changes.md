@@ -1,5 +1,85 @@
 # Changes Since Last Prompt
 
+Date: 2026-03-09  
+Prompt scope:  
+1. Production-prep seed cleanup enhancements  
+2. Youngster admin password reset behavior alignment  
+3. Billing proof-image access hardening (parent/admin)  
+4. Error and blocked-action visibility improvements  
+
+## 1) Billing Proof Image Access Hardening
+
+### Backend
+- Updated: `apps/api/src/core/core.controller.ts`
+  - Added:
+    - `GET /api/v1/billing/:billingId/proof-image` (PARENT)
+    - `GET /api/v1/admin/billing/:billingId/proof-image` (ADMIN)
+- Updated: `apps/api/src/core/core.service.ts`
+  - Added `getBillingProofImage(...)` to enforce role ownership checks and return image binary payload.
+  - Added secure remote proof retrieval fallback for private GCS objects:
+    - first unauthenticated fetch
+    - if 401/403 on Google Storage host, retry with service-account access token
+  - Added payload safety checks (size/image signature).
+
+### Frontend
+- Updated: `apps/web/lib/auth.ts`
+  - Added `apiFetchResponse(...)` for authenticated non-JSON responses (binary/blob support).
+- Updated: `apps/web/app/parents/billing/page.tsx`
+  - `View Proof Image` now calls authenticated proof-image endpoint and opens blob URL.
+- Updated: `apps/web/app/admin/billing/page.tsx`
+  - `View Proof` now calls authenticated proof-image endpoint and opens blob URL.
+
+Net effect:
+- Parent/Admin can view payment proof images without requiring public bucket ACL exposure.
+
+## 2) Youngster Show Password Behavior Alignment
+
+- Updated: `apps/api/src/core/core.controller.ts`
+  - Added: `PATCH /api/v1/admin/youngsters/:youngsterId/reset-password`
+- Updated: `apps/api/src/core/core.service.ts`
+  - Added: `adminResetYoungsterPassword(...)`
+- Updated: `apps/web/app/admin/youngsters/page.tsx`
+  - `Show Password` now targets youngster-scoped reset route.
+
+Net effect:
+- Youngster reset flow now follows youngster identity lookup path and aligns with intended Admin > Youngsters behavior.
+
+## 3) Production Cleanup Utilities
+
+Added scripts:
+- `scripts/cleanup_seed_data_before_2025_03_09.sql`
+  - Deletes orders/billing/delivery assignments and dependent rows before service date `2025-03-09`.
+- `scripts/cleanup_named_seed_parents_preprod.sh`
+  - Targets seed parent groups by name pattern:
+    - `Allergen Parent ...`
+    - `Blackout Parent ...`
+    - `Parent Guide ...` / `Parent_ Guide ...`
+  - Removes associated transactional data and soft-deactivates parent/youngster records.
+
+## 4) Error Visibility and Blocked Action UX
+
+- Updated: `apps/web/app/globals.css`
+  - `.auth-error` now high-contrast bold red block style.
+  - disabled/unallowed action buttons styled with bold red + `not-allowed` cursor.
+- Updated: `apps/web/app/admin/billing/page.tsx`
+  - Replaced popup alert error signaling with inline visible error for failed/unallowed actions.
+
+## 5) Build/Deploy/Runtime Verification
+
+- Build:
+  - `npm run build:api` -> PASS
+  - `npm run build:web` -> PASS
+- Deployment completed on VM:
+  - pulled branch `codex/phase1-stack-upgrade`
+  - rebuilt API + Web
+  - restarted `schoolcatering-api` and `schoolcatering-web`
+- Runtime checks:
+  - web routes return `200` after redirect-follow on server-local checks
+  - API endpoint `/api/v1/public/menu` returns `200`
+  - PM2 logs confirm new routes are mapped and app startup is healthy
+
+---
+
 Date: 2026-02-26  
 Prompt scope:  
 1. Implement phase 2 (`HttpOnly` refresh cookie flow)  

@@ -28,6 +28,7 @@ type KitchenData = {
   serviceDate: string;
   totals: {
     totalOrders: number;
+    totalOrdersComplete: number;
     totalDishes: number;
     breakfastOrders: number;
     snackOrders: number;
@@ -99,6 +100,7 @@ export default function AdminKitchenPage() {
                 <thead>
                   <tr>
                     <th>Total Orders</th>
+                    <th>Total Orders Complete</th>
                     <th>Total Dishes</th>
                     <th>Lunch</th>
                     <th>Snack</th>
@@ -108,6 +110,7 @@ export default function AdminKitchenPage() {
                 <tbody>
                   <tr>
                     <td>{data.totals.totalOrders}</td>
+                    <td>{data.totals.totalOrdersComplete}</td>
                     <td>{data.totals.totalDishes}</td>
                     <td>{data.totals.lunchOrders}</td>
                     <td>{data.totals.snackOrders}</td>
@@ -194,9 +197,17 @@ export default function AdminKitchenPage() {
         .admin-kitchen-controls label {
           display: grid;
           gap: 0.25rem;
+          min-width: 0;
+        }
+        .admin-kitchen-controls input {
+          width: 100%;
+          min-width: 0;
         }
         .kitchen-table-wrap {
           overflow-x: auto;
+          max-width: 100%;
+          width: 100%;
+          -webkit-overflow-scrolling: touch;
         }
         .kitchen-table {
           width: 100%;
@@ -212,6 +223,9 @@ export default function AdminKitchenPage() {
           border-bottom: 1px solid #efe7da;
           padding: 0.65rem;
           text-align: left;
+        }
+        .kitchen-table th {
+          white-space: nowrap;
         }
         .kitchen-table tbody tr:last-child td {
           border-bottom: none;

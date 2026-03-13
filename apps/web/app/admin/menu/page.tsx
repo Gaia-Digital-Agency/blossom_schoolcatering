@@ -52,13 +52,6 @@ type MasterIngredientFile = {
 type MasterDishFile = Record<string, string[]>;
 const DEFAULT_DISH_IMAGE = '/schoolcatering/assets/hero-meal.jpg';
 
-function nextWeekdayIsoDate() {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() + 1);
-  while (d.getUTCDay() === 0 || d.getUTCDay() === 6) d.setUTCDate(d.getUTCDate() + 1);
-  return d.toISOString().slice(0, 10);
-}
-
 function toLabel(raw: string) {
   return raw
     .replace(/_/g, ' ')
@@ -104,7 +97,6 @@ const masterDishes = Object.values(dishMaster as MasterDishFile)
   .sort((a, b) => a.localeCompare(b));
 
 export default function AdminMenuPage() {
-  const [menuServiceDate, setMenuServiceDate] = useState(nextWeekdayIsoDate());
   const [menuSession, setMenuSession] = useState<'LUNCH' | 'SNACK' | 'BREAKFAST'>('LUNCH');
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [menuItems, setMenuItems] = useState<AdminMenuItem[]>([]);
@@ -190,7 +182,7 @@ export default function AdminMenuPage() {
     const [ings, menu, ratings] = await Promise.all([
       apiFetch('/admin/ingredients') as Promise<Ingredient[]>,
       apiFetch(`/admin/menus?session=${menuSession}`) as Promise<{ items: AdminMenuItem[] }>,
-      apiFetch(`/admin/menu-ratings?service_date=${menuServiceDate}&session=${menuSession}`) as Promise<{ items: MenuRatingSummary[] }>,
+      apiFetch('/admin/menu-ratings') as Promise<{ items: MenuRatingSummary[] }>,
     ]);
     setIngredients(ings);
     setMenuItems(menu.items || []);
@@ -210,7 +202,7 @@ export default function AdminMenuPage() {
     setActionLoading(true);
     try {
       await loadMenuData();
-      setMessage('Menu context loaded.');
+      setMessage(`Menu loaded for ${menuSession}.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed loading menu context');
     } finally {
@@ -222,7 +214,7 @@ export default function AdminMenuPage() {
     clearUploadSelection();
     loadMenuData().catch((e) => setError(e instanceof Error ? e.message : 'Failed'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [menuServiceDate, menuSession]);
+  }, [menuSession]);
 
   const resetForm = () => {
     setEditingItemId('');
@@ -340,8 +332,7 @@ export default function AdminMenuPage() {
     setSavingItem(true);
     try {
       if (editingItemId) {
-        const payload = { ...basePayload, serviceDate: menuServiceDate };
-        await apiFetch(`/admin/menu-items/${editingItemId}`, { method: 'PATCH', body: JSON.stringify(payload) }, { skipAutoReload: true });
+        await apiFetch(`/admin/menu-items/${editingItemId}`, { method: 'PATCH', body: JSON.stringify(basePayload) }, { skipAutoReload: true });
         setMessage('Dish updated.');
       } else {
         const payload = { ...basePayload };
@@ -486,21 +477,6 @@ export default function AdminMenuPage() {
     }
   };
 
-  const onSeed = async () => {
-    setError('');
-    setMessage('');
-    setActionLoading(true);
-    try {
-      await apiFetch('/admin/menus/sample-seed', { method: 'POST', body: JSON.stringify({ serviceDate: menuServiceDate }) }, { skipAutoReload: true });
-      setMessage('Active menu cloned to selected date.');
-      await loadMenuData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed cloning active menu');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   const onEditItem = (item: AdminMenuItem) => {
     setEditingItemId(item.id);
     setItemName(item.name);
@@ -599,7 +575,6 @@ export default function AdminMenuPage() {
         {error ? <p className="auth-error">{error}</p> : null}
 
         <div className="auth-form menu-context-form">
-          <label>Service Date (for ratings/clone only)<input type="date" value={menuServiceDate} onChange={(e) => setMenuServiceDate(e.target.value)} /></label>
           <label>
             Session
             <select value={menuSession} onChange={(e) => setMenuSession(e.target.value as 'LUNCH' | 'SNACK' | 'BREAKFAST')}>
@@ -610,9 +585,8 @@ export default function AdminMenuPage() {
           </label>
           <div className="menu-actions-row">
             <button className="btn btn-outline" type="button" onClick={onLoadMenuContext} disabled={savingItem || actionLoading}>
-              {actionLoading ? 'Loading...' : 'Load Menu Context'}
+              {actionLoading ? 'Loading...' : 'Load Menu'}
             </button>
-            <button className="btn btn-outline" type="button" onClick={onSeed} disabled={savingItem || actionLoading}>Clone Active Menu</button>
             <button className="btn btn-primary" type="submit" form="menu-item-form" disabled={savingItem || actionLoading || imageConverting}>
               {savingItem ? 'Saving...' : (imageConverting ? 'Converting Image...' : (editingItemId ? 'Update Dish' : 'Create Dish'))}
             </button>
@@ -843,7 +817,7 @@ export default function AdminMenuPage() {
                 <small>Total Votes: {rating.total_votes}</small>
               </article>
             ))}
-            {menuRatings.length === 0 ? <p className="auth-help">No dishes found for selected date/session.</p> : null}
+            {menuRatings.length === 0 ? <p className="auth-help">No menu ratings found.</p> : null}
           </div>
         </div>
       </section>

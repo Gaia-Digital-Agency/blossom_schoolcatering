@@ -35,22 +35,42 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f docs/db/101_perf_indexes.sql
 
 ## Optional production data steps
 
-1. Reference/demo data (normally skip in production):
+1. School seed snapshot (future-use):
 
 ```bash
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f docs/db/002_seed_reference_data.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f docs/db/102_seed_schools_from_current_data.sql
 ```
 
-2. Clone current active menu into a future date (recommended operational seed):
+2. Delivery and delivery-to-school assignment seed (future-use):
 
 ```bash
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f docs/db/006_runtime_manual_test_seed.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f docs/db/103_seed_delivery_from_current_data.sql
 ```
 
-3. UAT bulk data (do not run on production):
+3. Menu seed snapshot (future-use):
 
 ```bash
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f docs/db/007_runtime_manual_data_seed.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f docs/db/104_seed_menu_from_current_data.sql
+```
+
+4. Parent + youngster registration seed (future-use):
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f docs/db/105_seed_parent_youngster_from_current_data.sql
+```
+
+5. Pre-go-live cleanup helpers (run only when needed):
+
+Delete historical transactional seed rows before 2025-03-09:
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/cleanup_seed_data_before_2025_03_09.sql
+```
+
+Delete named seed parent groups and associated youngster/orders/billing/delivery:
+
+```bash
+DATABASE_URL="$DATABASE_URL" bash scripts/cleanup_named_seed_parents_preprod.sh
 ```
 
 ## Existing environments

@@ -38,8 +38,8 @@ export function middleware(request: NextRequest) {
 
   const hasToken = Boolean(request.cookies.get(AUTH_COOKIE)?.value);
   const role = request.cookies.get(ROLE_COOKIE)?.value as Role | undefined;
-  const isRatingPath = normalizedPath === '/rating' || normalizedPath.startsWith('/rating/');
   const requiredRole = getRequiredRole(normalizedPath);
+  const isRatingPath = normalizedPath === '/rating' || normalizedPath.startsWith('/rating/');
   const isPublic =
     normalizedPath === '/' ||
     normalizedPath === '/menu' ||
@@ -59,13 +59,23 @@ export function middleware(request: NextRequest) {
     if (!hasToken) {
       return NextResponse.redirect(new URL(`${BASE_PATH}/login`, request.url));
     }
+    if (role !== 'PARENT' && role !== 'YOUNGSTER') {
+      const destination = role === 'ADMIN'
+        ? '/admin'
+        : role === 'KITCHEN'
+          ? '/kitchen'
+          : role === 'DELIVERY'
+            ? '/delivery'
+            : '/login';
+      return NextResponse.redirect(new URL(`${BASE_PATH}${destination}`, request.url));
+    }
     return NextResponse.next();
   }
 
   if (requiredRole && normalizedPath === roleLoginPath(requiredRole)) {
     if (hasToken && role === requiredRole) {
       const destination = requiredRole === 'PARENT'
-        ? '/parents'
+        ? '/parents/orders'
         : requiredRole === 'YOUNGSTER'
           ? '/youngsters'
           : `/${requiredRole.toLowerCase()}`;
@@ -87,7 +97,7 @@ export function middleware(request: NextRequest) {
 
   if (hasToken && normalizedPath === '/login') {
     const destination = role === 'PARENT'
-      ? '/parents'
+      ? '/parents/orders'
       : role === 'YOUNGSTER'
         ? '/youngsters'
         : role === 'ADMIN'

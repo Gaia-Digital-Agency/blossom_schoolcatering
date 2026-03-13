@@ -14,6 +14,10 @@ export function getApiBase() {
   return process.env.NEXT_PUBLIC_API_BASE ?? '/schoolcatering/api/v1';
 }
 
+export function getAppBase() {
+  return getApiBase().replace('/api/v1', '');
+}
+
 export function setAuthState(accessToken: string, role: Role) {
   localStorage.setItem(ACCESS_KEY, accessToken);
   localStorage.setItem(ROLE_KEY, role);
@@ -93,7 +97,7 @@ export class SessionExpiredError extends Error {
 function redirectToLogin(): void {
   const role = localStorage.getItem(ROLE_KEY);
   clearAuthState();
-  const base = getApiBase().replace('/api/v1', '');
+  const base = getAppBase();
   const paths: Record<string, string> = {
     ADMIN:     `${base}/admin/login`,
     KITCHEN:   `${base}/kitchen/login`,
@@ -102,6 +106,16 @@ function redirectToLogin(): void {
     YOUNGSTER: `${base}/youngster/login`,
   };
   window.location.href = paths[role ?? ''] ?? `${base}/login`;
+}
+
+export async function clearBrowserSession() {
+  await fetchWithTimeout(`${getApiBase()}/auth/logout`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({}),
+  }).catch(() => undefined);
+  clearAuthState();
 }
 
 /**
@@ -115,6 +129,27 @@ function redirectToLogin(): void {
  * Catch SessionExpiredError to suppress error UI when a redirect has fired.
  */
 export async function apiFetch(path: string, init?: RequestInit, options?: { skipAutoReload?: boolean }): Promise<unknown> {
+  const res = await apiFetchResponse(path, init);
+  const method = String(init?.method || 'GET').toUpperCase();
+  const shouldAutoRefresh =
+    !options?.skipAutoReload &&
+    typeof window !== 'undefined' &&
+    ['POST', 'PATCH', 'PUT', 'DELETE'].includes(method);
+
+  if (res.status === 204) {
+    if (shouldAutoRefresh) {
+      window.setTimeout(() => window.location.reload(), 120);
+    }
+    return null;
+  }
+  const data = await res.json();
+  if (shouldAutoRefresh) {
+    window.setTimeout(() => window.location.reload(), 120);
+  }
+  return data;
+}
+
+export async function apiFetchResponse(path: string, init?: RequestInit): Promise<Response> {
   let token = localStorage.getItem(ACCESS_KEY);
   if (!token) {
     redirectToLogin();
@@ -140,26 +175,10 @@ export async function apiFetch(path: string, init?: RequestInit, options?: { ski
   }
 
   if (!res.ok) {
-    const body = await res.json().catch(() => ({})) as { message?: string | string[] };
-    const msg = Array.isArray(body.message) ? body.message.join(', ') : (body.message ?? 'Request failed');
+    const body = await res.json().catch(() => ({})) as { message?: string | string[]; error?: { message?: string; details?: string[] } };
+    const raw = body.message ?? body.error?.message ?? body.error?.details?.join(', ');
+    const msg = Array.isArray(raw) ? raw.join(', ') : (raw ?? 'Request failed');
     throw new Error(msg);
   }
-
-  const method = String(init?.method || 'GET').toUpperCase();
-  const shouldAutoRefresh =
-    !options?.skipAutoReload &&
-    typeof window !== 'undefined' &&
-    ['POST', 'PATCH', 'PUT', 'DELETE'].includes(method);
-
-  if (res.status === 204) {
-    if (shouldAutoRefresh) {
-      window.setTimeout(() => window.location.reload(), 120);
-    }
-    return null;
-  }
-  const data = await res.json();
-  if (shouldAutoRefresh) {
-    window.setTimeout(() => window.location.reload(), 120);
-  }
-  return data;
+  return res;
 }

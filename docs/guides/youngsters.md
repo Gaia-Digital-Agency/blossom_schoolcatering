@@ -1,6 +1,6 @@
 # Youngster User Guide
 
-Last updated: 2026-02-28
+Last updated: 2026-03-09
 
 ## Access
 - Login: `/schoolcatering/youngster/login`
@@ -28,6 +28,7 @@ Last updated: 2026-02-28
 - Cutoff countdown is shown and enforced.
 - Session availability depends on admin session settings.
 - Ordering on blocked dates/times is rejected by API.
+- If an action is blocked or fails, the message is displayed inline in bold red.
 
 ## Profile Edit Note
 - Youngster page is operational; profile corrections are handled by Admin modules.
