@@ -4791,9 +4791,11 @@ export class CoreService implements OnModuleInit {
         SELECT o.id AS order_id, c.school_id
         FROM orders o
         JOIN children c ON c.id = o.child_id
+        LEFT JOIN delivery_assignments da ON da.order_id = o.id
         WHERE o.service_date = $1::date
           AND o.status IN ('PLACED', 'LOCKED')
-          AND o.delivery_status = 'OUT_FOR_DELIVERY'
+          AND o.delivery_status IN ('PENDING', 'ASSIGNED', 'OUT_FOR_DELIVERY')
+          AND da.order_id IS NULL
       ) t;
     `,
       [serviceDate],

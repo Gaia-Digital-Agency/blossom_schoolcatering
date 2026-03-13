@@ -618,7 +618,7 @@ export default function AdminDeliveryPage() {
           </div>
         </div>
 
-        <h2>Auto Assignment ({assignDate})</h2>
+        <h2>Delivery Assignments ({assignDate})</h2>
         <div className="auth-form auto-assign-controls">
           <label>
             Service Date
