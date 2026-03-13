@@ -260,6 +260,8 @@ export default function ParentsOrdersPage() {
     if (!shouldShowPopup) return;
     window.sessionStorage.removeItem(ORDER_SUCCESS_POPUP_KEY);
     setShowSuccessPopup(true);
+    // Scroll to top so the popup is visible after the page reload restores scroll position.
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
   useEffect(() => {

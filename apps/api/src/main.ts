@@ -39,7 +39,13 @@ async function bootstrap() {
   loadDotEnv(join(process.cwd(), '.env'));
   loadDotEnv('/var/www/schoolcatering/.env');
   validateRequiredEnv();
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
+  // Raise JSON body limit to 10 MB so proof image uploads (base64 WebP) are accepted.
+  // NestJS default (100 KB) is too small for image payloads.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const express = require('express') as typeof import('express');
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   app.useLogger(new JsonLogger());
   const corsOrigins = [
     'http://localhost:5173',
