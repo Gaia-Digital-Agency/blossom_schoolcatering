@@ -56,8 +56,8 @@ export default function DevPage({ title, description }: DevPageProps) {
         <div className="dev-links">
           <Link href="/">Home</Link>
           <Link href="/dashboard">Dashboard</Link>
-          <Link href="/parents">Parents</Link>
-          <Link href="/youngsters">Youngsters</Link>
+          <Link href="/parent">Parent</Link>
+          <Link href="/youngster">Youngster</Link>
           <Link href="/admin">Admin</Link>
           <Link href="/kitchen">Kitchen</Link>
           <Link href="/delivery">Delivery</Link>

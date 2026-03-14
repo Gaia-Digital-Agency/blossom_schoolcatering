@@ -221,7 +221,7 @@ export default function YoungstersPage() {
   );
 
   const loadOrders = async () => {
-    const data = await apiFetch('/youngsters/me/orders/consolidated') as { orders: ConsolidatedOrder[] };
+    const data = await apiFetch('/youngster/me/orders/consolidated') as { orders: ConsolidatedOrder[] };
     setOrders(data.orders || []);
   };
 
@@ -230,7 +230,7 @@ export default function YoungstersPage() {
       .then((data) => setYoungster(data as Youngster))
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed loading youngster profile'))
       .finally(() => setLoading(false));
-    apiFetch('/youngsters/me/insights')
+    apiFetch('/youngster/me/insights')
       .then((data) => setInsights(data as YoungsterInsights))
       .catch(() => undefined);
     apiFetch('/session-settings')
@@ -395,7 +395,7 @@ export default function YoungstersPage() {
       setDraftExpiresAt('');
       setConfirmedViewDate(serviceDate);
       setShowSuccessPopup(true);
-      apiFetch('/youngsters/me/insights').then((x) => setInsights(x as YoungsterInsights)).catch(() => undefined);
+      apiFetch('/youngster/me/insights').then((x) => setInsights(x as YoungsterInsights)).catch(() => undefined);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Order placement failed';
       if (msg.includes('ORDER_SESSION_DISABLED') && session !== 'LUNCH') {
@@ -413,7 +413,7 @@ export default function YoungstersPage() {
     return (
       <main className="page-auth">
         <section className="auth-panel">
-          <h1>Youngsters Module</h1>
+          <h1>Youngster Module</h1>
           <p>Loading Step 6 data...</p>
         </section>
       </main>
@@ -424,7 +424,7 @@ export default function YoungstersPage() {
     <>
     <main className="page-auth page-auth-mobile youngsters-page">
       <section className="auth-panel">
-        <h1>Youngsters Module</h1>
+        <h1>Youngster Module</h1>
         <nav className="module-nav" aria-label="Youngster Module Navigation">
           <Link href="/">Home</Link>
           <a href="#youngster-order">Order</a>

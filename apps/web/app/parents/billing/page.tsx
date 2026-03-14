@@ -94,11 +94,11 @@ export default function ParentsBillingPage() {
     setBillings(data || []);
   };
   const loadSpending = async () => {
-    const data = await apiFetch('/parents/me/spending-dashboard') as SpendingDashboard;
+    const data = await apiFetch('/parent/me/spending-dashboard') as SpendingDashboard;
     setSpending(data);
   };
   const loadBaseData = async () => {
-    const childrenData = await apiFetch('/parents/me/children/pages') as { parentId: string; children: Child[] };
+    const childrenData = await apiFetch('/parent/me/children/pages') as { parentId: string; children: Child[] };
     setChildren(childrenData.children);
     if (childrenData.children.length > 0) setSelectedChildId(childrenData.children[0].id);
     await Promise.all([loadBilling(), loadSpending()]);
@@ -193,10 +193,10 @@ export default function ParentsBillingPage() {
         <h1>Parent Page</h1>
         <nav className="module-nav" aria-label="Parent Module Navigation">
           <Link href="/">Home</Link>
-          <Link href="/parents/orders">Order</Link>
+          <Link href="/parent/orders">Order</Link>
           <Link href="/menu">Menu</Link>
           <Link href="/rating">Rating</Link>
-          <Link href="/parents/billing" className="active">Billing</Link>
+          <Link href="/parent/billing" className="active">Billing</Link>
         </nav>
         <div className="module-guide-card">
           💡 View and pay your invoices. Track monthly spending.
@@ -206,7 +206,7 @@ export default function ParentsBillingPage() {
 
         <div className="module-section" id="parent-billing">
           <h2>Linked Youngsters</h2>
-          <p className="auth-help">Youngster registration is done on `/register/youngsters`. Linked youngsters are auto-linked during registration and immediately available for Order and Billing.</p>
+          <p className="auth-help">Youngster registration is done on `/register/youngster`. Linked youngsters are auto-linked during registration and immediately available for Order and Billing.</p>
           {children.length > 1 ? (
             <label>Select Youngster
               <select value={selectedChildId} onChange={(e) => setSelectedChildId(e.target.value)}>

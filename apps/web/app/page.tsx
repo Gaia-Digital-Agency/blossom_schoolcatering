@@ -98,7 +98,7 @@ export default function HomePage() {
             </p>
             <div className="auth-grid">
               <Link className="btn btn-primary" href="/login">Log In</Link>
-              <Link className="btn btn-outline" href="/register/youngsters">Register</Link>
+              <Link className="btn btn-outline" href="/register/youngster">Register</Link>
               <GoogleOAuthButton role="PARENT" redirectPath="/dashboard" className="google-oauth-wrap" />
             </div>
           </section>

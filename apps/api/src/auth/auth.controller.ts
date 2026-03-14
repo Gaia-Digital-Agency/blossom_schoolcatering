@@ -140,6 +140,12 @@ export class AuthController {
     });
   }
 
+  @Post('register/youngster')
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  async registerYoungsterWithParentSingular(@Body() body: RegisterYoungsterWithParentDto) {
+    return this.registerYoungsterWithParent(body);
+  }
+
   @Post('google/dev')
   async loginWithGoogleDev(
     @Req() req: Request,

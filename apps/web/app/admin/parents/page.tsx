@@ -32,7 +32,7 @@ export default function AdminParentsPage() {
   const [showPassInfo, setShowPassInfo] = useState<ShowPassInfo | null>(null);
 
   const load = async () => {
-    const p = await apiFetch('/admin/parents') as ParentRow[];
+    const p = await apiFetch('/admin/parent') as ParentRow[];
     setParents(p || []);
   };
 
@@ -45,22 +45,22 @@ export default function AdminParentsPage() {
     setMessage('');
     try {
       const res = await apiFetch(
-        `/admin/users/${p.user_id}/reset-password`,
-        { method: 'PATCH', body: JSON.stringify({}) },
+        `/admin/users/${p.user_id}/password`,
+        { method: 'GET' },
         { skipAutoReload: true },
-      ) as { ok: boolean; newPassword: string; username: string };
+      ) as { ok: boolean; password: string; username: string };
       setShowPassInfo({
         parentFirstName: p.first_name,
         parentLastName: p.last_name,
         parentUsername: res.username,
-        parentNewPassword: res.newPassword,
+        parentNewPassword: res.password,
         youngsters: (p.youngsters || []).map((y) => ({
           name: y.name,
           school: y.school_name || '—',
         })),
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed resetting password');
+      setError(e instanceof Error ? e.message : 'Failed loading password');
     }
   };
 
@@ -73,7 +73,7 @@ export default function AdminParentsPage() {
     setError('');
     setMessage('');
     try {
-      await apiFetch(`/admin/parents/${p.id}`, { method: 'DELETE' }, { skipAutoReload: true });
+      await apiFetch(`/admin/parent/${p.id}`, { method: 'DELETE' }, { skipAutoReload: true });
       setMessage(`Parent deleted: ${p.first_name} ${p.last_name}`);
       await load();
     } catch (e) {
@@ -84,9 +84,9 @@ export default function AdminParentsPage() {
   return (
     <main className="page-auth page-auth-desktop">
       <section className="auth-panel">
-        <h1>Admin Parents</h1>
+        <h1>Admin Parent</h1>
         <AdminNav />
-        <p className="auth-help">Parent records are view-only here. Youngster edits are managed in Admin Youngsters.</p>
+        <p className="auth-help">Parent records are view-only here. Youngster edits are managed in Admin Youngster.</p>
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
 
@@ -160,7 +160,7 @@ export default function AdminParentsPage() {
                 <code className="reg-info-code">{showPassInfo.parentUsername}</code>
               </div>
               <div className="reg-info-row">
-                <span className="reg-info-label">Parent New Password</span>
+                <span className="reg-info-label">Parent Password</span>
                 <code className="reg-info-code">{showPassInfo.parentNewPassword}</code>
               </div>
               {showPassInfo.youngsters.length > 0 ? (
@@ -175,7 +175,7 @@ export default function AdminParentsPage() {
               ) : null}
               <div className="reg-info-row">
                 <span className="reg-info-label">Youngster Password</span>
-                <span className="reg-info-muted">Not changed — use Check Password on Youngsters page</span>
+                <span className="reg-info-muted">Not changed — use Check Password on Admin Youngster page</span>
               </div>
             </div>
             <button className="btn btn-primary pass-modal-close" type="button" onClick={() => setShowPassInfo(null)}>

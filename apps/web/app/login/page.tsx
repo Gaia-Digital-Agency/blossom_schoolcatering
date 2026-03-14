@@ -30,9 +30,9 @@ export default function LoginPage() {
       setAuthState(data.accessToken, data.user.role);
       const role = String(data?.user?.role || '').toUpperCase();
       if (role === 'PARENT') {
-        router.push('/parents');
+        router.push('/parent');
       } else if (role === 'YOUNGSTER') {
-        router.push('/youngsters');
+        router.push('/youngster');
       } else {
         router.push('/dashboard');
       }

@@ -115,7 +115,7 @@ export default function YoungsterRegisterPage() {
         }
 
         if (recordRole === 'PARENT') {
-          const data = await apiFetch('/parents/me/children/pages') as { children?: RecordChild[] };
+          const data = await apiFetch('/parent/me/children/pages') as { children?: RecordChild[] };
           const children = Array.isArray(data.children) ? data.children : [];
           if (!active) return;
           setRecordChildren(children);
@@ -208,7 +208,7 @@ export default function YoungsterRegisterPage() {
 
     setSubmitting(true);
     try {
-      const res = await fetchWithTimeout(`${getApiBase()}/auth/register/youngsters`, {
+      const res = await fetchWithTimeout(`${getApiBase()}/auth/register/youngster`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

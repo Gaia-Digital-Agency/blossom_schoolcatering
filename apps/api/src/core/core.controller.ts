@@ -127,9 +127,21 @@ export class CoreController {
     return this.coreService.registerYoungster(req.user, body);
   }
 
+  @Post('child/register')
+  @Roles('PARENT', 'ADMIN')
+  registerYoungsterSingular(@Req() req: AuthRequest, @Body() body: RegisterYoungsterDto) {
+    return this.coreService.registerYoungster(req.user, body);
+  }
+
   @Get('admin/parents')
   @Roles('ADMIN')
   getAdminParents() {
+    return this.coreService.getAdminParents();
+  }
+
+  @Get('admin/parent')
+  @Roles('ADMIN')
+  getAdminParentsSingular() {
     return this.coreService.getAdminParents();
   }
 
@@ -143,15 +155,37 @@ export class CoreController {
     return this.coreService.updateParentProfile(req.user, parentId, body);
   }
 
+  @Patch('admin/parent/:parentId')
+  @Roles('ADMIN')
+  updateParentProfileSingular(
+    @Req() req: AuthRequest,
+    @Param('parentId', ParseUUIDPipe) parentId: string,
+    @Body() body: UpdateParentDto,
+  ) {
+    return this.coreService.updateParentProfile(req.user, parentId, body);
+  }
+
   @Delete('admin/parents/:parentId')
   @Roles('ADMIN')
   deleteParent(@Req() req: AuthRequest, @Param('parentId', ParseUUIDPipe) parentId: string) {
     return this.coreService.deleteParent(req.user, parentId);
   }
 
+  @Delete('admin/parent/:parentId')
+  @Roles('ADMIN')
+  deleteParentSingular(@Req() req: AuthRequest, @Param('parentId', ParseUUIDPipe) parentId: string) {
+    return this.coreService.deleteParent(req.user, parentId);
+  }
+
   @Get('admin/children')
   @Roles('ADMIN')
   getAdminChildren() {
+    return this.coreService.getAdminChildren();
+  }
+
+  @Get('admin/youngster')
+  @Roles('ADMIN')
+  getAdminChildrenSingular() {
     return this.coreService.getAdminChildren();
   }
 
@@ -165,10 +199,35 @@ export class CoreController {
     return this.coreService.updateYoungsterProfile(req.user, youngsterId, body);
   }
 
+  @Patch('admin/youngster/:youngsterId')
+  @Roles('ADMIN')
+  updateYoungsterProfileSingular(
+    @Req() req: AuthRequest,
+    @Param('youngsterId', ParseUUIDPipe) youngsterId: string,
+    @Body() body: UpdateYoungsterDto,
+  ) {
+    return this.coreService.updateYoungsterProfile(req.user, youngsterId, body);
+  }
+
   @Delete('admin/youngsters/:youngsterId')
   @Roles('ADMIN')
   deleteYoungster(@Req() req: AuthRequest, @Param('youngsterId', ParseUUIDPipe) youngsterId: string) {
     return this.coreService.deleteYoungster(req.user, youngsterId);
+  }
+
+  @Delete('admin/youngster/:youngsterId')
+  @Roles('ADMIN')
+  deleteYoungsterSingular(@Req() req: AuthRequest, @Param('youngsterId', ParseUUIDPipe) youngsterId: string) {
+    return this.coreService.deleteYoungster(req.user, youngsterId);
+  }
+
+  @Get('admin/users/:userId/password')
+  @Roles('ADMIN')
+  adminGetUserPassword(
+    @Req() req: AuthRequest,
+    @Param('userId', ParseUUIDPipe) userId: string,
+  ) {
+    return this.coreService.adminGetUserPassword(req.user, userId);
   }
 
   @Patch('admin/users/:userId/reset-password')
@@ -189,6 +248,34 @@ export class CoreController {
     @Body() body: ResetPasswordDto,
   ) {
     return this.coreService.adminResetYoungsterPassword(req.user, youngsterId, body.newPassword);
+  }
+
+  @Get('admin/youngsters/:youngsterId/password')
+  @Roles('ADMIN')
+  adminGetYoungsterPassword(
+    @Req() req: AuthRequest,
+    @Param('youngsterId', ParseUUIDPipe) youngsterId: string,
+  ) {
+    return this.coreService.adminGetYoungsterPassword(req.user, youngsterId);
+  }
+
+  @Patch('admin/youngster/:youngsterId/reset-password')
+  @Roles('ADMIN')
+  adminResetYoungsterPasswordSingular(
+    @Req() req: AuthRequest,
+    @Param('youngsterId', ParseUUIDPipe) youngsterId: string,
+    @Body() body: ResetPasswordDto,
+  ) {
+    return this.coreService.adminResetYoungsterPassword(req.user, youngsterId, body.newPassword);
+  }
+
+  @Get('admin/youngster/:youngsterId/password')
+  @Roles('ADMIN')
+  adminGetYoungsterPasswordSingular(
+    @Req() req: AuthRequest,
+    @Param('youngsterId', ParseUUIDPipe) youngsterId: string,
+  ) {
+    return this.coreService.adminGetYoungsterPassword(req.user, youngsterId);
   }
 
   @Get('admin/dashboard')
@@ -345,9 +432,21 @@ export class CoreController {
     return this.coreService.getYoungsterInsights(req.user, date);
   }
 
+  @Get('youngster/me/insights')
+  @Roles('YOUNGSTER')
+  getYoungsterInsightsSingular(@Req() req: AuthRequest, @Query('date') date?: string) {
+    return this.coreService.getYoungsterInsights(req.user, date);
+  }
+
   @Get('youngsters/me/orders/consolidated')
   @Roles('YOUNGSTER')
   getYoungsterConsolidatedOrders(@Req() req: AuthRequest) {
+    return this.coreService.getYoungsterConsolidatedOrders(req.user);
+  }
+
+  @Get('youngster/me/orders/consolidated')
+  @Roles('YOUNGSTER')
+  getYoungsterConsolidatedOrdersSingular(@Req() req: AuthRequest) {
     return this.coreService.getYoungsterConsolidatedOrders(req.user);
   }
 
@@ -357,9 +456,21 @@ export class CoreController {
     return this.coreService.getParentChildrenPages(req.user);
   }
 
+  @Get('parent/me/children/pages')
+  @Roles('PARENT')
+  getParentChildrenPagesSingular(@Req() req: AuthRequest) {
+    return this.coreService.getParentChildrenPages(req.user);
+  }
+
   @Post('parents/:parentId/children/:childId/link')
   @Roles('PARENT', 'ADMIN')
   linkParentChild(@Req() req: AuthRequest, @Param('parentId', ParseUUIDPipe) parentId: string, @Param('childId', ParseUUIDPipe) childId: string) {
+    return this.coreService.linkParentChild(req.user, parentId, childId);
+  }
+
+  @Post('parent/:parentId/children/:childId/link')
+  @Roles('PARENT', 'ADMIN')
+  linkParentChildSingular(@Req() req: AuthRequest, @Param('parentId', ParseUUIDPipe) parentId: string, @Param('childId', ParseUUIDPipe) childId: string) {
     return this.coreService.linkParentChild(req.user, parentId, childId);
   }
 
@@ -668,9 +779,21 @@ export class CoreController {
     return this.coreService.getParentConsolidatedOrders(req.user);
   }
 
+  @Get('parent/me/orders/consolidated')
+  @Roles('PARENT')
+  getParentConsolidatedOrdersSingular(@Req() req: AuthRequest) {
+    return this.coreService.getParentConsolidatedOrders(req.user);
+  }
+
   @Get('parents/me/spending-dashboard')
   @Roles('PARENT')
   getParentSpendingDashboard(@Req() req: AuthRequest, @Query('month') month?: string) {
+    return this.coreService.getParentSpendingDashboard(req.user, month);
+  }
+
+  @Get('parent/me/spending-dashboard')
+  @Roles('PARENT')
+  getParentSpendingDashboardSingular(@Req() req: AuthRequest, @Query('month') month?: string) {
     return this.coreService.getParentSpendingDashboard(req.user, month);
   }
 

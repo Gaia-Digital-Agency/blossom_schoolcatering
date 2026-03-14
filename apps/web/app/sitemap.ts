@@ -13,7 +13,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     '/privacy-and-confidentiality',
     '/login',
     '/register',
-    '/register/youngsters',
+    '/register/youngster',
     '/register/delivery',
     '/parent/login',
     '/youngster/login',

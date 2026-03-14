@@ -105,8 +105,8 @@ export default function AdminYoungstersPage() {
   const load = async () => {
     const [s, p, c] = await Promise.all([
       apiFetch('/schools?active=true') as Promise<School[]>,
-      apiFetch('/admin/parents') as Promise<ParentRow[]>,
-      apiFetch('/admin/children') as Promise<ChildRow[]>,
+      apiFetch('/admin/parent') as Promise<ParentRow[]>,
+      apiFetch('/admin/youngster') as Promise<ChildRow[]>,
     ]);
     setSchools(s || []);
     setParents(p || []);
@@ -208,7 +208,7 @@ export default function AdminYoungstersPage() {
     setBusy(true);
     try {
       if (editingYoungsterId) {
-        await apiFetch(`/admin/youngsters/${editingYoungsterId}`, {
+        await apiFetch(`/admin/youngster/${editingYoungsterId}`, {
           method: 'PATCH',
           body: JSON.stringify({
             firstName,
@@ -225,7 +225,7 @@ export default function AdminYoungstersPage() {
         });
         // Update linked parent profile fields if any are filled
         if (selectedParentId && (pFirstName || pLastName || pPhone || pEmail || pAddress)) {
-          await apiFetch(`/admin/parents/${selectedParentId}`, {
+          await apiFetch(`/admin/parent/${selectedParentId}`, {
             method: 'PATCH',
             body: JSON.stringify({
               firstName: pFirstName || undefined,
@@ -277,10 +277,10 @@ export default function AdminYoungstersPage() {
     setMessage('');
     try {
       const res = (await apiFetch(
-        `/admin/youngsters/${child.id}/reset-password`,
-        { method: 'PATCH', body: JSON.stringify({}) },
+        `/admin/youngster/${child.id}/password`,
+        { method: 'GET' },
         { skipAutoReload: true },
-      )) as { ok: boolean; newPassword: string; username: string };
+      )) as { ok: boolean; password: string; username: string };
       const parentId = (child.parent_ids || [])[0] || '';
       const parent = parentById.get(parentId);
       const parentLabel = parent
@@ -290,12 +290,12 @@ export default function AdminYoungstersPage() {
         youngsterFirstName: child.first_name,
         youngsterLastName: child.last_name,
         youngsterUsername: res.username,
-        youngsterNewPassword: res.newPassword,
+        youngsterNewPassword: res.password,
         schoolName: child.school_name,
         parentLabel,
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed resetting password');
+      setError(e instanceof Error ? e.message : 'Failed loading password');
     }
   };
 
@@ -304,7 +304,7 @@ export default function AdminYoungstersPage() {
     setMessage('');
     setCreateResult(null);
     try {
-      await apiFetch(`/admin/youngsters/${youngsterId}`, { method: 'DELETE' });
+      await apiFetch(`/admin/youngster/${youngsterId}`, { method: 'DELETE' });
       if (editingYoungsterId === youngsterId) resetForm();
       await load();
     } catch (e) {
@@ -327,7 +327,7 @@ export default function AdminYoungstersPage() {
   return (
     <main className="page-auth page-auth-desktop">
       <section className="auth-panel">
-        <h1>Admin Youngsters</h1>
+        <h1>Admin Youngster</h1>
         <AdminNav />
 
         {message ? <p className="auth-help">{message}</p> : null}
@@ -582,7 +582,7 @@ export default function AdminYoungstersPage() {
                 <code className="reg-info-code">{showPassInfo.youngsterUsername}</code>
               </div>
               <div className="reg-info-row">
-                <span className="reg-info-label">Youngster New Password</span>
+                <span className="reg-info-label">Youngster Password</span>
                 <code className="reg-info-code">{showPassInfo.youngsterNewPassword}</code>
               </div>
               <div className="reg-info-row">

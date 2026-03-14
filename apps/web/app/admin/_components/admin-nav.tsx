@@ -7,8 +7,8 @@ import { clearAuthState, fetchWithTimeout, getApiBase } from '../../../lib/auth'
 
 const leftLinks = [
   { href: '/admin', label: 'Dashboard' },
-  { href: '/admin/parents', label: 'Parents' },
-  { href: '/admin/youngsters', label: 'Youngsters' },
+  { href: '/admin/parent', label: 'Parent' },
+  { href: '/admin/youngster', label: 'Youngster' },
   { href: '/admin/schools', label: 'Schools' },
   { href: '/admin/delivery', label: 'Delivery' },
 ];
