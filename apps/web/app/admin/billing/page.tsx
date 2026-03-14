@@ -69,6 +69,8 @@ export default function AdminBillingPage() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [proofPreviewUrl, setProofPreviewUrl] = useState('');
+  const [receiptInfo, setReceiptInfo] = useState<{ receiptNumber: string; pdfUrl: string } | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -134,12 +136,12 @@ export default function AdminBillingPage() {
       const res = await apiFetchResponse(`/admin/billing/${row.id}/proof-image`);
       const blob = await res.blob();
       const blobUrl = window.URL.createObjectURL(blob);
-      window.open(blobUrl, '_blank', 'noopener,noreferrer');
-      window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60_000);
+      if (proofPreviewUrl) window.URL.revokeObjectURL(proofPreviewUrl);
+      setProofPreviewUrl(blobUrl);
     } catch (err) {
-      window.open(proof, '_blank', 'noopener,noreferrer');
-      const msg = err instanceof Error ? err.message : 'Failed opening proof image';
-      setMessage(`Fallback opened raw proof URL (${msg}).`);
+      setProofPreviewUrl(proof);
+      const msg = err instanceof Error ? err.message : 'Failed loading proof image';
+      setMessage(`Showing fallback proof image URL (${msg}).`);
     }
   };
 
@@ -169,12 +171,34 @@ export default function AdminBillingPage() {
     setError('');
     setMessage('');
     try {
-      const out = await apiFetch(`/admin/billing/${billingId}/receipt`, { method: 'POST' }) as { receiptNumber: string };
+      const out = await apiFetch(`/admin/billing/${billingId}/receipt`, { method: 'POST' }) as { receiptNumber: string; pdfUrl?: string };
+      setReceiptInfo({
+        receiptNumber: out.receiptNumber,
+        pdfUrl: String(out.pdfUrl || '').trim(),
+      });
       setMessage(`Receipt generated: ${out.receiptNumber}`);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed generating receipt');
     }
+  };
+
+  const closeProofPreview = () => {
+    if (proofPreviewUrl && proofPreviewUrl.startsWith('blob:')) {
+      window.URL.revokeObjectURL(proofPreviewUrl);
+    }
+    setProofPreviewUrl('');
+  };
+
+  const openReceiptInfo = (row: BillingRow) => {
+    if (!String(row.pdf_url || '').trim()) {
+      setError('Receipt PDF is not available yet.');
+      return;
+    }
+    setReceiptInfo({
+      receiptNumber: String(row.receipt_number || '').trim() || 'Receipt',
+      pdfUrl: String(row.pdf_url || '').trim(),
+    });
   };
 
   const renderRef = (row: BillingRow) => (
@@ -220,9 +244,9 @@ export default function AdminBillingPage() {
         </button>
       ) : null}
       {row.pdf_url ? (
-        <a className="btn btn-outline btn-sm" href={row.pdf_url} target="_blank" rel="noreferrer">
+        <button className="btn btn-outline btn-sm" type="button" onClick={() => openReceiptInfo(row)}>
           Open Receipt
-        </a>
+        </button>
       ) : (
         <button className="btn btn-outline btn-sm" type="button" onClick={() => onGenerateReceipt(row.id)}>
           Gen Receipt
@@ -370,6 +394,43 @@ export default function AdminBillingPage() {
           )}
         </div>
 
+        {proofPreviewUrl ? (
+          <div className="proof-modal-overlay" onClick={closeProofPreview}>
+            <div className="proof-modal-card" onClick={(e) => e.stopPropagation()}>
+              <h3>Payment Proof</h3>
+              <img className="proof-preview-image" src={proofPreviewUrl} alt="Payment proof" />
+              <div className="modal-action-row">
+                <a className="btn btn-outline" href={proofPreviewUrl} target="_blank" rel="noreferrer">
+                  Open Full Size
+                </a>
+                <button className="btn btn-primary" type="button" onClick={closeProofPreview}>
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {receiptInfo ? (
+          <div className="proof-modal-overlay" onClick={() => setReceiptInfo(null)}>
+            <div className="proof-modal-card" onClick={(e) => e.stopPropagation()}>
+              <h3>Receipt Ready</h3>
+              <p className="receipt-number">Receipt: {receiptInfo.receiptNumber}</p>
+              <div className="modal-action-row">
+                <a className="btn btn-outline" href={receiptInfo.pdfUrl} target="_blank" rel="noreferrer">
+                  Open PDF
+                </a>
+                <a className="btn btn-primary" href={receiptInfo.pdfUrl} target="_blank" rel="noreferrer" download>
+                  Download PDF
+                </a>
+              </div>
+              <button className="btn btn-outline receipt-close" type="button" onClick={() => setReceiptInfo(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         <style jsx>{`
           .billing-topbar {
             display: flex;
@@ -507,6 +568,48 @@ export default function AdminBillingPage() {
             padding: 0.28rem 0.7rem;
             font-size: 0.82rem;
           }
+          .proof-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 1rem;
+          }
+          .proof-modal-card {
+            background: #fff;
+            border-radius: 1rem;
+            padding: 1rem;
+            width: 100%;
+            max-width: 720px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
+          }
+          .proof-modal-card h3 {
+            margin: 0 0 0.75rem;
+          }
+          .proof-preview-image {
+            width: 100%;
+            max-height: 70vh;
+            object-fit: contain;
+            background: #f6f6f6;
+            border-radius: 0.6rem;
+            border: 1px solid #e2d6c2;
+          }
+          .modal-action-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.85rem;
+          }
+          .receipt-number {
+            margin: 0 0 0.85rem;
+            font-weight: 600;
+          }
+          .receipt-close {
+            margin-top: 0.75rem;
+          }
           @media (max-width: 760px) {
             .kitchen-table th,
             .kitchen-table td {
@@ -514,6 +617,9 @@ export default function AdminBillingPage() {
               padding: 0.45rem 0.5rem;
             }
             .admin-billing-table :global(.btn) {
+              width: 100%;
+            }
+            .modal-action-row :global(.btn) {
               width: 100%;
             }
           }
