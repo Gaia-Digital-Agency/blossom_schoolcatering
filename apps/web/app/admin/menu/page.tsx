@@ -66,8 +66,6 @@ function normalize(raw: string) {
 
 const PACKING_CARE_FLAG = 'PACKING_CARE_REQUIRED';
 const WET_DISH_FLAG = 'WET_DISH';
-type PackingMode = 'NORMAL' | 'CUTLERY_REQUIRED' | 'PACKING_CARE_REQUIRED' | 'WET_DISH';
-type DietaryMode = 'NORMAL' | 'VEGETARIAN' | 'GLUTEN_FREE' | 'DAIRY_FREE' | 'CONTAIN_PEANUT';
 
 function parsePackingFlags(raw?: string | null) {
   const tokens = String(raw || '')
@@ -87,28 +85,13 @@ function buildPackingRequirement(packingCareRequired: boolean, wetDish: boolean)
   return flags.join('; ');
 }
 
-function getPackingMode(cutleryRequired: boolean, packingCareRequired: boolean, wetDish: boolean): PackingMode {
-  if (packingCareRequired) return 'PACKING_CARE_REQUIRED';
-  if (wetDish) return 'WET_DISH';
-  if (cutleryRequired) return 'CUTLERY_REQUIRED';
-  return 'NORMAL';
-}
-
-function getDietaryMode(isVegetarian: boolean, isGlutenFree: boolean, isDairyFree: boolean, containsPeanut: boolean): DietaryMode {
-  if (containsPeanut) return 'CONTAIN_PEANUT';
-  if (isDairyFree) return 'DAIRY_FREE';
-  if (isGlutenFree) return 'GLUTEN_FREE';
-  if (isVegetarian) return 'VEGETARIAN';
-  return 'NORMAL';
-}
-
 function formatPackingLabel(raw?: string | null, cutleryRequired?: boolean) {
   const flags = parsePackingFlags(raw);
-  const mode = getPackingMode(Boolean(cutleryRequired), flags.packingCareRequired, flags.wetDish);
-  if (mode === 'CUTLERY_REQUIRED') return 'Cutlery Required';
-  if (mode === 'PACKING_CARE_REQUIRED') return 'Packing Care Required';
-  if (mode === 'WET_DISH') return 'Wet Dish';
-  return 'Normal';
+  const labels: string[] = [];
+  if (cutleryRequired) labels.push('Cutlery Required');
+  if (flags.packingCareRequired) labels.push('Packing Care Required');
+  if (flags.wetDish) labels.push('Wet Dish');
+  return labels.join(', ') || 'Normal';
 }
 
 function formatPriceLabel(value: number) {
@@ -207,15 +190,6 @@ export default function AdminMenuPage() {
     if (!q) return mergedDishOptions;
     return mergedDishOptions.filter((d) => d.toLowerCase().includes(q));
   }, [itemName, mergedDishOptions]);
-
-  const itemPackingMode = useMemo(
-    () => getPackingMode(itemCutleryRequired, itemPackingCareRequired, itemWetDish),
-    [itemCutleryRequired, itemPackingCareRequired, itemWetDish],
-  );
-  const itemDietaryMode = useMemo(
-    () => getDietaryMode(itemIsVegetarian, itemIsGlutenFree, itemIsDairyFree, itemContainsPeanut),
-    [itemIsVegetarian, itemIsGlutenFree, itemIsDairyFree, itemContainsPeanut],
-  );
 
   const loadMenuData = async () => {
     const [ings, menu, ratings] = await Promise.all([
@@ -704,10 +678,8 @@ export default function AdminMenuPage() {
                 <div className="menu-radio-group">
                   <label className="menu-radio-row">
                     <input
-                      type="radio"
-                      name="packing-mode"
-                      value="NORMAL"
-                      checked={itemPackingMode === 'NORMAL'}
+                      type="checkbox"
+                      checked={!itemCutleryRequired && !itemPackingCareRequired && !itemWetDish}
                       onChange={() => {
                         setItemCutleryRequired(false);
                         setItemPackingCareRequired(false);
@@ -718,43 +690,25 @@ export default function AdminMenuPage() {
                   </label>
                   <label className="menu-radio-row">
                     <input
-                      type="radio"
-                      name="packing-mode"
-                      value="CUTLERY_REQUIRED"
-                      checked={itemPackingMode === 'CUTLERY_REQUIRED'}
-                      onChange={() => {
-                        setItemCutleryRequired(true);
-                        setItemPackingCareRequired(false);
-                        setItemWetDish(false);
-                      }}
+                      type="checkbox"
+                      checked={itemCutleryRequired}
+                      onChange={(e) => setItemCutleryRequired(e.target.checked)}
                     />
                     <span>Cutlery Required</span>
                   </label>
                   <label className="menu-radio-row">
                     <input
-                      type="radio"
-                      name="packing-mode"
-                      value="PACKING_CARE_REQUIRED"
-                      checked={itemPackingMode === 'PACKING_CARE_REQUIRED'}
-                      onChange={() => {
-                        setItemCutleryRequired(false);
-                        setItemPackingCareRequired(true);
-                        setItemWetDish(false);
-                      }}
+                      type="checkbox"
+                      checked={itemPackingCareRequired}
+                      onChange={(e) => setItemPackingCareRequired(e.target.checked)}
                     />
                     <span>Packing Care Required</span>
                   </label>
                   <label className="menu-radio-row">
                     <input
-                      type="radio"
-                      name="packing-mode"
-                      value="WET_DISH"
-                      checked={itemPackingMode === 'WET_DISH'}
-                      onChange={() => {
-                        setItemCutleryRequired(false);
-                        setItemPackingCareRequired(false);
-                        setItemWetDish(true);
-                      }}
+                      type="checkbox"
+                      checked={itemWetDish}
+                      onChange={(e) => setItemWetDish(e.target.checked)}
                     />
                     <span>Wet Dish</span>
                   </label>
@@ -766,10 +720,8 @@ export default function AdminMenuPage() {
                 <div className="menu-radio-group">
                   <label className="menu-radio-row">
                     <input
-                      type="radio"
-                      name="dietary-mode"
-                      value="NORMAL"
-                      checked={itemDietaryMode === 'NORMAL'}
+                      type="checkbox"
+                      checked={!itemIsVegetarian && !itemIsGlutenFree && !itemIsDairyFree && !itemContainsPeanut}
                       onChange={() => {
                         setItemIsVegetarian(false);
                         setItemIsGlutenFree(false);
@@ -781,61 +733,33 @@ export default function AdminMenuPage() {
                   </label>
                   <label className="menu-radio-row">
                     <input
-                      type="radio"
-                      name="dietary-mode"
-                      value="VEGETARIAN"
-                      checked={itemDietaryMode === 'VEGETARIAN'}
-                      onChange={() => {
-                        setItemIsVegetarian(true);
-                        setItemIsGlutenFree(false);
-                        setItemIsDairyFree(false);
-                        setItemContainsPeanut(false);
-                      }}
+                      type="checkbox"
+                      checked={itemIsVegetarian}
+                      onChange={(e) => setItemIsVegetarian(e.target.checked)}
                     />
                     <span>Vegetarian</span>
                   </label>
                   <label className="menu-radio-row">
                     <input
-                      type="radio"
-                      name="dietary-mode"
-                      value="GLUTEN_FREE"
-                      checked={itemDietaryMode === 'GLUTEN_FREE'}
-                      onChange={() => {
-                        setItemIsVegetarian(false);
-                        setItemIsGlutenFree(true);
-                        setItemIsDairyFree(false);
-                        setItemContainsPeanut(false);
-                      }}
+                      type="checkbox"
+                      checked={itemIsGlutenFree}
+                      onChange={(e) => setItemIsGlutenFree(e.target.checked)}
                     />
                     <span>Gluten Free</span>
                   </label>
                   <label className="menu-radio-row">
                     <input
-                      type="radio"
-                      name="dietary-mode"
-                      value="DAIRY_FREE"
-                      checked={itemDietaryMode === 'DAIRY_FREE'}
-                      onChange={() => {
-                        setItemIsVegetarian(false);
-                        setItemIsGlutenFree(false);
-                        setItemIsDairyFree(true);
-                        setItemContainsPeanut(false);
-                      }}
+                      type="checkbox"
+                      checked={itemIsDairyFree}
+                      onChange={(e) => setItemIsDairyFree(e.target.checked)}
                     />
                     <span>Diary Free</span>
                   </label>
                   <label className="menu-radio-row">
                     <input
-                      type="radio"
-                      name="dietary-mode"
-                      value="CONTAIN_PEANUT"
-                      checked={itemDietaryMode === 'CONTAIN_PEANUT'}
-                      onChange={() => {
-                        setItemIsVegetarian(false);
-                        setItemIsGlutenFree(false);
-                        setItemIsDairyFree(false);
-                        setItemContainsPeanut(true);
-                      }}
+                      type="checkbox"
+                      checked={itemContainsPeanut}
+                      onChange={(e) => setItemContainsPeanut(e.target.checked)}
                     />
                     <span>Contain Peanut</span>
                   </label>
