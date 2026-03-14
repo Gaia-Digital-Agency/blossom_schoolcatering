@@ -4480,6 +4480,7 @@ export class CoreService implements OnModuleInit {
                o.service_date::text AS service_date,
                o.session::text AS session,
                o.total_price,
+               (uc.first_name || ' ' || uc.last_name) AS child_name,
                p.id AS parent_id,
                (up.first_name || ' ' || up.last_name) AS parent_name,
                s.name AS school_name,
@@ -4488,6 +4489,7 @@ export class CoreService implements OnModuleInit {
         FROM billing_records br
         JOIN orders o ON o.id = br.order_id
         JOIN children c ON c.id = o.child_id
+        JOIN users uc ON uc.id = c.user_id
         JOIN schools s ON s.id = c.school_id
         JOIN parents p ON p.id = br.parent_id
         JOIN users up ON up.id = p.user_id
@@ -4532,26 +4534,39 @@ export class CoreService implements OnModuleInit {
     if (decision === 'REJECTED' && !adminNote) {
       throw new BadRequestException('REJECTION_NOTE_REQUIRED');
     }
+    const isReject = decision === 'REJECTED';
+    const nextStatus = isReject ? 'UNPAID' : 'VERIFIED';
     const updatedOut = await runSql(
       `WITH updated AS (
          UPDATE billing_records
          SET status = $1::payment_status,
-             verified_by = $2,
-             admin_note = $3,
-             verified_at = now(),
+             verified_by = CASE WHEN $2::boolean THEN NULL ELSE $3 END,
+             admin_note = $4,
+             verified_at = CASE WHEN $2::boolean THEN NULL ELSE now() END,
+             proof_image_url = CASE WHEN $2::boolean THEN NULL ELSE proof_image_url END,
+             proof_uploaded_at = CASE WHEN $2::boolean THEN NULL ELSE proof_uploaded_at END,
              updated_at = now()
-         WHERE id = $4
+         WHERE id = $5
          RETURNING id
        )
        SELECT id FROM updated;`,
-      [decision, actor.uid, adminNote || null, billingId],
+      [
+        nextStatus,
+        isReject,
+        actor.uid,
+        adminNote || null,
+        billingId,
+      ],
     );
     if (!updatedOut) throw new NotFoundException('Billing record not found');
+    if (isReject) {
+      await runSql('DELETE FROM digital_receipts WHERE billing_record_id = $1;', [billingId]);
+    }
     await this.recordAdminAudit(actor, 'BILLING_VERIFIED', 'billing-record', billingId, {
-      decision,
+      decision: isReject ? 'REJECTED_TO_UNPAID' : decision,
       note: adminNote || null,
     });
-    return { ok: true, status: decision };
+    return { ok: true, status: nextStatus };
   }
 
   async generateReceipt(actor: AccessUser, billingId: string) {

@@ -217,72 +217,87 @@ export default function AdminSchoolsPage() {
         </div>
 
         <h2>Schools</h2>
-        <div className="schools-list">
-          {schools.length === 0 ? <p className="auth-help">No schools found.</p> : null}
-          {schools.map((school) => (
-            <div key={school.id} className="school-card">
-              {editingSchoolId === school.id ? (
-                <div className="school-edit-form">
-                  <label>School Name <span className="req">*</span><input value={editName} onChange={(e) => setEditName(e.target.value)} /></label>
-                  <label>City <span className="req">*</span><input value={editCity} onChange={(e) => setEditCity(e.target.value)} /></label>
-                  <label>Address <span className="req">*</span><input value={editAddress} onChange={(e) => setEditAddress(e.target.value)} /></label>
-                  <label>Phone Number <span className="req">*</span><input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} placeholder="+[country][area][number]" /><small className="field-hint">Format: + country code + area code + number &nbsp;e.g. +628123456789</small></label>
-                  <div className="action-row">
-                    <button className="btn btn-primary btn-sm" type="button" onClick={() => onSaveEdit(school)} disabled={savingSchoolId === school.id}>
-                      {savingSchoolId === school.id ? 'Saving...' : 'Save'}
-                    </button>
-                    <button className="btn btn-outline btn-sm" type="button" onClick={() => setEditingSchoolId('')}>Cancel</button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="school-info">
-                    <strong>{school.name}</strong>
-                    <span>City: {school.city || '-'}</span>
-                    <span>Address: {school.address || '-'}</span>
-                    <span>Phone: {school.contact_phone || '-'}</span>
-                    <span className={`status-badge ${school.is_active ? 'active' : 'inactive'}`}>{school.is_active ? 'Active' : 'Inactive'}</span>
-                  </div>
-                  <div className="action-row">
-                    <button
-                      className="btn btn-outline btn-sm"
-                      type="button"
-                      onClick={() => beginEdit(school)}
-                    >
-                      Edit
-                    </button>
-                    {school.is_active ? (
-                      <button
-                        className="btn btn-outline btn-sm"
-                        type="button"
-                        onClick={() => onToggleSchool(school, false)}
-                        disabled={savingSchoolId === school.id}
-                      >
-                        Deactivate
-                      </button>
-                    ) : (
-                      <button
-                        className="btn btn-outline btn-sm"
-                        type="button"
-                        onClick={() => onToggleSchool(school, true)}
-                        disabled={savingSchoolId === school.id}
-                      >
-                        Activate
-                      </button>
-                    )}
-                    <button
-                      className="btn btn-outline btn-sm"
-                      type="button"
-                      onClick={() => onDeleteSchool(school)}
-                      disabled={deletingSchoolId === school.id}
-                    >
-                      {deletingSchoolId === school.id ? 'Deleting...' : 'Delete'}
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          ))}
+        <div className="kitchen-table-wrap">
+          <table className="kitchen-table admin-schools-table">
+            <thead>
+              <tr>
+                <th>School</th>
+                <th>City</th>
+                <th>Address</th>
+                <th>Phone</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {schools.map((school) => (
+                <tr key={school.id}>
+                  {editingSchoolId === school.id ? (
+                    <>
+                      <td><input value={editName} onChange={(e) => setEditName(e.target.value)} /></td>
+                      <td><input value={editCity} onChange={(e) => setEditCity(e.target.value)} /></td>
+                      <td><input value={editAddress} onChange={(e) => setEditAddress(e.target.value)} /></td>
+                      <td><input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} placeholder="+[country][area][number]" /></td>
+                      <td><span className={`status-badge ${school.is_active ? 'active' : 'inactive'}`}>{school.is_active ? 'Active' : 'Inactive'}</span></td>
+                      <td>
+                        <div className="action-row">
+                          <button className="btn btn-primary btn-sm" type="button" onClick={() => onSaveEdit(school)} disabled={savingSchoolId === school.id}>
+                            {savingSchoolId === school.id ? 'Saving...' : 'Save'}
+                          </button>
+                          <button className="btn btn-outline btn-sm" type="button" onClick={() => setEditingSchoolId('')}>Cancel</button>
+                        </div>
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td>{school.name}</td>
+                      <td>{school.city || '-'}</td>
+                      <td>{school.address || '-'}</td>
+                      <td>{school.contact_phone || '-'}</td>
+                      <td><span className={`status-badge ${school.is_active ? 'active' : 'inactive'}`}>{school.is_active ? 'Active' : 'Inactive'}</span></td>
+                      <td>
+                        <div className="action-row">
+                          <button className="btn btn-outline btn-sm" type="button" onClick={() => beginEdit(school)}>
+                            Edit
+                          </button>
+                          {school.is_active ? (
+                            <button
+                              className="btn btn-outline btn-sm"
+                              type="button"
+                              onClick={() => onToggleSchool(school, false)}
+                              disabled={savingSchoolId === school.id}
+                            >
+                              Deactivate
+                            </button>
+                          ) : (
+                            <button
+                              className="btn btn-outline btn-sm"
+                              type="button"
+                              onClick={() => onToggleSchool(school, true)}
+                              disabled={savingSchoolId === school.id}
+                            >
+                              Activate
+                            </button>
+                          )}
+                          <button
+                            className="btn btn-outline btn-sm"
+                            type="button"
+                            onClick={() => onDeleteSchool(school)}
+                            disabled={deletingSchoolId === school.id}
+                          >
+                            {deletingSchoolId === school.id ? 'Deleting...' : 'Delete'}
+                          </button>
+                        </div>
+                      </td>
+                    </>
+                  )}
+                </tr>
+              ))}
+              {schools.length === 0 ? (
+                <tr><td colSpan={6}>No schools found.</td></tr>
+              ) : null}
+            </tbody>
+          </table>
         </div>
       </section>
       <style jsx>{`
@@ -320,26 +335,37 @@ export default function AdminSchoolsPage() {
           color: #c0392b;
           margin-left: 2px;
         }
-        .schools-list {
-          display: flex;
-          flex-direction: column;
-          gap: 0.65rem;
+        .kitchen-table-wrap {
+          overflow-x: auto;
+          max-width: 100%;
+          -webkit-overflow-scrolling: touch;
         }
-        .school-card {
+        .kitchen-table {
+          width: 100%;
+          border-collapse: collapse;
+          background: #fff;
           border: 1px solid #e2d6c2;
-          border-radius: 0.6rem;
-          background: #fffaf3;
-          padding: 0.75rem;
+          border-radius: 10px;
+          overflow: hidden;
         }
-        .school-info {
-          display: flex;
-          flex-direction: column;
-          gap: 0.2rem;
-          margin-bottom: 0.55rem;
+        .kitchen-table th,
+        .kitchen-table td {
+          border-bottom: 1px solid #efe7da;
+          padding: 0.65rem;
+          text-align: left;
+          vertical-align: top;
+          font-size: 0.92rem;
+          line-height: 1.35;
+        }
+        .kitchen-table tbody tr:last-child td {
+          border-bottom: none;
+        }
+        .admin-schools-table td input {
+          width: 100%;
+          padding: 0.35rem 0.6rem;
+          border: 1px solid #d1c3a8;
+          border-radius: 0.4rem;
           font-size: 0.88rem;
-        }
-        .school-info strong {
-          font-size: 1rem;
         }
         .status-badge {
           display: inline-block;
@@ -366,22 +392,15 @@ export default function AdminSchoolsPage() {
           padding: 0.28rem 0.7rem;
           font-size: 0.82rem;
         }
-        .school-edit-form {
-          display: grid;
-          gap: 0.5rem;
-        }
-        .school-edit-form label {
-          display: flex;
-          flex-direction: column;
-          gap: 0.2rem;
-          font-size: 0.88rem;
-          font-weight: 500;
-        }
-        .school-edit-form label input {
-          padding: 0.35rem 0.6rem;
-          border: 1px solid #d1c3a8;
-          border-radius: 0.4rem;
-          font-size: 0.88rem;
+        @media (max-width: 760px) {
+          .kitchen-table th,
+          .kitchen-table td {
+            font-size: 0.82rem;
+            padding: 0.45rem 0.5rem;
+          }
+          .admin-schools-table :global(.btn) {
+            width: 100%;
+          }
         }
       `}</style>
     </main>
