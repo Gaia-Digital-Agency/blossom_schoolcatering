@@ -701,40 +701,145 @@ export default function AdminMenuPage() {
             <div className="menu-right-stack">
               <div className="menu-option-card">
                 <strong>Packing Instruction</strong>
-                <select
-                  value={itemPackingMode}
-                  onChange={(e) => {
-                    const mode = e.target.value as PackingMode;
-                    setItemCutleryRequired(mode === 'CUTLERY_REQUIRED');
-                    setItemPackingCareRequired(mode === 'PACKING_CARE_REQUIRED');
-                    setItemWetDish(mode === 'WET_DISH');
-                  }}
-                >
-                  <option value="NORMAL">Normal</option>
-                  <option value="CUTLERY_REQUIRED">Cutlery Required</option>
-                  <option value="PACKING_CARE_REQUIRED">Packing Care Required</option>
-                  <option value="WET_DISH">Wet Dish</option>
-                </select>
+                <div className="menu-radio-group">
+                  <label className="menu-radio-row">
+                    <input
+                      type="radio"
+                      name="packing-mode"
+                      value="NORMAL"
+                      checked={itemPackingMode === 'NORMAL'}
+                      onChange={() => {
+                        setItemCutleryRequired(false);
+                        setItemPackingCareRequired(false);
+                        setItemWetDish(false);
+                      }}
+                    />
+                    <span>Normal</span>
+                  </label>
+                  <label className="menu-radio-row">
+                    <input
+                      type="radio"
+                      name="packing-mode"
+                      value="CUTLERY_REQUIRED"
+                      checked={itemPackingMode === 'CUTLERY_REQUIRED'}
+                      onChange={() => {
+                        setItemCutleryRequired(true);
+                        setItemPackingCareRequired(false);
+                        setItemWetDish(false);
+                      }}
+                    />
+                    <span>Cutlery Required</span>
+                  </label>
+                  <label className="menu-radio-row">
+                    <input
+                      type="radio"
+                      name="packing-mode"
+                      value="PACKING_CARE_REQUIRED"
+                      checked={itemPackingMode === 'PACKING_CARE_REQUIRED'}
+                      onChange={() => {
+                        setItemCutleryRequired(false);
+                        setItemPackingCareRequired(true);
+                        setItemWetDish(false);
+                      }}
+                    />
+                    <span>Packing Care Required</span>
+                  </label>
+                  <label className="menu-radio-row">
+                    <input
+                      type="radio"
+                      name="packing-mode"
+                      value="WET_DISH"
+                      checked={itemPackingMode === 'WET_DISH'}
+                      onChange={() => {
+                        setItemCutleryRequired(false);
+                        setItemPackingCareRequired(false);
+                        setItemWetDish(true);
+                      }}
+                    />
+                    <span>Wet Dish</span>
+                  </label>
+                </div>
               </div>
 
               <div className="menu-option-card">
                 <strong>Dietary</strong>
-                <select
-                  value={itemDietaryMode}
-                  onChange={(e) => {
-                    const mode = e.target.value as DietaryMode;
-                    setItemIsVegetarian(mode === 'VEGETARIAN');
-                    setItemIsGlutenFree(mode === 'GLUTEN_FREE');
-                    setItemIsDairyFree(mode === 'DAIRY_FREE');
-                    setItemContainsPeanut(mode === 'CONTAIN_PEANUT');
-                  }}
-                >
-                  <option value="NORMAL">Normal</option>
-                  <option value="VEGETARIAN">Vegetarian</option>
-                  <option value="GLUTEN_FREE">Gluten Free</option>
-                  <option value="DAIRY_FREE">Diary Free</option>
-                  <option value="CONTAIN_PEANUT">Contain Peanut</option>
-                </select>
+                <div className="menu-radio-group">
+                  <label className="menu-radio-row">
+                    <input
+                      type="radio"
+                      name="dietary-mode"
+                      value="NORMAL"
+                      checked={itemDietaryMode === 'NORMAL'}
+                      onChange={() => {
+                        setItemIsVegetarian(false);
+                        setItemIsGlutenFree(false);
+                        setItemIsDairyFree(false);
+                        setItemContainsPeanut(false);
+                      }}
+                    />
+                    <span>Normal</span>
+                  </label>
+                  <label className="menu-radio-row">
+                    <input
+                      type="radio"
+                      name="dietary-mode"
+                      value="VEGETARIAN"
+                      checked={itemDietaryMode === 'VEGETARIAN'}
+                      onChange={() => {
+                        setItemIsVegetarian(true);
+                        setItemIsGlutenFree(false);
+                        setItemIsDairyFree(false);
+                        setItemContainsPeanut(false);
+                      }}
+                    />
+                    <span>Vegetarian</span>
+                  </label>
+                  <label className="menu-radio-row">
+                    <input
+                      type="radio"
+                      name="dietary-mode"
+                      value="GLUTEN_FREE"
+                      checked={itemDietaryMode === 'GLUTEN_FREE'}
+                      onChange={() => {
+                        setItemIsVegetarian(false);
+                        setItemIsGlutenFree(true);
+                        setItemIsDairyFree(false);
+                        setItemContainsPeanut(false);
+                      }}
+                    />
+                    <span>Gluten Free</span>
+                  </label>
+                  <label className="menu-radio-row">
+                    <input
+                      type="radio"
+                      name="dietary-mode"
+                      value="DAIRY_FREE"
+                      checked={itemDietaryMode === 'DAIRY_FREE'}
+                      onChange={() => {
+                        setItemIsVegetarian(false);
+                        setItemIsGlutenFree(false);
+                        setItemIsDairyFree(true);
+                        setItemContainsPeanut(false);
+                      }}
+                    />
+                    <span>Diary Free</span>
+                  </label>
+                  <label className="menu-radio-row">
+                    <input
+                      type="radio"
+                      name="dietary-mode"
+                      value="CONTAIN_PEANUT"
+                      checked={itemDietaryMode === 'CONTAIN_PEANUT'}
+                      onChange={() => {
+                        setItemIsVegetarian(false);
+                        setItemIsGlutenFree(false);
+                        setItemIsDairyFree(false);
+                        setItemContainsPeanut(true);
+                      }}
+                    />
+                    <span>Contain Peanut</span>
+                  </label>
+                </div>
               </div>
 
               <div className="ingredient-selected-box">
@@ -906,6 +1011,21 @@ export default function AdminMenuPage() {
           border-radius: 0.55rem;
           background: #fff;
           padding: 0.6rem;
+        }
+        .menu-radio-group {
+          display: grid;
+          gap: 0.4rem;
+        }
+        .menu-radio-row {
+          display: flex;
+          align-items: center;
+          gap: 0.45rem;
+          margin: 0;
+          font-size: 0.92rem;
+        }
+        .menu-radio-row input[type='radio'] {
+          margin: 0;
+          flex: 0 0 auto;
         }
         .menu-selection-columns {
           display: grid;
