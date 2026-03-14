@@ -25,11 +25,17 @@ type ShowPassInfo = {
   youngsters: { name: string; school: string }[];
 };
 
+type ShowIdInfo = {
+  parentName: string;
+  parentId: string;
+};
+
 export default function AdminParentsPage() {
   const [parents, setParents] = useState<ParentRow[]>([]);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [showPassInfo, setShowPassInfo] = useState<ShowPassInfo | null>(null);
+  const [showIdInfo, setShowIdInfo] = useState<ShowIdInfo | null>(null);
 
   const load = async () => {
     const p = await apiFetch('/admin/parent') as ParentRow[];
@@ -108,6 +114,13 @@ export default function AdminParentsPage() {
     }
   };
 
+  const onShowId = (p: ParentRow) => {
+    setShowIdInfo({
+      parentName: `${p.first_name} ${p.last_name}`,
+      parentId: p.id,
+    });
+  };
+
   return (
     <main className="page-auth page-auth-desktop">
       <section className="auth-panel">
@@ -122,22 +135,20 @@ export default function AdminParentsPage() {
           <table className="kitchen-table admin-parents-table">
             <thead>
               <tr>
-                <th>Parent</th>
-                <th>Parent ID</th>
+                <th>Last Name</th>
+                <th>First Name</th>
+                <th>User Name</th>
                 <th>Youngsters Linked</th>
-                <th>Schools</th>
+                <th>School</th>
                 <th>Action</th>
               </tr>
             </thead>
             <tbody>
               {parents.map((p) => (
                 <tr key={p.id}>
-                  <td>
-                    {p.first_name} {p.last_name}
-                    <br />
-                    <small>{p.username}</small>
-                  </td>
-                  <td><code>{p.id}</code></td>
+                  <td>{p.last_name}</td>
+                  <td>{p.first_name}</td>
+                  <td>{p.username}</td>
                   <td>
                     {(p.youngsters || []).length === 0
                       ? '-'
@@ -146,11 +157,14 @@ export default function AdminParentsPage() {
                   <td>{(p.schools || []).join(', ') || '-'}</td>
                   <td>
                     <div className="action-row">
+                      <button className="btn btn-outline" type="button" onClick={() => onShowId(p)}>
+                        Show ID
+                      </button>
                       <button className="btn btn-outline" type="button" onClick={() => onShowPassword(p)}>
-                        Show Password
+                        Show PW
                       </button>
                       <button className="btn btn-outline" type="button" onClick={() => onResetPassword(p)}>
-                        Reset Password
+                        Reset PW
                       </button>
                       <button
                         className="btn btn-outline"
@@ -166,12 +180,33 @@ export default function AdminParentsPage() {
                 </tr>
               ))}
               {parents.length === 0 ? (
-                <tr><td colSpan={5}>No parents found.</td></tr>
+                <tr><td colSpan={6}>No parents found.</td></tr>
               ) : null}
             </tbody>
           </table>
         </div>
       </section>
+
+      {showIdInfo ? (
+        <div className="pass-modal-overlay" onClick={() => setShowIdInfo(null)}>
+          <div className="pass-modal-card" onClick={(e) => e.stopPropagation()}>
+            <h2 className="pass-modal-title">Parent ID</h2>
+            <div className="reg-info-list">
+              <div className="reg-info-row">
+                <span className="reg-info-label">Parent Name</span>
+                <span className="reg-info-val">{showIdInfo.parentName}</span>
+              </div>
+              <div className="reg-info-row">
+                <span className="reg-info-label">Parent ID</span>
+                <code className="reg-info-code">{showIdInfo.parentId}</code>
+              </div>
+            </div>
+            <button className="btn btn-primary pass-modal-close" type="button" onClick={() => setShowIdInfo(null)}>
+              Close
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {/* ── Show Password Modal ─────────────────────────────── */}
       {showPassInfo ? (
@@ -262,12 +297,10 @@ export default function AdminParentsPage() {
           .kitchen-table-wrap {
             overflow-x: hidden;
           }
-          .admin-parents-table th:nth-child(2),
-          .admin-parents-table td:nth-child(2),
-          .admin-parents-table th:nth-child(3),
-          .admin-parents-table td:nth-child(3),
           .admin-parents-table th:nth-child(4),
-          .admin-parents-table td:nth-child(4) {
+          .admin-parents-table td:nth-child(4),
+          .admin-parents-table th:nth-child(5),
+          .admin-parents-table td:nth-child(5) {
             display: none;
           }
           .kitchen-table {

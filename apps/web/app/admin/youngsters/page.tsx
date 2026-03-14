@@ -50,6 +50,11 @@ type ShowPassInfo = {
   parentLabel: string;
 };
 
+type ShowIdInfo = {
+  youngsterName: string;
+  userId: string;
+};
+
 const GRADES = Array.from({ length: 12 }, (_v, i) => String(i + 1));
 
 export default function AdminYoungstersPage() {
@@ -62,6 +67,7 @@ export default function AdminYoungstersPage() {
   const [busy, setBusy] = useState(false);
   const [createResult, setCreateResult] = useState<CreateResult | null>(null);
   const [showPassInfo, setShowPassInfo] = useState<ShowPassInfo | null>(null);
+  const [showIdInfo, setShowIdInfo] = useState<ShowIdInfo | null>(null);
 
   // Youngster fields
   const [selectedParentId, setSelectedParentId] = useState('');
@@ -342,6 +348,13 @@ export default function AdminYoungstersPage() {
     }
   };
 
+  const onShowId = (child: ChildRow) => {
+    setShowIdInfo({
+      youngsterName: `${child.first_name} ${child.last_name}`,
+      userId: child.user_id,
+    });
+  };
+
   const createSchoolLabel = useMemo(() => {
     if (!createResult) return '';
     const school = schools.find((s) => s.id === createResult.schoolId);
@@ -543,9 +556,9 @@ export default function AdminYoungstersPage() {
           <table className="kitchen-table">
             <thead>
               <tr>
-                <th>Youngster</th>
-                <th>User ID</th>
-                <th>Parent</th>
+                <th>Last Name</th>
+                <th>First Name</th>
+                <th>User Name</th>
                 <th>School</th>
                 <th>Grade</th>
                 <th>Actions</th>
@@ -554,21 +567,16 @@ export default function AdminYoungstersPage() {
             <tbody>
               {children.map((c) => (
                 <tr key={c.id}>
-                  <td>
-                    {c.first_name} {c.last_name}
-                    <br />
-                    <small>{c.username}</small>
-                  </td>
-                  <td>
-                    <code>{c.user_id}</code>
-                  </td>
-                  <td>
-                    {(c.parent_ids || []).map((id) => parentLabelById.get(id) || id).join(', ') || '-'}
-                  </td>
+                  <td>{c.last_name}</td>
+                  <td>{c.first_name}</td>
+                  <td>{c.username}</td>
                   <td>{c.school_name}</td>
                   <td>{String(c.school_grade || '').replace(/^[Gg]rade\s*/, '')}</td>
                   <td>
                     <div className="action-row">
+                      <button className="btn btn-outline" type="button" onClick={() => onShowId(c)}>
+                        Show ID
+                      </button>
                       <button className="btn btn-outline" type="button" onClick={() => onEdit(c)}>
                         Edit
                       </button>
@@ -576,10 +584,10 @@ export default function AdminYoungstersPage() {
                         Delete
                       </button>
                       <button className="btn btn-outline" type="button" onClick={() => onShowPassword(c)}>
-                        Show Password
+                        Show PW
                       </button>
                       <button className="btn btn-outline" type="button" onClick={() => onResetPassword(c)}>
-                        Reset Password
+                        Reset PW
                       </button>
                     </div>
                   </td>
@@ -594,6 +602,31 @@ export default function AdminYoungstersPage() {
           </table>
         </div>
       </section>
+
+      {showIdInfo ? (
+        <div className="pass-modal-overlay" onClick={() => setShowIdInfo(null)}>
+          <div className="pass-modal-card" onClick={(e) => e.stopPropagation()}>
+            <h2 className="pass-modal-title">Youngster ID</h2>
+            <div className="reg-info-list">
+              <div className="reg-info-row">
+                <span className="reg-info-label">Youngster Name</span>
+                <span className="reg-info-val">{showIdInfo.youngsterName}</span>
+              </div>
+              <div className="reg-info-row">
+                <span className="reg-info-label">User ID</span>
+                <code className="reg-info-code">{showIdInfo.userId}</code>
+              </div>
+            </div>
+            <button
+              className="btn btn-primary pass-modal-close"
+              type="button"
+              onClick={() => setShowIdInfo(null)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {/* ── Show Password Modal ─────────────────────────────── */}
       {showPassInfo ? (
@@ -756,8 +789,8 @@ export default function AdminYoungstersPage() {
 
         /* Mobile: hide User ID column */
         @media (max-width: 680px) {
-          .kitchen-table th:nth-child(2),
-          .kitchen-table td:nth-child(2) {
+          .kitchen-table th:nth-child(4),
+          .kitchen-table td:nth-child(4) {
             display: none;
           }
           .kitchen-table th,
