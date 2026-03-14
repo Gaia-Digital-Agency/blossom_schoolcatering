@@ -25,6 +25,8 @@ type DbUserRow = {
   role: string;
   first_name: string;
   last_name: string;
+  phone_number?: string | null;
+  email?: string | null;
   password_hash: string;
 };
 
@@ -388,6 +390,7 @@ export class AuthService {
       `SELECT row_to_json(t)::text
        FROM (
          SELECT id, username, role::text, first_name, last_name, password_hash
+               , phone_number, email
          FROM users
          WHERE username = $1
            AND is_active = true
@@ -497,6 +500,8 @@ export class AuthService {
       username: row.username,
       displayName: `${row.first_name} ${row.last_name}`.trim(),
       role,
+      phoneNumber: row.phone_number || null,
+      email: row.email || null,
     };
   }
 
