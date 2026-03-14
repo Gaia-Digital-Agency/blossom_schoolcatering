@@ -232,7 +232,7 @@ export default function ParentsOrdersPage() {
   const loadOrders = async (): Promise<ConsolidatedOrder[]> => {
     setLoadingOrders(true);
     try {
-      const data = await apiFetch('/parents/me/orders/consolidated') as { orders: ConsolidatedOrder[] };
+      const data = await apiFetch('/parent/me/orders/consolidated') as { orders: ConsolidatedOrder[] };
       const allOrders = data.orders || [];
       setOrders(allOrders);
       return allOrders;
@@ -248,7 +248,7 @@ export default function ParentsOrdersPage() {
   };
 
   const loadBaseData = async () => {
-    const childrenData = await apiFetch('/parents/me/children/pages') as { parentId: string; children: Child[] };
+    const childrenData = await apiFetch('/parent/me/children/pages') as { parentId: string; children: Child[] };
     setChildren(childrenData.children);
     if (childrenData.children.length > 0) setSelectedChildId(childrenData.children[0].id);
     await Promise.all([loadOrders(), loadSessionSettings()]);
@@ -485,10 +485,10 @@ export default function ParentsOrdersPage() {
         <h1>Parent Page</h1>
         <nav className="module-nav" aria-label="Parent Module Navigation">
           <Link href="/">Home</Link>
-          <Link href="/parents/orders" className="active">Order</Link>
+          <Link href="/parent/orders" className="active">Order</Link>
           <Link href="/menu">Menu</Link>
           <Link href="/rating">Rating</Link>
-          <Link href="/parents/billing">Billing</Link>
+          <Link href="/parent/billing">Billing</Link>
         </nav>
         <div className="module-guide-card">
           💡 View confirmed orders, manage your cart, and place orders.

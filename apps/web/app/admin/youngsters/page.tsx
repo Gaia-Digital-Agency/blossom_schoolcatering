@@ -45,9 +45,14 @@ type ShowPassInfo = {
   youngsterFirstName: string;
   youngsterLastName: string;
   youngsterUsername: string;
-  youngsterNewPassword: string;
+  youngsterPassword: string;
   schoolName: string;
   parentLabel: string;
+};
+
+type ShowIdInfo = {
+  youngsterName: string;
+  userId: string;
 };
 
 const GRADES = Array.from({ length: 12 }, (_v, i) => String(i + 1));
@@ -62,6 +67,7 @@ export default function AdminYoungstersPage() {
   const [busy, setBusy] = useState(false);
   const [createResult, setCreateResult] = useState<CreateResult | null>(null);
   const [showPassInfo, setShowPassInfo] = useState<ShowPassInfo | null>(null);
+  const [showIdInfo, setShowIdInfo] = useState<ShowIdInfo | null>(null);
 
   // Youngster fields
   const [selectedParentId, setSelectedParentId] = useState('');
@@ -105,8 +111,8 @@ export default function AdminYoungstersPage() {
   const load = async () => {
     const [s, p, c] = await Promise.all([
       apiFetch('/schools?active=true') as Promise<School[]>,
-      apiFetch('/admin/parents') as Promise<ParentRow[]>,
-      apiFetch('/admin/children') as Promise<ChildRow[]>,
+      apiFetch('/admin/parent') as Promise<ParentRow[]>,
+      apiFetch('/admin/youngster') as Promise<ChildRow[]>,
     ]);
     setSchools(s || []);
     setParents(p || []);
@@ -208,7 +214,7 @@ export default function AdminYoungstersPage() {
     setBusy(true);
     try {
       if (editingYoungsterId) {
-        await apiFetch(`/admin/youngsters/${editingYoungsterId}`, {
+        await apiFetch(`/admin/youngster/${editingYoungsterId}`, {
           method: 'PATCH',
           body: JSON.stringify({
             firstName,
@@ -225,7 +231,7 @@ export default function AdminYoungstersPage() {
         });
         // Update linked parent profile fields if any are filled
         if (selectedParentId && (pFirstName || pLastName || pPhone || pEmail || pAddress)) {
-          await apiFetch(`/admin/parents/${selectedParentId}`, {
+          await apiFetch(`/admin/parent/${selectedParentId}`, {
             method: 'PATCH',
             body: JSON.stringify({
               firstName: pFirstName || undefined,
@@ -277,7 +283,36 @@ export default function AdminYoungstersPage() {
     setMessage('');
     try {
       const res = (await apiFetch(
-        `/admin/youngsters/${child.id}/reset-password`,
+        `/admin/youngster/${child.id}/password`,
+        { method: 'GET' },
+        { skipAutoReload: true },
+      )) as { ok: boolean; password: string; username: string };
+      const parentId = (child.parent_ids || [])[0] || '';
+      const parent = parentById.get(parentId);
+      const parentLabel = parent
+        ? `${parent.first_name} ${parent.last_name} (${parent.username})`
+        : '—';
+      setShowPassInfo({
+        youngsterFirstName: child.first_name,
+        youngsterLastName: child.last_name,
+        youngsterUsername: res.username,
+        youngsterPassword: res.password,
+        schoolName: child.school_name,
+        parentLabel,
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed loading password');
+    }
+  };
+
+  const onResetPassword = async (child: ChildRow) => {
+    const ok = window.confirm(`Reset password for youngster "${child.first_name} ${child.last_name}"?`);
+    if (!ok) return;
+    setError('');
+    setMessage('');
+    try {
+      const res = (await apiFetch(
+        `/admin/youngster/${child.id}/reset-password`,
         { method: 'PATCH', body: JSON.stringify({}) },
         { skipAutoReload: true },
       )) as { ok: boolean; newPassword: string; username: string };
@@ -290,10 +325,11 @@ export default function AdminYoungstersPage() {
         youngsterFirstName: child.first_name,
         youngsterLastName: child.last_name,
         youngsterUsername: res.username,
-        youngsterNewPassword: res.newPassword,
+        youngsterPassword: res.newPassword,
         schoolName: child.school_name,
         parentLabel,
       });
+      setMessage(`Password reset for ${child.first_name} ${child.last_name}.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed resetting password');
     }
@@ -304,12 +340,19 @@ export default function AdminYoungstersPage() {
     setMessage('');
     setCreateResult(null);
     try {
-      await apiFetch(`/admin/youngsters/${youngsterId}`, { method: 'DELETE' });
+      await apiFetch(`/admin/youngster/${youngsterId}`, { method: 'DELETE' });
       if (editingYoungsterId === youngsterId) resetForm();
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed deleting youngster');
     }
+  };
+
+  const onShowId = (child: ChildRow) => {
+    setShowIdInfo({
+      youngsterName: `${child.first_name} ${child.last_name}`,
+      userId: child.user_id,
+    });
   };
 
   const createSchoolLabel = useMemo(() => {
@@ -327,7 +370,7 @@ export default function AdminYoungstersPage() {
   return (
     <main className="page-auth page-auth-desktop">
       <section className="auth-panel">
-        <h1>Admin Youngsters</h1>
+        <h1>Admin Youngster</h1>
         <AdminNav />
 
         {message ? <p className="auth-help">{message}</p> : null}
@@ -513,9 +556,9 @@ export default function AdminYoungstersPage() {
           <table className="kitchen-table">
             <thead>
               <tr>
-                <th>Youngster</th>
-                <th>User ID</th>
-                <th>Parent</th>
+                <th>Last Name</th>
+                <th>First Name</th>
+                <th>User Name</th>
                 <th>School</th>
                 <th>Grade</th>
                 <th>Actions</th>
@@ -524,21 +567,16 @@ export default function AdminYoungstersPage() {
             <tbody>
               {children.map((c) => (
                 <tr key={c.id}>
-                  <td>
-                    {c.first_name} {c.last_name}
-                    <br />
-                    <small>{c.username}</small>
-                  </td>
-                  <td>
-                    <code>{c.user_id}</code>
-                  </td>
-                  <td>
-                    {(c.parent_ids || []).map((id) => parentLabelById.get(id) || id).join(', ') || '-'}
-                  </td>
+                  <td>{c.last_name}</td>
+                  <td>{c.first_name}</td>
+                  <td>{c.username}</td>
                   <td>{c.school_name}</td>
                   <td>{String(c.school_grade || '').replace(/^[Gg]rade\s*/, '')}</td>
                   <td>
                     <div className="action-row">
+                      <button className="btn btn-outline" type="button" onClick={() => onShowId(c)}>
+                        Show ID
+                      </button>
                       <button className="btn btn-outline" type="button" onClick={() => onEdit(c)}>
                         Edit
                       </button>
@@ -546,7 +584,10 @@ export default function AdminYoungstersPage() {
                         Delete
                       </button>
                       <button className="btn btn-outline" type="button" onClick={() => onShowPassword(c)}>
-                        Show Password
+                        Show PW
+                      </button>
+                      <button className="btn btn-outline" type="button" onClick={() => onResetPassword(c)}>
+                        Reset PW
                       </button>
                     </div>
                   </td>
@@ -561,6 +602,31 @@ export default function AdminYoungstersPage() {
           </table>
         </div>
       </section>
+
+      {showIdInfo ? (
+        <div className="pass-modal-overlay" onClick={() => setShowIdInfo(null)}>
+          <div className="pass-modal-card" onClick={(e) => e.stopPropagation()}>
+            <h2 className="pass-modal-title">Youngster ID</h2>
+            <div className="reg-info-list">
+              <div className="reg-info-row">
+                <span className="reg-info-label">Youngster Name</span>
+                <span className="reg-info-val">{showIdInfo.youngsterName}</span>
+              </div>
+              <div className="reg-info-row">
+                <span className="reg-info-label">User ID</span>
+                <code className="reg-info-code">{showIdInfo.userId}</code>
+              </div>
+            </div>
+            <button
+              className="btn btn-primary pass-modal-close"
+              type="button"
+              onClick={() => setShowIdInfo(null)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {/* ── Show Password Modal ─────────────────────────────── */}
       {showPassInfo ? (
@@ -582,8 +648,8 @@ export default function AdminYoungstersPage() {
                 <code className="reg-info-code">{showPassInfo.youngsterUsername}</code>
               </div>
               <div className="reg-info-row">
-                <span className="reg-info-label">Youngster New Password</span>
-                <code className="reg-info-code">{showPassInfo.youngsterNewPassword}</code>
+                <span className="reg-info-label">Youngster Password</span>
+                <code className="reg-info-code">{showPassInfo.youngsterPassword}</code>
               </div>
               <div className="reg-info-row">
                 <span className="reg-info-label">School</span>
@@ -723,8 +789,8 @@ export default function AdminYoungstersPage() {
 
         /* Mobile: hide User ID column */
         @media (max-width: 680px) {
-          .kitchen-table th:nth-child(2),
-          .kitchen-table td:nth-child(2) {
+          .kitchen-table th:nth-child(4),
+          .kitchen-table td:nth-child(4) {
             display: none;
           }
           .kitchen-table th,

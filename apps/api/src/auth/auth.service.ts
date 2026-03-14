@@ -99,6 +99,7 @@ export class AuthService {
   private parentDietaryRestrictionsReady = false;
   private childRegistrationSourceColumnsReady = false;
   private passwordResetTableReady = false;
+  private adminVisiblePasswordsReady = false;
 
   private normalizeRole(role: string): Role {
     const normalized = role?.toUpperCase() as Role;
@@ -217,6 +218,32 @@ export class AuthService {
       throw new BadRequestException('Allergies must be less than 10 words');
     }
     return cleaned;
+  }
+
+  private async ensureAdminVisiblePasswordsTable() {
+    if (this.adminVisiblePasswordsReady) return;
+    await runSql(`
+      CREATE TABLE IF NOT EXISTS admin_visible_passwords (
+        user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        password_plaintext text NOT NULL,
+        source text NOT NULL DEFAULT 'REGISTRATION',
+        updated_at timestamptz NOT NULL DEFAULT now()
+      );
+    `);
+    this.adminVisiblePasswordsReady = true;
+  }
+
+  private async setAdminVisiblePassword(userId: string, password: string, source: 'REGISTRATION' | 'RESET' | 'MANUAL_CREATE') {
+    await this.ensureAdminVisiblePasswordsTable();
+    await runSql(
+      `INSERT INTO admin_visible_passwords (user_id, password_plaintext, source, updated_at)
+       VALUES ($1, $2, $3, now())
+       ON CONFLICT (user_id) DO UPDATE
+       SET password_plaintext = EXCLUDED.password_plaintext,
+           source = EXCLUDED.source,
+           updated_at = now();`,
+      [userId, password, source],
+    );
   }
 
   private async ensureParentDietaryRestrictionsTable() {
@@ -393,7 +420,7 @@ export class AuthService {
   private normalizeRegistrationRole(role: string): Role {
     const normalized = this.normalizeRole(role);
     if (!['PARENT', 'YOUNGSTER', 'DELIVERY'].includes(normalized)) {
-      throw new BadRequestException('Registration only allowed for Parent, Youngsters, and Delivery');
+      throw new BadRequestException('Registration only allowed for Parent, Youngster, and Delivery');
     }
     return normalized;
   }
@@ -401,7 +428,7 @@ export class AuthService {
   private normalizeGoogleRole(role: string): Role {
     const normalized = this.normalizeRole(role);
     if (normalized !== 'PARENT' && normalized !== 'YOUNGSTER') {
-      throw new BadRequestException('Google login is only for Parent and Youngsters');
+      throw new BadRequestException('Google login is only for Parent and Youngster');
     }
     return normalized;
   }
@@ -765,6 +792,7 @@ export class AuthService {
          VALUES ($1, $2);`,
         [parentUserId, parentAddress || 'Address pending from youngster registration'],
       );
+      await this.setAdminVisiblePassword(parentUserId, parentGeneratedPassword, 'REGISTRATION');
     }
 
     if (youngsterEmail) {
@@ -809,6 +837,7 @@ export class AuthService {
        ON CONFLICT (user_id) DO NOTHING;`,
       [youngsterCreated.id],
     );
+    await this.setAdminVisiblePassword(youngsterCreated.id, youngsterGeneratedPassword, 'REGISTRATION');
 
     await this.ensureChildRegistrationSourceColumns();
     const youngsterChildOut = await runSql(

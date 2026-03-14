@@ -21,8 +21,13 @@ type ShowPassInfo = {
   parentFirstName: string;
   parentLastName: string;
   parentUsername: string;
-  parentNewPassword: string;
+  parentPassword: string;
   youngsters: { name: string; school: string }[];
+};
+
+type ShowIdInfo = {
+  parentName: string;
+  parentId: string;
 };
 
 export default function AdminParentsPage() {
@@ -30,9 +35,10 @@ export default function AdminParentsPage() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [showPassInfo, setShowPassInfo] = useState<ShowPassInfo | null>(null);
+  const [showIdInfo, setShowIdInfo] = useState<ShowIdInfo | null>(null);
 
   const load = async () => {
-    const p = await apiFetch('/admin/parents') as ParentRow[];
+    const p = await apiFetch('/admin/parent') as ParentRow[];
     setParents(p || []);
   };
 
@@ -45,6 +51,32 @@ export default function AdminParentsPage() {
     setMessage('');
     try {
       const res = await apiFetch(
+        `/admin/users/${p.user_id}/password`,
+        { method: 'GET' },
+        { skipAutoReload: true },
+      ) as { ok: boolean; password: string; username: string };
+      setShowPassInfo({
+        parentFirstName: p.first_name,
+        parentLastName: p.last_name,
+        parentUsername: res.username,
+        parentPassword: res.password,
+        youngsters: (p.youngsters || []).map((y) => ({
+          name: y.name,
+          school: y.school_name || '—',
+        })),
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed loading password');
+    }
+  };
+
+  const onResetPassword = async (p: ParentRow) => {
+    const ok = window.confirm(`Reset password for parent "${p.first_name} ${p.last_name}"?`);
+    if (!ok) return;
+    setError('');
+    setMessage('');
+    try {
+      const res = await apiFetch(
         `/admin/users/${p.user_id}/reset-password`,
         { method: 'PATCH', body: JSON.stringify({}) },
         { skipAutoReload: true },
@@ -53,12 +85,13 @@ export default function AdminParentsPage() {
         parentFirstName: p.first_name,
         parentLastName: p.last_name,
         parentUsername: res.username,
-        parentNewPassword: res.newPassword,
+        parentPassword: res.newPassword,
         youngsters: (p.youngsters || []).map((y) => ({
           name: y.name,
           school: y.school_name || '—',
         })),
       });
+      setMessage(`Password reset for ${p.first_name} ${p.last_name}.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed resetting password');
     }
@@ -73,7 +106,7 @@ export default function AdminParentsPage() {
     setError('');
     setMessage('');
     try {
-      await apiFetch(`/admin/parents/${p.id}`, { method: 'DELETE' }, { skipAutoReload: true });
+      await apiFetch(`/admin/parent/${p.id}`, { method: 'DELETE' }, { skipAutoReload: true });
       setMessage(`Parent deleted: ${p.first_name} ${p.last_name}`);
       await load();
     } catch (e) {
@@ -81,45 +114,57 @@ export default function AdminParentsPage() {
     }
   };
 
+  const onShowId = (p: ParentRow) => {
+    setShowIdInfo({
+      parentName: `${p.first_name} ${p.last_name}`,
+      parentId: p.id,
+    });
+  };
+
   return (
     <main className="page-auth page-auth-desktop">
       <section className="auth-panel">
-        <h1>Admin Parents</h1>
+        <h1>Admin Parent</h1>
         <AdminNav />
-        <p className="auth-help">Parent records are view-only here. Youngster edits are managed in Admin Youngsters.</p>
+        <p className="auth-help">Parent records are view-only here. Youngster edits are managed in Admin Youngster.</p>
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
 
+        <h2>Existing Parents</h2>
         <div className="kitchen-table-wrap">
           <table className="kitchen-table admin-parents-table">
             <thead>
               <tr>
-                <th>Parent</th>
-                <th>Parent ID</th>
-                <th>Youngsters Linked</th>
-                <th>Schools</th>
+                <th>Last Name</th>
+                <th>First Name</th>
+                <th>User Name</th>
+                <th>Youngster</th>
+                <th>School</th>
                 <th>Action</th>
               </tr>
             </thead>
             <tbody>
               {parents.map((p) => (
                 <tr key={p.id}>
-                  <td>
-                    {p.first_name} {p.last_name}
-                    <br />
-                    <small>{p.username}</small>
-                  </td>
-                  <td><code>{p.id}</code></td>
+                  <td>{p.last_name}</td>
+                  <td>{p.first_name}</td>
+                  <td>{p.username}</td>
                   <td>
                     {(p.youngsters || []).length === 0
                       ? '-'
-                      : (p.youngsters || []).map((y) => `${y.name} (${y.id})`).join(', ')}
+                      : (p.youngsters || []).map((y) => String(y.name || '').trim().split(/\s+/)[0] || '-').join(', ')}
                   </td>
                   <td>{(p.schools || []).join(', ') || '-'}</td>
                   <td>
                     <div className="action-row">
+                      <button className="btn btn-outline" type="button" onClick={() => onShowId(p)}>
+                        Show ID
+                      </button>
                       <button className="btn btn-outline" type="button" onClick={() => onShowPassword(p)}>
-                        Show Password
+                        Show PW
+                      </button>
+                      <button className="btn btn-outline" type="button" onClick={() => onResetPassword(p)}>
+                        Reset PW
                       </button>
                       <button
                         className="btn btn-outline"
@@ -135,12 +180,33 @@ export default function AdminParentsPage() {
                 </tr>
               ))}
               {parents.length === 0 ? (
-                <tr><td colSpan={5}>No parents found.</td></tr>
+                <tr><td colSpan={6}>No parents found.</td></tr>
               ) : null}
             </tbody>
           </table>
         </div>
       </section>
+
+      {showIdInfo ? (
+        <div className="pass-modal-overlay" onClick={() => setShowIdInfo(null)}>
+          <div className="pass-modal-card" onClick={(e) => e.stopPropagation()}>
+            <h2 className="pass-modal-title">Parent ID</h2>
+            <div className="reg-info-list">
+              <div className="reg-info-row">
+                <span className="reg-info-label">Parent Name</span>
+                <span className="reg-info-val">{showIdInfo.parentName}</span>
+              </div>
+              <div className="reg-info-row">
+                <span className="reg-info-label">Parent ID</span>
+                <code className="reg-info-code">{showIdInfo.parentId}</code>
+              </div>
+            </div>
+            <button className="btn btn-primary pass-modal-close" type="button" onClick={() => setShowIdInfo(null)}>
+              Close
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {/* ── Show Password Modal ─────────────────────────────── */}
       {showPassInfo ? (
@@ -160,8 +226,8 @@ export default function AdminParentsPage() {
                 <code className="reg-info-code">{showPassInfo.parentUsername}</code>
               </div>
               <div className="reg-info-row">
-                <span className="reg-info-label">Parent New Password</span>
-                <code className="reg-info-code">{showPassInfo.parentNewPassword}</code>
+                <span className="reg-info-label">Parent Password</span>
+                <code className="reg-info-code">{showPassInfo.parentPassword}</code>
               </div>
               {showPassInfo.youngsters.length > 0 ? (
                 <div className="reg-info-row">
@@ -175,7 +241,7 @@ export default function AdminParentsPage() {
               ) : null}
               <div className="reg-info-row">
                 <span className="reg-info-label">Youngster Password</span>
-                <span className="reg-info-muted">Not changed — use Check Password on Youngsters page</span>
+                <span className="reg-info-muted">Not changed — use Check Password on Admin Youngster page</span>
               </div>
             </div>
             <button className="btn btn-primary pass-modal-close" type="button" onClick={() => setShowPassInfo(null)}>
@@ -231,12 +297,10 @@ export default function AdminParentsPage() {
           .kitchen-table-wrap {
             overflow-x: hidden;
           }
-          .admin-parents-table th:nth-child(2),
-          .admin-parents-table td:nth-child(2),
-          .admin-parents-table th:nth-child(3),
-          .admin-parents-table td:nth-child(3),
           .admin-parents-table th:nth-child(4),
-          .admin-parents-table td:nth-child(4) {
+          .admin-parents-table td:nth-child(4),
+          .admin-parents-table th:nth-child(5),
+          .admin-parents-table td:nth-child(5) {
             display: none;
           }
           .kitchen-table {

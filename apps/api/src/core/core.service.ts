@@ -62,6 +62,7 @@ export class CoreService implements OnModuleInit {
   private deliverySchoolAssignmentsReady = false;
   private billingReviewColumnsReady = false;
   private adminAuditTrailReady = false;
+  private adminVisiblePasswordsReady = false;
   private readonly publicMenuCacheTtlMs = 60_000;
   private publicMenuCache = new Map<string, {
     data: { serviceDate: string; session: SessionType | 'ALL'; items: unknown[] };
@@ -76,6 +77,51 @@ export class CoreService implements OnModuleInit {
     await this.ensureChildRegistrationSourceColumns();
     await this.ensureBillingReviewColumns();
     await this.ensureAdminAuditTrailTable();
+  }
+
+  private async ensureAdminVisiblePasswordsTable() {
+    if (this.adminVisiblePasswordsReady) return;
+    await runSql(`
+      CREATE TABLE IF NOT EXISTS admin_visible_passwords (
+        user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        password_plaintext text NOT NULL,
+        source text NOT NULL DEFAULT 'REGISTRATION',
+        updated_at timestamptz NOT NULL DEFAULT now()
+      );
+    `);
+    this.adminVisiblePasswordsReady = true;
+  }
+
+  private async setAdminVisiblePassword(userId: string, password: string, source: 'REGISTRATION' | 'RESET' | 'MANUAL_CREATE') {
+    await this.ensureAdminVisiblePasswordsTable();
+    await runSql(
+      `INSERT INTO admin_visible_passwords (user_id, password_plaintext, source, updated_at)
+       VALUES ($1, $2, $3, now())
+       ON CONFLICT (user_id) DO UPDATE
+       SET password_plaintext = EXCLUDED.password_plaintext,
+           source = EXCLUDED.source,
+           updated_at = now();`,
+      [userId, password, source],
+    );
+  }
+
+  private async getAdminVisiblePasswordRow(userId: string) {
+    await this.ensureAdminVisiblePasswordsTable();
+    const out = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT avp.password_plaintext, avp.source, avp.updated_at::text AS updated_at
+        FROM admin_visible_passwords avp
+        WHERE avp.user_id = $1
+        LIMIT 1
+      ) t;
+      `,
+      [userId],
+    );
+    return out
+      ? this.parseJsonLine<{ password_plaintext: string; source: string; updated_at: string }>(out)
+      : null;
   }
 
   private async ensureMenuItemNameUniquenessScope() {
@@ -224,6 +270,13 @@ export class CoreService implements OnModuleInit {
     const trimmed = String(value || '').trim();
     if (trimmed.length <= max) return trimmed;
     return `${trimmed.slice(0, Math.max(0, max - 3))}...`;
+  }
+
+  private buildGeneratedPasswordFromPhone(phoneLike?: string | null) {
+    const digits = String(phoneLike || '').replace(/\D/g, '');
+    if (digits.length >= 6) return digits;
+    if (!digits) return '';
+    return `${digits}123456`.slice(0, 6);
   }
 
   private buildTwoColumnDeliveryPdfLines(input: {
@@ -403,6 +456,15 @@ export class CoreService implements OnModuleInit {
     return '';
   }
 
+  private isPdfBinary(data: Buffer) {
+    return data.length >= 5
+      && data[0] === 0x25
+      && data[1] === 0x50
+      && data[2] === 0x44
+      && data[3] === 0x46
+      && data[4] === 0x2d;
+  }
+
   private assertSafeImagePayload(input: { contentType: string; data: Buffer; maxBytes: number; label: string }) {
     const normalizedContentType = String(input.contentType || '').toLowerCase();
     const allowedTypes = new Set(['image/png', 'image/jpeg', 'image/webp']);
@@ -500,6 +562,44 @@ export class CoreService implements OnModuleInit {
     }
 
     return { contentType: detectedMime, data };
+  }
+
+  private async fetchReceiptPdfBinary(pdfUrl: string) {
+    let parsed: URL;
+    try {
+      parsed = new URL(pdfUrl);
+    } catch {
+      throw new BadRequestException('Invalid receipt PDF URL');
+    }
+
+    const performFetch = async (authToken?: string) => fetch(pdfUrl, {
+      method: 'GET',
+      headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+    });
+
+    let res = await performFetch();
+    if ((res.status === 401 || res.status === 403) && this.isGoogleStorageHost(parsed.host)) {
+      try {
+        const accessToken = await this.getGoogleAccessToken(['https://www.googleapis.com/auth/devstorage.read_only']);
+        res = await performFetch(accessToken);
+      } catch {
+        // Continue and let the non-ok response below raise a clear API error.
+      }
+    }
+
+    if (!res.ok) {
+      throw new BadRequestException(`RECEIPT_PDF_NOT_ACCESSIBLE (${res.status})`);
+    }
+
+    const data = Buffer.from(await res.arrayBuffer());
+    if (!data.length) throw new BadRequestException('RECEIPT_PDF_EMPTY');
+    if (data.length > 10 * 1024 * 1024) {
+      throw new BadRequestException('RECEIPT_PDF_TOO_LARGE');
+    }
+    if (!this.isPdfBinary(data)) {
+      throw new BadRequestException('RECEIPT_NOT_PDF');
+    }
+    return { contentType: 'application/pdf', data };
   }
 
   private slugify(value: string) {
@@ -1371,6 +1471,8 @@ export class CoreService implements OnModuleInit {
         [parentId, child.id],
       );
     }
+
+    await this.setAdminVisiblePassword(created.id, passwordSeed, 'REGISTRATION');
 
     return {
       childId: child.id,
@@ -4425,6 +4527,7 @@ export class CoreService implements OnModuleInit {
                o.service_date::text AS service_date,
                o.session::text AS session,
                o.total_price,
+               (uc.first_name || ' ' || uc.last_name) AS child_name,
                p.id AS parent_id,
                (up.first_name || ' ' || up.last_name) AS parent_name,
                s.name AS school_name,
@@ -4433,6 +4536,7 @@ export class CoreService implements OnModuleInit {
         FROM billing_records br
         JOIN orders o ON o.id = br.order_id
         JOIN children c ON c.id = o.child_id
+        JOIN users uc ON uc.id = c.user_id
         JOIN schools s ON s.id = c.school_id
         JOIN parents p ON p.id = br.parent_id
         JOIN users up ON up.id = p.user_id
@@ -4477,26 +4581,39 @@ export class CoreService implements OnModuleInit {
     if (decision === 'REJECTED' && !adminNote) {
       throw new BadRequestException('REJECTION_NOTE_REQUIRED');
     }
+    const isReject = decision === 'REJECTED';
+    const nextStatus = isReject ? 'UNPAID' : 'VERIFIED';
     const updatedOut = await runSql(
       `WITH updated AS (
          UPDATE billing_records
          SET status = $1::payment_status,
-             verified_by = $2,
-             admin_note = $3,
-             verified_at = now(),
+             verified_by = CASE WHEN $2::boolean THEN NULL ELSE $3 END,
+             admin_note = $4,
+             verified_at = CASE WHEN $2::boolean THEN NULL ELSE now() END,
+             proof_image_url = CASE WHEN $2::boolean THEN NULL ELSE proof_image_url END,
+             proof_uploaded_at = CASE WHEN $2::boolean THEN NULL ELSE proof_uploaded_at END,
              updated_at = now()
-         WHERE id = $4
+         WHERE id = $5
          RETURNING id
        )
        SELECT id FROM updated;`,
-      [decision, actor.uid, adminNote || null, billingId],
+      [
+        nextStatus,
+        isReject,
+        actor.uid,
+        adminNote || null,
+        billingId,
+      ],
     );
     if (!updatedOut) throw new NotFoundException('Billing record not found');
+    if (isReject) {
+      await runSql('DELETE FROM digital_receipts WHERE billing_record_id = $1;', [billingId]);
+    }
     await this.recordAdminAudit(actor, 'BILLING_VERIFIED', 'billing-record', billingId, {
-      decision,
+      decision: isReject ? 'REJECTED_TO_UNPAID' : decision,
       note: adminNote || null,
     });
-    return { ok: true, status: decision };
+    return { ok: true, status: nextStatus };
   }
 
   async generateReceipt(actor: AccessUser, billingId: string) {
@@ -4625,6 +4742,17 @@ export class CoreService implements OnModuleInit {
       throw new ForbiddenException('Role not allowed');
     }
     return row;
+  }
+
+  async getBillingReceiptFile(actor: AccessUser, billingId: string) {
+    const row = await this.getBillingReceipt(actor, billingId);
+    const pdfUrl = String(row.pdf_url || '').trim();
+    if (!pdfUrl) throw new NotFoundException('Receipt PDF not found');
+    const file = await this.fetchReceiptPdfBinary(pdfUrl);
+    return {
+      ...file,
+      fileName: `${String(row.receipt_number || '').trim() || 'receipt'}.pdf`,
+    };
   }
 
   async revertBillingProof(actor: AccessUser, billingId: string) {
@@ -6509,12 +6637,51 @@ export class CoreService implements OnModuleInit {
          AND revoked_at IS NULL;`,
       [userId],
     );
+    await this.setAdminVisiblePassword(userId, newPassword, 'RESET');
     await this.recordAdminAudit(actor, 'USER_PASSWORD_RESET', 'user', userId, {
       role: target.role,
       username: target.username,
       generated: !newPasswordRaw,
     });
     return { ok: true, userId, username: target.username, role: target.role, newPassword };
+  }
+
+  async adminGetUserPassword(actor: AccessUser, userId: string) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    this.assertValidUuid(userId, 'userId');
+    const out = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT id, username, role::text AS role, phone_number
+        FROM users
+        WHERE id = $1
+          AND deleted_at IS NULL
+        LIMIT 1
+      ) t;
+      `,
+      [userId],
+    );
+    if (!out) throw new NotFoundException('User not found');
+    const target = this.parseJsonLine<{ id: string; username: string; role: string; phone_number?: string | null }>(out);
+    if (!['PARENT', 'CHILD', 'DELIVERY'].includes(target.role)) {
+      throw new BadRequestException('Only PARENT, CHILD, and DELIVERY password view is allowed here');
+    }
+    const stored = await this.getAdminVisiblePasswordRow(userId);
+    const fallbackPassword = this.buildGeneratedPasswordFromPhone(target.phone_number);
+    const password = stored?.password_plaintext || fallbackPassword;
+    if (!password) {
+      throw new NotFoundException('Stored password not found for this user');
+    }
+    return {
+      ok: true,
+      userId,
+      username: target.username,
+      role: target.role,
+      password,
+      source: stored?.source || 'REGISTRATION_FALLBACK',
+      updatedAt: stored?.updated_at || null,
+    };
   }
 
   async adminResetYoungsterPassword(actor: AccessUser, youngsterId: string, newPasswordRaw?: string) {
@@ -6540,6 +6707,31 @@ export class CoreService implements OnModuleInit {
     if (!out) throw new NotFoundException('Youngster not found');
     const target = this.parseJsonLine<{ user_id: string }>(out);
     return this.adminResetUserPassword(actor, target.user_id, newPasswordRaw);
+  }
+
+  async adminGetYoungsterPassword(actor: AccessUser, youngsterId: string) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    this.assertValidUuid(youngsterId, 'youngsterId');
+    const out = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT c.user_id
+        FROM children c
+        JOIN users u ON u.id = c.user_id
+        WHERE c.id = $1
+          AND c.deleted_at IS NULL
+          AND c.is_active = true
+          AND u.deleted_at IS NULL
+          AND u.role = 'CHILD'
+        LIMIT 1
+      ) t;
+      `,
+      [youngsterId],
+    );
+    if (!out) throw new NotFoundException('Youngster not found');
+    const target = this.parseJsonLine<{ user_id: string }>(out);
+    return this.adminGetUserPassword(actor, target.user_id);
   }
 
   // ─── Ingredients CRUD ────────────────────────────────────────────────────
@@ -6758,6 +6950,7 @@ export class CoreService implements OnModuleInit {
     }
     if (!out) throw new BadRequestException('Failed to create delivery user');
     const user = this.parseJsonLine<{ id: string; username: string; first_name: string; last_name: string }>(out);
+    await this.setAdminVisiblePassword(user.id, password, 'MANUAL_CREATE');
     await runSql(
       `INSERT INTO user_preferences (user_id, onboarding_completed, dark_mode_enabled, tooltips_enabled)
        VALUES ($1, false, false, true)

@@ -75,9 +75,9 @@ export function middleware(request: NextRequest) {
   if (requiredRole && normalizedPath === roleLoginPath(requiredRole)) {
     if (hasToken && role === requiredRole) {
       const destination = requiredRole === 'PARENT'
-        ? '/parents/orders'
+        ? '/parent/orders'
         : requiredRole === 'YOUNGSTER'
-          ? '/youngsters'
+          ? '/youngster'
           : `/${requiredRole.toLowerCase()}`;
       return NextResponse.redirect(new URL(`${BASE_PATH}${destination}`, request.url));
     }
@@ -97,9 +97,9 @@ export function middleware(request: NextRequest) {
 
   if (hasToken && normalizedPath === '/login') {
     const destination = role === 'PARENT'
-      ? '/parents/orders'
+      ? '/parent/orders'
       : role === 'YOUNGSTER'
-        ? '/youngsters'
+        ? '/youngster'
         : role === 'ADMIN'
           ? '/admin'
           : role === 'KITCHEN'

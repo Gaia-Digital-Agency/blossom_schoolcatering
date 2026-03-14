@@ -335,17 +335,17 @@ export default function AdminDeliveryPage() {
     setMessage('');
     try {
       const res = await apiFetch(
-        `/admin/users/${user.id}/reset-password`,
-        { method: 'PATCH', body: JSON.stringify({}) },
+        `/admin/users/${user.id}/password`,
+        { method: 'GET' },
         { skipAutoReload: true },
-      ) as { ok: boolean; newPassword: string; username: string };
+      ) as { ok: boolean; password: string; username: string };
       setShowPassInfo({
         deliveryName: `${user.first_name} ${user.last_name}`,
         deliveryUsername: res.username,
-        deliveryNewPassword: res.newPassword,
+        deliveryNewPassword: res.password,
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed resetting password');
+      setError(e instanceof Error ? e.message : 'Failed loading password');
     }
   };
 
@@ -671,7 +671,7 @@ export default function AdminDeliveryPage() {
           <div className="pass-modal-card" onClick={(e) => e.stopPropagation()}>
             <h2 className="pass-modal-title">Delivery Password Information</h2>
             <p className="pass-modal-warning">
-              This action resets password. Save it before closing.
+              Displaying stored login password. It is not changed by this action.
             </p>
             <div className="reg-info-list">
               <div className="reg-info-row">
@@ -683,7 +683,7 @@ export default function AdminDeliveryPage() {
                 <code className="reg-info-code">{showPassInfo.deliveryUsername}</code>
               </div>
               <div className="reg-info-row">
-                <span className="reg-info-label">Delivery New Password</span>
+                <span className="reg-info-label">Delivery Password</span>
                 <code className="reg-info-code">{showPassInfo.deliveryNewPassword}</code>
               </div>
             </div>

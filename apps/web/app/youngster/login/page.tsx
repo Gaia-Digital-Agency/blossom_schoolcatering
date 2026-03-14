@@ -5,7 +5,7 @@ export default function YoungsterLoginPage() {
     <RoleLoginForm
       role="YOUNGSTER"
       title="Youngster Login"
-      redirectPath="/youngsters"
+      redirectPath="/youngster"
     />
   );
 }
