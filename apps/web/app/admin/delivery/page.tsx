@@ -536,7 +536,7 @@ export default function AdminDeliveryPage() {
                           onClick={() => onShowPassword(u)}
                           disabled={deletingUserId === u.id || togglingUserId === u.id || savingUserId === u.id}
                         >
-                          Show Password
+                          Show PW
                         </button>
                         <button
                           className="btn btn-outline"
@@ -544,7 +544,7 @@ export default function AdminDeliveryPage() {
                           onClick={() => onResetPassword(u)}
                           disabled={deletingUserId === u.id || togglingUserId === u.id || savingUserId === u.id}
                         >
-                          Reset Password
+                          Reset PW
                         </button>
                         <button
                           className="btn btn-outline"
