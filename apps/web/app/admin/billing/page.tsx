@@ -70,7 +70,7 @@ export default function AdminBillingPage() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [proofPreviewUrl, setProofPreviewUrl] = useState('');
-  const [receiptInfo, setReceiptInfo] = useState<{ receiptNumber: string; pdfUrl: string } | null>(null);
+  const [receiptInfo, setReceiptInfo] = useState<{ billingId: string; receiptNumber: string } | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -171,10 +171,10 @@ export default function AdminBillingPage() {
     setError('');
     setMessage('');
     try {
-      const out = await apiFetch(`/admin/billing/${billingId}/receipt`, { method: 'POST' }) as { receiptNumber: string; pdfUrl?: string };
+      const out = await apiFetch(`/admin/billing/${billingId}/receipt`, { method: 'POST' }) as { receiptNumber: string };
       setReceiptInfo({
+        billingId,
         receiptNumber: out.receiptNumber,
-        pdfUrl: String(out.pdfUrl || '').trim(),
       });
       setMessage(`Receipt generated: ${out.receiptNumber}`);
       await load();
@@ -191,14 +191,52 @@ export default function AdminBillingPage() {
   };
 
   const openReceiptInfo = (row: BillingRow) => {
-    if (!String(row.pdf_url || '').trim()) {
+    if (!String(row.receipt_number || '').trim()) {
       setError('Receipt PDF is not available yet.');
       return;
     }
     setReceiptInfo({
+      billingId: row.id,
       receiptNumber: String(row.receipt_number || '').trim() || 'Receipt',
-      pdfUrl: String(row.pdf_url || '').trim(),
     });
+  };
+
+  const fetchReceiptBlob = async (billingId: string) => {
+    const res = await apiFetchResponse(`/admin/billing/${billingId}/receipt-file`, {
+      headers: { Accept: 'application/pdf' },
+    });
+    return res.blob();
+  };
+
+  const onOpenReceiptPdf = async () => {
+    if (!receiptInfo) return;
+    setError('');
+    try {
+      const blob = await fetchReceiptBlob(receiptInfo.billingId);
+      const blobUrl = window.URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank', 'noopener,noreferrer');
+      window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60_000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed opening receipt PDF');
+    }
+  };
+
+  const onDownloadReceiptPdf = async () => {
+    if (!receiptInfo) return;
+    setError('');
+    try {
+      const blob = await fetchReceiptBlob(receiptInfo.billingId);
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `${receiptInfo.receiptNumber}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60_000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed downloading receipt PDF');
+    }
   };
 
   const renderRef = (row: BillingRow) => (
@@ -417,12 +455,12 @@ export default function AdminBillingPage() {
               <h3>Receipt Ready</h3>
               <p className="receipt-number">Receipt: {receiptInfo.receiptNumber}</p>
               <div className="modal-action-row">
-                <a className="btn btn-outline" href={receiptInfo.pdfUrl} target="_blank" rel="noreferrer">
+                <button className="btn btn-outline" type="button" onClick={onOpenReceiptPdf}>
                   Open PDF
-                </a>
-                <a className="btn btn-primary" href={receiptInfo.pdfUrl} target="_blank" rel="noreferrer" download>
+                </button>
+                <button className="btn btn-primary" type="button" onClick={onDownloadReceiptPdf}>
                   Download PDF
-                </a>
+                </button>
               </div>
               <button className="btn btn-outline receipt-close" type="button" onClick={() => setReceiptInfo(null)}>
                 Close

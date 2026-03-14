@@ -456,6 +456,15 @@ export class CoreService implements OnModuleInit {
     return '';
   }
 
+  private isPdfBinary(data: Buffer) {
+    return data.length >= 5
+      && data[0] === 0x25
+      && data[1] === 0x50
+      && data[2] === 0x44
+      && data[3] === 0x46
+      && data[4] === 0x2d;
+  }
+
   private assertSafeImagePayload(input: { contentType: string; data: Buffer; maxBytes: number; label: string }) {
     const normalizedContentType = String(input.contentType || '').toLowerCase();
     const allowedTypes = new Set(['image/png', 'image/jpeg', 'image/webp']);
@@ -553,6 +562,44 @@ export class CoreService implements OnModuleInit {
     }
 
     return { contentType: detectedMime, data };
+  }
+
+  private async fetchReceiptPdfBinary(pdfUrl: string) {
+    let parsed: URL;
+    try {
+      parsed = new URL(pdfUrl);
+    } catch {
+      throw new BadRequestException('Invalid receipt PDF URL');
+    }
+
+    const performFetch = async (authToken?: string) => fetch(pdfUrl, {
+      method: 'GET',
+      headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+    });
+
+    let res = await performFetch();
+    if ((res.status === 401 || res.status === 403) && this.isGoogleStorageHost(parsed.host)) {
+      try {
+        const accessToken = await this.getGoogleAccessToken(['https://www.googleapis.com/auth/devstorage.read_only']);
+        res = await performFetch(accessToken);
+      } catch {
+        // Continue and let the non-ok response below raise a clear API error.
+      }
+    }
+
+    if (!res.ok) {
+      throw new BadRequestException(`RECEIPT_PDF_NOT_ACCESSIBLE (${res.status})`);
+    }
+
+    const data = Buffer.from(await res.arrayBuffer());
+    if (!data.length) throw new BadRequestException('RECEIPT_PDF_EMPTY');
+    if (data.length > 10 * 1024 * 1024) {
+      throw new BadRequestException('RECEIPT_PDF_TOO_LARGE');
+    }
+    if (!this.isPdfBinary(data)) {
+      throw new BadRequestException('RECEIPT_NOT_PDF');
+    }
+    return { contentType: 'application/pdf', data };
   }
 
   private slugify(value: string) {
@@ -4695,6 +4742,17 @@ export class CoreService implements OnModuleInit {
       throw new ForbiddenException('Role not allowed');
     }
     return row;
+  }
+
+  async getBillingReceiptFile(actor: AccessUser, billingId: string) {
+    const row = await this.getBillingReceipt(actor, billingId);
+    const pdfUrl = String(row.pdf_url || '').trim();
+    if (!pdfUrl) throw new NotFoundException('Receipt PDF not found');
+    const file = await this.fetchReceiptPdfBinary(pdfUrl);
+    return {
+      ...file,
+      fileName: `${String(row.receipt_number || '').trim() || 'receipt'}.pdf`,
+    };
   }
 
   async revertBillingProof(actor: AccessUser, billingId: string) {

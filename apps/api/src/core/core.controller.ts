@@ -619,6 +619,20 @@ export class CoreController {
     return this.coreService.generateReceipt(req.user, billingId);
   }
 
+  @Get('admin/billing/:billingId/receipt-file')
+  @Roles('ADMIN')
+  async getAdminBillingReceiptFile(
+    @Req() req: AuthRequest,
+    @Param('billingId', ParseUUIDPipe) billingId: string,
+    @Res() res: Response,
+  ) {
+    const out = await this.coreService.getBillingReceiptFile(req.user, billingId);
+    res.setHeader('Content-Type', out.contentType);
+    res.setHeader('Content-Disposition', `inline; filename="${out.fileName}"`);
+    res.setHeader('Cache-Control', 'private, max-age=60');
+    res.send(out.data);
+  }
+
   @Get('delivery/users')
   @Roles('ADMIN')
   getDeliveryUsers(@Query('include_inactive') includeInactive?: string) {
