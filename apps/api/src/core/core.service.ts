@@ -6482,8 +6482,40 @@ export class CoreService implements OnModuleInit {
     );
     if (!out) throw new NotFoundException('Parent not found');
     const parent = this.parseJsonLine<{ id: string; user_id: string }>(out);
-    await runSql(`UPDATE parents SET deleted_at = now(), updated_at = now() WHERE id = $1;`, [targetParentId]);
-    await runSql(`UPDATE users SET is_active = false, deleted_at = now(), updated_at = now() WHERE id = $1;`, [parent.user_id]);
+    const blockingHistoryOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT
+          (SELECT COUNT(*)::int FROM billing_records WHERE parent_id = $1) AS billing_count,
+          (SELECT COUNT(*)::int FROM orders WHERE placed_by_user_id = $2) AS orders_count,
+          (SELECT COUNT(*)::int FROM order_carts WHERE created_by_user_id = $2) AS carts_count,
+          (SELECT COUNT(*)::int FROM favourite_meals WHERE created_by_user_id = $2) AS favourites_count,
+          (SELECT COUNT(*)::int FROM admin_audit_logs WHERE actor_user_id = $2) AS audit_count
+      ) t;
+      `,
+      [targetParentId, parent.user_id],
+    );
+    const blockingHistory = this.parseJsonLine<{
+      billing_count: number;
+      orders_count: number;
+      carts_count: number;
+      favourites_count: number;
+      audit_count: number;
+    }>(blockingHistoryOut);
+    if (
+      Number(blockingHistory?.billing_count || 0) > 0 ||
+      Number(blockingHistory?.orders_count || 0) > 0 ||
+      Number(blockingHistory?.carts_count || 0) > 0 ||
+      Number(blockingHistory?.favourites_count || 0) > 0 ||
+      Number(blockingHistory?.audit_count || 0) > 0
+    ) {
+      throw new BadRequestException('Cannot hard-delete parent with billing or order history');
+    }
+    await runSql(`DELETE FROM parent_children WHERE parent_id = $1;`, [targetParentId]);
+    await runSql(`DELETE FROM user_preferences WHERE user_id = $1;`, [parent.user_id]);
+    await runSql(`DELETE FROM parents WHERE id = $1;`, [targetParentId]);
+    await runSql(`DELETE FROM users WHERE id = $1;`, [parent.user_id]);
     await this.recordAdminAudit(actor, 'PARENT_DELETED', 'parent', targetParentId);
     return { ok: true };
   }

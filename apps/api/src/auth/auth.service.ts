@@ -407,8 +407,9 @@ export class AuthService {
        FROM (
          SELECT id, username, role::text, first_name, last_name, password_hash
          FROM users
-         WHERE email = $1
+         WHERE LOWER(email) = $1
            AND is_active = true
+           AND deleted_at IS NULL
          LIMIT 1
        ) t;`,
       [normalizedEmail],
@@ -802,16 +803,28 @@ export class AuthService {
       parentUsername = await runSql(`SELECT generate_unique_username($1);`, [parentUsernameBase]);
       parentGeneratedPassword = this.buildGeneratedPassword(parentMobileNumber);
       const parentPasswordHash = this.hashPassword(parentGeneratedPassword);
-      const parentOut = await runSql(
-        `WITH inserted AS (
-           INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email)
-           VALUES ('PARENT', $1, $2, $3, $4, $5, $6)
-           RETURNING id, username
-         )
-         SELECT row_to_json(inserted)::text
-         FROM inserted;`,
-        [parentUsername, parentPasswordHash, parentFirstName, parentLastName, parentMobileNumber, parentEmail],
-      );
+      let parentOut = '';
+      try {
+        parentOut = await runSql(
+          `WITH inserted AS (
+             INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email)
+             VALUES ('PARENT', $1, $2, $3, $4, $5, $6)
+             RETURNING id, username
+           )
+           SELECT row_to_json(inserted)::text
+           FROM inserted;`,
+          [parentUsername, parentPasswordHash, parentFirstName, parentLastName, parentMobileNumber, parentEmail],
+        );
+      } catch (err) {
+        const message = err instanceof Error ? err.message.toLowerCase() : '';
+        if (message.includes('users_email_ci_uq') || (message.includes('duplicate key') && message.includes('email'))) {
+          throw new BadRequestException('Parent email already exists. Please use the existing parent account or inquire with Admin for assistance.');
+        }
+        if (message.includes('users_username_key') || (message.includes('duplicate key') && message.includes('username'))) {
+          throw new BadRequestException('Parent username already exists. Please retry registration.');
+        }
+        throw err;
+      }
       const parentCreated = this.parseJsonLine<{ id: string; username: string }>(parentOut);
       parentUserId = parentCreated.id;
 
@@ -853,16 +866,28 @@ export class AuthService {
     const youngsterUsername = await runSql(`SELECT generate_unique_username($1);`, [youngsterUsernameBase]);
     const youngsterGeneratedPassword = this.buildGeneratedPassword(youngsterPhone);
     const youngsterPasswordHash = this.hashPassword(youngsterGeneratedPassword);
-    const youngsterOut = await runSql(
-      `WITH inserted AS (
-         INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email)
-         VALUES ('CHILD', $1, $2, $3, $4, $5, $6)
-         RETURNING id, username, first_name, last_name
-       )
-       SELECT row_to_json(inserted)::text
-       FROM inserted;`,
-      [youngsterUsername, youngsterPasswordHash, youngsterFirstName, youngsterLastName, youngsterPhone, youngsterEmail || null],
-    );
+    let youngsterOut = '';
+    try {
+      youngsterOut = await runSql(
+        `WITH inserted AS (
+           INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email)
+           VALUES ('CHILD', $1, $2, $3, $4, $5, $6)
+           RETURNING id, username, first_name, last_name
+         )
+         SELECT row_to_json(inserted)::text
+         FROM inserted;`,
+        [youngsterUsername, youngsterPasswordHash, youngsterFirstName, youngsterLastName, youngsterPhone, youngsterEmail || null],
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message.toLowerCase() : '';
+      if (message.includes('users_email_ci_uq') || (message.includes('duplicate key') && message.includes('email'))) {
+        throw new BadRequestException('Youngster email already exists. Please inquire with Admin for assistance.');
+      }
+      if (message.includes('users_username_key') || (message.includes('duplicate key') && message.includes('username'))) {
+        throw new BadRequestException('Youngster username already exists. Please retry registration.');
+      }
+      throw err;
+    }
     const youngsterCreated = this.parseJsonLine<{ id: string; username: string; first_name: string; last_name: string }>(youngsterOut);
 
     await runSql(
