@@ -77,6 +77,7 @@ export class CoreService implements OnModuleInit {
     await this.ensureChildRegistrationSourceColumns();
     await this.ensureBillingReviewColumns();
     await this.ensureAdminAuditTrailTable();
+    await this.ensureMenuItemTextDefaults();
   }
 
   private async ensureAdminVisiblePasswordsTable() {
@@ -1544,6 +1545,49 @@ export class CoreService implements OnModuleInit {
     this.billingReviewColumnsReady = true;
   }
 
+  private async ensureMenuItemTextDefaults() {
+    await runSql(`
+      UPDATE menu_items
+      SET description = 'TBA',
+          updated_at = now()
+      WHERE deleted_at IS NULL
+        AND is_available = true
+        AND COALESCE(NULLIF(BTRIM(description), ''), '') = '';
+
+      UPDATE menu_items
+      SET nutrition_facts_text = 'TBA',
+          updated_at = now()
+      WHERE deleted_at IS NULL
+        AND is_available = true
+        AND COALESCE(NULLIF(BTRIM(nutrition_facts_text), ''), '') = '';
+    `);
+  }
+
+  private normalizeMenuText(raw?: string | null) {
+    return String(raw || '').trim() || 'TBA';
+  }
+
+  private async ensureTbaIngredientId() {
+    const existingId = await runSql(
+      `
+      SELECT id
+      FROM ingredients
+      WHERE lower(name) = 'tba'
+        AND deleted_at IS NULL
+      ORDER BY created_at ASC
+      LIMIT 1;
+      `,
+    );
+    if (existingId) return existingId;
+    return runSql(
+      `
+      INSERT INTO ingredients (name, allergen_flag, is_active)
+      VALUES ('TBA', false, true)
+      RETURNING id;
+      `,
+    );
+  }
+
   async getAdminChildren() {
     const out = await runSql(`
       SELECT row_to_json(t)::text
@@ -2256,6 +2300,8 @@ export class CoreService implements OnModuleInit {
       FROM (
         SELECT mi.id,
                mi.name,
+               mi.description,
+               mi.calories_kcal,
                mi.price,
                mi.dish_category,
                mi.image_url,
@@ -2495,13 +2541,13 @@ export class CoreService implements OnModuleInit {
     const serviceDate = input.serviceDate
       ? this.validateServiceDate(input.serviceDate)
       : await this.resolveCreateMenuServiceDate(session);
-    const name = (input.name || '').trim();
-    const description = (input.description || '').trim();
-    const nutritionFactsText = (input.nutritionFactsText || '').trim();
+    const name = this.normalizeMenuText(input.name);
+    const description = this.normalizeMenuText(input.description);
+    const nutritionFactsText = this.normalizeMenuText(input.nutritionFactsText);
     const caloriesKcal = input.caloriesKcal === undefined || input.caloriesKcal === null ? null : Number(input.caloriesKcal);
-    const price = Number(input.price || 0);
+    const price = input.price === undefined || input.price === null || String(input.price).trim() === '' ? 0 : Number(input.price);
     const rawImageUrl = (input.imageUrl || '').trim();
-    const ingredientIds = Array.isArray(input.ingredientIds) ? input.ingredientIds.filter(Boolean) : [];
+    const ingredientIdsRaw = Array.isArray(input.ingredientIds) ? input.ingredientIds.filter(Boolean) : [];
     const isAvailable = input.isAvailable !== false;
     const displayOrder = Number.isInteger(input.displayOrder) ? Number(input.displayOrder) : 0;
     const cutleryRequired = Boolean(input.cutleryRequired);
@@ -2512,9 +2558,13 @@ export class CoreService implements OnModuleInit {
     const containsPeanut = Boolean(input.containsPeanut);
     const dishCategory = this.normalizeDishCategory(input.dishCategory);
 
-    if (price < 0) {
+    if (price < 0 || Number.isNaN(price)) {
       throw new BadRequestException('Invalid price');
     }
+    if (name !== 'TBA' && description !== 'TBA' && name.localeCompare(description, undefined, { sensitivity: 'accent' }) === 0) {
+      throw new BadRequestException('Dish name and description must be different');
+    }
+    const ingredientIds = ingredientIdsRaw.length > 0 ? ingredientIdsRaw : [await this.ensureTbaIngredientId()];
     if (caloriesKcal !== null && (!Number.isInteger(caloriesKcal) || caloriesKcal < 0)) {
       throw new BadRequestException('Invalid caloriesKcal');
     }
@@ -2657,19 +2707,21 @@ export class CoreService implements OnModuleInit {
 
     const serviceDate = input.serviceDate ? this.validateServiceDate(input.serviceDate) : current.service_date;
     const session = input.session ? this.normalizeSession(input.session) : current.session;
-    const name = input.name !== undefined ? input.name.trim() : current.name;
-    const description = input.description !== undefined ? input.description.trim() : current.description;
+    const name = input.name !== undefined ? this.normalizeMenuText(input.name) : this.normalizeMenuText(current.name);
+    const description = input.description !== undefined ? this.normalizeMenuText(input.description) : this.normalizeMenuText(current.description);
     const nutritionFactsText = input.nutritionFactsText !== undefined
-      ? input.nutritionFactsText.trim() || 'TBA'
-      : (String(current.nutrition_facts_text || '').trim() || 'TBA');
+      ? this.normalizeMenuText(input.nutritionFactsText)
+      : this.normalizeMenuText(current.nutrition_facts_text);
     const caloriesKcal = input.caloriesKcal === undefined
       ? (current.calories_kcal ?? null)
       : (input.caloriesKcal === null ? null : Number(input.caloriesKcal));
-    const price = input.price === undefined ? Number(current.price || 0) : Number(input.price || 0);
+    const price = input.price === undefined
+      ? Number(current.price || 0)
+      : (input.price === null || String(input.price).trim() === '' ? 0 : Number(input.price));
     const rawImageUrl = input.imageUrl !== undefined
       ? input.imageUrl.trim()
       : String(current.image_url || '').trim();
-    const ingredientIds = Array.isArray(input.ingredientIds)
+    const ingredientIdsRaw = Array.isArray(input.ingredientIds)
       ? input.ingredientIds.filter(Boolean)
       : Array.isArray(current.ingredient_ids) ? current.ingredient_ids : [];
     const isAvailable = input.isAvailable === undefined ? Boolean(current.is_available) : Boolean(input.isAvailable);
@@ -2689,6 +2741,10 @@ export class CoreService implements OnModuleInit {
     if (price < 0 || Number.isNaN(price)) {
       throw new BadRequestException('Invalid price');
     }
+    if (name !== 'TBA' && description !== 'TBA' && name.localeCompare(description, undefined, { sensitivity: 'accent' }) === 0) {
+      throw new BadRequestException('Dish name and description must be different');
+    }
+    const ingredientIds = ingredientIdsRaw.length > 0 ? ingredientIdsRaw : [await this.ensureTbaIngredientId()];
     if (caloriesKcal !== null && (!Number.isInteger(caloriesKcal) || caloriesKcal < 0)) {
       throw new BadRequestException('Invalid caloriesKcal');
     }

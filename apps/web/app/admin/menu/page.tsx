@@ -66,6 +66,8 @@ function normalize(raw: string) {
 
 const PACKING_CARE_FLAG = 'PACKING_CARE_REQUIRED';
 const WET_DISH_FLAG = 'WET_DISH';
+type PackingMode = 'NORMAL' | 'CUTLERY_REQUIRED' | 'PACKING_CARE_REQUIRED' | 'WET_DISH';
+type DietaryMode = 'NORMAL' | 'VEGETARIAN' | 'GLUTEN_FREE' | 'DAIRY_FREE' | 'CONTAIN_PEANUT';
 
 function parsePackingFlags(raw?: string | null) {
   const tokens = String(raw || '')
@@ -83,6 +85,34 @@ function buildPackingRequirement(packingCareRequired: boolean, wetDish: boolean)
   if (packingCareRequired) flags.push(PACKING_CARE_FLAG);
   if (wetDish) flags.push(WET_DISH_FLAG);
   return flags.join('; ');
+}
+
+function getPackingMode(cutleryRequired: boolean, packingCareRequired: boolean, wetDish: boolean): PackingMode {
+  if (packingCareRequired) return 'PACKING_CARE_REQUIRED';
+  if (wetDish) return 'WET_DISH';
+  if (cutleryRequired) return 'CUTLERY_REQUIRED';
+  return 'NORMAL';
+}
+
+function getDietaryMode(isVegetarian: boolean, isGlutenFree: boolean, isDairyFree: boolean, containsPeanut: boolean): DietaryMode {
+  if (containsPeanut) return 'CONTAIN_PEANUT';
+  if (isDairyFree) return 'DAIRY_FREE';
+  if (isGlutenFree) return 'GLUTEN_FREE';
+  if (isVegetarian) return 'VEGETARIAN';
+  return 'NORMAL';
+}
+
+function formatPackingLabel(raw?: string | null, cutleryRequired?: boolean) {
+  const flags = parsePackingFlags(raw);
+  const mode = getPackingMode(Boolean(cutleryRequired), flags.packingCareRequired, flags.wetDish);
+  if (mode === 'CUTLERY_REQUIRED') return 'Cutlery Required';
+  if (mode === 'PACKING_CARE_REQUIRED') return 'Packing Care Required';
+  if (mode === 'WET_DISH') return 'Wet Dish';
+  return 'Normal';
+}
+
+function formatPriceLabel(value: number) {
+  return Number(value || 0) > 0 ? `Rp ${Number(value).toLocaleString('id-ID')}` : 'TBA';
 }
 
 const masterIngredients = ((ingredientMaster as MasterIngredientFile).ingredients || []).map((x) => ({
@@ -121,7 +151,7 @@ export default function AdminMenuPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [itemAvailable, setItemAvailable] = useState(true);
   const [itemDisplayOrder, setItemDisplayOrder] = useState('1');
-  const [itemCutleryRequired, setItemCutleryRequired] = useState(true);
+  const [itemCutleryRequired, setItemCutleryRequired] = useState(false);
   const [itemPackingCareRequired, setItemPackingCareRequired] = useState(false);
   const [itemWetDish, setItemWetDish] = useState(false);
   const [itemIsVegetarian, setItemIsVegetarian] = useState(false);
@@ -178,6 +208,15 @@ export default function AdminMenuPage() {
     return mergedDishOptions.filter((d) => d.toLowerCase().includes(q));
   }, [itemName, mergedDishOptions]);
 
+  const itemPackingMode = useMemo(
+    () => getPackingMode(itemCutleryRequired, itemPackingCareRequired, itemWetDish),
+    [itemCutleryRequired, itemPackingCareRequired, itemWetDish],
+  );
+  const itemDietaryMode = useMemo(
+    () => getDietaryMode(itemIsVegetarian, itemIsGlutenFree, itemIsDairyFree, itemContainsPeanut),
+    [itemIsVegetarian, itemIsGlutenFree, itemIsDairyFree, itemContainsPeanut],
+  );
+
   const loadMenuData = async () => {
     const [ings, menu, ratings] = await Promise.all([
       apiFetch('/admin/ingredients') as Promise<Ingredient[]>,
@@ -228,7 +267,7 @@ export default function AdminMenuPage() {
     clearUploadSelection();
     setItemAvailable(true);
     setItemDisplayOrder('1');
-    setItemCutleryRequired(true);
+    setItemCutleryRequired(false);
     setItemPackingCareRequired(false);
     setItemWetDish(false);
     setItemIsVegetarian(false);
@@ -296,8 +335,14 @@ export default function AdminMenuPage() {
     e.preventDefault();
     setError('');
     setMessage('');
+    const trimmedName = itemName.trim() || 'TBA';
+    const trimmedDescription = itemDescription.trim() || 'TBA';
     if (itemIngredientIds.length > ingredientLimit) {
       setError(`Maximum ${ingredientLimit} ingredients per dish.`);
+      return;
+    }
+    if (trimmedName !== 'TBA' && trimmedDescription !== 'TBA' && trimmedName.toLowerCase() === trimmedDescription.toLowerCase()) {
+      setError('Dish Name and Description must be different.');
       return;
     }
     if (imageConverting) {
@@ -311,9 +356,9 @@ export default function AdminMenuPage() {
 
     const basePayload = {
       session: menuSession,
-      name: itemName,
+      name: trimmedName,
       dishCategory: itemDishCategory,
-      description: itemDescription,
+      description: trimmedDescription,
       nutritionFactsText: 'TBA',
       caloriesKcal: itemCaloriesKcal ? Number(itemCaloriesKcal) : null,
       price: Number(itemPrice || 0),
@@ -412,7 +457,6 @@ export default function AdminMenuPage() {
     }
     setCustomDishOptions((prev) => [...prev, raw]);
     setItemName(raw);
-    if (!itemDescription.trim()) setItemDescription(raw);
     setCustomDishInput('');
     setMessage(`Dish added to selection: ${raw}`);
   };
@@ -450,7 +494,7 @@ export default function AdminMenuPage() {
         session: menuSession,
         name: dish,
         dishCategory: itemDishCategory,
-        description: dish,
+        description: itemDescription.trim() || 'TBA',
         nutritionFactsText: 'TBA',
         caloriesKcal: null,
         price: Number(itemPrice || 0),
@@ -467,7 +511,6 @@ export default function AdminMenuPage() {
       };
       await apiFetch('/admin/menu-items', { method: 'POST', body: JSON.stringify(payload) }, { skipAutoReload: true });
       setItemName(dish);
-      if (!itemDescription.trim()) setItemDescription(dish);
       setMessage(`Dish auto-created: ${dish}`);
       await loadMenuData();
     } catch (err) {
@@ -596,7 +639,7 @@ export default function AdminMenuPage() {
 
         <form id="menu-item-form" className="auth-form" onSubmit={onSaveItem}>
           <label>
-            Dish Label
+            Category
             <select value={itemDishCategory} onChange={(e) => setItemDishCategory(e.target.value as 'MAIN' | 'APPETISER' | 'COMPLEMENT' | 'DESSERT' | 'SIDES' | 'GARNISH' | 'DRINK')} required>
               <option value="MAIN">Main</option>
               <option value="DRINK">Drinks</option>
@@ -607,9 +650,9 @@ export default function AdminMenuPage() {
               <option value="SIDES">Sides</option>
             </select>
           </label>
-          <label>Description<input value={itemDescription} onChange={(e) => setItemDescription(e.target.value)} required /></label>
+          <label>Description<input value={itemDescription} onChange={(e) => setItemDescription(e.target.value)} placeholder="TBA" required /></label>
           <label>Price (IDR)<input type="number" min={0} step={100} value={itemPrice} onChange={(e) => setItemPrice(e.target.value)} required /></label>
-          <label>Calories (kcal)<input type="number" min={0} step={1} value={itemCaloriesKcal} onChange={(e) => setItemCaloriesKcal(e.target.value)} placeholder="leave empty for TBA" /></label>
+          <label>Calories (kcal)<input type="number" min={0} step={1} value={itemCaloriesKcal} onChange={(e) => setItemCaloriesKcal(e.target.value)} placeholder="TBA" /></label>
           <label>Display Order<input type="number" min={0} value={itemDisplayOrder} onChange={(e) => setItemDisplayOrder(e.target.value)} required /></label>
 
           <label className="menu-full-row">Upload Image (WebP auto-convert, upload only)
@@ -626,7 +669,7 @@ export default function AdminMenuPage() {
 
           <div className="menu-selection-columns menu-full-row">
             <div className="ingredient-selected-box">
-              <label>Dish Name<input ref={itemNameInputRef} value={itemName} onChange={(e) => setItemName(e.target.value)} required /></label>
+              <label>Dish Name<input ref={itemNameInputRef} value={itemName} onChange={(e) => setItemName(e.target.value)} placeholder="TBA" required /></label>
               <div className="menu-add-row">
                 <input
                   value={customDishInput}
@@ -644,10 +687,7 @@ export default function AdminMenuPage() {
                     key={dish}
                     className="btn btn-outline ingredient-chip"
                     type="button"
-                    onClick={() => {
-                      setItemName(dish);
-                      if (!itemDescription.trim()) setItemDescription(dish);
-                    }}
+                    onClick={() => setItemName(dish)}
                     onDoubleClick={() => void onAutoCreateDishFromMaster(dish)}
                     title="Click to fill Dish Name. Double-click to auto-create dish item."
                   >
@@ -659,35 +699,42 @@ export default function AdminMenuPage() {
             </div>
 
             <div className="menu-right-stack">
-              <div className="menu-check-grid">
-                <label className="menu-check-row">
-                  <input type="checkbox" checked={itemCutleryRequired} onChange={(e) => setItemCutleryRequired(e.target.checked)} />
-                  <span>Cutlery Required</span>
-                </label>
-                <label className="menu-check-row">
-                  <input type="checkbox" checked={itemPackingCareRequired} onChange={(e) => setItemPackingCareRequired(e.target.checked)} />
-                  <span>Packing Care Required</span>
-                </label>
-                <label className="menu-check-row">
-                  <input type="checkbox" checked={itemWetDish} onChange={(e) => setItemWetDish(e.target.checked)} />
-                  <span>Wet Dish</span>
-                </label>
-                <label className="menu-check-row">
-                  <input type="checkbox" checked={itemIsVegetarian} onChange={(e) => setItemIsVegetarian(e.target.checked)} />
-                  <span>Vegetarian</span>
-                </label>
-                <label className="menu-check-row">
-                  <input type="checkbox" checked={itemIsGlutenFree} onChange={(e) => setItemIsGlutenFree(e.target.checked)} />
-                  <span>Gluten Free</span>
-                </label>
-                <label className="menu-check-row">
-                  <input type="checkbox" checked={itemIsDairyFree} onChange={(e) => setItemIsDairyFree(e.target.checked)} />
-                  <span>Dairy Free</span>
-                </label>
-                <label className="menu-check-row">
-                  <input type="checkbox" checked={itemContainsPeanut} onChange={(e) => setItemContainsPeanut(e.target.checked)} />
-                  <span>Contain Peanut</span>
-                </label>
+              <div className="menu-option-card">
+                <strong>Packing Instruction</strong>
+                <select
+                  value={itemPackingMode}
+                  onChange={(e) => {
+                    const mode = e.target.value as PackingMode;
+                    setItemCutleryRequired(mode === 'CUTLERY_REQUIRED');
+                    setItemPackingCareRequired(mode === 'PACKING_CARE_REQUIRED');
+                    setItemWetDish(mode === 'WET_DISH');
+                  }}
+                >
+                  <option value="NORMAL">Normal</option>
+                  <option value="CUTLERY_REQUIRED">Cutlery Required</option>
+                  <option value="PACKING_CARE_REQUIRED">Packing Care Required</option>
+                  <option value="WET_DISH">Wet Dish</option>
+                </select>
+              </div>
+
+              <div className="menu-option-card">
+                <strong>Dietary</strong>
+                <select
+                  value={itemDietaryMode}
+                  onChange={(e) => {
+                    const mode = e.target.value as DietaryMode;
+                    setItemIsVegetarian(mode === 'VEGETARIAN');
+                    setItemIsGlutenFree(mode === 'GLUTEN_FREE');
+                    setItemIsDairyFree(mode === 'DAIRY_FREE');
+                    setItemContainsPeanut(mode === 'CONTAIN_PEANUT');
+                  }}
+                >
+                  <option value="NORMAL">Normal</option>
+                  <option value="VEGETARIAN">Vegetarian</option>
+                  <option value="GLUTEN_FREE">Gluten Free</option>
+                  <option value="DAIRY_FREE">Diary Free</option>
+                  <option value="CONTAIN_PEANUT">Contain Peanut</option>
+                </select>
               </div>
 
               <div className="ingredient-selected-box">
@@ -752,18 +799,17 @@ export default function AdminMenuPage() {
               <div className="auth-form menu-list-card menu-list-card-active">
                 {activeMenuItems.map((item) => (
                   <article key={item.id} className="menu-item-card">
-                    <strong>{item.name}</strong>
-                    <small>{item.description}</small>
-                    <small>Date/Session: {item.service_date || '-'} / {item.session || '-'}</small>
-                    <small>Image: {hasUploadedImage(item.image_url) ? 'Uploaded' : 'Default image'}</small>
-                    <small>Image File: {getImageFileLabel(item.image_url)}</small>
-                    <small>Calories: {item.calories_kcal ?? 'TBA'}</small>
-                    <small>Price: Rp {Number(item.price).toLocaleString('id-ID')}</small>
-                    <small>Category: {formatDishCategoryLabel(item.dish_category)}</small>
+                    <strong>Dish Name: {item.name || 'TBA'}</strong>
+                    <small>Description: {(item.description || '').trim() || 'TBA'}</small>
                     <small>Dietary: {formatDishDietaryTags(item)}</small>
-                    <small>Ingredients: {item.ingredients.map(toLabel).join(', ') || '-'}</small>
-                    <small>Cutlery: {item.cutlery_required ? 'Required' : 'Not required'}</small>
-                    <small>Packing: {item.packing_requirement || '-'}</small>
+                    <small>Ingredient: {item.ingredients.map(toLabel).join(', ') || 'TBA'}</small>
+                    <small>Calories: {item.calories_kcal ?? 'TBA'}</small>
+                    <small>Price: {formatPriceLabel(Number(item.price || 0))}</small>
+                    <small>Category: {formatDishCategoryLabel(item.dish_category)}</small>
+                    <small>Date/Session: {item.service_date || '-'} / {item.session || '-'}</small>
+                    <small>Image Status: {hasUploadedImage(item.image_url) ? 'Uploaded' : 'Default image'}</small>
+                    <small>Image File Name: {getImageFileLabel(item.image_url)}</small>
+                    <small>Packing: {formatPackingLabel(item.packing_requirement, item.cutlery_required)}</small>
                     <div className="menu-actions-row">
                       <button className="btn btn-outline" type="button" onClick={() => onEditItem(item)} disabled={savingItem || actionLoading}>Edit Dish</button>
                       <button className="btn btn-outline" type="button" onClick={() => onSetDishActive(item, false)} disabled={savingItem || actionLoading}>Deactivate</button>
@@ -778,18 +824,17 @@ export default function AdminMenuPage() {
               <div className="auth-form menu-list-card menu-list-card-inactive">
                 {inactiveMenuItems.map((item) => (
                   <article key={item.id} className="menu-item-card">
-                    <strong>{item.name}</strong>
-                    <small>{item.description}</small>
-                    <small>Date/Session: {item.service_date || '-'} / {item.session || '-'}</small>
-                    <small>Image: {hasUploadedImage(item.image_url) ? 'Uploaded' : 'Default image'}</small>
-                    <small>Image File: {getImageFileLabel(item.image_url)}</small>
-                    <small>Calories: {item.calories_kcal ?? 'TBA'}</small>
-                    <small>Price: Rp {Number(item.price).toLocaleString('id-ID')}</small>
-                    <small>Category: {formatDishCategoryLabel(item.dish_category)}</small>
+                    <strong>Dish Name: {item.name || 'TBA'}</strong>
+                    <small>Description: {(item.description || '').trim() || 'TBA'}</small>
                     <small>Dietary: {formatDishDietaryTags(item)}</small>
-                    <small>Ingredients: {item.ingredients.map(toLabel).join(', ') || '-'}</small>
-                    <small>Cutlery: {item.cutlery_required ? 'Required' : 'Not required'}</small>
-                    <small>Packing: {item.packing_requirement || '-'}</small>
+                    <small>Ingredient: {item.ingredients.map(toLabel).join(', ') || 'TBA'}</small>
+                    <small>Calories: {item.calories_kcal ?? 'TBA'}</small>
+                    <small>Price: {formatPriceLabel(Number(item.price || 0))}</small>
+                    <small>Category: {formatDishCategoryLabel(item.dish_category)}</small>
+                    <small>Date/Session: {item.service_date || '-'} / {item.session || '-'}</small>
+                    <small>Image Status: {hasUploadedImage(item.image_url) ? 'Uploaded' : 'Default image'}</small>
+                    <small>Image File Name: {getImageFileLabel(item.image_url)}</small>
+                    <small>Packing: {formatPackingLabel(item.packing_requirement, item.cutlery_required)}</small>
                     <div className="menu-actions-row">
                       <button className="btn btn-outline" type="button" onClick={() => onEditItem(item)} disabled={savingItem || actionLoading}>Edit Dish</button>
                       <button className="btn btn-outline" type="button" onClick={() => onSetDishActive(item, true)} disabled={savingItem || actionLoading}>Activate</button>
@@ -854,14 +899,13 @@ export default function AdminMenuPage() {
         .menu-add-row input {
           min-width: 0;
         }
-        .menu-check-grid {
+        .menu-option-card {
           display: grid;
-          grid-template-columns: 1fr;
-          gap: 0.4rem;
+          gap: 0.45rem;
           border: 1px solid #ccbda2;
           border-radius: 0.55rem;
           background: #fff;
-          padding: 0.55rem 0.6rem;
+          padding: 0.6rem;
         }
         .menu-selection-columns {
           display: grid;
@@ -874,19 +918,6 @@ export default function AdminMenuPage() {
         .menu-right-stack {
           display: grid;
           gap: 0.7rem;
-        }
-        .menu-check-row {
-          display: flex;
-          align-items: center;
-          gap: 0.45rem;
-          margin: 0;
-          font-size: 0.92rem;
-        }
-        .menu-check-row input[type='checkbox'] {
-          width: 0.95rem;
-          height: 0.95rem;
-          margin: 0;
-          flex: 0 0 auto;
         }
         .ingredient-selected-box {
           border: 1px solid #ccbda2;

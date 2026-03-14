@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { fetchWithTimeout, getApiBase } from '../../lib/auth';
-import { formatDishDietaryTags } from '../../lib/dish-tags';
 
 type PublicMenuItem = {
   id: string;
   name: string;
+  description?: string;
+  calories_kcal?: number | null;
   price: number;
   image_url: string;
   is_available?: boolean;
@@ -128,11 +129,10 @@ export default function MenuPage() {
                         }}
                       />
                       <div>
-                        <strong>{item.name}</strong>
-                        <small>Rp {Number(item.price || 0).toLocaleString('id-ID')}</small>
-                        <small>Dietary: {formatDishDietaryTags(item)}</small>
-                        <small>Status: {item.is_available === false ? 'Not Active' : 'Active'}</small>
-                        <small>{item.session}</small>
+                        <strong>{item.name || 'TBA'}</strong>
+                        <small>Price: {Number(item.price || 0) > 0 ? `Rp ${Number(item.price || 0).toLocaleString('id-ID')}` : 'TBA'}</small>
+                        <small>Description: {(item.description || '').trim() || 'TBA'}</small>
+                        <small>Calories: {item.calories_kcal ?? 'TBA'}</small>
                       </div>
                     </article>
                   ))}
@@ -159,11 +159,10 @@ export default function MenuPage() {
                             }}
                           />
                           <div>
-                            <strong>{item.name}</strong>
-                            <small>Rp {Number(item.price || 0).toLocaleString('id-ID')}</small>
-                            <small>Dietary: {formatDishDietaryTags(item)}</small>
-                            <small>Status: {item.is_available === false ? 'Not Active' : 'Active'}</small>
-                            <small>{item.session}</small>
+                            <strong>{item.name || 'TBA'}</strong>
+                            <small>Price: {Number(item.price || 0) > 0 ? `Rp ${Number(item.price || 0).toLocaleString('id-ID')}` : 'TBA'}</small>
+                            <small>Description: {(item.description || '').trim() || 'TBA'}</small>
+                            <small>Calories: {item.calories_kcal ?? 'TBA'}</small>
                           </div>
                         </article>
                       ))}
@@ -218,8 +217,7 @@ export default function MenuPage() {
           background: #fff;
           overflow: hidden;
           display: grid;
-          gap: 0.4rem;
-          padding-bottom: 0.5rem;
+          grid-template-rows: 120px auto;
         }
         .menu-public-grid > .menu-public-card:only-child,
         .menu-public-grid > .menu-public-card:last-child:nth-child(odd) {
@@ -232,9 +230,13 @@ export default function MenuPage() {
           display: block;
         }
         .menu-public-card div {
+          border-top: 1px solid #d8cab1;
           padding-inline: 0.55rem;
+          padding-top: 0.55rem;
+          padding-bottom: 0.55rem;
           display: grid;
           gap: 0.2rem;
+          align-content: start;
         }
         .menu-public-card small {
           color: #5d554b;
