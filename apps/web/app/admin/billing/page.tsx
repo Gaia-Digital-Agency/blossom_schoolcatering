@@ -41,6 +41,11 @@ function getLastName(fullName?: string | null) {
   return parts.length > 1 ? parts[parts.length - 1] : (parts[0] || '-');
 }
 
+function getFirstName(fullName?: string | null) {
+  const parts = String(fullName || '').trim().split(/\s+/).filter(Boolean);
+  return parts[0] || '-';
+}
+
 function getProofFileName(proofImageUrl?: string | null) {
   const raw = String(proofImageUrl || '').trim();
   if (!raw) return '-';
@@ -289,18 +294,16 @@ export default function AdminBillingPage() {
                         {group.rows.map((row) => (
                           <tr key={row.id}>
                             <td>
-                              <strong>{getLastName(row.parent_name)}</strong>
-                              <small>{row.status.replace(/_/g, ' ')}</small>
+                              {getLastName(row.parent_name)}
                             </td>
-                            <td><strong>{row.child_name || '-'}</strong></td>
+                            <td>{getFirstName(row.child_name)}</td>
                             <td>
-                              <strong>{row.service_date}</strong>
-                              <small>{row.session}</small>
+                              {row.service_date}
                             </td>
                             <td>{renderRef(row)}</td>
-                            <td><strong>{formatMoney(row.total_price)}</strong></td>
+                            <td>{formatMoney(row.total_price)}</td>
                             <td>
-                              <strong>{getProofFileName(row.proof_image_url)}</strong>
+                              {getProofFileName(row.proof_image_url)}
                               {row.admin_note ? <small className="admin-note">{row.admin_note}</small> : null}
                             </td>
                             <td>{renderUnpaidActions(row)}</td>
@@ -341,22 +344,18 @@ export default function AdminBillingPage() {
                       <tbody>
                         {group.rows.map((row) => (
                           <tr key={row.id}>
+                            <td>{getLastName(row.parent_name)}</td>
+                            <td>{getFirstName(row.child_name)}</td>
                             <td>
-                              <strong>{getLastName(row.parent_name)}</strong>
-                              <small>Verified</small>
-                            </td>
-                            <td><strong>{row.child_name || '-'}</strong></td>
-                            <td>
-                              <strong>{row.service_date}</strong>
-                              <small>{row.session}</small>
+                              {row.service_date}
                             </td>
                             <td>
                               {renderRef(row)}
                               {row.receipt_number ? <small>Receipt: {row.receipt_number}</small> : null}
                             </td>
-                            <td><strong>{formatMoney(row.total_price)}</strong></td>
+                            <td>{formatMoney(row.total_price)}</td>
                             <td>
-                              <strong>{getProofFileName(row.proof_image_url)}</strong>
+                              {getProofFileName(row.proof_image_url)}
                               {row.admin_note ? <small className="admin-note">{row.admin_note}</small> : null}
                             </td>
                             <td>{renderPaidActions(row)}</td>
@@ -480,7 +479,6 @@ export default function AdminBillingPage() {
           .admin-billing-table td:nth-child(4) {
             min-width: 130px;
           }
-          .admin-billing-table strong,
           .admin-billing-table small,
           .ref-cell code {
             display: block;
