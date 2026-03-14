@@ -32,6 +32,8 @@ export default function AdminSchoolsPage() {
   const [editCity, setEditCity] = useState('');
   const [editAddress, setEditAddress] = useState('');
   const [editPhone, setEditPhone] = useState('');
+  const activeSchools = schools.filter((school) => school.is_active !== false);
+  const inactiveSchools = schools.filter((school) => school.is_active === false);
 
   const load = async () => {
     setError('');
@@ -168,6 +170,94 @@ export default function AdminSchoolsPage() {
     }
   };
 
+  const renderSchoolTable = (title: string, list: School[]) => (
+    <div className="school-section-card">
+      <div className="school-section-head">
+        <h3>{title}</h3>
+        <span>{list.length} school(s)</span>
+      </div>
+      <div className="kitchen-table-wrap">
+        <table className="kitchen-table admin-schools-table">
+          <thead>
+            <tr>
+              <th>School</th>
+              <th>City</th>
+              <th>Address</th>
+              <th>Phone</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.map((school) => (
+              <tr key={school.id}>
+                {editingSchoolId === school.id ? (
+                  <>
+                    <td><input value={editName} onChange={(e) => setEditName(e.target.value)} /></td>
+                    <td><input value={editCity} onChange={(e) => setEditCity(e.target.value)} /></td>
+                    <td><input value={editAddress} onChange={(e) => setEditAddress(e.target.value)} /></td>
+                    <td><input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} placeholder="+[country][area][number]" /></td>
+                    <td>
+                      <div className="action-row">
+                        <button className="btn btn-primary btn-sm" type="button" onClick={() => onSaveEdit(school)} disabled={savingSchoolId === school.id}>
+                          {savingSchoolId === school.id ? 'Saving...' : 'Save'}
+                        </button>
+                        <button className="btn btn-outline btn-sm" type="button" onClick={() => setEditingSchoolId('')}>Cancel</button>
+                      </div>
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td>{school.name}</td>
+                    <td>{school.city || '-'}</td>
+                    <td>{school.address || '-'}</td>
+                    <td>{school.contact_phone || '-'}</td>
+                    <td>
+                      <div className="action-row">
+                        <button className="btn btn-outline btn-sm" type="button" onClick={() => beginEdit(school)}>
+                          Edit
+                        </button>
+                        {school.is_active ? (
+                          <button
+                            className="btn btn-outline btn-sm"
+                            type="button"
+                            onClick={() => onToggleSchool(school, false)}
+                            disabled={savingSchoolId === school.id}
+                          >
+                            Deactivate
+                          </button>
+                        ) : (
+                          <button
+                            className="btn btn-outline btn-sm"
+                            type="button"
+                            onClick={() => onToggleSchool(school, true)}
+                            disabled={savingSchoolId === school.id}
+                          >
+                            Activate
+                          </button>
+                        )}
+                        <button
+                          className="btn btn-outline btn-sm"
+                          type="button"
+                          onClick={() => onDeleteSchool(school)}
+                          disabled={deletingSchoolId === school.id}
+                        >
+                          {deletingSchoolId === school.id ? 'Deleting...' : 'Delete'}
+                        </button>
+                      </div>
+                    </td>
+                  </>
+                )}
+              </tr>
+            ))}
+            {list.length === 0 ? (
+              <tr><td colSpan={5}>No schools found.</td></tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
   return (
     <main className="page-auth page-auth-desktop">
       <section className="auth-panel">
@@ -217,87 +307,9 @@ export default function AdminSchoolsPage() {
         </div>
 
         <h2>Schools</h2>
-        <div className="kitchen-table-wrap">
-          <table className="kitchen-table admin-schools-table">
-            <thead>
-              <tr>
-                <th>School</th>
-                <th>City</th>
-                <th>Address</th>
-                <th>Phone</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {schools.map((school) => (
-                <tr key={school.id}>
-                  {editingSchoolId === school.id ? (
-                    <>
-                      <td><input value={editName} onChange={(e) => setEditName(e.target.value)} /></td>
-                      <td><input value={editCity} onChange={(e) => setEditCity(e.target.value)} /></td>
-                      <td><input value={editAddress} onChange={(e) => setEditAddress(e.target.value)} /></td>
-                      <td><input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} placeholder="+[country][area][number]" /></td>
-                      <td><span className={`status-badge ${school.is_active ? 'active' : 'inactive'}`}>{school.is_active ? 'Active' : 'Inactive'}</span></td>
-                      <td>
-                        <div className="action-row">
-                          <button className="btn btn-primary btn-sm" type="button" onClick={() => onSaveEdit(school)} disabled={savingSchoolId === school.id}>
-                            {savingSchoolId === school.id ? 'Saving...' : 'Save'}
-                          </button>
-                          <button className="btn btn-outline btn-sm" type="button" onClick={() => setEditingSchoolId('')}>Cancel</button>
-                        </div>
-                      </td>
-                    </>
-                  ) : (
-                    <>
-                      <td>{school.name}</td>
-                      <td>{school.city || '-'}</td>
-                      <td>{school.address || '-'}</td>
-                      <td>{school.contact_phone || '-'}</td>
-                      <td><span className={`status-badge ${school.is_active ? 'active' : 'inactive'}`}>{school.is_active ? 'Active' : 'Inactive'}</span></td>
-                      <td>
-                        <div className="action-row">
-                          <button className="btn btn-outline btn-sm" type="button" onClick={() => beginEdit(school)}>
-                            Edit
-                          </button>
-                          {school.is_active ? (
-                            <button
-                              className="btn btn-outline btn-sm"
-                              type="button"
-                              onClick={() => onToggleSchool(school, false)}
-                              disabled={savingSchoolId === school.id}
-                            >
-                              Deactivate
-                            </button>
-                          ) : (
-                            <button
-                              className="btn btn-outline btn-sm"
-                              type="button"
-                              onClick={() => onToggleSchool(school, true)}
-                              disabled={savingSchoolId === school.id}
-                            >
-                              Activate
-                            </button>
-                          )}
-                          <button
-                            className="btn btn-outline btn-sm"
-                            type="button"
-                            onClick={() => onDeleteSchool(school)}
-                            disabled={deletingSchoolId === school.id}
-                          >
-                            {deletingSchoolId === school.id ? 'Deleting...' : 'Delete'}
-                          </button>
-                        </div>
-                      </td>
-                    </>
-                  )}
-                </tr>
-              ))}
-              {schools.length === 0 ? (
-                <tr><td colSpan={6}>No schools found.</td></tr>
-              ) : null}
-            </tbody>
-          </table>
+        <div className="schools-grid">
+          {renderSchoolTable('Active Schools', activeSchools)}
+          {renderSchoolTable('Deactivated Schools', inactiveSchools)}
         </div>
       </section>
       <style jsx>{`
@@ -360,28 +372,37 @@ export default function AdminSchoolsPage() {
         .kitchen-table tbody tr:last-child td {
           border-bottom: none;
         }
+        .schools-grid {
+          display: grid;
+          gap: 1rem;
+        }
+        .school-section-card {
+          border: 1px solid #e2d6c2;
+          border-radius: 0.85rem;
+          background: #fffdf9;
+          padding: 0.8rem;
+        }
+        .school-section-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 1rem;
+          margin-bottom: 0.65rem;
+        }
+        .school-section-head h3 {
+          margin: 0;
+          font-size: 1rem;
+        }
+        .school-section-head span {
+          font-size: 0.8rem;
+          color: #7a6652;
+        }
         .admin-schools-table td input {
           width: 100%;
           padding: 0.35rem 0.6rem;
           border: 1px solid #d1c3a8;
           border-radius: 0.4rem;
           font-size: 0.88rem;
-        }
-        .status-badge {
-          display: inline-block;
-          padding: 0.15rem 0.55rem;
-          border-radius: 999px;
-          font-size: 0.75rem;
-          font-weight: 600;
-          width: fit-content;
-        }
-        .status-badge.active {
-          background: #d4edda;
-          color: #155724;
-        }
-        .status-badge.inactive {
-          background: #f8d7da;
-          color: #721c24;
         }
         .action-row {
           display: flex;
