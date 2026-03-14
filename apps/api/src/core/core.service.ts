@@ -6484,6 +6484,28 @@ export class CoreService implements OnModuleInit {
   async deleteParent(actor: AccessUser, targetParentId: string) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     this.assertValidUuid(targetParentId, 'parentId');
+    const linkedYoungstersRaw = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT c.id,
+               c.user_id,
+               c.deleted_at::text AS deleted_at
+        FROM parent_children pc
+        JOIN children c ON c.id = pc.child_id
+        WHERE pc.parent_id = $1
+      ) t;
+      `,
+      [targetParentId],
+    );
+    const linkedYoungsters = this.parseJsonLines<{ id: string; user_id: string; deleted_at?: string | null }>(linkedYoungstersRaw);
+    const activeLinkedYoungster = linkedYoungsters.find((row) => !row.deleted_at);
+    if (activeLinkedYoungster) {
+      throw new BadRequestException('Cannot delete parent with associated youngster(s)');
+    }
+    for (const youngster of linkedYoungsters) {
+      await this.hardDeleteYoungsterIfSafe(youngster.id, youngster.user_id);
+    }
     const linkedYoungsterExists = await runSql(
       `SELECT EXISTS (
          SELECT 1
@@ -6491,7 +6513,7 @@ export class CoreService implements OnModuleInit {
          JOIN children c ON c.id = pc.child_id
          WHERE pc.parent_id = $1
            AND c.deleted_at IS NULL
-       );`,
+      );`,
       [targetParentId],
     );
     if (linkedYoungsterExists === 't') {
@@ -6542,6 +6564,48 @@ export class CoreService implements OnModuleInit {
     await runSql(`DELETE FROM users WHERE id = $1;`, [parent.user_id]);
     await this.recordAdminAudit(actor, 'PARENT_DELETED', 'parent', targetParentId);
     return { ok: true };
+  }
+
+  private async hardDeleteYoungsterIfSafe(youngsterId: string, userId: string) {
+    const blockerRaw = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT
+          (SELECT COUNT(*)::int FROM orders WHERE child_id = $1) AS orders_count,
+          (SELECT COUNT(*)::int
+             FROM billing_records br
+             JOIN orders o ON o.id = br.order_id
+            WHERE o.child_id = $1) AS billing_count,
+          (SELECT COUNT(*)::int FROM order_carts WHERE child_id = $1 OR created_by_user_id = $2) AS carts_count,
+          (SELECT COUNT(*)::int FROM favourite_meals WHERE child_id = $1 OR created_by_user_id = $2) AS favourites_count,
+          (SELECT COUNT(*)::int FROM admin_audit_logs WHERE actor_user_id = $2) AS audit_count
+      ) t;
+      `,
+      [youngsterId, userId],
+    );
+    const blocker = this.parseJsonLine<{
+      orders_count: number;
+      billing_count: number;
+      carts_count: number;
+      favourites_count: number;
+      audit_count: number;
+    }>(blockerRaw);
+    if (
+      Number(blocker?.orders_count || 0) > 0 ||
+      Number(blocker?.billing_count || 0) > 0 ||
+      Number(blocker?.carts_count || 0) > 0 ||
+      Number(blocker?.favourites_count || 0) > 0 ||
+      Number(blocker?.audit_count || 0) > 0
+    ) {
+      throw new BadRequestException('Cannot hard-delete youngster with order or billing history');
+    }
+    await runSql(`DELETE FROM parent_children WHERE child_id = $1;`, [youngsterId]);
+    await runSql(`DELETE FROM child_dietary_restrictions WHERE child_id = $1;`, [youngsterId]);
+    await runSql(`DELETE FROM user_preferences WHERE user_id = $1;`, [userId]);
+    await runSql(`DELETE FROM auth_refresh_sessions WHERE user_id = $1;`, [userId]);
+    await runSql(`DELETE FROM children WHERE id = $1;`, [youngsterId]);
+    await runSql(`DELETE FROM users WHERE id = $1;`, [userId]);
   }
 
   // ─── Youngster CRUD ──────────────────────────────────────────────────────
@@ -6648,8 +6712,7 @@ export class CoreService implements OnModuleInit {
     );
     if (!out) throw new NotFoundException('Youngster not found');
     const child = this.parseJsonLine<{ id: string; user_id: string }>(out);
-    await runSql(`UPDATE children SET deleted_at = now(), is_active = false, updated_at = now() WHERE id = $1;`, [youngsterId]);
-    await runSql(`UPDATE users SET is_active = false, deleted_at = now(), updated_at = now() WHERE id = $1;`, [child.user_id]);
+    await this.hardDeleteYoungsterIfSafe(youngsterId, child.user_id);
     await this.recordAdminAudit(actor, 'YOUNGSTER_DELETED', 'youngster', youngsterId);
     return { ok: true };
   }
