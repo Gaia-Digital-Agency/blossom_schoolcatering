@@ -2247,7 +2247,7 @@ export class CoreService implements OnModuleInit {
           AND mi.deleted_at IS NULL
           ${filterSql}
         GROUP BY mi.id, m.service_date, m.session
-        ORDER BY m.session ASC, mi.display_order ASC, mi.name ASC
+        ORDER BY m.session ASC, lower(mi.name) ASC
       ) t;
     `,
       params,
@@ -2321,7 +2321,7 @@ export class CoreService implements OnModuleInit {
           AND m.deleted_at IS NULL
           AND mi.deleted_at IS NULL
           AND mi.is_available = true
-        ORDER BY m.service_date DESC, m.session ASC, mi.display_order ASC, mi.name ASC
+        ORDER BY m.service_date DESC, m.session ASC, lower(mi.name) ASC
       ) t;
       `,
       params,
@@ -2400,7 +2400,7 @@ export class CoreService implements OnModuleInit {
           AND m.deleted_at IS NULL
           AND mi.deleted_at IS NULL
         GROUP BY mi.id, m.service_date, m.session
-        ORDER BY m.service_date DESC, m.session ASC, mi.display_order ASC, mi.name ASC
+        ORDER BY m.service_date DESC, m.session ASC, lower(mi.name) ASC
       ) t;
     `,
       params,

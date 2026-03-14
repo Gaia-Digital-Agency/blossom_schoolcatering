@@ -133,7 +133,6 @@ export default function AdminMenuPage() {
   const [savingItem, setSavingItem] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [itemAvailable, setItemAvailable] = useState(true);
-  const [itemDisplayOrder, setItemDisplayOrder] = useState('1');
   const [itemCutleryRequired, setItemCutleryRequired] = useState(false);
   const [itemPackingCareRequired, setItemPackingCareRequired] = useState(false);
   const [itemWetDish, setItemWetDish] = useState(false);
@@ -240,7 +239,6 @@ export default function AdminMenuPage() {
     setStoredImageUrl('');
     clearUploadSelection();
     setItemAvailable(true);
-    setItemDisplayOrder('1');
     setItemCutleryRequired(false);
     setItemPackingCareRequired(false);
     setItemWetDish(false);
@@ -339,7 +337,6 @@ export default function AdminMenuPage() {
       imageUrl: itemImageUrl,
       ingredientIds: itemIngredientIds,
       isAvailable: itemAvailable,
-      displayOrder: Number(itemDisplayOrder || 0),
       cutleryRequired: itemCutleryRequired,
       packingRequirement: buildPackingRequirement(itemPackingCareRequired, itemWetDish),
       isVegetarian: itemIsVegetarian,
@@ -475,7 +472,6 @@ export default function AdminMenuPage() {
         imageUrl: itemImageUrl || '/schoolcatering/assets/hero-meal.jpg',
         ingredientIds: itemIngredientIds,
         isAvailable: true,
-        displayOrder: Math.max(0, ...menuItems.map((x) => Number(x.display_order || 0))) + 1,
         cutleryRequired: itemCutleryRequired,
         packingRequirement: buildPackingRequirement(itemPackingCareRequired, itemWetDish),
         isVegetarian: itemIsVegetarian,
@@ -507,7 +503,6 @@ export default function AdminMenuPage() {
     setStoredImageUrl(item.image_url || '');
     clearUploadSelection();
     setItemAvailable(Boolean(item.is_available));
-    setItemDisplayOrder(String(item.display_order ?? 0));
     setItemCutleryRequired(Boolean(item.cutlery_required));
     const flags = parsePackingFlags(item.packing_requirement || '');
     setItemPackingCareRequired(flags.packingCareRequired);
@@ -574,8 +569,20 @@ export default function AdminMenuPage() {
     if (!raw) return false;
     return !raw.includes(DEFAULT_DISH_IMAGE.toLowerCase());
   };
-  const activeMenuItems = useMemo(() => menuItems.filter((x) => x.is_available), [menuItems]);
-  const inactiveMenuItems = useMemo(() => menuItems.filter((x) => !x.is_available), [menuItems]);
+  const activeMenuItems = useMemo(
+    () => menuItems
+      .filter((x) => x.is_available)
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+    [menuItems],
+  );
+  const inactiveMenuItems = useMemo(
+    () => menuItems
+      .filter((x) => !x.is_available)
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+    [menuItems],
+  );
 
   useEffect(() => {
     if (activeMenuItems.length > 0 && activeMenuItems.length < 5) {
@@ -627,7 +634,6 @@ export default function AdminMenuPage() {
           <label>Description<input value={itemDescription} onChange={(e) => setItemDescription(e.target.value)} placeholder="TBA" required /></label>
           <label>Price (IDR)<input type="number" min={0} step={100} value={itemPrice} onChange={(e) => setItemPrice(e.target.value)} required /></label>
           <label>Calories (kcal)<input type="number" min={0} step={1} value={itemCaloriesKcal} onChange={(e) => setItemCaloriesKcal(e.target.value)} placeholder="TBA" /></label>
-          <label>Display Order<input type="number" min={0} value={itemDisplayOrder} onChange={(e) => setItemDisplayOrder(e.target.value)} required /></label>
 
           <label className="menu-full-row">Upload Image (WebP auto-convert, upload only)
             <input
