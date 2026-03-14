@@ -183,6 +183,19 @@ export default function AdminBillingPage() {
     }
   };
 
+  const onDeleteBilling = async (row: BillingRow) => {
+    if (!window.confirm(`Delete billing "${row.id}" for ${row.parent_name}? This cannot be undone.`)) return;
+    setError('');
+    setMessage('');
+    try {
+      await apiFetch(`/admin/billing/${row.id}`, { method: 'DELETE' }, { skipAutoReload: true });
+      setMessage(`Billing deleted: ${row.id}`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed deleting billing');
+    }
+  };
+
   const closeProofPreview = () => {
     if (proofPreviewUrl && proofPreviewUrl.startsWith('blob:')) {
       window.URL.revokeObjectURL(proofPreviewUrl);
@@ -278,6 +291,9 @@ export default function AdminBillingPage() {
             Receipt
           </button>
         ) : null}
+        <button className="btn btn-outline btn-sm" type="button" onClick={() => onDeleteBilling(row)}>
+          Delete
+        </button>
       </div>
     );
   };
@@ -300,6 +316,9 @@ export default function AdminBillingPage() {
       )}
       <button className="btn btn-outline btn-sm" type="button" onClick={() => onReject(row)}>
         Reject
+      </button>
+      <button className="btn btn-outline btn-sm" type="button" onClick={() => onDeleteBilling(row)}>
+        Delete
       </button>
     </div>
   );

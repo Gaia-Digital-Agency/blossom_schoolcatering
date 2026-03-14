@@ -619,6 +619,12 @@ export class CoreController {
     return this.coreService.generateReceipt(req.user, billingId);
   }
 
+  @Delete('admin/billing/:billingId')
+  @Roles('ADMIN')
+  deleteAdminBilling(@Req() req: AuthRequest, @Param('billingId', ParseUUIDPipe) billingId: string) {
+    return this.coreService.deleteBilling(req.user, billingId);
+  }
+
   @Get('admin/billing/:billingId/receipt-file')
   @Roles('ADMIN')
   async getAdminBillingReceiptFile(

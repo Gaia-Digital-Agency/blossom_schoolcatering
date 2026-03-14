@@ -4618,6 +4618,28 @@ export class CoreService implements OnModuleInit {
     return { ok: true, status: nextStatus };
   }
 
+  async deleteBilling(actor: AccessUser, billingId: string) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    this.assertValidUuid(billingId, 'billingId');
+    const billingOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT id
+        FROM billing_records
+        WHERE id = $1
+        LIMIT 1
+      ) t;
+      `,
+      [billingId],
+    );
+    if (!billingOut) throw new NotFoundException('Billing record not found');
+    await runSql('DELETE FROM digital_receipts WHERE billing_record_id = $1;', [billingId]);
+    await runSql('DELETE FROM billing_records WHERE id = $1;', [billingId]);
+    await this.recordAdminAudit(actor, 'BILLING_DELETED', 'billing-record', billingId);
+    return { ok: true };
+  }
+
   async generateReceipt(actor: AccessUser, billingId: string) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     const billingOut = await runSql(
