@@ -138,7 +138,7 @@ export default function AdminParentsPage() {
                 <th>Last Name</th>
                 <th>First Name</th>
                 <th>User Name</th>
-                <th>Youngsters Linked</th>
+                <th>Youngster</th>
                 <th>School</th>
                 <th>Action</th>
               </tr>
@@ -152,7 +152,7 @@ export default function AdminParentsPage() {
                   <td>
                     {(p.youngsters || []).length === 0
                       ? '-'
-                      : (p.youngsters || []).map((y) => `${y.name} (${y.id})`).join(', ')}
+                      : (p.youngsters || []).map((y) => String(y.name || '').trim().split(/\s+/)[0] || '-').join(', ')}
                   </td>
                   <td>{(p.schools || []).join(', ') || '-'}</td>
                   <td>
