@@ -21,6 +21,21 @@ type BillingRow = {
   pdf_url?: string | null;
 };
 
+function groupBySchool(rows: BillingRow[]) {
+  const schoolMap = new Map<string, BillingRow[]>();
+  for (const row of rows) {
+    const schoolKey = String(row.school_name || 'Unknown School').trim() || 'Unknown School';
+    if (!schoolMap.has(schoolKey)) schoolMap.set(schoolKey, []);
+    schoolMap.get(schoolKey)?.push(row);
+  }
+  return Array.from(schoolMap.entries())
+    .map(([schoolName, schoolRows]) => ({
+      schoolName,
+      rows: schoolRows.sort((a, b) => String(b.service_date).localeCompare(String(a.service_date))),
+    }))
+    .sort((a, b) => a.schoolName.localeCompare(b.schoolName));
+}
+
 function getLastName(fullName?: string | null) {
   const parts = String(fullName || '').trim().split(/\s+/).filter(Boolean);
   return parts.length > 1 ? parts[parts.length - 1] : (parts[0] || '-');
@@ -36,6 +51,12 @@ function getProofFileName(proofImageUrl?: string | null) {
 
 function formatMoney(value: number) {
   return `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
+}
+
+function shortRef(value?: string | null) {
+  const raw = String(value || '').trim();
+  if (!raw) return '-';
+  return raw.slice(0, 10);
 }
 
 export default function AdminBillingPage() {
@@ -78,6 +99,8 @@ export default function AdminBillingPage() {
     totalAmount: paidRows.reduce((sum, row) => sum + Number(row.total_price || 0), 0),
     totalParents: new Set(paidRows.map((row) => row.parent_name)).size,
   }), [paidRows]);
+  const unpaidBySchool = useMemo(() => groupBySchool(unpaidRows), [unpaidRows]);
+  const paidBySchool = useMemo(() => groupBySchool(paidRows), [paidRows]);
 
   const onDecision = async (billingId: string, decision: 'VERIFIED' | 'REJECTED', note?: string) => {
     setError('');
@@ -151,8 +174,8 @@ export default function AdminBillingPage() {
 
   const renderRef = (row: BillingRow) => (
     <div className="ref-cell">
-      <code>Order: {row.order_id}</code>
-      <code>Bill: {row.id}</code>
+      <code title={row.order_id}>{shortRef(row.order_id)}</code>
+      <code title={row.id}>{shortRef(row.id)}</code>
     </div>
   );
 
@@ -241,97 +264,111 @@ export default function AdminBillingPage() {
 
         <div className="billing-section billing-section--unpaid">
           <h2>Unpaid / Pending ({unpaidRows.length})</h2>
-          <div className="kitchen-table-wrap">
-            <table className="kitchen-table admin-billing-table">
-              <thead>
-                <tr>
-                  <th>Last Name</th>
-                  <th>Youngster Name</th>
-                  <th>Date Of Order</th>
-                  <th>Order/Bill Reference</th>
-                  <th>Image Proof Name</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {unpaidRows.map((row) => (
-                  <tr key={row.id}>
-                    <td>
-                      <strong>{getLastName(row.parent_name)}</strong>
-                      <small>{row.status.replace(/_/g, ' ')}</small>
-                    </td>
-                    <td>
-                      <strong>{row.child_name || '-'}</strong>
-                      <small>{row.school_name || '-'}</small>
-                    </td>
-                    <td>
-                      <strong>{row.service_date}</strong>
-                      <small>{row.session}</small>
-                    </td>
-                    <td>{renderRef(row)}</td>
-                    <td>
-                      <strong>{getProofFileName(row.proof_image_url)}</strong>
-                      <small>{formatMoney(row.total_price)}</small>
-                      {row.admin_note ? <small className="admin-note">{row.admin_note}</small> : null}
-                    </td>
-                    <td>{renderUnpaidActions(row)}</td>
-                  </tr>
-                ))}
-                {unpaidRows.length === 0 ? (
-                  <tr><td colSpan={6}>All clear - no unpaid or pending bills.</td></tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
+          {unpaidBySchool.length === 0 ? <p className="auth-help">All clear - no unpaid or pending bills.</p> : (
+            <div className="school-group-list">
+              {unpaidBySchool.map((group) => (
+                <div key={group.schoolName} className="school-group-card">
+                  <div className="school-group-head">
+                    <strong>{group.schoolName}</strong>
+                    <span>{group.rows.length} bill(s)</span>
+                  </div>
+                  <div className="kitchen-table-wrap">
+                    <table className="kitchen-table admin-billing-table">
+                      <thead>
+                        <tr>
+                          <th>Last Name</th>
+                          <th>Youngster Name</th>
+                          <th>Date Of Order</th>
+                          <th>Order/Bill Reference</th>
+                          <th>Bill Amount</th>
+                          <th>Image Proof Name</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {group.rows.map((row) => (
+                          <tr key={row.id}>
+                            <td>
+                              <strong>{getLastName(row.parent_name)}</strong>
+                              <small>{row.status.replace(/_/g, ' ')}</small>
+                            </td>
+                            <td><strong>{row.child_name || '-'}</strong></td>
+                            <td>
+                              <strong>{row.service_date}</strong>
+                              <small>{row.session}</small>
+                            </td>
+                            <td>{renderRef(row)}</td>
+                            <td><strong>{formatMoney(row.total_price)}</strong></td>
+                            <td>
+                              <strong>{getProofFileName(row.proof_image_url)}</strong>
+                              {row.admin_note ? <small className="admin-note">{row.admin_note}</small> : null}
+                            </td>
+                            <td>{renderUnpaidActions(row)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="billing-section billing-section--paid">
           <h2>Paid / Verified ({paidRows.length})</h2>
-          <div className="kitchen-table-wrap">
-            <table className="kitchen-table admin-billing-table">
-              <thead>
-                <tr>
-                  <th>Last Name</th>
-                  <th>Youngster Name</th>
-                  <th>Date Of Order</th>
-                  <th>Order/Bill Reference</th>
-                  <th>Image Proof Name</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paidRows.map((row) => (
-                  <tr key={row.id}>
-                    <td>
-                      <strong>{getLastName(row.parent_name)}</strong>
-                      <small>Verified</small>
-                    </td>
-                    <td>
-                      <strong>{row.child_name || '-'}</strong>
-                      <small>{row.school_name || '-'}</small>
-                    </td>
-                    <td>
-                      <strong>{row.service_date}</strong>
-                      <small>{row.session}</small>
-                    </td>
-                    <td>
-                      {renderRef(row)}
-                      {row.receipt_number ? <small>Receipt: {row.receipt_number}</small> : null}
-                    </td>
-                    <td>
-                      <strong>{getProofFileName(row.proof_image_url)}</strong>
-                      <small>{formatMoney(row.total_price)}</small>
-                      {row.admin_note ? <small className="admin-note">{row.admin_note}</small> : null}
-                    </td>
-                    <td>{renderPaidActions(row)}</td>
-                  </tr>
-                ))}
-                {paidRows.length === 0 ? (
-                  <tr><td colSpan={6}>No verified bills yet.</td></tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
+          {paidBySchool.length === 0 ? <p className="auth-help">No verified bills yet.</p> : (
+            <div className="school-group-list">
+              {paidBySchool.map((group) => (
+                <div key={group.schoolName} className="school-group-card">
+                  <div className="school-group-head">
+                    <strong>{group.schoolName}</strong>
+                    <span>{group.rows.length} bill(s)</span>
+                  </div>
+                  <div className="kitchen-table-wrap">
+                    <table className="kitchen-table admin-billing-table">
+                      <thead>
+                        <tr>
+                          <th>Last Name</th>
+                          <th>Youngster Name</th>
+                          <th>Date Of Order</th>
+                          <th>Order/Bill Reference</th>
+                          <th>Bill Amount</th>
+                          <th>Image Proof Name</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {group.rows.map((row) => (
+                          <tr key={row.id}>
+                            <td>
+                              <strong>{getLastName(row.parent_name)}</strong>
+                              <small>Verified</small>
+                            </td>
+                            <td><strong>{row.child_name || '-'}</strong></td>
+                            <td>
+                              <strong>{row.service_date}</strong>
+                              <small>{row.session}</small>
+                            </td>
+                            <td>
+                              {renderRef(row)}
+                              {row.receipt_number ? <small>Receipt: {row.receipt_number}</small> : null}
+                            </td>
+                            <td><strong>{formatMoney(row.total_price)}</strong></td>
+                            <td>
+                              <strong>{getProofFileName(row.proof_image_url)}</strong>
+                              {row.admin_note ? <small className="admin-note">{row.admin_note}</small> : null}
+                            </td>
+                            <td>{renderPaidActions(row)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <style jsx>{`
@@ -387,6 +424,29 @@ export default function AdminBillingPage() {
             font-weight: 700;
             margin: 0 0 0.65rem;
           }
+          .school-group-list {
+            display: grid;
+            gap: 0.8rem;
+          }
+          .school-group-card {
+            border: 1px solid #d9cdb7;
+            border-radius: 0.7rem;
+            overflow: hidden;
+            background: #fff;
+          }
+          .school-group-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 0.55rem 0.75rem;
+            background: #f5ede0;
+            border-bottom: 1px solid #e2d6c2;
+          }
+          .school-group-head span {
+            font-size: 0.78rem;
+            color: #6b5a43;
+          }
           .kitchen-table-wrap {
             overflow-x: auto;
             max-width: 100%;
@@ -415,6 +475,10 @@ export default function AdminBillingPage() {
           .admin-billing-table th:last-child,
           .admin-billing-table td:last-child {
             min-width: 180px;
+          }
+          .admin-billing-table th:nth-child(4),
+          .admin-billing-table td:nth-child(4) {
+            min-width: 130px;
           }
           .admin-billing-table strong,
           .admin-billing-table small,
