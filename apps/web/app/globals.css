@@ -771,11 +771,11 @@ button:hover,
 button:disabled,
 .btn[aria-disabled='true'] {
   cursor: not-allowed !important;
-  opacity: 1 !important;
-  background: #f7e1e5 !important;
-  border-color: #b00020 !important;
-  color: #8a0017 !important;
-  font-weight: 800;
+  opacity: 0.42 !important;
+  background: #f2f0ed !important;
+  border-color: #c8c3bb !important;
+  color: #888 !important;
+  font-weight: 600;
   transform: none !important;
   filter: none !important;
 }

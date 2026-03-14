@@ -214,7 +214,15 @@ export default function AdminBillingPage() {
     try {
       const blob = await fetchReceiptBlob(receiptInfo.billingId);
       const blobUrl = window.URL.createObjectURL(blob);
-      window.open(blobUrl, '_blank', 'noopener,noreferrer');
+      // Use programmatic <a> click — window.open() is blocked by browsers after
+      // async awaits because the user-gesture flag is consumed by the first await.
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
       window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60_000);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed opening receipt PDF');
@@ -454,17 +462,17 @@ export default function AdminBillingPage() {
             <div className="proof-modal-card" onClick={(e) => e.stopPropagation()}>
               <h3>Receipt Ready</h3>
               <p className="receipt-number">Receipt: {receiptInfo.receiptNumber}</p>
-              <div className="modal-action-row">
+              <div className="receipt-modal-actions">
                 <button className="btn btn-outline" type="button" onClick={onOpenReceiptPdf}>
                   Open PDF
                 </button>
-                <button className="btn btn-primary" type="button" onClick={onDownloadReceiptPdf}>
+                <button className="btn btn-outline" type="button" onClick={onDownloadReceiptPdf}>
                   Download PDF
                 </button>
+                <button className="btn btn-outline" type="button" onClick={() => setReceiptInfo(null)}>
+                  Close
+                </button>
               </div>
-              <button className="btn btn-outline receipt-close" type="button" onClick={() => setReceiptInfo(null)}>
-                Close
-              </button>
             </div>
           </div>
         ) : null}
@@ -645,8 +653,14 @@ export default function AdminBillingPage() {
             margin: 0 0 0.85rem;
             font-weight: 600;
           }
-          .receipt-close {
-            margin-top: 0.75rem;
+          .receipt-modal-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 0.55rem;
+          }
+          .receipt-modal-actions :global(.btn) {
+            width: 100%;
+            justify-content: center;
           }
           @media (max-width: 760px) {
             .kitchen-table th,
