@@ -45,7 +45,7 @@ type ShowPassInfo = {
   youngsterFirstName: string;
   youngsterLastName: string;
   youngsterUsername: string;
-  youngsterNewPassword: string;
+  youngsterPassword: string;
   schoolName: string;
   parentLabel: string;
 };
@@ -290,12 +290,42 @@ export default function AdminYoungstersPage() {
         youngsterFirstName: child.first_name,
         youngsterLastName: child.last_name,
         youngsterUsername: res.username,
-        youngsterNewPassword: res.password,
+        youngsterPassword: res.password,
         schoolName: child.school_name,
         parentLabel,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed loading password');
+    }
+  };
+
+  const onResetPassword = async (child: ChildRow) => {
+    const ok = window.confirm(`Reset password for youngster "${child.first_name} ${child.last_name}"?`);
+    if (!ok) return;
+    setError('');
+    setMessage('');
+    try {
+      const res = (await apiFetch(
+        `/admin/youngster/${child.id}/reset-password`,
+        { method: 'PATCH', body: JSON.stringify({}) },
+        { skipAutoReload: true },
+      )) as { ok: boolean; newPassword: string; username: string };
+      const parentId = (child.parent_ids || [])[0] || '';
+      const parent = parentById.get(parentId);
+      const parentLabel = parent
+        ? `${parent.first_name} ${parent.last_name} (${parent.username})`
+        : '—';
+      setShowPassInfo({
+        youngsterFirstName: child.first_name,
+        youngsterLastName: child.last_name,
+        youngsterUsername: res.username,
+        youngsterPassword: res.newPassword,
+        schoolName: child.school_name,
+        parentLabel,
+      });
+      setMessage(`Password reset for ${child.first_name} ${child.last_name}.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed resetting password');
     }
   };
 
@@ -548,6 +578,9 @@ export default function AdminYoungstersPage() {
                       <button className="btn btn-outline" type="button" onClick={() => onShowPassword(c)}>
                         Show Password
                       </button>
+                      <button className="btn btn-outline" type="button" onClick={() => onResetPassword(c)}>
+                        Reset Password
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -583,7 +616,7 @@ export default function AdminYoungstersPage() {
               </div>
               <div className="reg-info-row">
                 <span className="reg-info-label">Youngster Password</span>
-                <code className="reg-info-code">{showPassInfo.youngsterNewPassword}</code>
+                <code className="reg-info-code">{showPassInfo.youngsterPassword}</code>
               </div>
               <div className="reg-info-row">
                 <span className="reg-info-label">School</span>

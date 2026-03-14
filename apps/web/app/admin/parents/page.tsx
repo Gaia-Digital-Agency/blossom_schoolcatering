@@ -21,7 +21,7 @@ type ShowPassInfo = {
   parentFirstName: string;
   parentLastName: string;
   parentUsername: string;
-  parentNewPassword: string;
+  parentPassword: string;
   youngsters: { name: string; school: string }[];
 };
 
@@ -53,7 +53,7 @@ export default function AdminParentsPage() {
         parentFirstName: p.first_name,
         parentLastName: p.last_name,
         parentUsername: res.username,
-        parentNewPassword: res.password,
+        parentPassword: res.password,
         youngsters: (p.youngsters || []).map((y) => ({
           name: y.name,
           school: y.school_name || '—',
@@ -61,6 +61,33 @@ export default function AdminParentsPage() {
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed loading password');
+    }
+  };
+
+  const onResetPassword = async (p: ParentRow) => {
+    const ok = window.confirm(`Reset password for parent "${p.first_name} ${p.last_name}"?`);
+    if (!ok) return;
+    setError('');
+    setMessage('');
+    try {
+      const res = await apiFetch(
+        `/admin/users/${p.user_id}/reset-password`,
+        { method: 'PATCH', body: JSON.stringify({}) },
+        { skipAutoReload: true },
+      ) as { ok: boolean; newPassword: string; username: string };
+      setShowPassInfo({
+        parentFirstName: p.first_name,
+        parentLastName: p.last_name,
+        parentUsername: res.username,
+        parentPassword: res.newPassword,
+        youngsters: (p.youngsters || []).map((y) => ({
+          name: y.name,
+          school: y.school_name || '—',
+        })),
+      });
+      setMessage(`Password reset for ${p.first_name} ${p.last_name}.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed resetting password');
     }
   };
 
@@ -90,6 +117,7 @@ export default function AdminParentsPage() {
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
 
+        <h2>Existing Parents</h2>
         <div className="kitchen-table-wrap">
           <table className="kitchen-table admin-parents-table">
             <thead>
@@ -120,6 +148,9 @@ export default function AdminParentsPage() {
                     <div className="action-row">
                       <button className="btn btn-outline" type="button" onClick={() => onShowPassword(p)}>
                         Show Password
+                      </button>
+                      <button className="btn btn-outline" type="button" onClick={() => onResetPassword(p)}>
+                        Reset Password
                       </button>
                       <button
                         className="btn btn-outline"
@@ -161,7 +192,7 @@ export default function AdminParentsPage() {
               </div>
               <div className="reg-info-row">
                 <span className="reg-info-label">Parent Password</span>
-                <code className="reg-info-code">{showPassInfo.parentNewPassword}</code>
+                <code className="reg-info-code">{showPassInfo.parentPassword}</code>
               </div>
               {showPassInfo.youngsters.length > 0 ? (
                 <div className="reg-info-row">
