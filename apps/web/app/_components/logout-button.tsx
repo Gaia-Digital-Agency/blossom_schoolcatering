@@ -46,7 +46,7 @@ export default function LogoutButton() {
           <button
             type="button"
             className="record-btn"
-            onClick={() => router.push('/register/youngster?mode=record')}
+            onClick={() => router.push('/register?mode=record')}
             aria-label="View youngster record"
           >
             Record

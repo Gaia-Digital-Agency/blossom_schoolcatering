@@ -163,6 +163,7 @@ export default function YoungsterRegisterPage() {
     if (!found) return '';
     return found.city ? `${found.name} (${found.city})` : found.name;
   }, [schools, youngsterSchoolId]);
+  const successMode = registrantType === 'YOUNGSTER' ? 'YOUNGSTER' : 'PARENT';
 
   useEffect(() => {
     if (!success) return;
@@ -250,7 +251,7 @@ export default function YoungsterRegisterPage() {
     return (
       <main className="page-auth">
         <section className="auth-panel">
-          <h1>Registration Successful</h1>
+          <h1>{successMode === 'YOUNGSTER' ? 'Youngster Registration Successful' : 'Parent Registration Successful'}</h1>
           <p className="auth-help reg-save-warning">
             ⚠️ Please take this information down and keep it safely for login.
           </p>
@@ -260,27 +261,42 @@ export default function YoungsterRegisterPage() {
               <span className="reg-info-value">{selectedSchoolLabel || '-'}</span>
             </div>
             <div className="reg-info-row">
-              <span className="reg-info-label">Youngster Full Last Name</span>
+              <span className="reg-info-label">Youngster Last Name</span>
               <span className="reg-info-value">{success.youngster.lastName}</span>
             </div>
             <div className="reg-info-row">
-              <span className="reg-info-label">Youngster Username</span>
-              <code className="reg-info-code">{success.youngster.username}</code>
+              <span className="reg-info-label">Youngster First Name</span>
+              <span className="reg-info-value">{youngsterFirstName}</span>
             </div>
             <div className="reg-info-row">
-              <span className="reg-info-label">Youngster Password</span>
-              <code className="reg-info-code">{success.youngster.generatedPassword}</code>
+              <span className="reg-info-label">Parent First Name</span>
+              <span className="reg-info-value">{parentFirstName}</span>
             </div>
-            <div className="reg-info-row">
-              <span className="reg-info-label">Parent Username</span>
-              <code className="reg-info-code">{success.parent.username}</code>
-            </div>
-            <div className="reg-info-row">
-              <span className="reg-info-label">Parent Password</span>
-              <code className="reg-info-code">
-                {success.parent.generatedPassword || 'Existing password retained'}
-              </code>
-            </div>
+            {successMode === 'YOUNGSTER' ? (
+              <>
+                <div className="reg-info-row">
+                  <span className="reg-info-label">Youngster Username</span>
+                  <code className="reg-info-code">{success.youngster.username}</code>
+                </div>
+                <div className="reg-info-row">
+                  <span className="reg-info-label">Youngster Password</span>
+                  <code className="reg-info-code">{success.youngster.generatedPassword}</code>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="reg-info-row">
+                  <span className="reg-info-label">Parent Username</span>
+                  <code className="reg-info-code">{success.parent.username}</code>
+                </div>
+                <div className="reg-info-row">
+                  <span className="reg-info-label">Parent Password</span>
+                  <code className="reg-info-code">
+                    {success.parent.generatedPassword || 'Existing password retained'}
+                  </code>
+                </div>
+              </>
+            )}
             {success.parent.existed ? (
               <p className="reg-info-note">
                 ℹ️ Parent email already existed — linked to the existing parent account.
@@ -382,8 +398,8 @@ export default function YoungsterRegisterPage() {
   return (
     <main className="page-auth">
       <section className="auth-panel">
-        <h1>Youngster Registration</h1>
-        <p className="auth-help">Youngster registration also creates/links the parent account in one flow.</p>
+        <h1>Registration</h1>
+        <p className="auth-help">One registration flow handles youngster, parent, and teacher registrations.</p>
         <form onSubmit={onSubmit} className="auth-form">
           {isReadonlyRecord ? (
             <p className="auth-help">
@@ -541,7 +557,7 @@ export default function YoungsterRegisterPage() {
           {error ? <p className="auth-error">{error}</p> : null}
           {!isReadonlyRecord ? (
             <button className="btn btn-primary" type="submit" disabled={submitting || loadingSchools || schools.length === 0}>
-              {submitting ? 'Creating Accounts...' : 'Register Youngster'}
+              {submitting ? 'Creating Accounts...' : 'Register'}
             </button>
           ) : null}
         </form>

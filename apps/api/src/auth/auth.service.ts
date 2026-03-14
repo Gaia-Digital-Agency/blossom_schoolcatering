@@ -204,9 +204,9 @@ export class AuthService {
   }
 
   private buildGeneratedPassword(phoneLike: string) {
-    const digits = (phoneLike || '').replace(/\D/g, '');
-    if (digits.length >= 6) return digits;
-    return `${digits}123456`.slice(0, 6);
+    const raw = (phoneLike || '').trim();
+    if (raw.length >= 6) return raw;
+    return `${raw}123456`.slice(0, 6);
   }
 
   private normalizeAllergies(allergiesRaw?: string) {
@@ -733,6 +733,40 @@ export class AuthService {
     const parentLastName = parentLastNameInput;
     if (parentLastName.toLowerCase() !== youngsterLastName.toLowerCase()) {
       throw new BadRequestException('Parent last name must match youngster last name');
+    }
+    await this.ensureChildRegistrationSourceColumns();
+    const duplicateOut = await runSql(
+      `
+      SELECT EXISTS (
+        SELECT 1
+        FROM children c
+        JOIN users cu ON cu.id = c.user_id
+        JOIN parent_children pc ON pc.child_id = c.id
+        JOIN parents p ON p.id = pc.parent_id
+        JOIN users pu ON pu.id = p.user_id
+        WHERE c.deleted_at IS NULL
+          AND p.deleted_at IS NULL
+          AND cu.deleted_at IS NULL
+          AND pu.deleted_at IS NULL
+          AND c.school_id = $1
+          AND LOWER(TRIM(cu.first_name)) = LOWER(TRIM($2))
+          AND LOWER(TRIM(cu.last_name)) = LOWER(TRIM($3))
+          AND LOWER(TRIM(pu.first_name)) = LOWER(TRIM($4))
+          AND LOWER(TRIM(pu.last_name)) = LOWER(TRIM($5))
+          AND COALESCE(c.registration_actor_type::text, '') = $6
+      );
+      `,
+      [
+        youngsterSchoolId,
+        youngsterFirstName,
+        youngsterLastName,
+        parentFirstName,
+        parentLastName,
+        registrantType,
+      ],
+    );
+    if (duplicateOut === 't') {
+      throw new BadRequestException('This parent and youngster combination has been registered, duplicate registration not allowed please inquire with Admin for assistance.');
     }
 
     const existingParentByEmail = await this.findUserByEmail(parentEmail);
