@@ -4,6 +4,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { apiFetch, apiFetchResponse } from '../../../lib/auth';
 import AdminNav from '../_components/admin-nav';
 
+/**
+ * Type definition for a single row in the billing table.
+ */
 type BillingRow = {
   id: string;
   order_id: string;
@@ -21,6 +24,11 @@ type BillingRow = {
   pdf_url?: string | null;
 };
 
+/**
+ * Groups an array of billing rows by school name.
+ * @param {BillingRow[]} rows The billing rows to group.
+ * @returns An array of objects, each containing a school name and its corresponding rows.
+ */
 function groupBySchool(rows: BillingRow[]) {
   const schoolMap = new Map<string, BillingRow[]>();
   for (const row of rows) {
@@ -36,6 +44,9 @@ function groupBySchool(rows: BillingRow[]) {
     .sort((a, b) => a.schoolName.localeCompare(b.schoolName));
 }
 
+/**
+ * Utility functions for formatting data within the component.
+ */
 function getLastName(fullName?: string | null) {
   const parts = String(fullName || '').trim().split(/\s+/).filter(Boolean);
   return parts.length > 1 ? parts[parts.length - 1] : (parts[0] || '-');
@@ -64,14 +75,27 @@ function shortRef(value?: string | null) {
   return raw.slice(0, 10);
 }
 
+/**
+ * The main component for the Admin Billing page.
+ * It provides a comprehensive interface for managing billing, including viewing,
+ * verifying, and rejecting payments, and generating receipts.
+ */
 export default function AdminBillingPage() {
+  // State for all billing rows fetched from the API.
   const [rows, setRows] = useState<BillingRow[]>([]);
+  // State for error and informational messages.
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  // State for loading status.
   const [loading, setLoading] = useState(true);
+  // State for the payment proof image preview modal.
   const [proofPreviewUrl, setProofPreviewUrl] = useState('');
+  // State for the receipt generation/information modal.
   const [receiptInfo, setReceiptInfo] = useState<{ billingId: string; receiptNumber: string } | null>(null);
 
+  /**
+   * Fetches all billing data from the API.
+   */
   const load = async () => {
     setLoading(true);
     setError('');
@@ -85,8 +109,10 @@ export default function AdminBillingPage() {
     }
   };
 
+  // Load data on initial component mount.
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
+  // Memoized lists of unpaid and paid rows for performance.
   const unpaidRows = useMemo(
     () => rows
       .filter((r) => r.status !== 'VERIFIED')
@@ -101,6 +127,7 @@ export default function AdminBillingPage() {
     [rows],
   );
 
+  // Memoized summaries and groupings of data.
   const paidSummary = useMemo(() => ({
     totalBills: paidRows.length,
     totalAmount: paidRows.reduce((sum, row) => sum + Number(row.total_price || 0), 0),
@@ -109,6 +136,9 @@ export default function AdminBillingPage() {
   const unpaidBySchool = useMemo(() => groupBySchool(unpaidRows), [unpaidRows]);
   const paidBySchool = useMemo(() => groupBySchool(paidRows), [paidRows]);
 
+  /**
+   * Handles the decision to verify or reject a payment.
+   */
   const onDecision = async (billingId: string, decision: 'VERIFIED' | 'REJECTED', note?: string) => {
     setError('');
     setMessage('');
@@ -126,6 +156,9 @@ export default function AdminBillingPage() {
     }
   };
 
+  /**
+   * Fetches and displays the payment proof image for review.
+   */
   const onReview = async (row: BillingRow) => {
     const proof = String(row.proof_image_url || '').trim();
     if (!proof) {
@@ -145,6 +178,9 @@ export default function AdminBillingPage() {
     }
   };
 
+  /**
+   * Prompts the admin for a reason and rejects a payment.
+   */
   const onReject = async (row: BillingRow) => {
     const note = window.prompt(
       'Reject note to parent (required):',
@@ -158,6 +194,9 @@ export default function AdminBillingPage() {
     await onDecision(row.id, 'REJECTED', note.trim());
   };
 
+  /**
+   * Confirms and approves a payment.
+   */
   const onApprove = async (row: BillingRow) => {
     if (!String(row.proof_image_url || '').trim()) {
       setError('Cannot approve: parent has not uploaded a payment proof yet.');
@@ -167,6 +206,9 @@ export default function AdminBillingPage() {
     await onDecision(row.id, 'VERIFIED');
   };
 
+  /**
+   * Generates a receipt for a specific billing entry.
+   */
   const onGenerateReceipt = async (billingId: string) => {
     setError('');
     setMessage('');
@@ -183,6 +225,9 @@ export default function AdminBillingPage() {
     }
   };
 
+  /**
+   * Deletes a billing entry after confirmation.
+   */
   const onDeleteBilling = async (row: BillingRow) => {
     if (!window.confirm(`Delete billing "${row.id}" for ${row.parent_name}? This cannot be undone.`)) return;
     setError('');
@@ -196,6 +241,9 @@ export default function AdminBillingPage() {
     }
   };
 
+  /**
+   * Closes the proof image preview modal.
+   */
   const closeProofPreview = () => {
     if (proofPreviewUrl && proofPreviewUrl.startsWith('blob:')) {
       window.URL.revokeObjectURL(proofPreviewUrl);
@@ -203,6 +251,9 @@ export default function AdminBillingPage() {
     setProofPreviewUrl('');
   };
 
+  /**
+   * Opens the receipt information modal.
+   */
   const openReceiptInfo = (row: BillingRow) => {
     if (!String(row.receipt_number || '').trim()) {
       setError('Receipt PDF is not available yet.');
@@ -214,6 +265,9 @@ export default function AdminBillingPage() {
     });
   };
 
+  /**
+   * Fetches the receipt PDF as a blob.
+   */
   const fetchReceiptBlob = async (billingId: string) => {
     const res = await apiFetchResponse(`/admin/billing/${billingId}/receipt-file`, {
       headers: { Accept: 'application/pdf' },
@@ -221,6 +275,9 @@ export default function AdminBillingPage() {
     return res.blob();
   };
 
+  /**
+   * Handles opening the receipt PDF in a new tab.
+   */
   const onOpenReceiptPdf = async () => {
     if (!receiptInfo) return;
     setError('');
@@ -242,6 +299,9 @@ export default function AdminBillingPage() {
     }
   };
 
+  /**
+   * Handles downloading the receipt PDF.
+   */
   const onDownloadReceiptPdf = async () => {
     if (!receiptInfo) return;
     setError('');
@@ -260,6 +320,9 @@ export default function AdminBillingPage() {
     }
   };
 
+  /**
+   * Render functions for complex table cells.
+   */
   const renderRef = (row: BillingRow) => (
     <div className="ref-cell">
       <code title={row.order_id}>{shortRef(row.order_id)}</code>
@@ -326,6 +389,7 @@ export default function AdminBillingPage() {
   return (
     <main className="page-auth page-auth-desktop">
       <section className="auth-panel">
+        {/* Page header and navigation */}
         <div className="billing-topbar">
           <h1>Admin Billing</h1>
           <button className="btn btn-outline" type="button" onClick={load} disabled={loading}>
@@ -337,6 +401,7 @@ export default function AdminBillingPage() {
         {message ? <p className="auth-help" style={{ marginBottom: '0.5rem' }}>{message}</p> : null}
         {error ? <p className="auth-error" style={{ marginBottom: '0.5rem' }}>{error}</p> : null}
 
+        {/* Summary bar with key billing metrics */}
         <div className="billing-summary-bar">
           <div className="bsb-card">
             <span className="bsb-label">Paid Bills</span>
@@ -356,6 +421,7 @@ export default function AdminBillingPage() {
           </div>
         </div>
 
+        {/* Section for unpaid and pending bills */}
         <div className="billing-section billing-section--unpaid">
           <h2>Unpaid / Pending ({unpaidRows.length})</h2>
           {unpaidBySchool.length === 0 ? <p className="auth-help">All clear - no unpaid or pending bills.</p> : (
@@ -407,6 +473,7 @@ export default function AdminBillingPage() {
           )}
         </div>
 
+        {/* Section for paid and verified bills */}
         <div className="billing-section billing-section--paid">
           <h2>Paid / Verified ({paidRows.length})</h2>
           {paidBySchool.length === 0 ? <p className="auth-help">No verified bills yet.</p> : (
@@ -459,6 +526,7 @@ export default function AdminBillingPage() {
           )}
         </div>
 
+        {/* Modal for previewing payment proof images */}
         {proofPreviewUrl ? (
           <div className="proof-modal-overlay" onClick={closeProofPreview}>
             <div className="proof-modal-card" onClick={(e) => e.stopPropagation()}>
@@ -476,6 +544,7 @@ export default function AdminBillingPage() {
           </div>
         ) : null}
 
+        {/* Modal for receipt-related actions */}
         {receiptInfo ? (
           <div className="proof-modal-overlay" onClick={() => setReceiptInfo(null)}>
             <div className="proof-modal-card" onClick={(e) => e.stopPropagation()}>
@@ -496,6 +565,7 @@ export default function AdminBillingPage() {
           </div>
         ) : null}
 
+        {/* Scoped CSS for the component */}
         <style jsx>{`
           .billing-topbar {
             display: flex;

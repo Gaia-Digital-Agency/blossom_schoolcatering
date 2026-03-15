@@ -6,6 +6,13 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { CoreModule } from './core/core.module';
 
+/**
+ * The main application module.
+ * This module imports all the other modules required for the application to run,
+ * including rate limiting (ThrottlerModule), authentication (AuthModule), and core business logic (CoreModule).
+ * It also declares the main AppController and AppService, and registers a global ThrottlerGuard
+ * to protect all endpoints from excessive requests.
+ */
 @Module({
   imports: [
     // Global rate limit: 60 requests per minute per IP

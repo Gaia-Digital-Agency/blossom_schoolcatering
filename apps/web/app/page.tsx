@@ -4,17 +4,33 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import GoogleOAuthButton from './_components/google-oauth-button';
 
+/**
+ * The home page of the application.
+ * This component serves as the main landing page, displaying a hero section,
+ * login/register buttons, a chef message, and a footer with dynamic information.
+ */
 export default function HomePage() {
+  // State for managing the mobile menu's open/closed status.
   const [open, setOpen] = useState(false);
+  // State for storing the total number of page visits.
   const [visitCount, setVisitCount] = useState<number>(0);
+  // State for the current local time.
   const [localTime, setLocalTime] = useState<string>('--:--');
+  // State for the current date.
   const [localToday, setLocalToday] = useState<string>('-');
+  // State for the user's timezone.
   const [localTz, setLocalTz] = useState<string>('-');
+  // State for the timezone abbreviation.
   const [localTzAbbr, setLocalTzAbbr] = useState<string>('');
+  // State for the chef's message, with a default value.
   const [chefMessage, setChefMessage] = useState<string>(
     'Every dish is prepared for school-day energy and balanced nutrition. We keep every meal fresh, consistent, and safe for all youngsters.'
   );
 
+  /**
+   * Fetches the site settings, specifically the chef's message, when the component mounts.
+   * If the fetch is successful, it updates the chefMessage state.
+   */
   useEffect(() => {
     fetch('/schoolcatering/api/v1/public/site-settings', { credentials: 'include' })
       .then((res) => res.ok ? res.json() : null)
@@ -24,8 +40,16 @@ export default function HomePage() {
       .catch(() => { /* keep default */ });
   }, []);
 
+  /**
+   * This effect runs on mount to handle several tasks:
+   * - It sends a 'hit' to the page visit counter API and updates the visit count.
+   * - It determines the user's local timezone.
+   * - It sets up timers to update the local time every second and the date every minute.
+   * - It returns a cleanup function to clear the timers when the component unmounts.
+   */
   useEffect(() => {
     let alive = true;
+    // Increment the page visit counter.
     fetch('/schoolcatering/api/v1/public/page-visits/hit', {
       method: 'POST',
       credentials: 'include',
@@ -40,6 +64,7 @@ export default function HomePage() {
         if (alive) setVisitCount(0);
       });
 
+    // Get and set the user's timezone information.
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     setLocalTz(tz);
 
@@ -58,8 +83,11 @@ export default function HomePage() {
     setLocalToday(formatToday());
     setLocalTzAbbr(getTzAbbr());
 
+    // Set up timers to keep the time and date updated.
     const timer = window.setInterval(() => setLocalTime(formatTime()), 1000);
     const dateTimer = window.setInterval(() => { setLocalToday(formatToday()); setLocalTzAbbr(getTzAbbr()); }, 60_000);
+    
+    // Cleanup function to clear intervals when the component unmounts.
     return () => {
       alive = false;
       window.clearInterval(timer);
@@ -70,6 +98,7 @@ export default function HomePage() {
   return (
     <>
       <div className="site-wrap">
+        {/* Header section with branding, navigation, and menu toggle */}
         <header className="topbar">
           <Link className="brand" href="/">
             <img className="brand-logo" src="/schoolcatering/assets/logo.svg" alt="Bali Catering logo" />
@@ -88,6 +117,7 @@ export default function HomePage() {
           </nav>
         </header>
 
+        {/* Main hero section with the app title, description, and authentication buttons */}
         <main className="hero">
           <section className="hero-card">
             <h1>Meal Order App</h1>
@@ -104,16 +134,19 @@ export default function HomePage() {
           </section>
         </main>
 
+        {/* A large hero image card with a caption */}
         <section className="hero-image-card" aria-label="Healthy Meal For Lovely Souls">
           <img src="/schoolcatering/assets/hero-meal.jpg" alt="Healthy Meal For Lovely Souls" />
           <div className="hero-image-caption">Everyday Nourishing Zesty Originals</div>
         </section>
 
+        {/* Section to display the message from the chef */}
         <section className="chef-message" aria-label="Message from the Chef">
           <h2>Chef Message</h2>
           <p>"{chefMessage}"</p>
         </section>
 
+        {/* Footer section with copyright info and dynamic data like date, time, and visitor count */}
         <footer className="footer">
           <p>Copyright (C) 2026, Developed by Gaiada.com</p>
           <p>Today: {localToday}</p>

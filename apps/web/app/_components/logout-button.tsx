@@ -4,13 +4,24 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { clearAuthState, fetchWithTimeout, getApiBase, ROLE_KEY, type Role } from '../../lib/auth';
 
+/**
+ * A component that provides a logout button and, for certain user roles,
+ * a button to view their record.
+ */
 export default function LogoutButton() {
   const router = useRouter();
+  // State to manage the loading status of the logout process.
   const [loading, setLoading] = useState(false);
+  // State to store the current user's role.
   const [role, setRole] = useState<Role | ''>('');
 
+  // Determines if the "Record" button should be visible based on the user's role.
   const canOpenRecord = role === 'PARENT' || role === 'YOUNGSTER';
 
+  /**
+   * On component mount, this effect retrieves the user's role from local storage
+   * and sets it in the component's state.
+   */
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const stored = localStorage.getItem(ROLE_KEY) as Role | null;
@@ -18,6 +29,11 @@ export default function LogoutButton() {
     setRole(stored);
   }, []);
 
+  /**
+   * Handles the logout process.
+   * It sets the loading state, sends a request to the logout endpoint,
+   * clears the authentication state from local storage, and redirects the user to the rating page.
+   */
   const onLogout = async () => {
     setLoading(true);
     await fetchWithTimeout(`${getApiBase()}/auth/logout`, {
@@ -33,6 +49,7 @@ export default function LogoutButton() {
   return (
     <>
       <div className="session-actions">
+        {/* The main logout button */}
         <button
           type="button"
           className="logout-btn"
@@ -42,6 +59,7 @@ export default function LogoutButton() {
         >
           {loading ? '...' : 'Logout'}
         </button>
+        {/* Conditionally rendered button to view the user's record */}
         {canOpenRecord ? (
           <button
             type="button"
@@ -53,6 +71,7 @@ export default function LogoutButton() {
           </button>
         ) : null}
       </div>
+      {/* Scoped CSS for the component */}
       <style jsx>{`
         .session-actions {
           position: static;

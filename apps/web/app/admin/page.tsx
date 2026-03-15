@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react';
 import { apiFetch } from '../../lib/auth';
 import AdminNav from './_components/admin-nav';
 
+/**
+ * Type definitions for the dashboard data structures.
+ */
 type OrdersDishes = {
   totalOrders: number;
   totalDishes: number;
@@ -62,6 +65,10 @@ type BillingPeriod = {
   totalValueUnpaidNoProof: number;
 };
 
+/**
+ * Returns the current date in 'YYYY-MM-DD' format for the local timezone.
+ * @returns {string} The formatted date string.
+ */
 function todayIsoLocal() {
   const d = new Date();
   const yyyy = d.getFullYear();
@@ -70,20 +77,35 @@ function todayIsoLocal() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+/**
+ * Formats a number as an Indonesian Rupiah (IDR) currency string.
+ * @param {number} value The number to format.
+ * @returns {string} The formatted currency string (e.g., "Rp 1.000").
+ */
 function asCurrency(value: number) {
   return `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
 }
 
+/**
+ * The main component for the Admin Dashboard page.
+ * It fetches and displays a wide range of operational metrics and provides
+ * controls for certain administrative tasks like updating the chef's message.
+ */
 export default function AdminPage() {
+  // State for the main dashboard data.
   const [data, setData] = useState<Dashboard | null>(null);
+  // State for loading and error handling of the dashboard data.
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Chef personal message
+  // State for the chef's personal message editor.
   const [chefMessage, setChefMessage] = useState('');
   const [chefMessageSaving, setChefMessageSaving] = useState(false);
   const [chefMessageStatus, setChefMessageStatus] = useState<'idle' | 'saved' | 'error'>('idle');
 
+  /**
+   * Fetches the main dashboard data from the API.
+   */
   const load = async () => {
     setLoading(true);
     setError('');
@@ -97,6 +119,9 @@ export default function AdminPage() {
     }
   };
 
+  /**
+   * Loads the current chef message from the site settings.
+   */
   const loadChefMessage = async () => {
     try {
       const result = await apiFetch('/admin/site-settings') as { chef_message: string };
@@ -106,6 +131,9 @@ export default function AdminPage() {
     }
   };
 
+  /**
+   * Saves the updated chef message to the site settings.
+   */
   const saveChefMessage = async () => {
     setChefMessageSaving(true);
     setChefMessageStatus('idle');
@@ -120,6 +148,9 @@ export default function AdminPage() {
     }
   };
 
+  /**
+   * On component mount, load the initial dashboard data and chef message.
+   */
   useEffect(() => {
     load();
     loadChefMessage();
@@ -133,6 +164,7 @@ export default function AdminPage() {
         <p className="auth-help">Overview and key operational metrics.</p>
         <AdminNav />
 
+        {/* Card for administrative controls like the chef message and data refresh */}
         <div className="auth-form admin-controls-card">
           <div className="chef-message-controls">
             <label>
@@ -163,6 +195,7 @@ export default function AdminPage() {
 
         {error ? <p className="auth-error">{error}</p> : null}
 
+        {/* The main dashboard data display */}
         {data ? (
           <div className="auth-form admin-dashboard-block">
             <div className="kitchen-table-wrap admin-overview-wrap">
@@ -172,11 +205,14 @@ export default function AdminPage() {
                     <th>Date</th>
                     <td>{data.date}</td>
                   </tr>
+                  {/* Parents & Youngsters Section */}
                   <tr className="section-row"><th colSpan={2}>PARENTS</th></tr>
                   <tr><th>Number of Youngsters</th><td>{data.youngstersCount}</td></tr>
                   <tr><th>Number of Parents</th><td>{data.parentsCount}</td></tr>
                   <tr><th>Number Of Schools</th><td>{data.schoolsCount}</td></tr>
                   <tr><th>Birthday Highlight (Today)</th><td>{(data.birthdayHighlights || []).map((b) => b.child_name).join(', ') || '-'}</td></tr>
+                  
+                  {/* Delivery Section */}
                   <tr className="section-row"><th colSpan={2}>DELIVERY</th></tr>
                   <tr><th>Number of Delivery Person</th><td>{data.deliveryPersonnelCount}</td></tr>
                   <tr>
@@ -232,9 +268,13 @@ export default function AdminPage() {
                         : data.failedDeliveryByPerson.map((x) => `${x.delivery_person_name} (${x.orders_count})`).join(', ')}
                     </td>
                   </tr>
+
+                  {/* Menu Section */}
                   <tr className="section-row"><th colSpan={2}>MENU</th></tr>
                   <tr><th>Dishes Total Created</th><td>{data.menu.dishesTotalCreated}</td></tr>
                   <tr><th>Dishes Total Active</th><td>{data.menu.dishesTotalActive}</td></tr>
+                  
+                  {/* Kitchen Section */}
                   <tr className="section-row"><th colSpan={2}>KITCHEN</th></tr>
                   <tr>
                     <th>Next Blackout Day</th>
@@ -286,6 +326,8 @@ export default function AdminPage() {
                       </div>
                     </td>
                   </tr>
+
+                  {/* Billing Section */}
                   <tr className="section-row"><th colSpan={2}>BILLING</th></tr>
                   <tr>
                     <th>Total Number Billing</th>
@@ -335,6 +377,7 @@ export default function AdminPage() {
           <p className="auth-help">Loading dashboard...</p>
         ) : null}
       </section>
+      {/* Scoped CSS for styling the admin dashboard */}
       <style jsx>{`
         .chef-message-controls {
           display: grid;

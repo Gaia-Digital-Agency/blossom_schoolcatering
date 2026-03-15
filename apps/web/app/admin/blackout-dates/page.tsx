@@ -4,6 +4,9 @@ import { FormEvent, useEffect, useState } from 'react';
 import { apiFetch, SessionExpiredError } from '../../../lib/auth';
 import AdminNav from '../_components/admin-nav';
 
+/**
+ * Type definition for a single blackout day entry.
+ */
 type BlackoutDay = {
   id: string;
   blackout_date: string;
@@ -13,6 +16,10 @@ type BlackoutDay = {
   created_by_username: string;
 };
 
+/**
+ * Returns the current date in 'YYYY-MM-DD' format for the local timezone.
+ * @returns {string} The formatted date string.
+ */
 function todayIsoLocal() {
   const d = new Date();
   const yyyy = d.getFullYear();
@@ -21,19 +28,31 @@ function todayIsoLocal() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+/**
+ * The main component for the Admin Blackout Dates page.
+ * It allows administrators to view, add, and delete blackout dates, which
+ * immediately affect ordering and service availability.
+ */
 export default function AdminBlackoutDatesPage() {
+  // State for the list of blackout dates.
   const [rows, setRows] = useState<BlackoutDay[]>([]);
+  // State for loading, error, and informational messages.
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
+  // State for the date filtering inputs.
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
 
+  // State for the new blackout date form fields.
   const [blackoutDate, setBlackoutDate] = useState(todayIsoLocal());
   const [type, setType] = useState<'ORDER_BLOCK' | 'SERVICE_BLOCK' | 'BOTH'>('BOTH');
   const [reason, setReason] = useState('');
 
+  /**
+   * Fetches the list of blackout dates from the API, optionally applying date filters.
+   */
   const load = async () => {
     setLoading(true);
     setError('');
@@ -51,11 +70,15 @@ export default function AdminBlackoutDatesPage() {
     }
   };
 
+  // Load data on initial component mount.
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /**
+   * Handles the submission of the new blackout date form.
+   */
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
@@ -72,6 +95,9 @@ export default function AdminBlackoutDatesPage() {
     }
   };
 
+  /**
+   * Handles the deletion of a blackout date.
+   */
   const onDelete = async (id: string) => {
     if (!window.confirm('Delete this blackout date?')) return;
     setError('');
@@ -91,6 +117,8 @@ export default function AdminBlackoutDatesPage() {
         <h1>Admin Blackout Dates</h1>
         <AdminNav />
         <p className="auth-help">Manage blackout dates. Order placement checks these rules immediately.</p>
+        
+        {/* Informational guide for the different blackout types */}
         <div className="blackout-type-guide">
           <strong>Type Guide</strong>
           <ul>
@@ -103,6 +131,7 @@ export default function AdminBlackoutDatesPage() {
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
 
+        {/* Form for adding a new blackout date */}
         <form className="auth-form" onSubmit={onSubmit}>
           <label>
             Blackout Date
@@ -123,6 +152,7 @@ export default function AdminBlackoutDatesPage() {
           <button className="btn btn-primary" type="submit">Save Blackout Date</button>
         </form>
 
+        {/* Filtering controls for the blackout list */}
         <h2>Filter</h2>
         <label>
           From Date
@@ -136,6 +166,7 @@ export default function AdminBlackoutDatesPage() {
           {loading ? 'Refreshing...' : 'Refresh List'}
         </button>
 
+        {/* List of existing blackout dates */}
         <h2>Blackout List</h2>
         {rows.length === 0 ? (
           <p className="auth-help">No blackout dates found.</p>
@@ -152,6 +183,7 @@ export default function AdminBlackoutDatesPage() {
           </div>
         )}
       </section>
+      {/* Scoped CSS for the component */}
       <style jsx>{`
         .blackout-type-guide {
           background: #f8f5f0;
