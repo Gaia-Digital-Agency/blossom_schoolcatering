@@ -20,7 +20,7 @@ Blossom School Catering is a role-based school meal ordering platform for Bali o
 - API base: `/schoolcatering/api/v1`
 - Current deployed branch (staging): `codex/phase1-stack-upgrade`
 
-## Latest Verified State (2026-03-10)
+## Verified State
 - Request validation enforced via DTO + global `ValidationPipe`.
 - Global API throttling enabled (`ThrottlerModule` + guard).
 - Health endpoints live:
