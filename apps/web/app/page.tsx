@@ -137,7 +137,7 @@ export default function HomePage() {
         {/* A large hero image card with a caption */}
         <section className="hero-image-card" aria-label="Healthy Meal For Lovely Souls">
           <img src="/schoolcatering/assets/hero-meal.jpg" alt="Healthy Meal For Lovely Souls" />
-          <div className="hero-image-caption">Everyday Nourishing Zesty Originals</div>
+          <div className="hero-image-caption">Enchanting Nourished Zesty Original Meals</div>
         </section>
 
         {/* Section to display the message from the chef */}
