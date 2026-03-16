@@ -87,22 +87,23 @@ export default function ModuleHub({
         .module-hub-grid {
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 0.65rem;
+          gap: 0.55rem;
           min-height: 0;
+          align-content: center;
         }
         .module-hub-card {
-          min-height: 0;
+          aspect-ratio: 1;
           border: 1px solid #d8cab1;
-          border-radius: 1.15rem;
+          border-radius: 0.95rem;
           background:
             radial-gradient(circle at top, rgba(255, 248, 232, 0.95), rgba(255, 243, 225, 0.92)),
             linear-gradient(180deg, #fffdf8 0%, #fff1d7 100%);
           display: grid;
-          grid-template-rows: minmax(0, 1fr) auto;
-          align-items: center;
+          grid-template-rows: 1fr auto;
+          align-items: stretch;
           justify-items: center;
-          gap: 0.25rem;
-          padding: 0.45rem 0.35rem 0.5rem;
+          gap: 0.15rem;
+          padding: 0.35rem 0.2rem 0.4rem;
           cursor: pointer;
           transition: transform 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
           box-shadow: 0 12px 26px rgba(122, 106, 88, 0.11);
@@ -114,24 +115,20 @@ export default function ModuleHub({
           box-shadow: 0 16px 32px rgba(122, 106, 88, 0.16);
         }
         .module-hub-icon {
-          width: min(100%, 3.4rem);
-          aspect-ratio: 1;
-          border-radius: 999px;
-          background: #fff;
-          border: 1px solid #ecd7ae;
+          width: 100%;
+          height: 100%;
           display: grid;
           place-items: center;
-          font-size: clamp(1.45rem, 5vw, 1.8rem);
+          font-size: clamp(2rem, 8vw, 2.6rem);
           line-height: 1;
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95);
         }
         .module-hub-label {
           width: 100%;
-          font-size: 0.82rem;
+          font-size: 0.88rem;
           font-weight: 700;
           color: #5d4e3a;
           text-align: center;
-          line-height: 1.05;
+          line-height: 0.98;
           text-wrap: balance;
         }
         @media (max-width: 460px) {
@@ -145,14 +142,17 @@ export default function ModuleHub({
             gap: 0.6rem;
           }
           .module-hub-grid {
-            gap: 0.5rem;
+            gap: 0.45rem;
           }
           .module-hub-card {
-            padding: 0.35rem 0.25rem 0.45rem;
-            border-radius: 0.95rem;
+            padding: 0.25rem 0.15rem 0.3rem;
+            border-radius: 0.85rem;
+          }
+          .module-hub-icon {
+            font-size: clamp(1.75rem, 9vw, 2.25rem);
           }
           .module-hub-label {
-            font-size: 0.76rem;
+            font-size: 0.8rem;
           }
         }
       `}</style>
