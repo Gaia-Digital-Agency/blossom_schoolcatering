@@ -207,12 +207,17 @@ export default function AdminPage() {
   return (
     <main className="page-auth page-auth-desktop">
       <section className="auth-panel">
-        <h1>Admin Dashboard</h1>
-        <p className="auth-help">Overview and key operational metrics.</p>
-        <AdminNav />
 
-        {/* Card for administrative controls like the chef message and data refresh */}
-        <div className="auth-form admin-controls-card">
+        {/* ── Card 1: Admin Dashboard ─────────────────────────────── */}
+        <div className="auth-form dash-card dash-card--admin">
+          <h1 className="dash-card-title">Admin Dashboard</h1>
+          <p className="auth-help" style={{ margin: '0.1rem 0 0.6rem' }}>Overview and key operational metrics.</p>
+          <AdminNav />
+        </div>
+
+        {/* ── Card 2: Chef's Cockpit ──────────────────────────────── */}
+        <div className="auth-form dash-card dash-card--cockpit">
+          <h2 className="dash-card-title">Chef's Cockpit</h2>
           <div className="chef-message-controls">
             <label>
               Hero Image
@@ -264,18 +269,22 @@ export default function AdminPage() {
               </button>
             </div>
           </div>
-          <div className="admin-dashboard-controls">
-            <button className="btn btn-outline" type="button" onClick={load} disabled={loading}>
+        </div>
+
+        {/* ── Card 3: Order Dashboard ─────────────────────────────── */}
+        <div className="auth-form dash-card dash-card--orders">
+          <div className="order-dash-header">
+            <h2 className="dash-card-title" style={{ margin: 0 }}>Order Dashboard</h2>
+            <button className="btn btn-outline btn-sm" type="button" onClick={load} disabled={loading}>
               {loading ? 'Refreshing...' : 'Refresh Dashboard'}
             </button>
           </div>
-        </div>
 
-        {error ? <p className="auth-error">{error}</p> : null}
+          {error ? <p className="auth-error" style={{ marginTop: '0.5rem' }}>{error}</p> : null}
 
         {/* The main dashboard data display */}
         {data ? (
-          <div className="auth-form admin-dashboard-block">
+          <div className="admin-dashboard-block">
             <div className="kitchen-table-wrap admin-overview-wrap">
               <table className="kitchen-table admin-overview-table">
                 <tbody>
@@ -454,15 +463,51 @@ export default function AdminPage() {
         ) : loading ? (
           <p className="auth-help">Loading dashboard...</p>
         ) : null}
+        </div>{/* end dash-card--orders */}
+
       </section>
       {/* Scoped CSS for styling the admin dashboard */}
       <style jsx>{`
+        /* ── Three-card layout ── */
+        .dash-card {
+          margin-bottom: 1rem;
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .dash-card-title {
+          margin: 0 0 0.65rem;
+          font-size: 1.05rem;
+          font-weight: 700;
+          letter-spacing: 0.01em;
+        }
+        /* Card 1 – Admin Dashboard: subtle warm tint */
+        .dash-card--admin {
+          background: #faf8f4;
+          border-color: #d9cdb7;
+        }
+        /* Card 2 – Chef's Cockpit: warm amber accent */
+        .dash-card--cockpit {
+          background: #fffbf2;
+          border-color: #c89a4a;
+        }
+        /* Card 3 – Order Dashboard: cool slate accent */
+        .dash-card--orders {
+          background: #f8fafc;
+          border-color: #94a3b8;
+        }
+
+        /* ── Order Dashboard header row ── */
+        .order-dash-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 1rem;
+          margin-bottom: 0.75rem;
+        }
+
+        /* ── Chef's Cockpit controls ── */
         .chef-message-controls {
           display: grid;
-          gap: 0.4rem;
-          padding-bottom: 0.8rem;
-          border-bottom: 1px solid rgba(15,23,42,0.1);
-          margin-bottom: 0.6rem;
+          gap: 0.5rem;
         }
         .chef-message-controls label {
           display: grid;
@@ -514,6 +559,7 @@ export default function AdminPage() {
           align-items: center;
           gap: 0.6rem;
           flex-wrap: wrap;
+          padding-top: 0.25rem;
         }
         .chef-message-count {
           font-size: 0.75rem;
@@ -529,32 +575,18 @@ export default function AdminPage() {
           color: #dc2626;
           font-weight: 600;
         }
+
+        /* ── Shared button size ── */
         .btn-sm {
           padding: 0.3rem 0.8rem;
           font-size: 0.82rem;
           min-height: unset;
         }
-        .admin-dashboard-controls {
-          display: grid;
-          grid-template-columns: minmax(0, 1fr);
-          gap: 0.6rem;
-        }
-        .admin-controls-card {
-          margin-bottom: 0.9rem;
-          grid-template-columns: minmax(0, 1fr);
-        }
-        .admin-dashboard-controls label {
-          display: grid;
-          gap: 0.25rem;
-        }
-        .admin-dashboard-controls input {
-          min-height: 2.3rem;
-        }
-        .admin-dashboard-block h2 {
-          margin: 0.25rem 0;
-        }
+
+        /* ── Order Dashboard data block ── */
         .admin-dashboard-block {
           grid-template-columns: minmax(0, 1fr);
+          margin-top: 0;
         }
         .admin-overview-wrap {
           margin-top: 0.1rem;
@@ -584,12 +616,6 @@ export default function AdminPage() {
           border-radius: 999px;
           background: rgba(148, 163, 184, 0.1);
           white-space: nowrap;
-        }
-        @media (min-width: 860px) {
-          .admin-dashboard-controls {
-            grid-template-columns: 1fr auto;
-            align-items: end;
-          }
         }
       `}</style>
     </main>
