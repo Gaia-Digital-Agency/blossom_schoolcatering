@@ -2,7 +2,7 @@
 
 import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
-import { getSessionTheme } from '../../lib/session-theme';
+import { getSessionBadgeLabel, getSessionTheme } from '../../lib/session-theme';
 
 type Props = {
   highlightedDates: string[];
@@ -62,7 +62,7 @@ export default function ModuleOverviewCalendar({
         day: date.getUTCDate(),
         inMonth: date.getUTCMonth() === first.getUTCMonth(),
         highlighted: highlighted.has(iso),
-        sessions: dateSessions[iso] || [],
+        sessions: [...new Set(dateSessions[iso] || [])],
       };
     });
   }, [dateSessions, highlighted, visibleMonth]);
@@ -92,10 +92,15 @@ export default function ModuleOverviewCalendar({
               cell.inMonth ? '' : 'overview-calendar-cell-muted',
               cell.highlighted ? 'overview-calendar-cell-active' : '',
             ].filter(Boolean).join(' ')}
-            title={cell.highlighted ? `Order recorded on ${cell.iso}` : cell.iso}
+            title={cell.highlighted ? `${cell.iso}: ${cell.sessions.map((session) => getSessionBadgeLabel(session)).join(', ')}` : cell.iso}
             style={cell.highlighted ? getCalendarStyle(cell.sessions) : undefined}
           >
-            <span>{cell.day}</span>
+            <span className="overview-calendar-day">{cell.day}</span>
+            {cell.highlighted ? (
+              <small className="overview-calendar-sessions">
+                {cell.sessions.map((session) => getSessionBadgeLabel(session)).join(', ')}
+              </small>
+            ) : null}
           </div>
         ))}
       </div>
@@ -123,16 +128,29 @@ export default function ModuleOverviewCalendar({
           text-align: center;
         }
         .overview-calendar-cell {
-          min-height: 3rem;
+          min-height: 4.1rem;
           border-radius: 0.65rem;
           border: 1px solid #e1d6c4;
           background: #fff;
           color: #5d4e3a;
           display: flex;
+          flex-direction: column;
           align-items: flex-start;
-          justify-content: flex-end;
+          justify-content: space-between;
           padding: 0.4rem;
+          gap: 0.25rem;
+        }
+        .overview-calendar-day {
+          width: 100%;
+          text-align: right;
           font-size: 0.85rem;
+        }
+        .overview-calendar-sessions {
+          display: block;
+          font-size: 0.6rem;
+          font-weight: 700;
+          line-height: 1.2;
+          text-wrap: balance;
         }
         .overview-calendar-cell-muted {
           opacity: 0.45;
