@@ -206,7 +206,7 @@ export default function ParentsBillingPage() {
 
         <div className="module-section" id="parent-billing">
           <h2>Linked Youngsters</h2>
-          <p className="auth-help">Youngster registration is done on `/register/youngster`. Linked youngsters are auto-linked during registration and immediately available for Order and Billing.</p>
+          <p className="auth-help">Registration is done on `/register`. Linked youngsters are auto-linked during registration and immediately available for Order and Billing.</p>
           {children.length > 1 ? (
             <label>Select Youngster
               <select value={selectedChildId} onChange={(e) => setSelectedChildId(e.target.value)}>

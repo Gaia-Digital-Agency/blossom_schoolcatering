@@ -12,6 +12,12 @@ import { JsonLogger } from './shared/json.logger';
 import { RequestLoggingMiddleware } from './shared/request-logging.middleware';
 import { logStartupMonitorInfo, setupProcessMonitoring } from './shared/monitoring';
 
+/**
+ * Loads environment variables from a specified .env file path.
+ * It reads the file, parses each line, and sets the environment variables
+ * if they are not already set. It skips empty lines, comments, and lines without an '='.
+ * @param path The path to the .env file.
+ */
 function loadDotEnv(path: string) {
   if (!existsSync(path)) return;
   const raw = readFileSync(path, 'utf8');
@@ -25,6 +31,11 @@ function loadDotEnv(path: string) {
   }
 }
 
+/**
+ * Validates that all required environment variables are set.
+ * If any of the required variables are missing, it logs an error
+ * to the console and exits the process with a status code of 1.
+ */
 function validateRequiredEnv() {
   const required = ['DATABASE_URL', 'AUTH_JWT_SECRET', 'AUTH_JWT_REFRESH_SECRET'];
   const missing = required.filter((key) => !process.env[key]);
@@ -34,19 +45,31 @@ function validateRequiredEnv() {
   }
 }
 
+/**
+ * Bootstraps the NestJS application.
+ * This function sets up and initializes everything the application needs to run.
+ */
 async function bootstrap() {
+  // Set up process monitoring and load environment variables from .env files.
   setupProcessMonitoring();
   loadDotEnv(join(process.cwd(), '.env'));
   loadDotEnv('/var/www/schoolcatering/.env');
   validateRequiredEnv();
+
+  // Create a new NestJS application instance.
   const app = await NestFactory.create(AppModule, { bodyParser: false });
-  // Raise JSON body limit to 10 MB so proof image uploads (base64 WebP) are accepted.
-  // NestJS default (100 KB) is too small for image payloads.
+
+  // Configure express to handle larger payloads, specifically for image uploads.
+  // The default limit of 100kb is too small.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const express = require('express') as typeof import('express');
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+  // Use a custom JSON logger for application-wide logging.
   app.useLogger(new JsonLogger());
+
+  // Define the list of allowed origins for Cross-Origin Resource Sharing (CORS).
   const corsOrigins = [
     'http://localhost:5173',
     'http://127.0.0.1:5173',
@@ -54,21 +77,27 @@ async function bootstrap() {
     process.env.CORS_ORIGIN,
   ].filter(Boolean) as string[];
 
+  // Apply various middleware for security and request handling.
   app.use(SecurityHeadersMiddleware);
   app.use(CorrelationIdMiddleware);
   app.use(RequestLoggingMiddleware);
   app.use(CsrfOriginMiddleware(corsOrigins));
+
+  // Apply global filters and pipes for exception handling and data validation/transformation.
   app.useGlobalFilters(new StandardHttpExceptionFilter());
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
     transform: true,
     transformOptions: { enableImplicitConversion: true },
   }));
+
+  // Enable and configure CORS for the application.
   app.enableCors({
     origin: corsOrigins,
     credentials: true,
   });
 
+  // Configure Swagger for API documentation.
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Blossom School Catering API')
     .setDescription('REST API contract for Blossom School Catering')
@@ -80,8 +109,11 @@ async function bootstrap() {
     jsonDocumentUrl: 'api/v1/docs-json',
   });
 
+  // Start the application, listening on the configured port.
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
   logStartupMonitorInfo(port);
 }
+
+// Start the application by calling the bootstrap function.
 bootstrap();

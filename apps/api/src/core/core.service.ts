@@ -77,6 +77,7 @@ export class CoreService implements OnModuleInit {
     await this.ensureChildRegistrationSourceColumns();
     await this.ensureBillingReviewColumns();
     await this.ensureAdminAuditTrailTable();
+    await this.ensureMenuItemTextDefaults();
   }
 
   private async ensureAdminVisiblePasswordsTable() {
@@ -1192,9 +1193,8 @@ export class CoreService implements OnModuleInit {
     const cleaned = (allergiesRaw || '').trim().replace(/\s+/g, ' ');
     const fallback = 'No Allergies';
     if (!cleaned) return fallback;
-    const words = cleaned.split(' ').filter(Boolean);
-    if (words.length >= 10) {
-      throw new BadRequestException('Allergies must be less than 10 words');
+    if (cleaned.length > 50) {
+      throw new BadRequestException('Allergies must be 50 characters or less');
     }
     return cleaned;
   }
@@ -1496,6 +1496,7 @@ export class CoreService implements OnModuleInit {
                u.phone_number,
                p.address,
                count(DISTINCT c.id)::int AS linked_children_count,
+               count(DISTINCT br.id)::int AS billing_count,
                COALESCE(
                  json_agg(
                    DISTINCT jsonb_build_object(
@@ -1516,6 +1517,7 @@ export class CoreService implements OnModuleInit {
         LEFT JOIN children c ON c.id = pc.child_id AND c.deleted_at IS NULL
         LEFT JOIN users uc ON uc.id = c.user_id
         LEFT JOIN schools s ON s.id = c.school_id
+        LEFT JOIN billing_records br ON br.parent_id = p.id
         WHERE p.deleted_at IS NULL
           AND u.is_active = true
         GROUP BY p.id, p.user_id, u.username, u.first_name, u.last_name, u.email, u.phone_number, p.address
@@ -1540,6 +1542,49 @@ export class CoreService implements OnModuleInit {
       ADD COLUMN IF NOT EXISTS admin_note text;
     `);
     this.billingReviewColumnsReady = true;
+  }
+
+  private async ensureMenuItemTextDefaults() {
+    await runSql(`
+      UPDATE menu_items
+      SET description = 'TBA',
+          updated_at = now()
+      WHERE deleted_at IS NULL
+        AND is_available = true
+        AND COALESCE(NULLIF(BTRIM(description), ''), '') = '';
+
+      UPDATE menu_items
+      SET nutrition_facts_text = 'TBA',
+          updated_at = now()
+      WHERE deleted_at IS NULL
+        AND is_available = true
+        AND COALESCE(NULLIF(BTRIM(nutrition_facts_text), ''), '') = '';
+    `);
+  }
+
+  private normalizeMenuText(raw?: string | null) {
+    return String(raw || '').trim() || 'TBA';
+  }
+
+  private async ensureTbaIngredientId() {
+    const existingId = await runSql(
+      `
+      SELECT id
+      FROM ingredients
+      WHERE lower(name) = 'tba'
+        AND deleted_at IS NULL
+      ORDER BY created_at ASC
+      LIMIT 1;
+      `,
+    );
+    if (existingId) return existingId;
+    return runSql(
+      `
+      INSERT INTO ingredients (name, allergen_flag, is_active)
+      VALUES ('TBA', false, true)
+      RETURNING id;
+      `,
+    );
   }
 
   async getAdminChildren() {
@@ -2201,7 +2246,7 @@ export class CoreService implements OnModuleInit {
           AND mi.deleted_at IS NULL
           ${filterSql}
         GROUP BY mi.id, m.service_date, m.session
-        ORDER BY m.session ASC, mi.display_order ASC, mi.name ASC
+        ORDER BY m.session ASC, lower(mi.name) ASC
       ) t;
     `,
       params,
@@ -2254,6 +2299,8 @@ export class CoreService implements OnModuleInit {
       FROM (
         SELECT mi.id,
                mi.name,
+               mi.description,
+               mi.calories_kcal,
                mi.price,
                mi.dish_category,
                mi.image_url,
@@ -2273,7 +2320,7 @@ export class CoreService implements OnModuleInit {
           AND m.deleted_at IS NULL
           AND mi.deleted_at IS NULL
           AND mi.is_available = true
-        ORDER BY m.service_date DESC, m.session ASC, mi.display_order ASC, mi.name ASC
+        ORDER BY m.service_date DESC, m.session ASC, lower(mi.name) ASC
       ) t;
       `,
       params,
@@ -2352,7 +2399,7 @@ export class CoreService implements OnModuleInit {
           AND m.deleted_at IS NULL
           AND mi.deleted_at IS NULL
         GROUP BY mi.id, m.service_date, m.session
-        ORDER BY m.service_date DESC, m.session ASC, mi.display_order ASC, mi.name ASC
+        ORDER BY m.service_date DESC, m.session ASC, lower(mi.name) ASC
       ) t;
     `,
       params,
@@ -2469,6 +2516,26 @@ export class CoreService implements OnModuleInit {
     return { url: this.buildGoogleStoragePublicUrl(uploaded.objectName) };
   }
 
+  async uploadSiteHeroImage(buffer: Buffer, mimetype: string): Promise<{ url: string }> {
+    if (!buffer?.length) throw new BadRequestException('No file data received');
+    this.assertSafeImagePayload({
+      contentType: mimetype,
+      data: buffer,
+      maxBytes: 5 * 1024 * 1024,
+      label: 'Hero image',
+    });
+    const ext = this.getFileExtFromContentType(mimetype);
+    const objectName = `${this.getGcsCategoryFolder('menu-images')}/hero-${Date.now()}.${ext}`;
+    const uploaded = await this.uploadToGcs({
+      objectName,
+      contentType: mimetype,
+      data: buffer,
+      cacheControl: 'public, max-age=86400',
+      publicRead: true,
+    });
+    return { url: this.buildGoogleStoragePublicUrl(uploaded.objectName) };
+  }
+
   async createAdminMenuItem(actor: AccessUser, input: {
     serviceDate?: string;
     session?: string;
@@ -2493,13 +2560,13 @@ export class CoreService implements OnModuleInit {
     const serviceDate = input.serviceDate
       ? this.validateServiceDate(input.serviceDate)
       : await this.resolveCreateMenuServiceDate(session);
-    const name = (input.name || '').trim();
-    const description = (input.description || '').trim();
-    const nutritionFactsText = (input.nutritionFactsText || '').trim();
+    const name = this.normalizeMenuText(input.name);
+    const description = this.normalizeMenuText(input.description);
+    const nutritionFactsText = this.normalizeMenuText(input.nutritionFactsText);
     const caloriesKcal = input.caloriesKcal === undefined || input.caloriesKcal === null ? null : Number(input.caloriesKcal);
-    const price = Number(input.price || 0);
+    const price = input.price === undefined || input.price === null || String(input.price).trim() === '' ? 0 : Number(input.price);
     const rawImageUrl = (input.imageUrl || '').trim();
-    const ingredientIds = Array.isArray(input.ingredientIds) ? input.ingredientIds.filter(Boolean) : [];
+    const ingredientIdsRaw = Array.isArray(input.ingredientIds) ? input.ingredientIds.filter(Boolean) : [];
     const isAvailable = input.isAvailable !== false;
     const displayOrder = Number.isInteger(input.displayOrder) ? Number(input.displayOrder) : 0;
     const cutleryRequired = Boolean(input.cutleryRequired);
@@ -2510,9 +2577,13 @@ export class CoreService implements OnModuleInit {
     const containsPeanut = Boolean(input.containsPeanut);
     const dishCategory = this.normalizeDishCategory(input.dishCategory);
 
-    if (price < 0) {
+    if (price < 0 || Number.isNaN(price)) {
       throw new BadRequestException('Invalid price');
     }
+    if (name !== 'TBA' && description !== 'TBA' && name.localeCompare(description, undefined, { sensitivity: 'accent' }) === 0) {
+      throw new BadRequestException('Dish name and description must be different');
+    }
+    const ingredientIds = ingredientIdsRaw.length > 0 ? ingredientIdsRaw : [await this.ensureTbaIngredientId()];
     if (caloriesKcal !== null && (!Number.isInteger(caloriesKcal) || caloriesKcal < 0)) {
       throw new BadRequestException('Invalid caloriesKcal');
     }
@@ -2655,19 +2726,21 @@ export class CoreService implements OnModuleInit {
 
     const serviceDate = input.serviceDate ? this.validateServiceDate(input.serviceDate) : current.service_date;
     const session = input.session ? this.normalizeSession(input.session) : current.session;
-    const name = input.name !== undefined ? input.name.trim() : current.name;
-    const description = input.description !== undefined ? input.description.trim() : current.description;
+    const name = input.name !== undefined ? this.normalizeMenuText(input.name) : this.normalizeMenuText(current.name);
+    const description = input.description !== undefined ? this.normalizeMenuText(input.description) : this.normalizeMenuText(current.description);
     const nutritionFactsText = input.nutritionFactsText !== undefined
-      ? input.nutritionFactsText.trim() || 'TBA'
-      : (String(current.nutrition_facts_text || '').trim() || 'TBA');
+      ? this.normalizeMenuText(input.nutritionFactsText)
+      : this.normalizeMenuText(current.nutrition_facts_text);
     const caloriesKcal = input.caloriesKcal === undefined
       ? (current.calories_kcal ?? null)
       : (input.caloriesKcal === null ? null : Number(input.caloriesKcal));
-    const price = input.price === undefined ? Number(current.price || 0) : Number(input.price || 0);
+    const price = input.price === undefined
+      ? Number(current.price || 0)
+      : (input.price === null || String(input.price).trim() === '' ? 0 : Number(input.price));
     const rawImageUrl = input.imageUrl !== undefined
       ? input.imageUrl.trim()
       : String(current.image_url || '').trim();
-    const ingredientIds = Array.isArray(input.ingredientIds)
+    const ingredientIdsRaw = Array.isArray(input.ingredientIds)
       ? input.ingredientIds.filter(Boolean)
       : Array.isArray(current.ingredient_ids) ? current.ingredient_ids : [];
     const isAvailable = input.isAvailable === undefined ? Boolean(current.is_available) : Boolean(input.isAvailable);
@@ -2687,6 +2760,10 @@ export class CoreService implements OnModuleInit {
     if (price < 0 || Number.isNaN(price)) {
       throw new BadRequestException('Invalid price');
     }
+    if (name !== 'TBA' && description !== 'TBA' && name.localeCompare(description, undefined, { sensitivity: 'accent' }) === 0) {
+      throw new BadRequestException('Dish name and description must be different');
+    }
+    const ingredientIds = ingredientIdsRaw.length > 0 ? ingredientIdsRaw : [await this.ensureTbaIngredientId()];
     if (caloriesKcal !== null && (!Number.isInteger(caloriesKcal) || caloriesKcal < 0)) {
       throw new BadRequestException('Invalid caloriesKcal');
     }
@@ -4616,6 +4693,28 @@ export class CoreService implements OnModuleInit {
     return { ok: true, status: nextStatus };
   }
 
+  async deleteBilling(actor: AccessUser, billingId: string) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    this.assertValidUuid(billingId, 'billingId');
+    const billingOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT id
+        FROM billing_records
+        WHERE id = $1
+        LIMIT 1
+      ) t;
+      `,
+      [billingId],
+    );
+    if (!billingOut) throw new NotFoundException('Billing record not found');
+    await runSql('DELETE FROM digital_receipts WHERE billing_record_id = $1;', [billingId]);
+    await runSql('DELETE FROM billing_records WHERE id = $1;', [billingId]);
+    await this.recordAdminAudit(actor, 'BILLING_DELETED', 'billing-record', billingId);
+    return { ok: true };
+  }
+
   async generateReceipt(actor: AccessUser, billingId: string) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     const billingOut = await runSql(
@@ -6215,10 +6314,20 @@ export class CoreService implements OnModuleInit {
                  ELSE true
                END AS has_allergen,
                CASE
+                 WHEN COALESCE(trim(reg_allergy.restriction_details), '') = '' THEN false
+                 WHEN lower(reg_allergy.restriction_details) LIKE '%no allergies%' THEN false
+                 ELSE true
+               END AS has_registration_allergen,
+               CASE
                  WHEN COALESCE(trim(o.dietary_snapshot), '') = '' THEN ''
                  WHEN lower(o.dietary_snapshot) LIKE '%no allergies%' THEN ''
                  ELSE o.dietary_snapshot
                END AS allergen_items,
+               CASE
+                 WHEN COALESCE(trim(reg_allergy.restriction_details), '') = '' THEN ''
+                 WHEN lower(reg_allergy.restriction_details) LIKE '%no allergies%' THEN ''
+                 ELSE reg_allergy.restriction_details
+               END AS registration_allergen_items,
                COALESCE((
                  SELECT json_agg(row_to_json(d) ORDER BY d.item_name)
                  FROM (
@@ -6239,6 +6348,16 @@ export class CoreService implements OnModuleInit {
           FROM order_items oi2
           GROUP BY oi2.order_id
         ) item_counts ON item_counts.order_id = o.id
+        LEFT JOIN LATERAL (
+          SELECT cdr.restriction_details
+          FROM child_dietary_restrictions cdr
+          WHERE cdr.child_id = c.id
+            AND cdr.is_active = true
+            AND cdr.deleted_at IS NULL
+            AND upper(cdr.restriction_label) = 'ALLERGIES'
+          ORDER BY cdr.updated_at DESC NULLS LAST, cdr.created_at DESC
+          LIMIT 1
+        ) reg_allergy ON true
         LEFT JOIN parent_children pc ON pc.child_id = c.id
         LEFT JOIN parents p ON p.id = pc.parent_id
         LEFT JOIN users up ON up.id = p.user_id
@@ -6262,7 +6381,9 @@ export class CoreService implements OnModuleInit {
       parent_name: string;
       dish_count: number;
       has_allergen: boolean;
+      has_registration_allergen: boolean;
       allergen_items: string;
+      registration_allergen_items: string;
       dishes: Array<{ menu_item_id: string; item_name: string; quantity: number }>;
     }>(ordersOut);
 
@@ -6298,7 +6419,12 @@ export class CoreService implements OnModuleInit {
         lunchOrders: Number(totals.lunch_orders || 0),
       },
       dishSummary,
-      allergenAlerts: orders.filter((o) => o.has_allergen),
+      allergenAlerts: orders
+        .filter((o) => o.has_registration_allergen)
+        .map((o) => ({
+          ...o,
+          allergen_items: o.registration_allergen_items || o.allergen_items,
+        })),
       orders,
     };
   }
@@ -6460,6 +6586,28 @@ export class CoreService implements OnModuleInit {
   async deleteParent(actor: AccessUser, targetParentId: string) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     this.assertValidUuid(targetParentId, 'parentId');
+    const linkedYoungstersRaw = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT c.id,
+               c.user_id,
+               c.deleted_at::text AS deleted_at
+        FROM parent_children pc
+        JOIN children c ON c.id = pc.child_id
+        WHERE pc.parent_id = $1
+      ) t;
+      `,
+      [targetParentId],
+    );
+    const linkedYoungsters = this.parseJsonLines<{ id: string; user_id: string; deleted_at?: string | null }>(linkedYoungstersRaw);
+    const activeLinkedYoungster = linkedYoungsters.find((row) => !row.deleted_at);
+    if (activeLinkedYoungster) {
+      throw new BadRequestException('Cannot delete parent with associated youngster(s)');
+    }
+    for (const youngster of linkedYoungsters) {
+      await this.hardDeleteYoungsterIfSafe(youngster.id, youngster.user_id);
+    }
     const linkedYoungsterExists = await runSql(
       `SELECT EXISTS (
          SELECT 1
@@ -6467,7 +6615,7 @@ export class CoreService implements OnModuleInit {
          JOIN children c ON c.id = pc.child_id
          WHERE pc.parent_id = $1
            AND c.deleted_at IS NULL
-       );`,
+      );`,
       [targetParentId],
     );
     if (linkedYoungsterExists === 't') {
@@ -6482,10 +6630,84 @@ export class CoreService implements OnModuleInit {
     );
     if (!out) throw new NotFoundException('Parent not found');
     const parent = this.parseJsonLine<{ id: string; user_id: string }>(out);
-    await runSql(`UPDATE parents SET deleted_at = now(), updated_at = now() WHERE id = $1;`, [targetParentId]);
-    await runSql(`UPDATE users SET is_active = false, deleted_at = now(), updated_at = now() WHERE id = $1;`, [parent.user_id]);
+    const blockingHistoryOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT
+          (SELECT COUNT(*)::int FROM billing_records WHERE parent_id = $1) AS billing_count,
+          (SELECT COUNT(*)::int FROM orders WHERE placed_by_user_id = $2) AS orders_count,
+          (SELECT COUNT(*)::int FROM order_carts WHERE created_by_user_id = $2) AS carts_count,
+          (SELECT COUNT(*)::int FROM favourite_meals WHERE created_by_user_id = $2) AS favourites_count,
+          (SELECT COUNT(*)::int FROM admin_audit_logs WHERE actor_user_id = $2) AS audit_count
+      ) t;
+      `,
+      [targetParentId, parent.user_id],
+    );
+    const blockingHistory = this.parseJsonLine<{
+      billing_count: number;
+      orders_count: number;
+      carts_count: number;
+      favourites_count: number;
+      audit_count: number;
+    }>(blockingHistoryOut);
+    if (
+      Number(blockingHistory?.billing_count || 0) > 0 ||
+      Number(blockingHistory?.orders_count || 0) > 0 ||
+      Number(blockingHistory?.carts_count || 0) > 0 ||
+      Number(blockingHistory?.favourites_count || 0) > 0 ||
+      Number(blockingHistory?.audit_count || 0) > 0
+    ) {
+      throw new BadRequestException('Cannot hard-delete parent with billing or order history');
+    }
+    await runSql(`DELETE FROM parent_children WHERE parent_id = $1;`, [targetParentId]);
+    await runSql(`DELETE FROM user_preferences WHERE user_id = $1;`, [parent.user_id]);
+    await runSql(`DELETE FROM parents WHERE id = $1;`, [targetParentId]);
+    await runSql(`DELETE FROM users WHERE id = $1;`, [parent.user_id]);
     await this.recordAdminAudit(actor, 'PARENT_DELETED', 'parent', targetParentId);
     return { ok: true };
+  }
+
+  private async hardDeleteYoungsterIfSafe(youngsterId: string, userId: string) {
+    const blockerRaw = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT
+          (SELECT COUNT(*)::int FROM orders WHERE child_id = $1) AS orders_count,
+          (SELECT COUNT(*)::int
+             FROM billing_records br
+             JOIN orders o ON o.id = br.order_id
+            WHERE o.child_id = $1) AS billing_count,
+          (SELECT COUNT(*)::int FROM order_carts WHERE child_id = $1 OR created_by_user_id = $2) AS carts_count,
+          (SELECT COUNT(*)::int FROM favourite_meals WHERE child_id = $1 OR created_by_user_id = $2) AS favourites_count,
+          (SELECT COUNT(*)::int FROM admin_audit_logs WHERE actor_user_id = $2) AS audit_count
+      ) t;
+      `,
+      [youngsterId, userId],
+    );
+    const blocker = this.parseJsonLine<{
+      orders_count: number;
+      billing_count: number;
+      carts_count: number;
+      favourites_count: number;
+      audit_count: number;
+    }>(blockerRaw);
+    if (
+      Number(blocker?.orders_count || 0) > 0 ||
+      Number(blocker?.billing_count || 0) > 0 ||
+      Number(blocker?.carts_count || 0) > 0 ||
+      Number(blocker?.favourites_count || 0) > 0 ||
+      Number(blocker?.audit_count || 0) > 0
+    ) {
+      throw new BadRequestException('Cannot hard-delete youngster with order or billing history');
+    }
+    await runSql(`DELETE FROM parent_children WHERE child_id = $1;`, [youngsterId]);
+    await runSql(`DELETE FROM child_dietary_restrictions WHERE child_id = $1;`, [youngsterId]);
+    await runSql(`DELETE FROM user_preferences WHERE user_id = $1;`, [userId]);
+    await runSql(`DELETE FROM auth_refresh_sessions WHERE user_id = $1;`, [userId]);
+    await runSql(`DELETE FROM children WHERE id = $1;`, [youngsterId]);
+    await runSql(`DELETE FROM users WHERE id = $1;`, [userId]);
   }
 
   // ─── Youngster CRUD ──────────────────────────────────────────────────────
@@ -6592,8 +6814,7 @@ export class CoreService implements OnModuleInit {
     );
     if (!out) throw new NotFoundException('Youngster not found');
     const child = this.parseJsonLine<{ id: string; user_id: string }>(out);
-    await runSql(`UPDATE children SET deleted_at = now(), is_active = false, updated_at = now() WHERE id = $1;`, [youngsterId]);
-    await runSql(`UPDATE users SET is_active = false, deleted_at = now(), updated_at = now() WHERE id = $1;`, [child.user_id]);
+    await this.hardDeleteYoungsterIfSafe(youngsterId, child.user_id);
     await this.recordAdminAudit(actor, 'YOUNGSTER_DELETED', 'youngster', youngsterId);
     return { ok: true };
   }
@@ -7184,6 +7405,16 @@ export class CoreService implements OnModuleInit {
       VALUES ('chef_message', 'Every dish is prepared for school-day energy and balanced nutrition. We keep every meal fresh, consistent, and safe for all youngsters.')
       ON CONFLICT (setting_key) DO NOTHING;
     `);
+    await runSql(`
+      INSERT INTO site_settings (setting_key, setting_value)
+      VALUES ('hero_image_url', '/schoolcatering/assets/hero-meal.jpg')
+      ON CONFLICT (setting_key) DO NOTHING;
+    `);
+    await runSql(`
+      INSERT INTO site_settings (setting_key, setting_value)
+      VALUES ('hero_image_caption', 'Enchanting Nourished Zesty Original Meals')
+      ON CONFLICT (setting_key) DO NOTHING;
+    `);
   }
 
   async getSiteSettings() {
@@ -7191,31 +7422,48 @@ export class CoreService implements OnModuleInit {
     const out = await runSql(`
       SELECT row_to_json(t)::text
       FROM (
-        SELECT setting_value AS chef_message
+        SELECT
+          COALESCE(MAX(CASE WHEN setting_key = 'chef_message' THEN setting_value END), '') AS chef_message,
+          COALESCE(MAX(CASE WHEN setting_key = 'hero_image_url' THEN setting_value END), '/schoolcatering/assets/hero-meal.jpg') AS hero_image_url,
+          COALESCE(MAX(CASE WHEN setting_key = 'hero_image_caption' THEN setting_value END), 'Enchanting Nourished Zesty Original Meals') AS hero_image_caption
         FROM site_settings
-        WHERE setting_key = 'chef_message'
-        LIMIT 1
       ) t;
     `);
     const lines = out.split('\n').map((x: string) => x.trim()).filter(Boolean);
-    const data = lines[0] ? (JSON.parse(lines[0]) as { chef_message?: string }) : {};
-    return { chef_message: data.chef_message ?? '' };
+    const data = lines[0]
+      ? (JSON.parse(lines[0]) as { chef_message?: string; hero_image_url?: string; hero_image_caption?: string })
+      : {};
+    return {
+      chef_message: data.chef_message ?? '',
+      hero_image_url: data.hero_image_url ?? '/schoolcatering/assets/hero-meal.jpg',
+      hero_image_caption: data.hero_image_caption ?? 'Enchanting Nourished Zesty Original Meals',
+    };
   }
 
-  async updateSiteSettings(actor: AccessUser, chefMessage: string) {
+  async updateSiteSettings(actor: AccessUser, input: { chef_message?: string; hero_image_url?: string; hero_image_caption?: string }) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
-    if (typeof chefMessage !== 'string') throw new BadRequestException('chef_message must be a string');
-    const trimmed = chefMessage.trim();
-    if (trimmed.length > 500) throw new BadRequestException('chef_message must be 500 characters or fewer');
+    const chefMessage = typeof input.chef_message === 'string' ? input.chef_message.trim() : '';
+    const heroImageUrl = typeof input.hero_image_url === 'string' ? input.hero_image_url.trim() : '/schoolcatering/assets/hero-meal.jpg';
+    const heroImageCaption = typeof input.hero_image_caption === 'string' ? input.hero_image_caption.trim() : 'Enchanting Nourished Zesty Original Meals';
+    if (chefMessage.length > 500) throw new BadRequestException('chef_message must be 500 characters or fewer');
+    if (heroImageCaption.length > 200) throw new BadRequestException('hero_image_caption must be 200 characters or fewer');
+    if (heroImageUrl.length > 2000) throw new BadRequestException('hero_image_url must be 2000 characters or fewer');
     await this.ensureSiteSettingsTable();
     await runSql(
       `INSERT INTO site_settings (setting_key, setting_value, updated_at)
-       VALUES ('chef_message', $1, now())
+       VALUES
+         ('chef_message', $1, now()),
+         ('hero_image_url', $2, now()),
+         ('hero_image_caption', $3, now())
        ON CONFLICT (setting_key)
        DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = now();`,
-      [trimmed],
+      [chefMessage, heroImageUrl || '/schoolcatering/assets/hero-meal.jpg', heroImageCaption],
     );
-    return { chef_message: trimmed };
+    return {
+      chef_message: chefMessage,
+      hero_image_url: heroImageUrl || '/schoolcatering/assets/hero-meal.jpg',
+      hero_image_caption: heroImageCaption,
+    };
   }
 
   // ─── Health check ─────────────────────────────────────────────────────────

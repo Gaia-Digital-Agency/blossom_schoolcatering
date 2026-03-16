@@ -1,4 +1,4 @@
-import { IsEmail, IsIn, IsOptional, IsString, IsUUID, Matches } from 'class-validator';
+import { IsEmail, IsIn, IsOptional, IsString, IsUUID, Matches, MaxLength } from 'class-validator';
 
 export class UpdateYoungsterDto {
   @IsOptional()
@@ -39,5 +39,6 @@ export class UpdateYoungsterDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(50)
   allergies?: string;
 }

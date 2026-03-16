@@ -20,6 +20,14 @@ type Assignment = {
   confirmed_at?: string | null;
 };
 
+type DeliveryProfile = {
+  username: string;
+  displayName: string;
+  role: string;
+  phoneNumber?: string | null;
+  email?: string | null;
+};
+
 function dateInMakassar(offsetDays = 0) {
   const now = new Date();
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -38,6 +46,7 @@ function dateInMakassar(offsetDays = 0) {
 
 export default function DeliveryPage() {
   const [rows, setRows] = useState<Assignment[]>([]);
+  const [profile, setProfile] = useState<DeliveryProfile | null>(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [note, setNote] = useState('');
@@ -175,6 +184,15 @@ export default function DeliveryPage() {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
 
+  useEffect(() => {
+    apiFetch('/auth/me')
+      .then((data) => setProfile(data as DeliveryProfile))
+      .catch((e) => {
+        if (e instanceof SessionExpiredError) return;
+        setError((prev) => prev || (e instanceof Error ? e.message : 'Failed loading delivery profile'));
+      });
+  }, []);
+
   const onToggleComplete = async (assignmentId: string) => {
     setError(''); setMessage('');
     try {
@@ -216,6 +234,28 @@ export default function DeliveryPage() {
 
         <div className="module-guide-card">
           💡 Mark Assigned deliveries by school. See Assigned Orders yesterday, today, tomorrow.
+        </div>
+
+        <div className="delivery-user-card">
+          <h2>Delivery User Info</h2>
+          <div className="delivery-user-grid">
+            <div>
+              <span>Name</span>
+              <strong>{profile?.displayName || '-'}</strong>
+            </div>
+            <div>
+              <span>Username</span>
+              <strong>{profile?.username || '-'}</strong>
+            </div>
+            <div>
+              <span>Phone</span>
+              <strong>{profile?.phoneNumber || '-'}</strong>
+            </div>
+            <div>
+              <span>Email</span>
+              <strong>{profile?.email || '-'}</strong>
+            </div>
+          </div>
         </div>
 
         <div className="delivery-controls">
@@ -322,6 +362,34 @@ export default function DeliveryPage() {
           gap: 0.4rem;
           margin-bottom: 0.75rem;
         }
+        .delivery-user-card {
+          background: #fffdf8;
+          border: 1px solid #eadfc9;
+          border-radius: 0.8rem;
+          padding: 0.85rem 1rem;
+          margin-bottom: 1rem;
+        }
+        .delivery-user-card h2 {
+          margin: 0 0 0.75rem 0;
+          font-size: 1rem;
+        }
+        .delivery-user-grid {
+          display: grid;
+          gap: 0.65rem;
+        }
+        .delivery-user-grid div {
+          display: grid;
+          gap: 0.15rem;
+        }
+        .delivery-user-grid span {
+          font-size: 0.78rem;
+          color: #7b6952;
+        }
+        .delivery-user-grid strong {
+          font-size: 0.95rem;
+          color: #2f2418;
+          font-weight: 600;
+        }
         .delivery-date-row .btn {
           flex: 1 1 auto;
         }
@@ -335,6 +403,9 @@ export default function DeliveryPage() {
           margin: 0;
         }
         @media (min-width: 720px) {
+          .delivery-user-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
           .delivery-date-picker-row {
             grid-template-columns: 1fr auto auto;
             align-items: end;

@@ -25,6 +25,8 @@ type DbUserRow = {
   role: string;
   first_name: string;
   last_name: string;
+  phone_number?: string | null;
+  email?: string | null;
   password_hash: string;
 };
 
@@ -204,18 +206,17 @@ export class AuthService {
   }
 
   private buildGeneratedPassword(phoneLike: string) {
-    const digits = (phoneLike || '').replace(/\D/g, '');
-    if (digits.length >= 6) return digits;
-    return `${digits}123456`.slice(0, 6);
+    const raw = (phoneLike || '').trim();
+    if (raw.length >= 6) return raw;
+    return `${raw}123456`.slice(0, 6);
   }
 
   private normalizeAllergies(allergiesRaw?: string) {
     const cleaned = (allergiesRaw || '').trim().replace(/\s+/g, ' ');
     const fallback = 'No Allergies';
     if (!cleaned) return fallback;
-    const words = cleaned.split(' ').filter(Boolean);
-    if (words.length >= 10) {
-      throw new BadRequestException('Allergies must be less than 10 words');
+    if (cleaned.length > 50) {
+      throw new BadRequestException('Allergies must be 50 characters or less');
     }
     return cleaned;
   }
@@ -388,6 +389,7 @@ export class AuthService {
       `SELECT row_to_json(t)::text
        FROM (
          SELECT id, username, role::text, first_name, last_name, password_hash
+               , phone_number, email
          FROM users
          WHERE username = $1
            AND is_active = true
@@ -407,8 +409,9 @@ export class AuthService {
        FROM (
          SELECT id, username, role::text, first_name, last_name, password_hash
          FROM users
-         WHERE email = $1
+         WHERE LOWER(email) = $1
            AND is_active = true
+           AND deleted_at IS NULL
          LIMIT 1
        ) t;`,
       [normalizedEmail],
@@ -496,6 +499,8 @@ export class AuthService {
       username: row.username,
       displayName: `${row.first_name} ${row.last_name}`.trim(),
       role,
+      phoneNumber: row.phone_number || null,
+      email: row.email || null,
     };
   }
 
@@ -684,7 +689,6 @@ export class AuthService {
       !youngsterDateOfBirth ||
       !youngsterSchoolId ||
       !youngsterGrade ||
-      !youngsterPhone ||
       !parentFirstName ||
       !parentLastNameInput ||
       !parentMobileNumber ||
@@ -699,6 +703,9 @@ export class AuthService {
     if (registrantType === 'TEACHER') {
       if (!teacherName) throw new BadRequestException('Teacher name is required when registrantType is TEACHER');
       if (teacherName.length > 50) throw new BadRequestException('Teacher name must be max 50 characters');
+    }
+    if ((registrantType === 'YOUNGSTER' || registrantType === 'TEACHER') && !youngsterPhone) {
+      throw new BadRequestException('Youngster phone is required when registrantType is YOUNGSTER or TEACHER');
     }
     if (registrantType !== 'TEACHER' && teacherName) {
       throw new BadRequestException('Teacher name is only allowed when registrantType is TEACHER');
@@ -734,6 +741,40 @@ export class AuthService {
     if (parentLastName.toLowerCase() !== youngsterLastName.toLowerCase()) {
       throw new BadRequestException('Parent last name must match youngster last name');
     }
+    await this.ensureChildRegistrationSourceColumns();
+    const duplicateOut = await runSql(
+      `
+      SELECT EXISTS (
+        SELECT 1
+        FROM children c
+        JOIN users cu ON cu.id = c.user_id
+        JOIN parent_children pc ON pc.child_id = c.id
+        JOIN parents p ON p.id = pc.parent_id
+        JOIN users pu ON pu.id = p.user_id
+        WHERE c.deleted_at IS NULL
+          AND p.deleted_at IS NULL
+          AND cu.deleted_at IS NULL
+          AND pu.deleted_at IS NULL
+          AND c.school_id = $1
+          AND LOWER(TRIM(cu.first_name)) = LOWER(TRIM($2))
+          AND LOWER(TRIM(cu.last_name)) = LOWER(TRIM($3))
+          AND LOWER(TRIM(pu.first_name)) = LOWER(TRIM($4))
+          AND LOWER(TRIM(pu.last_name)) = LOWER(TRIM($5))
+          AND COALESCE(c.registration_actor_type::text, '') = $6
+      );
+      `,
+      [
+        youngsterSchoolId,
+        youngsterFirstName,
+        youngsterLastName,
+        parentFirstName,
+        parentLastName,
+        registrantType,
+      ],
+    );
+    if (duplicateOut === 't') {
+      throw new BadRequestException('This parent and youngster combination has been registered, duplicate registration not allowed please inquire with Admin for assistance.');
+    }
 
     const existingParentByEmail = await this.findUserByEmail(parentEmail);
     let parentUserId = '';
@@ -768,16 +809,28 @@ export class AuthService {
       parentUsername = await runSql(`SELECT generate_unique_username($1);`, [parentUsernameBase]);
       parentGeneratedPassword = this.buildGeneratedPassword(parentMobileNumber);
       const parentPasswordHash = this.hashPassword(parentGeneratedPassword);
-      const parentOut = await runSql(
-        `WITH inserted AS (
-           INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email)
-           VALUES ('PARENT', $1, $2, $3, $4, $5, $6)
-           RETURNING id, username
-         )
-         SELECT row_to_json(inserted)::text
-         FROM inserted;`,
-        [parentUsername, parentPasswordHash, parentFirstName, parentLastName, parentMobileNumber, parentEmail],
-      );
+      let parentOut = '';
+      try {
+        parentOut = await runSql(
+          `WITH inserted AS (
+             INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email)
+             VALUES ('PARENT', $1, $2, $3, $4, $5, $6)
+             RETURNING id, username
+           )
+           SELECT row_to_json(inserted)::text
+           FROM inserted;`,
+          [parentUsername, parentPasswordHash, parentFirstName, parentLastName, parentMobileNumber, parentEmail],
+        );
+      } catch (err) {
+        const message = err instanceof Error ? err.message.toLowerCase() : '';
+        if (message.includes('users_email_ci_uq') || (message.includes('duplicate key') && message.includes('email'))) {
+          throw new BadRequestException('Parent email already exists. Please use the existing parent account or inquire with Admin for assistance.');
+        }
+        if (message.includes('users_username_key') || (message.includes('duplicate key') && message.includes('username'))) {
+          throw new BadRequestException('Parent username already exists. Please retry registration.');
+        }
+        throw err;
+      }
       const parentCreated = this.parseJsonLine<{ id: string; username: string }>(parentOut);
       parentUserId = parentCreated.id;
 
@@ -817,18 +870,30 @@ export class AuthService {
 
     const youngsterUsernameBase = this.sanitizeUsernamePart(`${youngsterLastName}_${youngsterFirstName}`);
     const youngsterUsername = await runSql(`SELECT generate_unique_username($1);`, [youngsterUsernameBase]);
-    const youngsterGeneratedPassword = this.buildGeneratedPassword(youngsterPhone);
+    const youngsterGeneratedPassword = this.buildGeneratedPassword(youngsterPhone || parentMobileNumber);
     const youngsterPasswordHash = this.hashPassword(youngsterGeneratedPassword);
-    const youngsterOut = await runSql(
-      `WITH inserted AS (
-         INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email)
-         VALUES ('CHILD', $1, $2, $3, $4, $5, $6)
-         RETURNING id, username, first_name, last_name
-       )
-       SELECT row_to_json(inserted)::text
-       FROM inserted;`,
-      [youngsterUsername, youngsterPasswordHash, youngsterFirstName, youngsterLastName, youngsterPhone, youngsterEmail || null],
-    );
+    let youngsterOut = '';
+    try {
+      youngsterOut = await runSql(
+        `WITH inserted AS (
+           INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email)
+           VALUES ('CHILD', $1, $2, $3, $4, $5, $6)
+           RETURNING id, username, first_name, last_name
+         )
+         SELECT row_to_json(inserted)::text
+         FROM inserted;`,
+        [youngsterUsername, youngsterPasswordHash, youngsterFirstName, youngsterLastName, youngsterPhone, youngsterEmail || null],
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message.toLowerCase() : '';
+      if (message.includes('users_email_ci_uq') || (message.includes('duplicate key') && message.includes('email'))) {
+        throw new BadRequestException('Youngster email already exists. Please inquire with Admin for assistance.');
+      }
+      if (message.includes('users_username_key') || (message.includes('duplicate key') && message.includes('username'))) {
+        throw new BadRequestException('Youngster username already exists. Please retry registration.');
+      }
+      throw err;
+    }
     const youngsterCreated = this.parseJsonLine<{ id: string; username: string; first_name: string; last_name: string }>(youngsterOut);
 
     await runSql(

@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { clearAuthState, fetchWithTimeout, getApiBase } from '../../../lib/auth';
 
+// Navigation links for the left column of the admin navigation.
 const leftLinks = [
   { href: '/admin', label: 'Dashboard' },
   { href: '/admin/parent', label: 'Parent' },
@@ -13,18 +14,29 @@ const leftLinks = [
   { href: '/admin/delivery', label: 'Delivery' },
 ];
 
+// Navigation links for the right column of the admin navigation.
 const rightLinks = [
   { href: '/admin/menu', label: 'Menu' },
   { href: '/admin/kitchen', label: 'Kitchen' },
   { href: '/admin/blackout-dates', label: 'Blackout' },
-  { href: '/admin/reports', label: 'Reports' },
   { href: '/admin/billing', label: 'Billing' },
+  { href: '/admin/reports', label: 'Reports' },
 ];
 
+/**
+ * A navigation component for the admin section of the application.
+ * It displays links to all the admin-specific pages and includes a logout button.
+ */
 export default function AdminNav() {
   const pathname = usePathname();
+  // State to manage the loading status of the logout process.
   const [loggingOut, setLoggingOut] = useState(false);
 
+  /**
+   * Handles the admin logout process.
+   * It calls the logout API endpoint, clears authentication state,
+   * and redirects to the admin login page.
+   */
   const onLogout = async () => {
     setLoggingOut(true);
     await fetchWithTimeout(`${getApiBase()}/auth/logout`, {
@@ -40,6 +52,7 @@ export default function AdminNav() {
   return (
     <>
     <div className="admin-nav-shell">
+      {/* Top bar of the navigation with title and logout button */}
       <div className="admin-nav-top">
         <strong>Admin Module</strong>
         <button
@@ -52,6 +65,7 @@ export default function AdminNav() {
           {loggingOut ? 'Logging out...' : 'Logout Admin'}
         </button>
       </div>
+      {/* Two-column layout for the navigation links */}
       <div className="admin-nav-columns">
         <div className="dev-links admin-nav-links">
           {leftLinks.map((link) => (
@@ -78,6 +92,7 @@ export default function AdminNav() {
           ))}
         </div>
       </div>
+      {/* Scoped CSS for the component */}
       <style jsx>{`
         .admin-nav-shell {
           margin: 0.45rem 0 1rem;

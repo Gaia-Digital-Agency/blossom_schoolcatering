@@ -13,6 +13,7 @@ type ParentRow = {
   last_name: string;
   email?: string | null;
   linked_children_count: number;
+  billing_count: number;
   youngsters: ParentYoungster[];
   schools: string[];
 };
@@ -102,6 +103,10 @@ export default function AdminParentsPage() {
       setError('Cannot delete parent with associated youngster(s).');
       return;
     }
+    if (p.billing_count > 0) {
+      setError('Cannot delete parent with attached billing. Resolve or remove billing first.');
+      return;
+    }
     if (!window.confirm(`Delete parent "${p.first_name} ${p.last_name}"? This cannot be undone.`)) return;
     setError('');
     setMessage('');
@@ -112,6 +117,20 @@ export default function AdminParentsPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed deleting parent');
     }
+  };
+
+  const deleteDisabled = (p: ParentRow) => p.linked_children_count > 0 || p.billing_count > 0;
+  const deleteTitle = (p: ParentRow) => {
+    if (p.linked_children_count > 0 && p.billing_count > 0) {
+      return 'Cannot delete while parent still has linked youngster(s) and attached billing.';
+    }
+    if (p.linked_children_count > 0) {
+      return 'Cannot delete while parent still has linked youngster(s).';
+    }
+    if (p.billing_count > 0) {
+      return 'Cannot delete while parent still has attached billing.';
+    }
+    return 'Delete parent';
   };
 
   const onShowId = (p: ParentRow) => {
@@ -170,8 +189,8 @@ export default function AdminParentsPage() {
                         className="btn btn-outline"
                         type="button"
                         onClick={() => onDeleteParent(p)}
-                        disabled={p.linked_children_count > 0}
-                        title={p.linked_children_count > 0 ? 'Cannot delete while parent still has linked youngster(s).' : 'Delete parent'}
+                        disabled={deleteDisabled(p)}
+                        title={deleteTitle(p)}
                       >
                         Delete
                       </button>

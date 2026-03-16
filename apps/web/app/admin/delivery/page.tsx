@@ -18,6 +18,7 @@ type ShowPassInfo = {
   deliveryName: string;
   deliveryUsername: string;
   deliveryNewPassword: string;
+  mode?: 'show' | 'reset';
 };
 type School = { id: string; name: string };
 type Mapping = {
@@ -343,6 +344,28 @@ export default function AdminDeliveryPage() {
         deliveryName: `${user.first_name} ${user.last_name}`,
         deliveryUsername: res.username,
         deliveryNewPassword: res.password,
+        mode: 'show',
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed loading password');
+    }
+  };
+
+  const onResetPassword = async (user: DeliveryUser) => {
+    if (!window.confirm(`Reset password for delivery user "${user.username}"?`)) return;
+    setError('');
+    setMessage('');
+    try {
+      const res = await apiFetch(
+        `/admin/users/${user.id}/reset-password`,
+        { method: 'PATCH' },
+        { skipAutoReload: true },
+      ) as { ok: boolean; newPassword: string; username: string };
+      setShowPassInfo({
+        deliveryName: `${user.first_name} ${user.last_name}`,
+        deliveryUsername: res.username,
+        deliveryNewPassword: res.newPassword,
+        mode: 'reset',
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed loading password');
@@ -513,7 +536,15 @@ export default function AdminDeliveryPage() {
                           onClick={() => onShowPassword(u)}
                           disabled={deletingUserId === u.id || togglingUserId === u.id || savingUserId === u.id}
                         >
-                          Show Password
+                          Show PW
+                        </button>
+                        <button
+                          className="btn btn-outline"
+                          type="button"
+                          onClick={() => onResetPassword(u)}
+                          disabled={deletingUserId === u.id || togglingUserId === u.id || savingUserId === u.id}
+                        >
+                          Reset PW
                         </button>
                         <button
                           className="btn btn-outline"
@@ -669,9 +700,13 @@ export default function AdminDeliveryPage() {
       {showPassInfo ? (
         <div className="pass-modal-overlay" onClick={() => setShowPassInfo(null)}>
           <div className="pass-modal-card" onClick={(e) => e.stopPropagation()}>
-            <h2 className="pass-modal-title">Delivery Password Information</h2>
+            <h2 className="pass-modal-title">
+              {showPassInfo.mode === 'reset' ? 'Delivery Password Reset' : 'Delivery Password Information'}
+            </h2>
             <p className="pass-modal-warning">
-              Displaying stored login password. It is not changed by this action.
+              {showPassInfo.mode === 'reset'
+                ? 'Password has been reset. Use the new stored login password below.'
+                : 'Displaying stored login password. It is not changed by this action.'}
             </p>
             <div className="reg-info-list">
               <div className="reg-info-row">
