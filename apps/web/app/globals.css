@@ -298,7 +298,7 @@ button:hover,
   object-fit: cover;
   object-position: center;
   display: block;
-  opacity: 0.48;
+  opacity: 0.9;
   filter: saturate(0.9);
 }
 
@@ -309,8 +309,8 @@ button:hover,
   border-radius: 0.6rem;
   background: linear-gradient(
     180deg,
-    rgba(26, 20, 13, 0.2) 0%,
-    rgba(26, 20, 13, 0.3) 100%
+    rgba(26, 20, 13, 0.06) 0%,
+    rgba(26, 20, 13, 0.1) 100%
   );
   pointer-events: none;
 }

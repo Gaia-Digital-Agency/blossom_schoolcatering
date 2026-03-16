@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ACCESS_KEY, apiFetch, fetchWithTimeout, getApiBase } from '../../lib/auth';
+import { fileToWebpDataUrl } from '../../lib/image';
 import AdminNav from './_components/admin-nav';
 
 /**
@@ -154,8 +155,11 @@ export default function AdminPage() {
     try {
       let nextHeroImageUrl = heroImageUrl;
       if (heroImageFile) {
+        const asWebpDataUrl = await fileToWebpDataUrl(heroImageFile);
+        const blobRes = await fetch(asWebpDataUrl);
+        const blob = await blobRes.blob();
         const formData = new FormData();
-        formData.append('image', heroImageFile, heroImageFile.name || `hero-${Date.now()}.webp`);
+        formData.append('image', blob, `hero-${Date.now()}.webp`);
         const token = localStorage.getItem(ACCESS_KEY);
         const uploadRes = await fetchWithTimeout(`${getApiBase()}/admin/site-settings/hero-image-upload`, {
           method: 'POST',
@@ -207,7 +211,6 @@ export default function AdminPage() {
   return (
     <main className="page-auth page-auth-desktop">
       <section className="auth-panel">
-
         {/* ── Card 1: Admin Dashboard ─────────────────────────────── */}
         <div className="auth-form dash-card dash-card--admin">
           <h1 className="dash-card-title">Admin Dashboard</h1>
@@ -586,7 +589,6 @@ export default function AdminPage() {
           font-size: 0.82rem;
           min-height: unset;
         }
-
         /* ── Order Dashboard data block ── */
         .admin-dashboard-block {
           grid-template-columns: minmax(0, 1fr);
