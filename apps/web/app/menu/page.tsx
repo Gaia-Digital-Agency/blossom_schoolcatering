@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { fetchWithTimeout, getApiBase } from '../../lib/auth';
+import { fetchWithTimeout, getApiBase, ROLE_KEY, type Role } from '../../lib/auth';
 import SessionBadge from '../_components/session-badge';
 import { getSessionCardStyle } from '../../lib/session-theme';
 
@@ -62,6 +62,7 @@ export default function MenuPage() {
   const [items, setItems] = useState<PublicMenuItem[]>([]);
   const [serviceDate, setServiceDate] = useState('');
   const [error, setError] = useState('');
+  const [returnHref, setReturnHref] = useState('/login');
 
   useEffect(() => {
     const load = async () => {
@@ -79,6 +80,17 @@ export default function MenuPage() {
       }
     };
     load().catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    const role = localStorage.getItem(ROLE_KEY) as Role | null;
+    if (role === 'PARENT') {
+      setReturnHref('/family');
+      return;
+    }
+    if (role === 'YOUNGSTER') {
+      setReturnHref('/student');
+    }
   }, []);
 
   const groupedItems = useMemo(() => {
@@ -179,7 +191,7 @@ export default function MenuPage() {
         )}
 
         <div className="dev-links">
-          <Link href="/">Back to Homepage</Link>
+          <Link href={returnHref}>Return</Link>
           <Link href="/rating">Rating</Link>
         </div>
       </section>
