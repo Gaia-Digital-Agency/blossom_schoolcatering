@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import GoogleOAuthButton from './_components/google-oauth-button';
 
 /**
  * The home page of the application.
@@ -134,7 +133,6 @@ export default function HomePage() {
             <div className="auth-grid">
               <Link className="btn btn-primary" href="/login">Log In</Link>
               <Link className="btn btn-outline" href="/register">Register</Link>
-              <GoogleOAuthButton role="PARENT" redirectPath="/dashboard" className="google-oauth-wrap" />
             </div>
           </section>
         </main>
