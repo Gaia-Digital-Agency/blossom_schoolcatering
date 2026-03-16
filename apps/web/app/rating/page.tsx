@@ -258,6 +258,12 @@ export default function RatingPage() {
           border-color: #7a5010;
           background: #ffefd0;
         }
+        .dev-links {
+          display: grid;
+        }
+        .dev-links :global(.btn) {
+          width: 100%;
+        }
         .dev-links button {
           border: 1px solid #ccbda2;
           background: #fff;

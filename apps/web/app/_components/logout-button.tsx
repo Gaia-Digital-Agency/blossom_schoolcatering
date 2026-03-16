@@ -92,17 +92,23 @@ export default function LogoutButton({
       {/* Scoped CSS for the component */}
       <style jsx>{`
         .session-actions {
-          position: static;
-          z-index: 1;
-          display: flex;
+          position: fixed;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          z-index: 20;
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
           align-items: center;
           gap: 0.45rem;
-          justify-content: flex-start;
-          margin: 0.85rem 1rem 1.2rem;
-          flex-wrap: wrap;
+          padding: 0.65rem 0.85rem calc(0.8rem + env(safe-area-inset-bottom));
+          background: linear-gradient(180deg, rgba(244, 239, 229, 0), rgba(244, 239, 229, 0.96) 35%, rgba(244, 239, 229, 0.99) 100%);
+          backdrop-filter: blur(6px);
         }
         .logout-btn {
-          padding: 0.35rem 0.75rem;
+          width: 100%;
+          min-height: 2.35rem;
+          padding: 0.35rem 0.6rem;
           border: 1px solid #ccbda2;
           border-radius: 0.5rem;
           background: rgba(255, 253, 248, 0.88);
@@ -123,7 +129,9 @@ export default function LogoutButton({
           cursor: default;
         }
         .record-btn {
-          padding: 0.35rem 0.75rem;
+          width: 100%;
+          min-height: 2.35rem;
+          padding: 0.35rem 0.6rem;
           border: 1px solid #ccbda2;
           border-radius: 0.5rem;
           background: rgba(255, 253, 248, 0.88);
@@ -138,6 +146,11 @@ export default function LogoutButton({
           background: #fff0e0;
           border-color: #9e6b20;
           color: #5a3a10;
+        }
+        @media (max-width: 520px) {
+          .session-actions {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
         }
       `}</style>
     </>
