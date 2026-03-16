@@ -549,7 +549,7 @@ export default function YoungsterRegisterPage() {
             <input type="email" value={youngsterEmail} onChange={(e) => setYoungsterEmail(e.target.value)} />
           </label>
           <fieldset className="allergy-fieldset">
-            <legend>Youngster Allergies (Required)</legend>
+            <div className="allergy-title">Youngster Allergies (Required)</div>
             <label className="allergy-option">
               <input
                 type="radio"
@@ -637,16 +637,18 @@ export default function YoungsterRegisterPage() {
         }
         .allergy-fieldset {
           margin: 0;
-          padding: 0.7rem 0.8rem;
+          padding: 0.65rem 0.75rem;
           border: 1px solid #d9ccb8;
           border-radius: 0.65rem;
           display: grid;
-          gap: 0.55rem;
+          gap: 0.4rem;
           background: #fffdf9;
         }
-        .allergy-fieldset legend {
+        .allergy-title {
           font-weight: 700;
-          padding: 0 0.2rem;
+          font-size: 0.92rem;
+          line-height: 1.2;
+          margin: 0 0 0.1rem;
         }
         .allergy-option {
           display: inline-flex;
