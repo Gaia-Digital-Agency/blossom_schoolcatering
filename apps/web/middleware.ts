@@ -14,15 +14,10 @@ function getRequiredRole(path: string): Role | null {
   if (path === '/admin' || path.startsWith('/admin/')) return 'ADMIN';
   if (path === '/kitchen' || path.startsWith('/kitchen/')) return 'KITCHEN';
   if (path === '/delivery' || path.startsWith('/delivery/')) return 'DELIVERY';
-  if (path === '/parents' || path.startsWith('/parents/') || path === '/parent' || path.startsWith('/parent/')) {
+  if (path === '/family' || path.startsWith('/family/')) {
     return 'PARENT';
   }
-  if (
-    path === '/youngsters' ||
-    path.startsWith('/youngsters/') ||
-    path === '/youngster' ||
-    path.startsWith('/youngster/')
-  ) {
+  if (path === '/student' || path.startsWith('/student/')) {
     return 'YOUNGSTER';
   }
   return null;
@@ -37,8 +32,16 @@ function roleLoginPath(role: Role) {
   if (role === 'ADMIN') return '/admin/login';
   if (role === 'KITCHEN') return '/kitchen/login';
   if (role === 'DELIVERY') return '/delivery/login';
-  if (role === 'PARENT') return '/parent/login';
-  return '/youngster/login';
+  if (role === 'PARENT') return '/family/login';
+  return '/student/login';
+}
+
+function roleHomePath(role: Role) {
+  if (role === 'ADMIN') return '/admin';
+  if (role === 'KITCHEN') return '/kitchen';
+  if (role === 'DELIVERY') return '/delivery';
+  if (role === 'PARENT') return '/family';
+  return '/student';
 }
 
 /**
@@ -77,8 +80,8 @@ export function middleware(request: NextRequest) {
     normalizedPath === '/admin/login' ||
     normalizedPath === '/kitchen/login' ||
     normalizedPath === '/delivery/login' ||
-    normalizedPath === '/parent/login' ||
-    normalizedPath === '/youngster/login';
+    normalizedPath === '/family/login' ||
+    normalizedPath === '/student/login';
 
   // Special handling for rating paths.
   if (isRatingPath) {
@@ -93,7 +96,11 @@ export function middleware(request: NextRequest) {
           ? '/kitchen'
           : role === 'DELIVERY'
             ? '/delivery'
-            : '/login';
+            : role === 'PARENT'
+              ? '/family'
+              : role === 'YOUNGSTER'
+                ? '/student'
+                : '/login';
       return NextResponse.redirect(new URL(`${BASE_PATH}${destination}`, request.url));
     }
     return NextResponse.next();
@@ -103,11 +110,7 @@ export function middleware(request: NextRequest) {
   if (requiredRole && normalizedPath === roleLoginPath(requiredRole)) {
     // If user is already logged in with the correct role, redirect them to their dashboard.
     if (hasToken && role === requiredRole) {
-      const destination = requiredRole === 'PARENT'
-        ? '/parent/orders'
-        : requiredRole === 'YOUNGSTER'
-          ? '/youngster'
-          : `/${requiredRole.toLowerCase()}`;
+      const destination = roleHomePath(requiredRole);
       return NextResponse.redirect(new URL(`${BASE_PATH}${destination}`, request.url));
     }
     return NextResponse.next();
@@ -129,17 +132,7 @@ export function middleware(request: NextRequest) {
 
   // If a logged-in user tries to access the main login page, redirect them to their dashboard.
   if (hasToken && normalizedPath === '/login') {
-    const destination = role === 'PARENT'
-      ? '/parent/orders'
-      : role === 'YOUNGSTER'
-        ? '/youngster'
-        : role === 'ADMIN'
-          ? '/admin'
-          : role === 'KITCHEN'
-            ? '/kitchen'
-            : role === 'DELIVERY'
-              ? '/delivery'
-              : '/dashboard';
+    const destination = role ? roleHomePath(role) : '/dashboard';
     return NextResponse.redirect(new URL(`${BASE_PATH}${destination}`, request.url));
   }
 

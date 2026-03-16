@@ -33,6 +33,12 @@ export default function LoginPage() {
         router.push('/family');
       } else if (role === 'YOUNGSTER') {
         router.push('/student');
+      } else if (role === 'DELIVERY') {
+        router.push('/delivery');
+      } else if (role === 'KITCHEN') {
+        router.push('/kitchen');
+      } else if (role === 'ADMIN') {
+        router.push('/admin');
       } else {
         router.push('/dashboard');
       }
@@ -46,8 +52,8 @@ export default function LoginPage() {
   return (
     <main className="page-auth">
       <section className="auth-panel">
-        <h1>Family and Student Login</h1>
-        <p className="auth-help">Use this page for Family Group and Student login.</p>
+        <h1>Single Login</h1>
+        <p className="auth-help">Use this page for Family, Student, Delivery, Kitchen, and Admin login.</p>
         <div className="auth-form" style={{ marginBottom: '0.75rem' }}>
           <strong>For Dev Period Use</strong>
           <small><strong>Admin</strong>: <code>admin</code> / <code>admin123</code> via <code>/admin/login</code></small>
