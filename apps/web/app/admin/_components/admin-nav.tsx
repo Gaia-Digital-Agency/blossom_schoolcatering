@@ -19,8 +19,8 @@ const rightLinks = [
   { href: '/admin/menu', label: 'Menu' },
   { href: '/admin/kitchen', label: 'Kitchen' },
   { href: '/admin/blackout-dates', label: 'Blackout' },
-  { href: '/admin/reports', label: 'Reports' },
   { href: '/admin/billing', label: 'Billing' },
+  { href: '/admin/reports', label: 'Reports' },
 ];
 
 /**

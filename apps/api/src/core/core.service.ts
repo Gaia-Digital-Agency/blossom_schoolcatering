@@ -1193,9 +1193,8 @@ export class CoreService implements OnModuleInit {
     const cleaned = (allergiesRaw || '').trim().replace(/\s+/g, ' ');
     const fallback = 'No Allergies';
     if (!cleaned) return fallback;
-    const words = cleaned.split(' ').filter(Boolean);
-    if (words.length >= 10) {
-      throw new BadRequestException('Allergies must be less than 10 words');
+    if (cleaned.length > 50) {
+      throw new BadRequestException('Allergies must be 50 characters or less');
     }
     return cleaned;
   }
@@ -6295,10 +6294,20 @@ export class CoreService implements OnModuleInit {
                  ELSE true
                END AS has_allergen,
                CASE
+                 WHEN COALESCE(trim(reg_allergy.restriction_details), '') = '' THEN false
+                 WHEN lower(reg_allergy.restriction_details) LIKE '%no allergies%' THEN false
+                 ELSE true
+               END AS has_registration_allergen,
+               CASE
                  WHEN COALESCE(trim(o.dietary_snapshot), '') = '' THEN ''
                  WHEN lower(o.dietary_snapshot) LIKE '%no allergies%' THEN ''
                  ELSE o.dietary_snapshot
                END AS allergen_items,
+               CASE
+                 WHEN COALESCE(trim(reg_allergy.restriction_details), '') = '' THEN ''
+                 WHEN lower(reg_allergy.restriction_details) LIKE '%no allergies%' THEN ''
+                 ELSE reg_allergy.restriction_details
+               END AS registration_allergen_items,
                COALESCE((
                  SELECT json_agg(row_to_json(d) ORDER BY d.item_name)
                  FROM (
@@ -6319,6 +6328,16 @@ export class CoreService implements OnModuleInit {
           FROM order_items oi2
           GROUP BY oi2.order_id
         ) item_counts ON item_counts.order_id = o.id
+        LEFT JOIN LATERAL (
+          SELECT cdr.restriction_details
+          FROM child_dietary_restrictions cdr
+          WHERE cdr.child_id = c.id
+            AND cdr.is_active = true
+            AND cdr.deleted_at IS NULL
+            AND upper(cdr.restriction_label) = 'ALLERGIES'
+          ORDER BY cdr.updated_at DESC NULLS LAST, cdr.created_at DESC
+          LIMIT 1
+        ) reg_allergy ON true
         LEFT JOIN parent_children pc ON pc.child_id = c.id
         LEFT JOIN parents p ON p.id = pc.parent_id
         LEFT JOIN users up ON up.id = p.user_id
@@ -6342,7 +6361,9 @@ export class CoreService implements OnModuleInit {
       parent_name: string;
       dish_count: number;
       has_allergen: boolean;
+      has_registration_allergen: boolean;
       allergen_items: string;
+      registration_allergen_items: string;
       dishes: Array<{ menu_item_id: string; item_name: string; quantity: number }>;
     }>(ordersOut);
 
@@ -6378,7 +6399,12 @@ export class CoreService implements OnModuleInit {
         lunchOrders: Number(totals.lunch_orders || 0),
       },
       dishSummary,
-      allergenAlerts: orders.filter((o) => o.has_allergen),
+      allergenAlerts: orders
+        .filter((o) => o.has_registration_allergen)
+        .map((o) => ({
+          ...o,
+          allergen_items: o.registration_allergen_items || o.allergen_items,
+        })),
       orders,
     };
   }

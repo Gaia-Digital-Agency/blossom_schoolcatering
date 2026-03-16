@@ -35,6 +35,7 @@ type RecordChild = {
 };
 
 const GRADES = Array.from({ length: 12 }, (_v, i) => `Grade ${i + 1}`);
+const NO_ALLERGIES_LABEL = 'No Allergies';
 
 export default function YoungsterRegisterPage() {
   const router = useRouter();
@@ -50,6 +51,7 @@ export default function YoungsterRegisterPage() {
   const [youngsterGrade, setYoungsterGrade] = useState(GRADES[0]);
   const [youngsterPhone, setYoungsterPhone] = useState('');
   const [youngsterEmail, setYoungsterEmail] = useState('');
+  const [youngsterAllergySelection, setYoungsterAllergySelection] = useState<'NO_ALLERGIES' | 'HAS_ALLERGIES'>('NO_ALLERGIES');
   const [youngsterAllergies, setYoungsterAllergies] = useState('');
   const [parentFirstName, setParentFirstName] = useState('');
   const [parentLastName, setParentLastName] = useState('');
@@ -154,7 +156,10 @@ export default function YoungsterRegisterPage() {
     setYoungsterDateOfBirth(selectedRecordChild.date_of_birth || '');
     setYoungsterSchoolId(selectedRecordChild.school_id || '');
     setYoungsterGrade(selectedRecordChild.school_grade || '');
-    setYoungsterAllergies(selectedRecordChild.dietary_allergies || 'No Allergies');
+    const existingAllergies = (selectedRecordChild.dietary_allergies || '').trim();
+    const hasRecordedAllergies = existingAllergies.length > 0 && existingAllergies.toLowerCase() !== NO_ALLERGIES_LABEL.toLowerCase();
+    setYoungsterAllergySelection(hasRecordedAllergies ? 'HAS_ALLERGIES' : 'NO_ALLERGIES');
+    setYoungsterAllergies(hasRecordedAllergies ? existingAllergies : '');
     setParentLastName(selectedRecordChild.last_name || '');
   }, [isReadonlyRecord, selectedRecordChild]);
 
@@ -164,6 +169,11 @@ export default function YoungsterRegisterPage() {
     return found.city ? `${found.name} (${found.city})` : found.name;
   }, [schools, youngsterSchoolId]);
   const successMode = registrantType === 'YOUNGSTER' ? 'YOUNGSTER' : 'PARENT';
+  const youngsterPhoneRequired = registrantType === 'YOUNGSTER' || registrantType === 'TEACHER';
+  const youngsterPhoneLabel = registrantType === 'TEACHER' ? 'Youngster/Teacher Phone' : 'Youngster Phone';
+  const normalizedYoungsterAllergies = youngsterAllergySelection === 'HAS_ALLERGIES'
+    ? youngsterAllergies.trim().replace(/\s+/g, ' ')
+    : NO_ALLERGIES_LABEL;
 
   useEffect(() => {
     if (!success) return;
@@ -194,8 +204,18 @@ export default function YoungsterRegisterPage() {
     if (!youngsterLastName.trim()) { setError('Youngster last name is required.'); return; }
     if (!youngsterDateOfBirth) { setError('Youngster date of birth is required.'); return; }
     if (!youngsterSchoolId) { setError('Please select the youngster\'s school.'); return; }
-    if (!youngsterPhone.trim()) { setError('Youngster phone number is required.'); return; }
-    if (!youngsterAllergies.trim()) { setError('Youngster allergies field is required — type "No Allergies" if none.'); return; }
+    if (youngsterPhoneRequired && !youngsterPhone.trim()) {
+      setError(registrantType === 'TEACHER' ? 'Youngster/Teacher phone number is required.' : 'Youngster phone number is required.');
+      return;
+    }
+    if (youngsterAllergySelection === 'HAS_ALLERGIES' && !normalizedYoungsterAllergies) {
+      setError('Please enter the youngster allergies.');
+      return;
+    }
+    if (normalizedYoungsterAllergies.length > 50) {
+      setError('Youngster allergies must be 50 characters or less.');
+      return;
+    }
     if (!parentFirstName.trim()) { setError('Parent first name is required.'); return; }
     if (!parentLastName.trim()) { setError('Parent last name is required.'); return; }
     if (parentLastName.trim().toLowerCase() !== youngsterLastName.trim().toLowerCase()) {
@@ -224,7 +244,7 @@ export default function YoungsterRegisterPage() {
           youngsterGrade,
           youngsterPhone,
           youngsterEmail,
-          youngsterAllergies,
+          youngsterAllergies: normalizedYoungsterAllergies,
           parentFirstName,
           parentLastName,
           parentMobileNumber,
@@ -515,23 +535,54 @@ export default function YoungsterRegisterPage() {
             </select>
           </label>
           <label>
-            Youngster Phone
-            <input value={youngsterPhone} onChange={(e) => setYoungsterPhone(e.target.value)} placeholder="+[country][area][number]" required />
+            {youngsterPhoneLabel}
+            <input
+              value={youngsterPhone}
+              onChange={(e) => setYoungsterPhone(e.target.value)}
+              placeholder="+[country][area][number]"
+              required={youngsterPhoneRequired}
+            />
             <small className="field-hint">Format: + country code + area code + number &nbsp;e.g. +628123456789</small>
           </label>
           <label>
             Youngster Email (Optional)
             <input type="email" value={youngsterEmail} onChange={(e) => setYoungsterEmail(e.target.value)} />
           </label>
-          <label>
-            Youngster Allergies (Required)
-            <input
-              value={youngsterAllergies}
-              onChange={(e) => setYoungsterAllergies(e.target.value)}
-              placeholder="Type No Allergies if none"
-              required
-            />
-          </label>
+          <fieldset className="allergy-fieldset">
+            <legend>Youngster Allergies (Required)</legend>
+            <label className="allergy-option">
+              <input
+                type="radio"
+                name="youngsterAllergiesChoice"
+                value="NO_ALLERGIES"
+                checked={youngsterAllergySelection === 'NO_ALLERGIES'}
+                onChange={() => {
+                  setYoungsterAllergySelection('NO_ALLERGIES');
+                  setYoungsterAllergies('');
+                }}
+              />
+              <span>No Allergies</span>
+            </label>
+            <label className="allergy-option">
+              <input
+                type="radio"
+                name="youngsterAllergiesChoice"
+                value="HAS_ALLERGIES"
+                checked={youngsterAllergySelection === 'HAS_ALLERGIES'}
+                onChange={() => setYoungsterAllergySelection('HAS_ALLERGIES')}
+              />
+              <span>Has Allergies</span>
+            </label>
+            {youngsterAllergySelection === 'HAS_ALLERGIES' ? (
+              <input
+                value={youngsterAllergies}
+                onChange={(e) => setYoungsterAllergies(e.target.value.slice(0, 50))}
+                placeholder="Enter allergies"
+                maxLength={50}
+                required
+              />
+            ) : null}
+          </fieldset>
           <label>
             Parent First Name
             <input value={parentFirstName} onChange={(e) => setParentFirstName(e.target.value)} required />
@@ -583,6 +634,26 @@ export default function YoungsterRegisterPage() {
           min-height: 0;
           margin: 0;
           padding: 0;
+        }
+        .allergy-fieldset {
+          margin: 0;
+          padding: 0.7rem 0.8rem;
+          border: 1px solid #d9ccb8;
+          border-radius: 0.65rem;
+          display: grid;
+          gap: 0.55rem;
+          background: #fffdf9;
+        }
+        .allergy-fieldset legend {
+          font-weight: 700;
+          padding: 0 0.2rem;
+        }
+        .allergy-option {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.42rem;
+          margin: 0;
+          font-size: 0.88rem;
         }
       `}</style>
     </main>

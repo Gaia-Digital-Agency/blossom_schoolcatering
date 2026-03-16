@@ -215,9 +215,8 @@ export class AuthService {
     const cleaned = (allergiesRaw || '').trim().replace(/\s+/g, ' ');
     const fallback = 'No Allergies';
     if (!cleaned) return fallback;
-    const words = cleaned.split(' ').filter(Boolean);
-    if (words.length >= 10) {
-      throw new BadRequestException('Allergies must be less than 10 words');
+    if (cleaned.length > 50) {
+      throw new BadRequestException('Allergies must be 50 characters or less');
     }
     return cleaned;
   }
@@ -690,7 +689,6 @@ export class AuthService {
       !youngsterDateOfBirth ||
       !youngsterSchoolId ||
       !youngsterGrade ||
-      !youngsterPhone ||
       !parentFirstName ||
       !parentLastNameInput ||
       !parentMobileNumber ||
@@ -705,6 +703,9 @@ export class AuthService {
     if (registrantType === 'TEACHER') {
       if (!teacherName) throw new BadRequestException('Teacher name is required when registrantType is TEACHER');
       if (teacherName.length > 50) throw new BadRequestException('Teacher name must be max 50 characters');
+    }
+    if ((registrantType === 'YOUNGSTER' || registrantType === 'TEACHER') && !youngsterPhone) {
+      throw new BadRequestException('Youngster phone is required when registrantType is YOUNGSTER or TEACHER');
     }
     if (registrantType !== 'TEACHER' && teacherName) {
       throw new BadRequestException('Teacher name is only allowed when registrantType is TEACHER');
@@ -869,7 +870,7 @@ export class AuthService {
 
     const youngsterUsernameBase = this.sanitizeUsernamePart(`${youngsterLastName}_${youngsterFirstName}`);
     const youngsterUsername = await runSql(`SELECT generate_unique_username($1);`, [youngsterUsernameBase]);
-    const youngsterGeneratedPassword = this.buildGeneratedPassword(youngsterPhone);
+    const youngsterGeneratedPassword = this.buildGeneratedPassword(youngsterPhone || parentMobileNumber);
     const youngsterPasswordHash = this.hashPassword(youngsterGeneratedPassword);
     let youngsterOut = '';
     try {

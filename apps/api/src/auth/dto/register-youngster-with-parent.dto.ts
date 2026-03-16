@@ -29,7 +29,7 @@ export class RegisterYoungsterWithParentDto {
   @IsString()
   youngsterGrade!: string;
 
-  @IsOptional()
+  @ValidateIf((o: RegisterYoungsterWithParentDto) => o.registrantType === 'YOUNGSTER' || o.registrantType === 'TEACHER')
   @IsString()
   youngsterPhone?: string;
 
@@ -38,6 +38,7 @@ export class RegisterYoungsterWithParentDto {
   youngsterEmail?: string;
 
   @IsString()
+  @MaxLength(50)
   youngsterAllergies!: string;
 
   @IsString()

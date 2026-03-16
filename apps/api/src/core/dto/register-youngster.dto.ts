@@ -1,4 +1,4 @@
-import { IsIn, IsNotEmpty, IsOptional, IsString, IsUUID, Matches } from 'class-validator';
+import { IsIn, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, MaxLength } from 'class-validator';
 
 export class RegisterYoungsterDto {
   @IsString()
@@ -37,5 +37,6 @@ export class RegisterYoungsterDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(50)
   allergies?: string;
 }
