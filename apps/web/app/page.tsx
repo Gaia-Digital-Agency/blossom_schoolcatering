@@ -127,8 +127,7 @@ export default function HomePage() {
             <h1>Meal Order App</h1>
             <p className="eyebrow">School Catering by Blossom Kitchen</p>
             <p className="lead">
-              Lunch Meals For Students, Up To Five Dishes Per Meal, Register or Log In.
-              Click the Menu button for more details.
+              Meals For Students, Up To Five Dishes Per Meal, Register or Log In.
             </p>
             <div className="auth-grid">
               <Link className="btn btn-primary" href="/login">Log In</Link>
