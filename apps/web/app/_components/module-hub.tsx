@@ -99,11 +99,11 @@ export default function ModuleHub({
             radial-gradient(circle at top, rgba(255, 248, 232, 0.95), rgba(255, 243, 225, 0.92)),
             linear-gradient(180deg, #fffdf8 0%, #fff1d7 100%);
           display: grid;
-          grid-template-rows: 1fr auto;
-          align-items: stretch;
+          grid-template-rows: minmax(0, 1fr) auto;
+          align-items: center;
           justify-items: center;
-          gap: 0.15rem;
-          padding: 0.35rem 0.2rem 0.4rem;
+          gap: 0.05rem;
+          padding: 0.18rem 0.12rem 0.22rem;
           cursor: pointer;
           transition: transform 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
           box-shadow: 0 12px 26px rgba(122, 106, 88, 0.11);
@@ -119,16 +119,16 @@ export default function ModuleHub({
           height: 100%;
           display: grid;
           place-items: center;
-          font-size: clamp(2rem, 8vw, 2.6rem);
+          font-size: clamp(2.35rem, 10vw, 3rem);
           line-height: 1;
         }
         .module-hub-label {
           width: 100%;
-          font-size: 0.88rem;
+          font-size: 0.92rem;
           font-weight: 700;
           color: #5d4e3a;
           text-align: center;
-          line-height: 0.98;
+          line-height: 0.92;
           text-wrap: balance;
         }
         @media (max-width: 460px) {
@@ -145,14 +145,14 @@ export default function ModuleHub({
             gap: 0.45rem;
           }
           .module-hub-card {
-            padding: 0.25rem 0.15rem 0.3rem;
+            padding: 0.14rem 0.08rem 0.18rem;
             border-radius: 0.85rem;
           }
           .module-hub-icon {
-            font-size: clamp(1.75rem, 9vw, 2.25rem);
+            font-size: clamp(2rem, 11vw, 2.55rem);
           }
           .module-hub-label {
-            font-size: 0.8rem;
+            font-size: 0.84rem;
           }
         }
       `}</style>
