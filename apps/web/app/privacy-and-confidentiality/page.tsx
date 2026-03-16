@@ -25,7 +25,7 @@ export default async function PrivacyAndConfidentialityPage() {
         <h1>Privacy and Confidentiality</h1>
         <pre className="guide-content">{content}</pre>
         <div className="dev-links">
-          <Link href="/">Back to Home</Link>
+          <Link href="/">Back to Homepage</Link>
           <Link href="/guide">Back to Guides</Link>
         </div>
       </section>

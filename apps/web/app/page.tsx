@@ -24,7 +24,7 @@ export default function HomePage() {
   const [localTzAbbr, setLocalTzAbbr] = useState<string>('');
   // State for the chef's message, with a default value.
   const [chefMessage, setChefMessage] = useState<string>(
-    'Every dish is prepared for school-day energy and balanced nutrition. We keep every meal fresh, consistent, and safe for all youngsters.'
+    'Every dish is prepared for school-day energy and balanced nutrition. We keep every meal fresh, consistent, and safe for all students.'
   );
   const [heroImageUrl, setHeroImageUrl] = useState<string>('');
   const [heroImageCaption, setHeroImageCaption] = useState<string>('Enchanting Nourished Zesty Original Meals');
@@ -128,7 +128,7 @@ export default function HomePage() {
             <h1>Meal Order App</h1>
             <p className="eyebrow">School Catering by Blossom Kitchen</p>
             <p className="lead">
-              Lunch Meal For Youngsters, Up To Five Dishes Per Meal, Register or Log In.
+              Lunch Meals For Students, Up To Five Dishes Per Meal, Register or Log In.
               Click the Menu button for more details.
             </p>
             <div className="auth-grid">

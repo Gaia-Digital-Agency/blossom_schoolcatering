@@ -12,7 +12,7 @@ const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'http://34.124.244.233').re
  */
 export const metadata: Metadata = {
   title: 'Blossom School Catering',
-  description: 'School meal ordering platform for parents, youngsters, kitchen, delivery, and admin operations.',
+  description: 'School meal ordering platform for families, students, kitchen, delivery, and admin operations.',
   metadataBase: new URL(siteUrl),
   alternates: {
     canonical: '/schoolcatering',

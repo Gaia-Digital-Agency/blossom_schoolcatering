@@ -2,8 +2,11 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { apiFetch, clearBrowserSession, fetchWithTimeout, getApiBase, ROLE_KEY, type Role } from '../../lib/auth';
+import { apiFetch, fetchWithTimeout, getApiBase, ROLE_KEY, type Role } from '../../lib/auth';
 import { formatDishCategoryLabel, formatDishDietaryTags } from '../../lib/dish-tags';
+import LogoutButton from '../_components/logout-button';
+import SessionBadge from '../_components/session-badge';
+import { getSessionCardStyle } from '../../lib/session-theme';
 
 type PublicMenuItem = {
   id: string;
@@ -54,6 +57,7 @@ export default function RatingPage() {
   const [savingItemId, setSavingItemId] = useState('');
   const [selectedStars, setSelectedStars] = useState<Record<string, number>>({});
   const [roleReady, setRoleReady] = useState(false);
+  const [currentRole, setCurrentRole] = useState<Role | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -62,6 +66,7 @@ export default function RatingPage() {
       router.replace('/login');
       return;
     }
+    setCurrentRole(role);
     setRoleReady(true);
   }, [router]);
 
@@ -90,12 +95,7 @@ export default function RatingPage() {
     setSelectedStars((prev) => ({ ...prev, [menuItemId]: stars }));
   };
 
-  const onBackToHome = async () => {
-    setError('');
-    setMessage('');
-    await clearBrowserSession();
-    router.push('/');
-  };
+  const backTarget = currentRole === 'PARENT' ? '/family' : '/student';
 
   const onSubmitReview = async () => {
     setError('');
@@ -119,8 +119,7 @@ export default function RatingPage() {
       }
       setSavingItemId('');
     }
-    await clearBrowserSession();
-    router.push('/');
+    router.push(backTarget);
   };
 
   if (!roleReady) {
@@ -144,7 +143,7 @@ export default function RatingPage() {
             {items.map((item) => {
               const selected = selectedStars[item.id] ?? 0;
               return (
-                <article className="menu-public-card" key={item.id}>
+                <article className="menu-public-card" key={item.id} style={getSessionCardStyle(item.session)}>
                   <img
                     src={resolveDishImageSrc(item)}
                     alt={item.name}
@@ -156,11 +155,11 @@ export default function RatingPage() {
                     }}
                   />
                   <div>
+                    <SessionBadge session={item.session} />
                     <strong>{item.name}</strong>
                     <small>Rp {Number(item.price || 0).toLocaleString('id-ID')}</small>
                     <small>Category: {formatDishCategoryLabel(item.dish_category)}</small>
                     <small>Dietary: {formatDishDietaryTags(item)}</small>
-                    <small>{item.session}</small>
                     <div className="rating-stars" role="group" aria-label={`Rate ${item.name}`}>
                       {starOptions.map((stars) => (
                         <button
@@ -183,14 +182,12 @@ export default function RatingPage() {
         )}
 
         <div className="dev-links">
-          <button className="btn btn-outline" type="button" onClick={() => void onBackToHome()} disabled={savingItemId === 'all'}>
-            Back To Home
-          </button>
           <button className="btn btn-primary" type="button" onClick={() => void onSubmitReview()} disabled={savingItemId === 'all'}>
             {savingItemId === 'all' ? 'Saving...' : 'Submit Review'}
           </button>
         </div>
       </section>
+      <LogoutButton returnHref={backTarget} showRecord={false} />
       <style jsx>{`
         .menu-public-grid {
           display: grid;
@@ -198,13 +195,14 @@ export default function RatingPage() {
           gap: 0.75rem;
         }
         .menu-public-card {
-          border: 1px solid #d8cab1;
+          border: 1px solid var(--session-strong, #d8cab1);
           border-radius: 0.75rem;
-          background: #fff;
+          background: linear-gradient(180deg, #fff 0%, var(--session-soft, #fff) 100%);
           overflow: hidden;
           display: grid;
           gap: 0.4rem;
           padding-bottom: 0.5rem;
+          box-shadow: 0 6px 18px rgba(122, 106, 88, 0.08);
         }
         .menu-public-grid > .menu-public-card:only-child,
         .menu-public-grid > .menu-public-card:last-child:nth-child(odd) {

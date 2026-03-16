@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { apiFetch } from '../../lib/auth';
-import { formatDishCategoryLabel, formatDishDietaryTags } from '../../lib/dish-tags';
-import LogoutButton from '../_components/logout-button';
+import { apiFetch } from '../../../lib/auth';
+import { formatDishCategoryLabel, formatDishDietaryTags } from '../../../lib/dish-tags';
+import DraftExitGuard from '../../_components/draft-exit-guard';
+import LogoutButton from '../../_components/logout-button';
+import SessionBadge from '../../_components/session-badge';
+import { getSessionCardStyle } from '../../../lib/session-theme';
 
 type Youngster = {
   id: string;
@@ -158,7 +160,7 @@ function mapOrderRuleError(raw: string) {
   return raw;
 }
 
-export default function YoungstersPage() {
+export default function StudentOrderPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -193,6 +195,7 @@ export default function YoungstersPage() {
       .map(([id, qty]) => ({ menuItem: index.get(id), id, qty }))
       .filter((x) => Boolean(x.menuItem));
   }, [itemQty, menuItems]);
+  const hasDraftChanges = draftItems.length > 0;
   const orderingWindow = useMemo(() => getMakassarOrderingWindow(), [nowMs]);
   const cutoffRemainingMs = getCutoffTimestamp(serviceDate) - nowMs;
   const draftRemainingMs = draftExpiresAt ? new Date(draftExpiresAt).getTime() - nowMs : 0;
@@ -228,7 +231,7 @@ export default function YoungstersPage() {
   useEffect(() => {
     apiFetch('/children/me')
       .then((data) => setYoungster(data as Youngster))
-      .catch((err) => setError(err instanceof Error ? err.message : 'Failed loading youngster profile'))
+      .catch((err) => setError(err instanceof Error ? err.message : 'Failed loading student profile'))
       .finally(() => setLoading(false));
     apiFetch('/youngster/me/insights')
       .then((data) => setInsights(data as YoungsterInsights))
@@ -324,7 +327,7 @@ export default function YoungstersPage() {
 
   const onPlaceOrder = async () => {
     if (!youngster) {
-      setError('Youngster profile is missing.');
+      setError('Student profile is missing.');
       return;
     }
 
@@ -409,12 +412,25 @@ export default function YoungstersPage() {
     }
   };
 
+  const discardDraftAndContinue = async () => {
+    if (draftCartId) {
+      try {
+        await apiFetch(`/carts/${draftCartId}`, { method: 'DELETE' }, { skipAutoReload: true });
+      } catch {
+        // Best-effort cleanup before leaving the page.
+      }
+    }
+    setItemQty({});
+    setDraftCartId('');
+    setDraftExpiresAt('');
+  };
+
   if (loading) {
     return (
       <main className="page-auth">
         <section className="auth-panel">
-          <h1>Youngster Module</h1>
-          <p>Loading Step 6 data...</p>
+          <h1>Student Module</h1>
+          <p>Loading data...</p>
         </section>
       </main>
     );
@@ -424,15 +440,9 @@ export default function YoungstersPage() {
     <>
     <main className="page-auth page-auth-mobile youngsters-page">
       <section className="auth-panel">
-        <h1>Youngster Module</h1>
-        <nav className="module-nav" aria-label="Youngster Module Navigation">
-          <Link href="/">Home</Link>
-          <a href="#youngster-order">Order</a>
-          <Link href="/menu">Menu</Link>
-          <Link href="/rating">Rating</Link>
-        </nav>
+          <h1>Student Order</h1>
         <div className="module-guide-card">
-          💡 Select Dish and Confirm Meal.
+          Select dishes, manage drafts, and confirm student meals.
         </div>
         {error ? <p className="auth-error">{error}</p> : null}
 
@@ -446,8 +456,9 @@ export default function YoungstersPage() {
           {confirmedOrders.length > 0 ? (
             <div className="auth-form">
               {confirmedOrders.map((order) => (
-                <label key={order.id}>
-                  <strong>{order.service_date} {order.session}</strong>
+                <label key={order.id} style={getSessionCardStyle(order.session)}>
+                  <SessionBadge session={order.session} />
+                  <strong>{order.service_date}</strong>
                   <small>Status: {order.status} | Billing: {order.billing_status || '-'} | Delivery: {order.delivery_status || '-'}</small>
                   <small>Total: Rp {Number(order.total_price).toLocaleString('id-ID')}</small>
                   <small>Items: {order.items.map((item) => `${item.item_name_snapshot} x${item.quantity}`).join(', ') || '-'}</small>
@@ -458,7 +469,7 @@ export default function YoungstersPage() {
         </div>
 
         <div className="module-section">
-          <h2>Weekly Nutrition + Badge</h2>
+          <h2>Weekly Nutrition and Badge</h2>
           {insights ? (
             <div className="auth-form">
               <label>
@@ -499,7 +510,8 @@ export default function YoungstersPage() {
                 {menuItems.length === 0 ? <p className="auth-help">No dishes found.</p> : (
                   <div className="auth-form">
                     {menuItems.map((item) => (
-                      <label key={item.id}>
+                      <label key={item.id} style={getSessionCardStyle(session)}>
+                        <SessionBadge session={session} />
                         <span><strong>{item.name}</strong> - Rp {Number(item.price).toLocaleString('id-ID')}</span>
                         <small>Category: {formatDishCategoryLabel(item.dish_category)}</small>
                         <small>Dietary: {formatDishDietaryTags(item)}</small>
@@ -517,7 +529,8 @@ export default function YoungstersPage() {
                 {draftItems.length === 0 ? <p className="auth-help">No dishes in draft. Use Add from Menu Section.</p> : (
                   <div className="auth-form">
                     {draftItems.map((d) => (
-                      <label key={d.id}>
+                      <label key={d.id} style={getSessionCardStyle(session)}>
+                        <SessionBadge session={session} />
                         <span><strong>{d.menuItem?.name}</strong> - Rp {Number(d.menuItem?.price || 0).toLocaleString('id-ID')}</span>
                         <small>Category: {d.menuItem ? formatDishCategoryLabel(d.menuItem.dish_category) : '-'}</small>
                         <small>Dietary: {d.menuItem ? formatDishDietaryTags(d.menuItem) : '-'}</small>
@@ -665,7 +678,8 @@ export default function YoungstersPage() {
         }
       `}</style>
     </main>
-    <LogoutButton />
+    <DraftExitGuard active={hasDraftChanges} onDiscard={discardDraftAndContinue} subjectLabel="student" />
+    <LogoutButton returnHref="/student" showRecord={false} />
     </>
   );
 }

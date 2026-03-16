@@ -8,7 +8,15 @@ import { clearAuthState, fetchWithTimeout, getApiBase, ROLE_KEY, type Role } fro
  * A component that provides a logout button and, for certain user roles,
  * a button to view their record.
  */
-export default function LogoutButton() {
+export default function LogoutButton({
+  returnHref,
+  showRecord = true,
+  logoutRedirect = '/',
+}: {
+  returnHref?: string;
+  showRecord?: boolean;
+  logoutRedirect?: string;
+}) {
   const router = useRouter();
   // State to manage the loading status of the logout process.
   const [loading, setLoading] = useState(false);
@@ -16,7 +24,7 @@ export default function LogoutButton() {
   const [role, setRole] = useState<Role | ''>('');
 
   // Determines if the "Record" button should be visible based on the user's role.
-  const canOpenRecord = role === 'PARENT' || role === 'YOUNGSTER';
+  const canOpenRecord = showRecord && (role === 'PARENT' || role === 'YOUNGSTER');
 
   /**
    * On component mount, this effect retrieves the user's role from local storage
@@ -43,7 +51,7 @@ export default function LogoutButton() {
       body: JSON.stringify({}),
     }).catch(() => undefined);
     clearAuthState();
-    router.push('/rating');
+    router.push(logoutRedirect);
   };
 
   return (
@@ -59,13 +67,23 @@ export default function LogoutButton() {
         >
           {loading ? '...' : 'Logout'}
         </button>
+        {returnHref ? (
+          <button
+            type="button"
+            className="record-btn"
+            onClick={() => router.push(returnHref)}
+            aria-label="Return to module"
+          >
+            Return
+          </button>
+        ) : null}
         {/* Conditionally rendered button to view the user's record */}
         {canOpenRecord ? (
           <button
             type="button"
             className="record-btn"
             onClick={() => router.push('/register?mode=record')}
-            aria-label="View youngster record"
+            aria-label="View family or student record"
           >
             Record
           </button>

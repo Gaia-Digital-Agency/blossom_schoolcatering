@@ -102,8 +102,8 @@ function redirectToLogin(): void {
     ADMIN:     `${base}/admin/login`,
     KITCHEN:   `${base}/kitchen/login`,
     DELIVERY:  `${base}/delivery/login`,
-    PARENT:    `${base}/parent/login`,
-    YOUNGSTER: `${base}/youngster/login`,
+    PARENT:    `${base}/family/login`,
+    YOUNGSTER: `${base}/student/login`,
   };
   window.location.href = paths[role ?? ''] ?? `${base}/login`;
 }

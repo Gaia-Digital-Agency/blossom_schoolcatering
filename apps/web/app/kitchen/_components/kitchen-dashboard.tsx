@@ -142,7 +142,7 @@ export default function KitchenDashboard({
     const renderOrder = (o: KitchenOrder) => `
       <article class=\"order-card\">
         <div><strong>Session:</strong> ${escapeHtml(o.session)}</div>
-        <div><strong>Youngster:</strong> ${escapeHtml(o.child_name)}</div>
+        <div><strong>Student:</strong> ${escapeHtml(o.child_name)}</div>
         <div><strong>School:</strong> ${escapeHtml(o.school_name || '-')}</div>
         <div><strong>Phone Number:</strong> ${escapeHtml(o.youngster_mobile || '-')}</div>
         <div><strong>Dietary Allergies:</strong> ${escapeHtml(o.allergen_items || '-')}</div>
@@ -307,7 +307,7 @@ export default function KitchenDashboard({
                   {data.allergenAlerts.map((o) => (
                     <article className="kitchen-alert-card" key={o.id}>
                       <strong>{o.session} - {o.child_name}</strong>
-                      <small>Parent: {o.parent_name}</small>
+                      <small>Family: {o.parent_name}</small>
                       <small>Dietary Allergies: {o.allergen_items || '-'}</small>
                       <small>Dishes: {o.dish_count}</small>
                     </article>
@@ -327,7 +327,7 @@ export default function KitchenDashboard({
                         {pendingOrders.map((o) => (
                           <button className="kitchen-order-card" key={o.id} type="button" onClick={() => onMarkKitchenComplete(o.id)}>
                             <small>Session: {o.session}</small>
-                            <small>Youngster: {o.child_name}</small>
+                            <small>Student: {o.child_name}</small>
                             <small>School: {o.school_name || '-'}</small>
                             <small>Phone Number: {o.youngster_mobile || '-'}</small>
                             <small>Dietary Allergies: {o.allergen_items || '-'}</small>
@@ -350,7 +350,7 @@ export default function KitchenDashboard({
                         {completedOrders.map((o) => (
                           <button className="kitchen-order-card kitchen-order-card-complete" key={o.id} type="button" onClick={() => onMarkKitchenComplete(o.id)}>
                             <small>Session: {o.session}</small>
-                            <small>Youngster: {o.child_name}</small>
+                            <small>Student: {o.child_name}</small>
                             <small>School: {o.school_name || '-'}</small>
                             <small>Phone Number: {o.youngster_mobile || '-'}</small>
                             <small>Dietary Allergies: {o.allergen_items || '-'}</small>

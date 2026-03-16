@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { apiFetch, apiFetchResponse } from '../../../lib/auth';
 import { fileToWebpDataUrl } from '../../../lib/image';
 import LogoutButton from '../../_components/logout-button';
+import SessionBadge from '../../_components/session-badge';
+import { getSessionCardStyle } from '../../../lib/session-theme';
 
 type Child = {
   id: string;
@@ -34,7 +36,8 @@ type SpendingDashboard = {
   birthdayHighlights: Array<{ child_name: string; days_until: number }>;
 };
 
-export default function ParentsBillingPage() {
+export default function FamilyBillingPage() {
+  const pathname = usePathname();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -45,6 +48,9 @@ export default function ParentsBillingPage() {
   const [spending, setSpending] = useState<SpendingDashboard | null>(null);
   const [batchProofData, setBatchProofData] = useState('');
   const [selectedBillingIds, setSelectedBillingIds] = useState<string[]>([]);
+  const isStudentView = pathname.startsWith('/student');
+  const moduleTitle = isStudentView ? 'Student Billing' : 'Family Billing';
+  const returnHref = isStudentView ? '/student' : '/family';
 
   const visibleBillings = useMemo(
     () => (selectedChildId ? billings.filter((b) => b.child_id === selectedChildId) : billings),
@@ -183,32 +189,27 @@ export default function ParentsBillingPage() {
   };
 
   if (loading) {
-    return <main className="page-auth page-auth-mobile"><section className="auth-panel"><h1>Parent Page</h1><p>Loading...</p></section></main>;
+    return <main className="page-auth page-auth-mobile"><section className="auth-panel"><h1>{moduleTitle}</h1><p>Loading...</p></section></main>;
   }
 
   return (
     <>
     <main className="page-auth page-auth-mobile parents-page">
       <section className="auth-panel">
-        <h1>Parent Page</h1>
-        <nav className="module-nav" aria-label="Parent Module Navigation">
-          <Link href="/">Home</Link>
-          <Link href="/parent/orders">Order</Link>
-          <Link href="/menu">Menu</Link>
-          <Link href="/rating">Rating</Link>
-          <Link href="/parent/billing" className="active">Billing</Link>
-        </nav>
+        <h1>{moduleTitle}</h1>
         <div className="module-guide-card">
-          💡 View and pay your invoices. Track monthly spending.
+          {isStudentView
+            ? 'Review the same live billing data used by the Family Group account.'
+            : 'Review Family Group billing, payment proof, and monthly spending.'}
         </div>
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
 
         <div className="module-section" id="parent-billing">
-          <h2>Linked Youngsters</h2>
-          <p className="auth-help">Registration is done on `/register`. Linked youngsters are auto-linked during registration and immediately available for Order and Billing.</p>
+          <h2>Linked Students</h2>
+          <p className="auth-help">Registration is done on `/register`. Linked students are available immediately for Order and Billing.</p>
           {children.length > 1 ? (
-            <label>Select Youngster
+            <label>Select Student
               <select value={selectedChildId} onChange={(e) => setSelectedChildId(e.target.value)}>
                 {children.map((child) => <option key={child.id} value={child.id}>{child.first_name} {child.last_name} ({child.school_grade})</option>)}
               </select>
@@ -236,8 +237,9 @@ export default function ParentsBillingPage() {
             {unpaidBillings.length === 0 ? <p className="auth-help">No unpaid billing records.</p> : (
               <div className="auth-form">
                 {unpaidBillings.map((b) => (
-                  <label key={b.id}>
-                    <strong>{b.service_date} {b.session}</strong>
+                  <label key={b.id} style={getSessionCardStyle(b.session)}>
+                    <SessionBadge session={b.session} />
+                    <strong>{b.service_date}</strong>
                     <small>Order: {b.order_id}</small>
                     <small>Status: {b.status} | Delivery: {b.delivery_status}</small>
                     <small>Total: Rp {Number(b.total_price).toLocaleString('id-ID')}</small>
@@ -263,8 +265,9 @@ export default function ParentsBillingPage() {
             {paidBillings.length === 0 ? <p className="auth-help">No paid billing records in last 30 days.</p> : (
               <div className="auth-form">
                 {paidBillings.map((b) => (
-                  <label key={b.id}>
-                    <strong>{b.service_date} {b.session}</strong>
+                  <label key={b.id} style={getSessionCardStyle(b.session)}>
+                    <SessionBadge session={b.session} />
+                    <strong>{b.service_date}</strong>
                     <small>Order: {b.order_id}</small>
                     <small>Status: {b.status} | Delivery: {b.delivery_status}</small>
                     <small>Total: Rp {Number(b.total_price).toLocaleString('id-ID')}</small>
@@ -303,9 +306,9 @@ export default function ParentsBillingPage() {
               </label>
               {visibleSpendingByChild.map((row) => (
                 <label key={row.child_name}>
-                  <strong>ParentLinked ({row.child_name})</strong>
-                  <small>Youngster Month Orders: {row.orders_count}</small>
-                  <small>Youngster Monthly Spend: Rp {Number(row.total_spend).toLocaleString('id-ID')}</small>
+                  <strong>Family Group ({row.child_name})</strong>
+                  <small>Student Month Orders: {row.orders_count}</small>
+                  <small>Student Monthly Spend: Rp {Number(row.total_spend).toLocaleString('id-ID')}</small>
                 </label>
               ))}
             </div>
@@ -325,7 +328,7 @@ export default function ParentsBillingPage() {
         }
       `}</style>
     </main>
-    <LogoutButton />
+    <LogoutButton returnHref={returnHref} showRecord={false} />
     </>
   );
 }

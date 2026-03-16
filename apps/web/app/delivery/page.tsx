@@ -119,7 +119,7 @@ export default function DeliveryPage() {
       const renderOrder = (row: Assignment) => `
         <article class=\"order-card\">
           <div><strong>Session:</strong> ${escapeHtml(row.session)}</div>
-          <div><strong>Youngster Full Name:</strong> ${escapeHtml(row.child_name)}</div>
+          <div><strong>Student Full Name:</strong> ${escapeHtml(row.child_name)}</div>
           <div><strong>School:</strong> ${escapeHtml(row.school_name || '-')}</div>
           <div><strong>Phone Number:</strong> ${escapeHtml(row.youngster_mobile || '-')}</div>
           <div><strong>Dietary Allergies:</strong> ${escapeHtml((row.allergen_items || '').trim() || '-')}</div>
@@ -293,7 +293,7 @@ export default function DeliveryPage() {
                   {group.map((row) => (
                     <label key={row.id}>
                       <strong>{row.service_date} | Session: {row.session}</strong>
-                      <small>Youngster Full Name: {row.child_name}</small>
+                      <small>Student Full Name: {row.child_name}</small>
                       <small>School: {row.school_name || '-'}</small>
                       <small>Phone Number: {row.youngster_mobile || '-'}</small>
                       <small>Dietary Allergies: {(row.allergen_items || '').trim() || '-'}</small>
@@ -324,7 +324,7 @@ export default function DeliveryPage() {
                   {group.map((row) => (
                     <label key={row.id}>
                       <strong>{row.service_date} | Session: {row.session}</strong>
-                      <small>Youngster Full Name: {row.child_name}</small>
+                      <small>Student Full Name: {row.child_name}</small>
                       <small>School: {row.school_name || '-'}</small>
                       <small>Phone Number: {row.youngster_mobile || '-'}</small>
                       <small>Dietary Allergies: {(row.allergen_items || '').trim() || '-'}</small>

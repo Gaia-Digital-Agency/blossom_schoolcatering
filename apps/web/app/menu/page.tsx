@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { fetchWithTimeout, getApiBase } from '../../lib/auth';
+import SessionBadge from '../_components/session-badge';
+import { getSessionCardStyle } from '../../lib/session-theme';
 
 type PublicMenuItem = {
   id: string;
@@ -103,7 +105,7 @@ export default function MenuPage() {
       <section className="auth-panel">
         <h1>Menu</h1>
         <div className="module-guide-card">
-          💡 Log In to order for the Youngsters from Blossom Steakhouse Kitchen.
+          Log in to order for students from Blossom Steakhouse Kitchen.
         </div>
         {error ? <p className="auth-error">{error}</p> : null}
 
@@ -117,7 +119,7 @@ export default function MenuPage() {
                 <h2>{group.label}</h2>
                 <div className="menu-public-grid">
                   {group.items.map((item) => (
-                    <article className="menu-public-card" key={item.id}>
+                    <article className="menu-public-card" key={item.id} style={getSessionCardStyle(item.session)}>
                       <img
                         src={resolveDishImageSrc(item)}
                         alt={item.name}
@@ -129,6 +131,7 @@ export default function MenuPage() {
                         }}
                       />
                       <div>
+                        <SessionBadge session={item.session} />
                         <strong>{item.name || 'TBA'}</strong>
                         <small>Price: {Number(item.price || 0) > 0 ? `Rp ${Number(item.price || 0).toLocaleString('id-ID')}` : 'TBA'}</small>
                         <small>Description: {(item.description || '').trim() || 'TBA'}</small>
@@ -147,7 +150,7 @@ export default function MenuPage() {
                     <h2>{group.label}</h2>
                     <div className="menu-public-grid">
                       {group.items.map((item) => (
-                        <article className="menu-public-card" key={item.id}>
+                        <article className="menu-public-card" key={item.id} style={getSessionCardStyle(item.session)}>
                           <img
                             src={resolveDishImageSrc(item)}
                             alt={item.name}
@@ -159,6 +162,7 @@ export default function MenuPage() {
                             }}
                           />
                           <div>
+                            <SessionBadge session={item.session} />
                             <strong>{item.name || 'TBA'}</strong>
                             <small>Price: {Number(item.price || 0) > 0 ? `Rp ${Number(item.price || 0).toLocaleString('id-ID')}` : 'TBA'}</small>
                             <small>Description: {(item.description || '').trim() || 'TBA'}</small>
@@ -175,7 +179,7 @@ export default function MenuPage() {
         )}
 
         <div className="dev-links">
-          <Link href="/">Back to Home</Link>
+          <Link href="/">Back to Homepage</Link>
           <Link href="/rating">Rating</Link>
         </div>
       </section>
@@ -212,12 +216,13 @@ export default function MenuPage() {
           gap: 0.75rem;
         }
         .menu-public-card {
-          border: 1px solid #d8cab1;
+          border: 1px solid var(--session-strong, #d8cab1);
           border-radius: 0.75rem;
-          background: #fff;
+          background: linear-gradient(180deg, #fff 0%, var(--session-soft, #fff) 100%);
           overflow: hidden;
           display: grid;
           grid-template-rows: 120px auto;
+          box-shadow: 0 6px 18px rgba(122, 106, 88, 0.08);
         }
         .menu-public-grid > .menu-public-card:only-child,
         .menu-public-grid > .menu-public-card:last-child:nth-child(odd) {
@@ -230,7 +235,7 @@ export default function MenuPage() {
           display: block;
         }
         .menu-public-card div {
-          border-top: 1px solid #d8cab1;
+          border-top: 1px solid var(--session-strong, #d8cab1);
           padding-inline: 0.55rem;
           padding-top: 0.55rem;
           padding-bottom: 0.55rem;

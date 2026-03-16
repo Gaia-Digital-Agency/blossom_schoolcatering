@@ -1,11 +1,11 @@
 import RoleLoginForm from '../../_components/role-login-form';
 
-export default function ParentLoginPage() {
+export default function FamilyLoginPage() {
   return (
     <RoleLoginForm
       role="PARENT"
-      title="Parent Login"
-      redirectPath="/parent"
+      title="Family Login"
+      redirectPath="/family"
     />
   );
 }

@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
 import { apiFetch } from '../../../lib/auth';
 import { formatDishCategoryLabel, formatDishDietaryTags } from '../../../lib/dish-tags';
+import DraftExitGuard from '../../_components/draft-exit-guard';
 import LogoutButton from '../../_components/logout-button';
+import SessionBadge from '../../_components/session-badge';
+import { getSessionCardStyle } from '../../../lib/session-theme';
 
 const ORDER_SUCCESS_POPUP_KEY = 'blossom_parent_order_success_popup';
 
@@ -142,7 +144,7 @@ function activeBlackoutMessage(blackout: ActiveBlackout | null) {
   return mapOrderRuleError('ORDER_BLACKOUT_BLOCKED');
 }
 
-export default function ParentsOrdersPage() {
+export default function FamilyOrderPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -219,6 +221,7 @@ export default function ParentsOrdersPage() {
       .map(([id, qty]) => ({ menuItem: index.get(id), id, qty }))
       .filter((x) => Boolean(x.menuItem));
   }, [itemQty, menuItems]);
+  const hasDraftChanges = draftItems.length > 0;
 
   useEffect(() => {
     if (activeSessions.length === 0) return;
@@ -330,7 +333,7 @@ export default function ParentsOrdersPage() {
   };
 
   const onPlaceOrder = async () => {
-    if (!selectedChildId) return setError('Please select a youngster first.');
+    if (!selectedChildId) return setError('Please select a student first.');
     const items = Object.entries(itemQty).filter(([, qty]) => qty > 0).map(([menuItemId, quantity]) => ({ menuItemId, quantity }));
     if (items.length === 0) return setError('Select at least one menu item.');
 
@@ -467,31 +470,38 @@ export default function ParentsOrdersPage() {
       if (toDelete.length > 0) {
         await Promise.all(toDelete.map((id) => apiFetch(`/orders/${id}`, { method: 'DELETE' })));
         await loadOrders();
-        setRefreshDedupMessage(`${toDelete.length} duplicate parent order(s) removed — youngster order(s) kept.`);
+        setRefreshDedupMessage(`${toDelete.length} duplicate family order(s) removed and student order(s) kept.`);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Refresh failed');
     }
   };
 
+  const discardDraftAndContinue = async () => {
+    if (draftCartId) {
+      try {
+        await apiFetch(`/carts/${draftCartId}`, { method: 'DELETE' }, { skipAutoReload: true });
+      } catch {
+        // Best-effort cleanup before navigation continues.
+      }
+    }
+    setItemQty({});
+    setDraftCartId('');
+    setDraftExpiresAt('');
+    setDraftSourceContext(null);
+  };
+
   if (loading) {
-    return <main className="page-auth page-auth-mobile"><section className="auth-panel"><h1>Parent Page</h1><p>Loading...</p></section></main>;
+    return <main className="page-auth page-auth-mobile"><section className="auth-panel"><h1>Family Module</h1><p>Loading...</p></section></main>;
   }
 
   return (
     <>
     <main className="page-auth page-auth-mobile parents-page">
       <section className="auth-panel">
-        <h1>Parent Page</h1>
-        <nav className="module-nav" aria-label="Parent Module Navigation">
-          <Link href="/">Home</Link>
-          <Link href="/parent/orders" className="active">Order</Link>
-          <Link href="/menu">Menu</Link>
-          <Link href="/rating">Rating</Link>
-          <Link href="/parent/billing">Billing</Link>
-        </nav>
+        <h1>Family Order</h1>
         <div className="module-guide-card">
-          💡 View confirmed orders, manage your cart, and place orders.
+          Manage Family Group orders, drafts, and confirmed meals.
         </div>
         {error ? <p className="auth-error">{error}</p> : null}
         {message ? <p className="auth-help">{message}</p> : null}
@@ -499,7 +509,7 @@ export default function ParentsOrdersPage() {
 
         {children.length > 1 && (
           <div className="module-section">
-            <label>Youngster
+            <label>Student
               <select value={selectedChildId} onChange={(e) => setSelectedChildId(e.target.value)}>
                 {children.map((c) => <option key={c.id} value={c.id}>{c.first_name} {c.last_name} ({c.school_grade})</option>)}
               </select>
@@ -524,8 +534,9 @@ export default function ParentsOrdersPage() {
           {confirmedOrders.length > 0 ? (
             <div className="auth-form">
               {confirmedOrders.map((order) => (
-                <label key={order.id}>
-                  <strong>{order.child_name} — {order.service_date} {order.session}</strong>
+                <label key={order.id} style={getSessionCardStyle(order.session)}>
+                  <SessionBadge session={order.session} />
+                  <strong>{order.child_name} — {order.service_date}</strong>
                   <small>Status: {order.status} | Billing: {order.billing_status || '-'} | Delivery: {order.delivery_status || '-'}</small>
                   <small>Total: Rp {Number(order.total_price).toLocaleString('id-ID')}</small>
                   <small>Items: {order.items.map((item) => `${item.item_name_snapshot} x${item.quantity}`).join(', ') || '-'}</small>
@@ -546,7 +557,7 @@ export default function ParentsOrdersPage() {
             && session === draftSourceContext.session ? (
               <p className="auth-help">
                 {draftSourceContext.mode === 'edit' ? '✏️ Editing order' : '🛒 Quick reorder from'}: #{draftSourceContext.orderId}
-                {' | '}Youngster: {draftSourceContext.childName}
+                {' | '}Student: {draftSourceContext.childName}
                 {' | '}Date: {draftSourceContext.targetServiceDate}
               </p>
             ) : null}
@@ -569,7 +580,8 @@ export default function ParentsOrdersPage() {
                 <h3>Menu Section</h3>
                 <div className="auth-form">
                   {menuItems.map((item) => (
-                    <label key={item.id}>
+                    <label key={item.id} style={getSessionCardStyle(session)}>
+                      <SessionBadge session={session} />
                       <span><strong>{item.name}</strong> — Rp {Number(item.price).toLocaleString('id-ID')}</span>
                       <small>Category: {formatDishCategoryLabel(item.dish_category)}</small>
                       <small>Dietary: {formatDishDietaryTags(item)}</small>
@@ -590,7 +602,8 @@ export default function ParentsOrdersPage() {
                 ) : (
                   <div className="auth-form">
                     {draftItems.map((d) => (
-                      <label key={d.id}>
+                      <label key={d.id} style={getSessionCardStyle(session)}>
+                        <SessionBadge session={session} />
                         <span><strong>{d.menuItem?.name}</strong> — Rp {Number(d.menuItem?.price || 0).toLocaleString('id-ID')}</span>
                         <small>Category: {d.menuItem ? formatDishCategoryLabel(d.menuItem.dish_category) : '-'}</small>
                         <small>{d.menuItem?.description}</small>
@@ -624,12 +637,13 @@ export default function ParentsOrdersPage() {
             {loadingOrders ? 'Refreshing...' : 'Refresh Orders'}
           </button>
           {sortedVisibleOrders.length === 0 ? (
-            <p className="auth-help">No orders yet for selected youngster.</p>
+            <p className="auth-help">No orders yet for the selected student.</p>
           ) : (
             <div className="auth-form">
               {sortedVisibleOrders.map((order) => (
-                <div key={order.id} className="order-row-card">
-                  <span><strong>{order.child_name}</strong> — {order.service_date} {order.session}</span>
+                <div key={order.id} className="order-row-card" style={getSessionCardStyle(order.session)}>
+                  <SessionBadge session={order.session} />
+                  <span><strong>{order.child_name}</strong> — {order.service_date}</span>
                   <small>Order: {order.id}</small>
                   <small>Status: {order.status} | Billing: {order.billing_status || '-'} | Delivery: {order.delivery_status || '-'}</small>
                   <small>Total: Rp {Number(order.total_price).toLocaleString('id-ID')}</small>
@@ -762,7 +776,8 @@ export default function ParentsOrdersPage() {
         .popup-close { width: 100%; margin-top: 0.25rem; }
       `}</style>
     </main>
-    <LogoutButton />
+    <DraftExitGuard active={hasDraftChanges} onDiscard={discardDraftAndContinue} subjectLabel="family" />
+    <LogoutButton returnHref="/family" showRecord={false} />
     </>
   );
 }

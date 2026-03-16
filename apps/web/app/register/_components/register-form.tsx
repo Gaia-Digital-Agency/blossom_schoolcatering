@@ -82,7 +82,7 @@ export default function RegisterForm({ role, allowedRoles, title, subtitle }: Re
               >
                 {availableRoles.map((availableRole) => (
                   <option key={availableRole} value={availableRole}>
-                    {availableRole === 'YOUNGSTER' ? 'Youngster' : availableRole === 'PARENT' ? 'Parent' : 'Delivery'}
+                    {availableRole === 'YOUNGSTER' ? 'Student' : availableRole === 'PARENT' ? 'Family' : 'Delivery'}
                   </option>
                 ))}
               </select>
