@@ -472,6 +472,10 @@ export default function AdminPage() {
         .dash-card {
           margin-bottom: 1rem;
           grid-template-columns: minmax(0, 1fr);
+          border: 1.5px solid #d9cdb7;
+          border-radius: 0.8rem;
+          padding: 0.9rem 1rem;
+          background: #fff;
         }
         .dash-card-title {
           margin: 0 0 0.65rem;
