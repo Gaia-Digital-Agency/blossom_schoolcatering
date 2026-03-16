@@ -77,7 +77,7 @@ export default function StudentOverviewPage() {
           </div>
         </section>
       </main>
-      <LogoutButton returnHref="/student" showRecord={false} />
+      <LogoutButton returnHref="/student" showRecord={false} showLogout={false} sticky={false} />
     </>
   );
 }

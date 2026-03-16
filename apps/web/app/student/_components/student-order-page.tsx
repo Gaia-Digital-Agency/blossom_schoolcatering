@@ -679,7 +679,7 @@ export default function StudentOrderPage() {
       `}</style>
     </main>
     <DraftExitGuard active={hasDraftChanges} onDiscard={discardDraftAndContinue} subjectLabel="student" />
-    <LogoutButton returnHref="/student" showRecord={false} />
+    <LogoutButton returnHref="/student" showRecord={false} showLogout={false} sticky={false} />
     </>
   );
 }

@@ -99,7 +99,7 @@ export default function FamilyOverviewPage() {
           </div>
         </section>
       </main>
-      <LogoutButton returnHref="/family" showRecord={false} />
+      <LogoutButton returnHref="/family" showRecord={false} showLogout={false} sticky={false} />
     </>
   );
 }

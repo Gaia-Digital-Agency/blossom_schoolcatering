@@ -12,10 +12,14 @@ export default function LogoutButton({
   returnHref,
   showRecord = true,
   logoutRedirect = '/',
+  showLogout = true,
+  sticky = true,
 }: {
   returnHref?: string;
   showRecord?: boolean;
   logoutRedirect?: string;
+  showLogout?: boolean;
+  sticky?: boolean;
 }) {
   const router = useRouter();
   // State to manage the loading status of the logout process.
@@ -56,17 +60,19 @@ export default function LogoutButton({
 
   return (
     <>
-      <div className="session-actions">
+      <div className={`session-actions ${sticky ? 'session-actions-sticky' : 'session-actions-inline'} ${showLogout ? '' : 'session-actions-return-only'}`}>
         {/* The main logout button */}
-        <button
-          type="button"
-          className="logout-btn"
-          onClick={onLogout}
-          disabled={loading}
-          aria-label="Logout"
-        >
-          {loading ? '...' : 'Logout'}
-        </button>
+        {showLogout ? (
+          <button
+            type="button"
+            className="logout-btn"
+            onClick={onLogout}
+            disabled={loading}
+            aria-label="Logout"
+          >
+            {loading ? '...' : 'Logout'}
+          </button>
+        ) : null}
         {returnHref ? (
           <button
             type="button"
@@ -92,18 +98,31 @@ export default function LogoutButton({
       {/* Scoped CSS for the component */}
       <style jsx>{`
         .session-actions {
-          position: fixed;
-          left: 0;
-          right: 0;
-          bottom: 0;
           z-index: 20;
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
           align-items: center;
           gap: 0.45rem;
+          width: min(680px, calc(100% - 2rem));
+          margin: 0.85rem auto 1.2rem;
+        }
+        .session-actions-sticky {
+          position: fixed;
+          left: 50%;
+          bottom: 0;
+          transform: translateX(-50%);
           padding: 0.65rem 0.85rem calc(0.8rem + env(safe-area-inset-bottom));
           background: linear-gradient(180deg, rgba(244, 239, 229, 0), rgba(244, 239, 229, 0.96) 35%, rgba(244, 239, 229, 0.99) 100%);
           backdrop-filter: blur(6px);
+        }
+        .session-actions-inline {
+          position: static;
+          padding: 0;
+          background: transparent;
+          backdrop-filter: none;
+        }
+        .session-actions-return-only {
+          grid-template-columns: minmax(0, 1fr);
         }
         .logout-btn {
           width: 100%;
@@ -148,7 +167,7 @@ export default function LogoutButton({
           color: #5a3a10;
         }
         @media (max-width: 520px) {
-          .session-actions {
+          .session-actions:not(.session-actions-return-only) {
             grid-template-columns: repeat(2, minmax(0, 1fr));
           }
         }

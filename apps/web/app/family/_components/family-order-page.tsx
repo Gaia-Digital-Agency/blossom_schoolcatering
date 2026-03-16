@@ -777,7 +777,7 @@ export default function FamilyOrderPage() {
       `}</style>
     </main>
     <DraftExitGuard active={hasDraftChanges} onDiscard={discardDraftAndContinue} subjectLabel="family" />
-    <LogoutButton returnHref="/family" showRecord={false} />
+    <LogoutButton returnHref="/family" showRecord={false} showLogout={false} sticky={false} />
     </>
   );
 }

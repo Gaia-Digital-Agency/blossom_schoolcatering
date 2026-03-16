@@ -328,7 +328,7 @@ export default function FamilyBillingPage() {
         }
       `}</style>
     </main>
-    <LogoutButton returnHref={returnHref} showRecord={false} />
+    <LogoutButton returnHref={returnHref} showRecord={false} showLogout={false} sticky={false} />
     </>
   );
 }

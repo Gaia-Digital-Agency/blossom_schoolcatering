@@ -187,7 +187,7 @@ export default function RatingPage() {
           </button>
         </div>
       </section>
-      <LogoutButton returnHref={backTarget} showRecord={false} />
+      <LogoutButton returnHref={backTarget} showRecord={false} showLogout={false} sticky={false} />
       <style jsx>{`
         .menu-public-grid {
           display: grid;
