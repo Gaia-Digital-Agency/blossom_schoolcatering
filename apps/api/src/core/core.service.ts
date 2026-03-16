@@ -6363,7 +6363,7 @@ export class CoreService implements OnModuleInit {
         LEFT JOIN users up ON up.id = p.user_id
         WHERE o.service_date = $1::date
           AND o.status IN ('PLACED', 'LOCKED')
-        GROUP BY o.id, s.name, uc.first_name, uc.last_name, uc.phone_number, up.first_name, up.last_name, up.phone_number, item_counts.dish_count
+        GROUP BY o.id, s.name, uc.first_name, uc.last_name, uc.phone_number, up.first_name, up.last_name, up.phone_number, item_counts.dish_count, reg_allergy.restriction_details
         ORDER BY s.name ASC, child_name ASC, o.session ASC
       ) t;
     `,

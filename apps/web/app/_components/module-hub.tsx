@@ -66,19 +66,16 @@ export default function ModuleHub({
       <style jsx>{`
         .page-auth {
           min-height: 100dvh;
-          padding: 0.65rem;
-          overflow: hidden;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 1.25rem 1rem;
         }
         .auth-panel {
-          width: min(680px, 100%);
-          max-width: 100%;
-          min-height: calc(100dvh - 1.3rem);
-          max-height: calc(100dvh - 1.3rem);
-          padding: 0.85rem;
-          display: grid;
-          grid-template-rows: auto 1fr;
-          gap: 0.7rem;
-          overflow: hidden;
+          width: min(480px, 100%);
+          display: flex;
+          flex-direction: column;
+          gap: 1.25rem;
         }
         .auth-panel h1 {
           margin: 0;
@@ -87,73 +84,41 @@ export default function ModuleHub({
         .module-hub-grid {
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 0.55rem;
-          min-height: 0;
-          align-content: center;
+          gap: 0.75rem;
         }
         .module-hub-card {
           aspect-ratio: 1;
-          border: 1px solid #d8cab1;
-          border-radius: 0.95rem;
+          border: 1.5px solid #d8cab1;
+          border-radius: 1.1rem;
           background:
-            radial-gradient(circle at top, rgba(255, 248, 232, 0.95), rgba(255, 243, 225, 0.92)),
-            linear-gradient(180deg, #fffdf8 0%, #fff1d7 100%);
-          display: grid;
-          grid-template-rows: minmax(0, 1fr) auto;
+            radial-gradient(circle at 30% 20%, rgba(255, 251, 240, 0.98), rgba(255, 240, 210, 0.94));
+          display: flex;
+          flex-direction: column;
           align-items: center;
-          justify-items: center;
-          gap: 0.05rem;
-          padding: 0.18rem 0.12rem 0.22rem;
+          justify-content: center;
+          gap: 0.45rem;
+          padding: 0.6rem 0.4rem 0.65rem;
           cursor: pointer;
           transition: transform 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
-          box-shadow: 0 12px 26px rgba(122, 106, 88, 0.11);
-          min-width: 0;
+          box-shadow: 0 4px 14px rgba(122, 106, 88, 0.12);
         }
         .module-hub-card:hover {
-          transform: translateY(-2px);
+          transform: translateY(-3px);
           border-color: #b8860b;
-          box-shadow: 0 16px 32px rgba(122, 106, 88, 0.16);
+          box-shadow: 0 10px 24px rgba(122, 106, 88, 0.18);
         }
         .module-hub-icon {
-          width: 100%;
-          height: 100%;
-          display: grid;
-          place-items: center;
-          font-size: clamp(2.35rem, 10vw, 3rem);
+          font-size: clamp(2rem, 9vw, 2.6rem);
           line-height: 1;
         }
         .module-hub-label {
           width: 100%;
-          font-size: 0.92rem;
+          font-size: clamp(0.78rem, 3vw, 0.95rem);
           font-weight: 700;
           color: #5d4e3a;
           text-align: center;
-          line-height: 0.92;
+          line-height: 1.15;
           text-wrap: balance;
-        }
-        @media (max-width: 460px) {
-          .page-auth {
-            padding: 0.5rem;
-          }
-          .auth-panel {
-            min-height: calc(100dvh - 1rem);
-            max-height: calc(100dvh - 1rem);
-            padding: 0.75rem;
-            gap: 0.6rem;
-          }
-          .module-hub-grid {
-            gap: 0.45rem;
-          }
-          .module-hub-card {
-            padding: 0.14rem 0.08rem 0.18rem;
-            border-radius: 0.85rem;
-          }
-          .module-hub-icon {
-            font-size: clamp(2rem, 11vw, 2.55rem);
-          }
-          .module-hub-label {
-            font-size: 0.84rem;
-          }
         }
       `}</style>
     </main>
