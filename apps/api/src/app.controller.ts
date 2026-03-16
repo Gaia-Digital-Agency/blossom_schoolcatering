@@ -24,12 +24,22 @@ export class AppController {
       VALUES ('chef_message', 'Every dish is prepared for school-day energy and balanced nutrition. We keep every meal fresh, consistent, and safe for all youngsters.')
       ON CONFLICT (setting_key) DO NOTHING;
     `);
+    await runSql(`
+      INSERT INTO site_settings (setting_key, setting_value)
+      VALUES ('hero_image_url', '/schoolcatering/assets/hero-meal.jpg')
+      ON CONFLICT (setting_key) DO NOTHING;
+    `);
+    await runSql(`
+      INSERT INTO site_settings (setting_key, setting_value)
+      VALUES ('hero_image_caption', 'Enchanting Nourished Zesty Original Meals')
+      ON CONFLICT (setting_key) DO NOTHING;
+    `);
   }
 
   /**
-   * Retrieves public site settings, specifically the 'chef_message'.
+   * Retrieves public site settings for the homepage.
    * It ensures the settings table is created and then fetches the message.
-   * @returns An object containing the chef_message.
+   * @returns An object containing the chef_message and hero image settings.
    */
   @Get('api/v1/public/site-settings')
   async getPublicSiteSettings() {
@@ -37,15 +47,20 @@ export class AppController {
     const out = await runSql(`
       SELECT row_to_json(t)::text
       FROM (
-        SELECT setting_value AS chef_message
+        SELECT
+          COALESCE(MAX(CASE WHEN setting_key = 'chef_message' THEN setting_value END), '') AS chef_message,
+          COALESCE(MAX(CASE WHEN setting_key = 'hero_image_url' THEN setting_value END), '/schoolcatering/assets/hero-meal.jpg') AS hero_image_url,
+          COALESCE(MAX(CASE WHEN setting_key = 'hero_image_caption' THEN setting_value END), 'Enchanting Nourished Zesty Original Meals') AS hero_image_caption
         FROM site_settings
-        WHERE setting_key = 'chef_message'
-        LIMIT 1
       ) t;
     `);
     const line = out.split('\n').map((x: string) => x.trim()).find(Boolean);
-    const data = line ? (JSON.parse(line) as { chef_message?: string }) : {};
-    return { chef_message: data.chef_message ?? '' };
+    const data = line ? (JSON.parse(line) as { chef_message?: string; hero_image_url?: string; hero_image_caption?: string }) : {};
+    return {
+      chef_message: data.chef_message ?? '',
+      hero_image_url: data.hero_image_url ?? '/schoolcatering/assets/hero-meal.jpg',
+      hero_image_caption: data.hero_image_caption ?? 'Enchanting Nourished Zesty Original Meals',
+    };
   }
 
   /**

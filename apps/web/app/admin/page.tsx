@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { apiFetch } from '../../lib/auth';
+import { ACCESS_KEY, apiFetch, fetchWithTimeout, getApiBase } from '../../lib/auth';
 import AdminNav from './_components/admin-nav';
 
 /**
@@ -100,6 +100,11 @@ export default function AdminPage() {
 
   // State for the chef's personal message editor.
   const [chefMessage, setChefMessage] = useState('');
+  const [heroImageUrl, setHeroImageUrl] = useState('/schoolcatering/assets/hero-meal.jpg');
+  const [heroImageCaption, setHeroImageCaption] = useState('Enchanting Nourished Zesty Original Meals');
+  const [heroImageFileName, setHeroImageFileName] = useState('');
+  const [heroImagePreviewUrl, setHeroImagePreviewUrl] = useState('');
+  const [heroImageFile, setHeroImageFile] = useState<File | null>(null);
   const [chefMessageSaving, setChefMessageSaving] = useState(false);
   const [chefMessageStatus, setChefMessageStatus] = useState<'idle' | 'saved' | 'error'>('idle');
 
@@ -124,21 +129,59 @@ export default function AdminPage() {
    */
   const loadChefMessage = async () => {
     try {
-      const result = await apiFetch('/admin/site-settings') as { chef_message: string };
+      const result = await apiFetch('/admin/site-settings') as {
+        chef_message: string;
+        hero_image_url?: string;
+        hero_image_caption?: string;
+      };
       setChefMessage(result.chef_message ?? '');
+      setHeroImageUrl(result.hero_image_url ?? '/schoolcatering/assets/hero-meal.jpg');
+      setHeroImageCaption(result.hero_image_caption ?? 'Enchanting Nourished Zesty Original Meals');
+      setHeroImageFileName('');
+      setHeroImageFile(null);
+      setHeroImagePreviewUrl('');
     } catch {
       // non-critical, ignore
     }
   };
 
   /**
-   * Saves the updated chef message to the site settings.
+   * Saves the updated hero image, hero text, and chef message to the site settings.
    */
   const saveChefMessage = async () => {
     setChefMessageSaving(true);
     setChefMessageStatus('idle');
     try {
-      await apiFetch('/admin/site-settings', { method: 'PATCH', body: JSON.stringify({ chef_message: chefMessage }) });
+      let nextHeroImageUrl = heroImageUrl;
+      if (heroImageFile) {
+        const formData = new FormData();
+        formData.append('image', heroImageFile, heroImageFile.name || `hero-${Date.now()}.webp`);
+        const token = localStorage.getItem(ACCESS_KEY);
+        const uploadRes = await fetchWithTimeout(`${getApiBase()}/admin/site-settings/hero-image-upload`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token ?? ''}` },
+          credentials: 'include',
+          body: formData,
+        });
+        if (!uploadRes.ok) {
+          const errBody = await uploadRes.json().catch(() => ({})) as { message?: string };
+          throw new Error(errBody.message ?? 'Hero image upload failed');
+        }
+        const uploaded = await uploadRes.json() as { url: string };
+        nextHeroImageUrl = uploaded.url;
+      }
+      await apiFetch('/admin/site-settings', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          chef_message: chefMessage,
+          hero_image_url: nextHeroImageUrl,
+          hero_image_caption: heroImageCaption,
+        }),
+      });
+      setHeroImageUrl(nextHeroImageUrl);
+      setHeroImageFile(null);
+      setHeroImageFileName('');
+      setHeroImagePreviewUrl('');
       setChefMessageStatus('saved');
       setTimeout(() => setChefMessageStatus('idle'), 3000);
     } catch {
@@ -157,6 +200,10 @@ export default function AdminPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => () => {
+    if (heroImagePreviewUrl) URL.revokeObjectURL(heroImagePreviewUrl);
+  }, [heroImagePreviewUrl]);
+
   return (
     <main className="page-auth page-auth-desktop">
       <section className="auth-panel">
@@ -167,6 +214,37 @@ export default function AdminPage() {
         {/* Card for administrative controls like the chef message and data refresh */}
         <div className="auth-form admin-controls-card">
           <div className="chef-message-controls">
+            <label>
+              Hero Image
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] || null;
+                  if (heroImagePreviewUrl) URL.revokeObjectURL(heroImagePreviewUrl);
+                  setHeroImageFile(file);
+                  setHeroImageFileName(file?.name || '');
+                  setHeroImagePreviewUrl(file ? URL.createObjectURL(file) : '');
+                  setChefMessageStatus('idle');
+                }}
+              />
+            </label>
+            <div className="admin-hero-preview">
+              <img src={heroImagePreviewUrl || heroImageUrl} alt={heroImageCaption || 'Hero image preview'} />
+              <div className="admin-hero-meta">
+                <strong>Current Hero Image</strong>
+                <span>{heroImageFileName || heroImageUrl.split('/').pop() || 'hero-meal.jpg'}</span>
+              </div>
+            </div>
+            <label>
+              Hero Image Text
+              <input
+                maxLength={200}
+                value={heroImageCaption}
+                onChange={(e) => { setHeroImageCaption(e.target.value); setChefMessageStatus('idle'); }}
+                placeholder="Write the text shown on the hero image…"
+              />
+            </label>
             <label>
               Chef Personal Message
               <textarea
@@ -182,7 +260,7 @@ export default function AdminPage() {
               {chefMessageStatus === 'saved' && <span className="chef-message-ok">✓ Saved</span>}
               {chefMessageStatus === 'error' && <span className="chef-message-err">✗ Failed to save</span>}
               <button className="btn btn-primary btn-sm" type="button" onClick={saveChefMessage} disabled={chefMessageSaving}>
-                {chefMessageSaving ? 'Saving…' : 'Save Message'}
+                {chefMessageSaving ? 'Saving…' : 'Save Image & Text'}
               </button>
             </div>
           </div>
@@ -392,6 +470,15 @@ export default function AdminPage() {
           font-size: 0.85rem;
           font-weight: 600;
         }
+        .chef-message-controls input[type='text'],
+        .chef-message-controls input[type='file'] {
+          min-height: 2.5rem;
+          padding: 0.5rem 0.65rem;
+          font-size: 0.88rem;
+          border: 1px solid rgba(15,23,42,0.18);
+          border-radius: 6px;
+          background: #fff;
+        }
         .chef-message-controls textarea {
           resize: vertical;
           min-height: 5rem;
@@ -401,6 +488,26 @@ export default function AdminPage() {
           border-radius: 6px;
           font-family: inherit;
           line-height: 1.5;
+        }
+        .admin-hero-preview {
+          display: grid;
+          gap: 0.55rem;
+          padding: 0.75rem;
+          border: 1px solid rgba(15,23,42,0.12);
+          border-radius: 0.75rem;
+          background: rgba(248,250,252,0.9);
+        }
+        .admin-hero-preview img {
+          width: 100%;
+          max-height: 220px;
+          object-fit: cover;
+          border-radius: 0.55rem;
+        }
+        .admin-hero-meta {
+          display: grid;
+          gap: 0.15rem;
+          font-size: 0.82rem;
+          color: #64748b;
         }
         .chef-message-footer {
           display: flex;

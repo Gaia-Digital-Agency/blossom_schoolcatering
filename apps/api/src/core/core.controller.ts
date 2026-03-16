@@ -95,8 +95,18 @@ export class CoreController {
 
   @Patch('admin/site-settings')
   @Roles('ADMIN')
-  updateAdminSiteSettings(@Req() req: AuthRequest, @Body() body: { chef_message: string }) {
-    return this.coreService.updateSiteSettings(req.user, body.chef_message ?? '');
+  updateAdminSiteSettings(
+    @Req() req: AuthRequest,
+    @Body() body: { chef_message?: string; hero_image_url?: string; hero_image_caption?: string },
+  ) {
+    return this.coreService.updateSiteSettings(req.user, body);
+  }
+
+  @Post('admin/site-settings/hero-image-upload')
+  @Roles('ADMIN')
+  @UseInterceptors(FileInterceptor('image', { limits: { fileSize: 5 * 1024 * 1024 } }))
+  uploadSiteHeroImage(@UploadedFile() file: any) {
+    return this.coreService.uploadSiteHeroImage(file?.buffer, file?.mimetype);
   }
 
   @Get('admin/session-settings')

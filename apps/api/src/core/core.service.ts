@@ -2516,6 +2516,26 @@ export class CoreService implements OnModuleInit {
     return { url: this.buildGoogleStoragePublicUrl(uploaded.objectName) };
   }
 
+  async uploadSiteHeroImage(buffer: Buffer, mimetype: string): Promise<{ url: string }> {
+    if (!buffer?.length) throw new BadRequestException('No file data received');
+    this.assertSafeImagePayload({
+      contentType: mimetype,
+      data: buffer,
+      maxBytes: 5 * 1024 * 1024,
+      label: 'Hero image',
+    });
+    const ext = this.getFileExtFromContentType(mimetype);
+    const objectName = `${this.getGcsCategoryFolder('menu-images')}/hero-${Date.now()}.${ext}`;
+    const uploaded = await this.uploadToGcs({
+      objectName,
+      contentType: mimetype,
+      data: buffer,
+      cacheControl: 'public, max-age=86400',
+      publicRead: true,
+    });
+    return { url: this.buildGoogleStoragePublicUrl(uploaded.objectName) };
+  }
+
   async createAdminMenuItem(actor: AccessUser, input: {
     serviceDate?: string;
     session?: string;
@@ -7385,6 +7405,16 @@ export class CoreService implements OnModuleInit {
       VALUES ('chef_message', 'Every dish is prepared for school-day energy and balanced nutrition. We keep every meal fresh, consistent, and safe for all youngsters.')
       ON CONFLICT (setting_key) DO NOTHING;
     `);
+    await runSql(`
+      INSERT INTO site_settings (setting_key, setting_value)
+      VALUES ('hero_image_url', '/schoolcatering/assets/hero-meal.jpg')
+      ON CONFLICT (setting_key) DO NOTHING;
+    `);
+    await runSql(`
+      INSERT INTO site_settings (setting_key, setting_value)
+      VALUES ('hero_image_caption', 'Enchanting Nourished Zesty Original Meals')
+      ON CONFLICT (setting_key) DO NOTHING;
+    `);
   }
 
   async getSiteSettings() {
@@ -7392,31 +7422,48 @@ export class CoreService implements OnModuleInit {
     const out = await runSql(`
       SELECT row_to_json(t)::text
       FROM (
-        SELECT setting_value AS chef_message
+        SELECT
+          COALESCE(MAX(CASE WHEN setting_key = 'chef_message' THEN setting_value END), '') AS chef_message,
+          COALESCE(MAX(CASE WHEN setting_key = 'hero_image_url' THEN setting_value END), '/schoolcatering/assets/hero-meal.jpg') AS hero_image_url,
+          COALESCE(MAX(CASE WHEN setting_key = 'hero_image_caption' THEN setting_value END), 'Enchanting Nourished Zesty Original Meals') AS hero_image_caption
         FROM site_settings
-        WHERE setting_key = 'chef_message'
-        LIMIT 1
       ) t;
     `);
     const lines = out.split('\n').map((x: string) => x.trim()).filter(Boolean);
-    const data = lines[0] ? (JSON.parse(lines[0]) as { chef_message?: string }) : {};
-    return { chef_message: data.chef_message ?? '' };
+    const data = lines[0]
+      ? (JSON.parse(lines[0]) as { chef_message?: string; hero_image_url?: string; hero_image_caption?: string })
+      : {};
+    return {
+      chef_message: data.chef_message ?? '',
+      hero_image_url: data.hero_image_url ?? '/schoolcatering/assets/hero-meal.jpg',
+      hero_image_caption: data.hero_image_caption ?? 'Enchanting Nourished Zesty Original Meals',
+    };
   }
 
-  async updateSiteSettings(actor: AccessUser, chefMessage: string) {
+  async updateSiteSettings(actor: AccessUser, input: { chef_message?: string; hero_image_url?: string; hero_image_caption?: string }) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
-    if (typeof chefMessage !== 'string') throw new BadRequestException('chef_message must be a string');
-    const trimmed = chefMessage.trim();
-    if (trimmed.length > 500) throw new BadRequestException('chef_message must be 500 characters or fewer');
+    const chefMessage = typeof input.chef_message === 'string' ? input.chef_message.trim() : '';
+    const heroImageUrl = typeof input.hero_image_url === 'string' ? input.hero_image_url.trim() : '/schoolcatering/assets/hero-meal.jpg';
+    const heroImageCaption = typeof input.hero_image_caption === 'string' ? input.hero_image_caption.trim() : 'Enchanting Nourished Zesty Original Meals';
+    if (chefMessage.length > 500) throw new BadRequestException('chef_message must be 500 characters or fewer');
+    if (heroImageCaption.length > 200) throw new BadRequestException('hero_image_caption must be 200 characters or fewer');
+    if (heroImageUrl.length > 2000) throw new BadRequestException('hero_image_url must be 2000 characters or fewer');
     await this.ensureSiteSettingsTable();
     await runSql(
       `INSERT INTO site_settings (setting_key, setting_value, updated_at)
-       VALUES ('chef_message', $1, now())
+       VALUES
+         ('chef_message', $1, now()),
+         ('hero_image_url', $2, now()),
+         ('hero_image_caption', $3, now())
        ON CONFLICT (setting_key)
        DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = now();`,
-      [trimmed],
+      [chefMessage, heroImageUrl || '/schoolcatering/assets/hero-meal.jpg', heroImageCaption],
     );
-    return { chef_message: trimmed };
+    return {
+      chef_message: chefMessage,
+      hero_image_url: heroImageUrl || '/schoolcatering/assets/hero-meal.jpg',
+      hero_image_caption: heroImageCaption,
+    };
   }
 
   // ─── Health check ─────────────────────────────────────────────────────────

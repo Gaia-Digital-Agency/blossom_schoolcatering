@@ -26,6 +26,8 @@ export default function HomePage() {
   const [chefMessage, setChefMessage] = useState<string>(
     'Every dish is prepared for school-day energy and balanced nutrition. We keep every meal fresh, consistent, and safe for all youngsters.'
   );
+  const [heroImageUrl, setHeroImageUrl] = useState<string>('/schoolcatering/assets/hero-meal.jpg');
+  const [heroImageCaption, setHeroImageCaption] = useState<string>('Enchanting Nourished Zesty Original Meals');
 
   /**
    * Fetches the site settings, specifically the chef's message, when the component mounts.
@@ -34,8 +36,10 @@ export default function HomePage() {
   useEffect(() => {
     fetch('/schoolcatering/api/v1/public/site-settings', { credentials: 'include' })
       .then((res) => res.ok ? res.json() : null)
-      .then((json: { chef_message?: string } | null) => {
+      .then((json: { chef_message?: string; hero_image_url?: string; hero_image_caption?: string } | null) => {
         if (json?.chef_message) setChefMessage(json.chef_message);
+        if (json?.hero_image_url) setHeroImageUrl(json.hero_image_url);
+        if (json?.hero_image_caption) setHeroImageCaption(json.hero_image_caption);
       })
       .catch(() => { /* keep default */ });
   }, []);
@@ -136,8 +140,8 @@ export default function HomePage() {
 
         {/* A large hero image card with a caption */}
         <section className="hero-image-card" aria-label="Healthy Meal For Lovely Souls">
-          <img src="/schoolcatering/assets/hero-meal.jpg" alt="Healthy Meal For Lovely Souls" />
-          <div className="hero-image-caption">Enchanting Nourished Zesty Original Meals</div>
+          <img src={heroImageUrl} alt={heroImageCaption || 'Healthy Meal For Lovely Souls'} />
+          <div className="hero-image-caption">{heroImageCaption}</div>
         </section>
 
         {/* Section to display the message from the chef */}
