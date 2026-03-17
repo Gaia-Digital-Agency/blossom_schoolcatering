@@ -6797,6 +6797,15 @@ export class CoreService implements OnModuleInit {
   async deleteParent(actor: AccessUser, targetParentId: string) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     this.assertValidUuid(targetParentId, 'parentId');
+    const out = await runSql(
+      `SELECT row_to_json(t)::text FROM (
+         SELECT p.id, p.user_id FROM parents p
+         WHERE p.id = $1 AND p.deleted_at IS NULL
+       ) t;`,
+      [targetParentId],
+    );
+    if (!out) throw new NotFoundException('Parent not found');
+    const parent = this.parseJsonLine<{ id: string; user_id: string }>(out);
     const linkedYoungstersRaw = await runSql(
       `
       SELECT row_to_json(t)::text
@@ -6812,12 +6821,23 @@ export class CoreService implements OnModuleInit {
       [targetParentId],
     );
     const linkedYoungsters = this.parseJsonLines<{ id: string; user_id: string; deleted_at?: string | null }>(linkedYoungstersRaw);
-    const activeLinkedYoungster = linkedYoungsters.find((row) => !row.deleted_at);
-    if (activeLinkedYoungster) {
-      throw new BadRequestException('Cannot delete parent with associated youngster(s)');
-    }
-    for (const youngster of linkedYoungsters) {
-      await this.hardDeleteYoungsterIfSafe(youngster.id, youngster.user_id);
+    const activeLinkedYoungsters = linkedYoungsters.filter((row) => !row.deleted_at);
+    for (const youngster of activeLinkedYoungsters) {
+      const youngsterBlocker = await this.getYoungsterDeleteBlockers(youngster.id, youngster.user_id);
+      if (youngsterBlocker.activeOrdersCount > 0 || youngsterBlocker.activeBillingCount > 0) {
+        throw new BadRequestException(
+          `Cannot delete family with linked student active orders or billing (orders: ${youngsterBlocker.activeOrdersCount}, billing: ${youngsterBlocker.activeBillingCount})`,
+        );
+      }
+      if (
+        youngsterBlocker.totalOrdersCount > 0 ||
+        youngsterBlocker.totalBillingCount > 0 ||
+        youngsterBlocker.auditCount > 0
+      ) {
+        await this.softDeleteYoungster(youngster.id, youngster.user_id);
+      } else {
+        await this.hardDeleteYoungsterIfSafe(youngster.id, youngster.user_id);
+      }
     }
     const linkedYoungsterExists = await runSql(
       `SELECT EXISTS (
@@ -6832,44 +6852,23 @@ export class CoreService implements OnModuleInit {
     if (linkedYoungsterExists === 't') {
       throw new BadRequestException('Cannot delete parent with associated youngster(s)');
     }
-    const out = await runSql(
-      `SELECT row_to_json(t)::text FROM (
-         SELECT p.id, p.user_id FROM parents p
-         WHERE p.id = $1 AND p.deleted_at IS NULL
-       ) t;`,
-      [targetParentId],
-    );
-    if (!out) throw new NotFoundException('Parent not found');
-    const parent = this.parseJsonLine<{ id: string; user_id: string }>(out);
-    const blockingHistoryOut = await runSql(
-      `
-      SELECT row_to_json(t)::text
-      FROM (
-        SELECT
-          (SELECT COUNT(*)::int FROM billing_records WHERE parent_id = $1) AS billing_count,
-          (SELECT COUNT(*)::int FROM orders WHERE placed_by_user_id = $2) AS orders_count,
-          (SELECT COUNT(*)::int FROM order_carts WHERE created_by_user_id = $2) AS carts_count,
-          (SELECT COUNT(*)::int FROM favourite_meals WHERE created_by_user_id = $2) AS favourites_count,
-          (SELECT COUNT(*)::int FROM admin_audit_logs WHERE actor_user_id = $2) AS audit_count
-      ) t;
-      `,
-      [targetParentId, parent.user_id],
-    );
-    const blockingHistory = this.parseJsonLine<{
-      billing_count: number;
-      orders_count: number;
-      carts_count: number;
-      favourites_count: number;
-      audit_count: number;
-    }>(blockingHistoryOut);
+    const blockingHistory = await this.getParentDeleteBlockers(targetParentId, parent.user_id);
     if (
-      Number(blockingHistory?.billing_count || 0) > 0 ||
-      Number(blockingHistory?.orders_count || 0) > 0 ||
-      Number(blockingHistory?.carts_count || 0) > 0 ||
-      Number(blockingHistory?.favourites_count || 0) > 0 ||
-      Number(blockingHistory?.audit_count || 0) > 0
+      blockingHistory.activeBillingCount > 0 ||
+      blockingHistory.activeOrdersCount > 0
     ) {
-      throw new BadRequestException('Cannot hard-delete parent with billing or order history');
+      throw new BadRequestException(
+        `Cannot delete family with active orders or billing (orders: ${blockingHistory.activeOrdersCount}, billing: ${blockingHistory.activeBillingCount})`,
+      );
+    }
+    if (
+      blockingHistory.totalBillingCount > 0 ||
+      blockingHistory.totalOrdersCount > 0 ||
+      blockingHistory.auditCount > 0
+    ) {
+      await this.softDeleteParent(targetParentId, parent.user_id);
+      await this.recordAdminAudit(actor, 'PARENT_DELETED', 'parent', targetParentId);
+      return { ok: true };
     }
     await runSql(`DELETE FROM parent_children WHERE parent_id = $1;`, [targetParentId]);
     await runSql(`DELETE FROM user_preferences WHERE user_id = $1;`, [parent.user_id]);
@@ -6877,6 +6876,73 @@ export class CoreService implements OnModuleInit {
     await runSql(`DELETE FROM users WHERE id = $1;`, [parent.user_id]);
     await this.recordAdminAudit(actor, 'PARENT_DELETED', 'parent', targetParentId);
     return { ok: true };
+  }
+
+  private async getParentDeleteBlockers(parentId: string, userId: string) {
+    const blockingHistoryOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT
+          (SELECT COUNT(*)::int
+             FROM billing_records br
+             JOIN orders o ON o.id = br.order_id
+            WHERE br.parent_id = $1
+              AND o.deleted_at IS NULL
+              AND o.status <> 'CANCELLED') AS active_billing_count,
+          (SELECT COUNT(*)::int FROM billing_records WHERE parent_id = $1) AS total_billing_count,
+          (SELECT COUNT(*)::int
+             FROM orders
+            WHERE placed_by_user_id = $2
+              AND deleted_at IS NULL
+              AND status <> 'CANCELLED') AS active_orders_count,
+          (SELECT COUNT(*)::int FROM orders WHERE placed_by_user_id = $2) AS total_orders_count,
+          (SELECT COUNT(*)::int FROM order_carts WHERE created_by_user_id = $2) AS carts_count,
+          (SELECT COUNT(*)::int FROM favourite_meals WHERE created_by_user_id = $2) AS favourites_count,
+          (SELECT COUNT(*)::int FROM admin_audit_logs WHERE actor_user_id = $2) AS audit_count
+      ) t;
+      `,
+      [parentId, userId],
+    );
+    const blockingHistory = this.parseJsonLine<{
+      active_billing_count: number;
+      total_billing_count: number;
+      active_orders_count: number;
+      total_orders_count: number;
+      carts_count: number;
+      favourites_count: number;
+      audit_count: number;
+    }>(blockingHistoryOut);
+    return {
+      activeBillingCount: Number(blockingHistory?.active_billing_count || 0),
+      totalBillingCount: Number(blockingHistory?.total_billing_count || 0),
+      activeOrdersCount: Number(blockingHistory?.active_orders_count || 0),
+      totalOrdersCount: Number(blockingHistory?.total_orders_count || 0),
+      cartsCount: Number(blockingHistory?.carts_count || 0),
+      favouritesCount: Number(blockingHistory?.favourites_count || 0),
+      auditCount: Number(blockingHistory?.audit_count || 0),
+    };
+  }
+
+  private async softDeleteParent(parentId: string, userId: string) {
+    await runSql(`DELETE FROM parent_children WHERE parent_id = $1;`, [parentId]);
+    await runSql(
+      `UPDATE parents
+       SET deleted_at = now(),
+           updated_at = now()
+       WHERE id = $1;`,
+      [parentId],
+    );
+    await runSql(
+      `UPDATE users
+       SET is_active = false,
+           deleted_at = now(),
+           updated_at = now()
+       WHERE id = $1;`,
+      [userId],
+    );
+    await runSql(`DELETE FROM user_preferences WHERE user_id = $1;`, [userId]);
+    await runSql(`DELETE FROM auth_refresh_sessions WHERE user_id = $1;`, [userId]);
   }
 
   private async getYoungsterDeleteBlockers(youngsterId: string, userId: string) {
