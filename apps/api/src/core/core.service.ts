@@ -1531,7 +1531,8 @@ export class CoreService implements OnModuleInit {
     await runSql(`
       ALTER TABLE children
       ADD COLUMN IF NOT EXISTS registration_actor_type varchar(20) NOT NULL DEFAULT 'PARENT',
-      ADD COLUMN IF NOT EXISTS registration_actor_teacher_name varchar(50);
+      ADD COLUMN IF NOT EXISTS registration_actor_teacher_name varchar(50),
+      ADD COLUMN IF NOT EXISTS registration_actor_teacher_phone varchar(30);
     `);
   }
 
@@ -1614,6 +1615,7 @@ export class CoreService implements OnModuleInit {
                  LIMIT 1
                ), '') AS dietary_allergies,
                c.registration_actor_teacher_name,
+               c.registration_actor_teacher_phone,
                coalesce(array_agg(pc.parent_id) FILTER (WHERE pc.parent_id IS NOT NULL), '{}') AS parent_ids
         FROM children c
         JOIN users u ON u.id = c.user_id
@@ -1622,7 +1624,7 @@ export class CoreService implements OnModuleInit {
         WHERE c.is_active = true
           AND c.deleted_at IS NULL
           AND u.is_active = true
-        GROUP BY c.id, c.user_id, u.username, u.first_name, u.last_name, u.phone_number, u.email, c.date_of_birth, c.gender, c.school_id, c.school_grade, s.name, c.registration_actor_teacher_name
+        GROUP BY c.id, c.user_id, u.username, u.first_name, u.last_name, u.phone_number, u.email, c.date_of_birth, c.gender, c.school_id, c.school_grade, s.name, c.registration_actor_teacher_name, c.registration_actor_teacher_phone
         ORDER BY u.first_name, u.last_name
       ) t;
     `);

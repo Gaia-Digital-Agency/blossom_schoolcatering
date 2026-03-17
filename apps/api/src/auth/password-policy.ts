@@ -11,8 +11,8 @@ const WEAK_PASSWORDS = new Set([
 
 export function validatePasswordPolicy(passwordRaw: string, field = 'password') {
   const password = String(passwordRaw || '');
-  if (password.length < 10 || password.length > 100) {
-    throw new BadRequestException(`${field} must be between 10 and 100 characters`);
+  if (password.length < 6 || password.length > 100) {
+    throw new BadRequestException(`${field} must be between 6 and 100 characters`);
   }
   if (/\s/.test(password)) {
     throw new BadRequestException(`${field} must not contain spaces`);

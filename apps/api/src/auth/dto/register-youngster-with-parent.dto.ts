@@ -10,14 +10,12 @@ export class RegisterYoungsterWithParentDto {
   @MaxLength(50)
   teacherName?: string;
 
+  @ValidateIf((o: RegisterYoungsterWithParentDto) => o.registrantType === 'TEACHER')
+  @IsString()
+  teacherPhone?: string;
+
   @IsString()
   youngsterFirstName!: string;
-
-  @IsString()
-  youngsterLastName!: string;
-
-  @IsString()
-  youngsterGender!: string;
 
   @IsString()
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
@@ -56,4 +54,7 @@ export class RegisterYoungsterWithParentDto {
   @IsOptional()
   @IsString()
   parentAddress?: string;
+
+  @IsString()
+  password!: string;
 }

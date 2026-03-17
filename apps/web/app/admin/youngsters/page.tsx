@@ -30,6 +30,7 @@ type ChildRow = {
   school_grade: string;
   dietary_allergies?: string;
   registration_actor_teacher_name?: string | null;
+  registration_actor_teacher_phone?: string | null;
   parent_ids: string[];
 };
 
@@ -53,6 +54,8 @@ type ShowPassInfo = {
 type ShowIdInfo = {
   youngsterName: string;
   userId: string;
+  youngsterUsername: string;
+  youngsterPassword: string;
 };
 
 const GRADES = Array.from({ length: 12 }, (_v, i) => String(i + 1));
@@ -179,7 +182,7 @@ export default function AdminYoungstersPage() {
     setAllergies(child.dietary_allergies || '');
     setRegistrationNote(
       child.registration_actor_teacher_name
-        ? `Registered by Teacher: ${child.registration_actor_teacher_name}`
+        ? `Registered by Guardian/Teacher: ${child.registration_actor_teacher_name}${child.registration_actor_teacher_phone ? ` (${child.registration_actor_teacher_phone})` : ''}`
         : '',
     );
     const primaryParentId = (child.parent_ids || [])[0] || '';
@@ -306,14 +309,14 @@ export default function AdminYoungstersPage() {
   };
 
   const onResetPassword = async (child: ChildRow) => {
-    const ok = window.confirm(`Reset password for youngster "${child.first_name} ${child.last_name}"?`);
-    if (!ok) return;
+    const newPassword = window.prompt(`Set new password for student "${child.first_name} ${child.last_name}"`, '');
+    if (newPassword === null) return;
     setError('');
     setMessage('');
     try {
       const res = (await apiFetch(
         `/admin/youngster/${child.id}/reset-password`,
-        { method: 'PATCH', body: JSON.stringify({}) },
+        { method: 'PATCH', body: JSON.stringify({ newPassword }) },
         { skipAutoReload: true },
       )) as { ok: boolean; newPassword: string; username: string };
       const parentId = (child.parent_ids || [])[0] || '';
@@ -329,7 +332,7 @@ export default function AdminYoungstersPage() {
         schoolName: child.school_name,
         parentLabel,
       });
-      setMessage(`Password reset for ${child.first_name} ${child.last_name}.`);
+      setMessage(`New password set for ${child.first_name} ${child.last_name}.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed resetting password');
     }
@@ -348,11 +351,24 @@ export default function AdminYoungstersPage() {
     }
   };
 
-  const onShowId = (child: ChildRow) => {
-    setShowIdInfo({
-      youngsterName: `${child.first_name} ${child.last_name}`,
-      userId: child.user_id,
-    });
+  const onShowId = async (child: ChildRow) => {
+    setError('');
+    setMessage('');
+    try {
+      const res = (await apiFetch(
+        `/admin/youngster/${child.id}/password`,
+        { method: 'GET' },
+        { skipAutoReload: true },
+      )) as { ok: boolean; password: string; username: string };
+      setShowIdInfo({
+        youngsterName: `${child.first_name} ${child.last_name}`,
+        userId: child.user_id,
+        youngsterUsername: res.username,
+        youngsterPassword: res.password,
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed loading ID');
+    }
   };
 
   const createSchoolLabel = useMemo(() => {
@@ -587,7 +603,7 @@ export default function AdminYoungstersPage() {
                         Show PW
                       </button>
                       <button className="btn btn-outline" type="button" onClick={() => onResetPassword(c)}>
-                        Reset PW
+                        Set new Password
                       </button>
                     </div>
                   </td>
@@ -615,6 +631,14 @@ export default function AdminYoungstersPage() {
               <div className="reg-info-row">
                 <span className="reg-info-label">User ID</span>
                 <code className="reg-info-code">{showIdInfo.userId}</code>
+              </div>
+              <div className="reg-info-row">
+                <span className="reg-info-label">Student Username</span>
+                <code className="reg-info-code">{showIdInfo.youngsterUsername}</code>
+              </div>
+              <div className="reg-info-row">
+                <span className="reg-info-label">Set Password</span>
+                <code className="reg-info-code">{showIdInfo.youngsterPassword}</code>
               </div>
             </div>
             <button

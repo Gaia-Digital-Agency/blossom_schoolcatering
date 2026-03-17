@@ -352,13 +352,14 @@ export default function AdminDeliveryPage() {
   };
 
   const onResetPassword = async (user: DeliveryUser) => {
-    if (!window.confirm(`Reset password for delivery user "${user.username}"?`)) return;
+    const newPassword = window.prompt(`Set new password for delivery user "${user.username}"`, '');
+    if (newPassword === null) return;
     setError('');
     setMessage('');
     try {
       const res = await apiFetch(
         `/admin/users/${user.id}/reset-password`,
-        { method: 'PATCH' },
+        { method: 'PATCH', body: JSON.stringify({ newPassword }) },
         { skipAutoReload: true },
       ) as { ok: boolean; newPassword: string; username: string };
       setShowPassInfo({
@@ -544,7 +545,7 @@ export default function AdminDeliveryPage() {
                           onClick={() => onResetPassword(u)}
                           disabled={deletingUserId === u.id || togglingUserId === u.id || savingUserId === u.id}
                         >
-                          Reset PW
+                          Set new Password
                         </button>
                         <button
                           className="btn btn-outline"

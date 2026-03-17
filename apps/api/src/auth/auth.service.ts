@@ -60,9 +60,8 @@ type RegisterInput = {
 type RegisterYoungsterWithParentInput = {
   registrantType: 'YOUNGSTER' | 'PARENT' | 'TEACHER';
   teacherName?: string;
+  teacherPhone?: string;
   youngsterFirstName: string;
-  youngsterLastName: string;
-  youngsterGender: string;
   youngsterDateOfBirth: string;
   youngsterSchoolId: string;
   youngsterGrade: string;
@@ -75,6 +74,7 @@ type RegisterYoungsterWithParentInput = {
   parentEmail: string;
   parentAddress?: string;
   parentAllergies?: string;
+  password: string;
 };
 
 type RegistrationSchoolRow = {
@@ -268,7 +268,8 @@ export class AuthService {
     await runSql(`
       ALTER TABLE children
       ADD COLUMN IF NOT EXISTS registration_actor_type varchar(20) NOT NULL DEFAULT 'PARENT',
-      ADD COLUMN IF NOT EXISTS registration_actor_teacher_name varchar(50);
+      ADD COLUMN IF NOT EXISTS registration_actor_teacher_name varchar(50),
+      ADD COLUMN IF NOT EXISTS registration_actor_teacher_phone varchar(30);
     `);
     this.childRegistrationSourceColumnsReady = true;
   }
@@ -665,9 +666,8 @@ export class AuthService {
   async registerYoungsterWithParent(input: RegisterYoungsterWithParentInput) {
     const registrantType = (input.registrantType || '').trim().toUpperCase();
     const teacherName = (input.teacherName || '').trim();
+    const teacherPhone = (input.teacherPhone || '').trim();
     const youngsterFirstName = (input.youngsterFirstName || '').trim();
-    const youngsterLastNameRaw = (input.youngsterLastName || '').trim();
-    const youngsterGender = (input.youngsterGender || '').trim().toUpperCase();
     const youngsterDateOfBirth = (input.youngsterDateOfBirth || '').trim();
     const youngsterSchoolId = (input.youngsterSchoolId || '').trim();
     const youngsterGrade = (input.youngsterGrade || '').trim();
@@ -680,12 +680,13 @@ export class AuthService {
     const parentEmail = (input.parentEmail || '').trim().toLowerCase();
     const parentAddress = (input.parentAddress || '').trim();
     const parentAllergies = this.normalizeAllergies(input.parentAllergies);
+    const password = String(input.password || '').trim();
+    const youngsterLastNameRaw = parentLastNameInput;
+    const youngsterGender = 'UNDISCLOSED';
 
     if (
       !registrantType ||
       !youngsterFirstName ||
-      !youngsterLastNameRaw ||
-      !youngsterGender ||
       !youngsterDateOfBirth ||
       !youngsterSchoolId ||
       !youngsterGrade ||
@@ -693,6 +694,7 @@ export class AuthService {
       !parentLastNameInput ||
       !parentMobileNumber ||
       !parentEmail ||
+      !password ||
       !String(input.youngsterAllergies || '').trim()
     ) {
       throw new BadRequestException('Missing required youngster/parent fields');
@@ -703,6 +705,7 @@ export class AuthService {
     if (registrantType === 'TEACHER') {
       if (!teacherName) throw new BadRequestException('Teacher name is required when registrantType is TEACHER');
       if (teacherName.length > 50) throw new BadRequestException('Teacher name must be max 50 characters');
+      if (!teacherPhone) throw new BadRequestException('Teacher phone is required when registrantType is TEACHER');
     }
     if ((registrantType === 'YOUNGSTER' || registrantType === 'TEACHER') && !youngsterPhone) {
       throw new BadRequestException('Youngster phone is required when registrantType is YOUNGSTER or TEACHER');
@@ -710,11 +713,11 @@ export class AuthService {
     if (registrantType !== 'TEACHER' && teacherName) {
       throw new BadRequestException('Teacher name is only allowed when registrantType is TEACHER');
     }
+    if (registrantType !== 'TEACHER' && teacherPhone) {
+      throw new BadRequestException('Teacher phone is only allowed when registrantType is TEACHER');
+    }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(youngsterDateOfBirth)) {
       throw new BadRequestException('Youngster date of birth must be YYYY-MM-DD');
-    }
-    if (!['MALE', 'FEMALE', 'OTHER', 'UNDISCLOSED'].includes(youngsterGender)) {
-      throw new BadRequestException('Invalid youngster gender');
     }
     if (!parentEmail.includes('@')) {
       throw new BadRequestException('Invalid parent email');
@@ -722,6 +725,7 @@ export class AuthService {
     if (youngsterEmail && !youngsterEmail.includes('@')) {
       throw new BadRequestException('Invalid youngster email');
     }
+    validatePasswordPolicy(password, 'password');
 
     const schoolExists = await runSql(
       `SELECT EXISTS (
@@ -738,9 +742,6 @@ export class AuthService {
 
     const youngsterLastName = youngsterLastNameRaw;
     const parentLastName = parentLastNameInput;
-    if (parentLastName.toLowerCase() !== youngsterLastName.toLowerCase()) {
-      throw new BadRequestException('Parent last name must match youngster last name');
-    }
     await this.ensureChildRegistrationSourceColumns();
     const duplicateOut = await runSql(
       `
@@ -807,7 +808,7 @@ export class AuthService {
     } else {
       const parentUsernameBase = this.sanitizeUsernamePart(`${parentFirstName}_${parentLastName}`);
       parentUsername = await runSql(`SELECT generate_unique_username($1);`, [parentUsernameBase]);
-      parentGeneratedPassword = this.buildGeneratedPassword(parentMobileNumber);
+      parentGeneratedPassword = password;
       const parentPasswordHash = this.hashPassword(parentGeneratedPassword);
       let parentOut = '';
       try {
@@ -870,7 +871,7 @@ export class AuthService {
 
     const youngsterUsernameBase = this.sanitizeUsernamePart(`${youngsterLastName}_${youngsterFirstName}`);
     const youngsterUsername = await runSql(`SELECT generate_unique_username($1);`, [youngsterUsernameBase]);
-    const youngsterGeneratedPassword = this.buildGeneratedPassword(youngsterPhone || parentMobileNumber);
+    const youngsterGeneratedPassword = password;
     const youngsterPasswordHash = this.hashPassword(youngsterGeneratedPassword);
     let youngsterOut = '';
     try {
@@ -915,9 +916,10 @@ export class AuthService {
            school_grade,
            photo_url,
            registration_actor_type,
-           registration_actor_teacher_name
+           registration_actor_teacher_name,
+           registration_actor_teacher_phone
          )
-         VALUES ($1, $2, $3::date, $4::gender_type, $5, NULL, $6, $7)
+         VALUES ($1, $2, $3::date, $4::gender_type, $5, NULL, $6, $7, $8)
          RETURNING id
        )
        SELECT row_to_json(inserted)::text
@@ -930,6 +932,7 @@ export class AuthService {
         youngsterGrade,
         registrantType,
         registrantType === 'TEACHER' ? teacherName : null,
+        registrantType === 'TEACHER' ? teacherPhone : null,
       ],
     );
     const youngsterChild = this.parseJsonLine<{ id: string }>(youngsterChildOut);

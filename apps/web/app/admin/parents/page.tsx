@@ -29,6 +29,8 @@ type ShowPassInfo = {
 type ShowIdInfo = {
   parentName: string;
   parentId: string;
+  parentUsername: string;
+  parentPassword: string;
 };
 
 export default function AdminParentsPage() {
@@ -72,14 +74,14 @@ export default function AdminParentsPage() {
   };
 
   const onResetPassword = async (p: ParentRow) => {
-    const ok = window.confirm(`Reset password for parent "${p.first_name} ${p.last_name}"?`);
-    if (!ok) return;
+    const newPassword = window.prompt(`Set new password for parent "${p.first_name} ${p.last_name}"`, '');
+    if (newPassword === null) return;
     setError('');
     setMessage('');
     try {
       const res = await apiFetch(
         `/admin/users/${p.user_id}/reset-password`,
-        { method: 'PATCH', body: JSON.stringify({}) },
+        { method: 'PATCH', body: JSON.stringify({ newPassword }) },
         { skipAutoReload: true },
       ) as { ok: boolean; newPassword: string; username: string };
       setShowPassInfo({
@@ -92,7 +94,7 @@ export default function AdminParentsPage() {
           school: y.school_name || '—',
         })),
       });
-      setMessage(`Password reset for ${p.first_name} ${p.last_name}.`);
+      setMessage(`New password set for ${p.first_name} ${p.last_name}.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed resetting password');
     }
@@ -133,11 +135,24 @@ export default function AdminParentsPage() {
     return 'Delete parent';
   };
 
-  const onShowId = (p: ParentRow) => {
-    setShowIdInfo({
-      parentName: `${p.first_name} ${p.last_name}`,
-      parentId: p.id,
-    });
+  const onShowId = async (p: ParentRow) => {
+    setError('');
+    setMessage('');
+    try {
+      const res = await apiFetch(
+        `/admin/users/${p.user_id}/password`,
+        { method: 'GET' },
+        { skipAutoReload: true },
+      ) as { ok: boolean; password: string; username: string };
+      setShowIdInfo({
+        parentName: `${p.first_name} ${p.last_name}`,
+        parentId: p.id,
+        parentUsername: res.username,
+        parentPassword: res.password,
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed loading ID');
+    }
   };
 
   return (
@@ -183,7 +198,7 @@ export default function AdminParentsPage() {
                         Show PW
                       </button>
                       <button className="btn btn-outline" type="button" onClick={() => onResetPassword(p)}>
-                        Reset PW
+                        Set new Password
                       </button>
                       <button
                         className="btn btn-outline"
@@ -218,6 +233,14 @@ export default function AdminParentsPage() {
               <div className="reg-info-row">
                 <span className="reg-info-label">Parent ID</span>
                 <code className="reg-info-code">{showIdInfo.parentId}</code>
+              </div>
+              <div className="reg-info-row">
+                <span className="reg-info-label">Parent Username</span>
+                <code className="reg-info-code">{showIdInfo.parentUsername}</code>
+              </div>
+              <div className="reg-info-row">
+                <span className="reg-info-label">Set Password</span>
+                <code className="reg-info-code">{showIdInfo.parentPassword}</code>
               </div>
             </div>
             <button className="btn btn-primary pass-modal-close" type="button" onClick={() => setShowIdInfo(null)}>

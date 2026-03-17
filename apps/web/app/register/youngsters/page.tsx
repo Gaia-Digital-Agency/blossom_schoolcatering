@@ -43,9 +43,8 @@ export default function YoungsterRegisterPage() {
   const [loadingSchools, setLoadingSchools] = useState(true);
   const [registrantType, setRegistrantType] = useState<'' | 'YOUNGSTER' | 'PARENT' | 'TEACHER'>('');
   const [teacherName, setTeacherName] = useState('');
+  const [teacherPhone, setTeacherPhone] = useState('');
   const [youngsterFirstName, setYoungsterFirstName] = useState('');
-  const [youngsterLastName, setYoungsterLastName] = useState('');
-  const [youngsterGender, setYoungsterGender] = useState('UNDISCLOSED');
   const [youngsterDateOfBirth, setYoungsterDateOfBirth] = useState('');
   const [youngsterSchoolId, setYoungsterSchoolId] = useState('');
   const [youngsterGrade, setYoungsterGrade] = useState(GRADES[0]);
@@ -58,6 +57,8 @@ export default function YoungsterRegisterPage() {
   const [parentMobileNumber, setParentMobileNumber] = useState('');
   const [parentEmail, setParentEmail] = useState('');
   const [parentAddress, setParentAddress] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState<RegisterResponse | null>(null);
@@ -151,8 +152,6 @@ export default function YoungsterRegisterPage() {
   useEffect(() => {
     if (!isReadonlyRecord || !selectedRecordChild) return;
     setYoungsterFirstName(selectedRecordChild.first_name || '');
-    setYoungsterLastName(selectedRecordChild.last_name || '');
-    setYoungsterGender((selectedRecordChild.gender || 'UNDISCLOSED').toUpperCase());
     setYoungsterDateOfBirth(selectedRecordChild.date_of_birth || '');
     setYoungsterSchoolId(selectedRecordChild.school_id || '');
     setYoungsterGrade(selectedRecordChild.school_grade || '');
@@ -169,8 +168,6 @@ export default function YoungsterRegisterPage() {
     return found.city ? `${found.name} (${found.city})` : found.name;
   }, [schools, youngsterSchoolId]);
   const successMode = registrantType === 'YOUNGSTER' ? 'YOUNGSTER' : 'PARENT';
-  const youngsterPhoneRequired = registrantType === 'YOUNGSTER' || registrantType === 'TEACHER';
-  const youngsterPhoneLabel = registrantType === 'TEACHER' ? 'Student/Teacher Phone' : 'Student Phone';
   const normalizedYoungsterAllergies = youngsterAllergySelection === 'HAS_ALLERGIES'
     ? youngsterAllergies.trim().replace(/\s+/g, ' ')
     : NO_ALLERGIES_LABEL;
@@ -193,21 +190,22 @@ export default function YoungsterRegisterPage() {
 
     // ── Client-side validation with clear messages ─────────────────────────
     if (!registrantType) {
-      setError('Please select who is registering: Student, Family, or Teacher.');
+      setError('Please select a Registrant User.');
       return;
     }
     if (registrantType === 'TEACHER' && !teacherName.trim()) {
-      setError('Teacher name is required when registering as a Teacher.');
+      setError('Guardian/Teacher name is required.');
+      return;
+    }
+    if (registrantType === 'TEACHER' && !teacherPhone.trim()) {
+      setError('Guardian/Teacher phone number is required.');
       return;
     }
     if (!youngsterFirstName.trim()) { setError('Student first name is required.'); return; }
-    if (!youngsterLastName.trim()) { setError('Student last name is required.'); return; }
     if (!youngsterDateOfBirth) { setError('Student date of birth is required.'); return; }
-    if (!youngsterSchoolId) { setError('Please select the student\'s school.'); return; }
-    if (youngsterPhoneRequired && !youngsterPhone.trim()) {
-      setError(registrantType === 'TEACHER' ? 'Student/Teacher phone number is required.' : 'Student phone number is required.');
-      return;
-    }
+    if (!youngsterGrade.trim()) { setError('Student grade on registration date is required.'); return; }
+    if (!youngsterSchoolId) { setError('Please select the student school.'); return; }
+    if (!youngsterPhone.trim()) { setError('Student phone is required.'); return; }
     if (youngsterAllergySelection === 'HAS_ALLERGIES' && !normalizedYoungsterAllergies) {
       setError('Please enter the student allergies.');
       return;
@@ -221,6 +219,12 @@ export default function YoungsterRegisterPage() {
     if (!parentMobileNumber.trim()) { setError('Parent/Guardian mobile number is required.'); return; }
     if (!parentEmail.trim()) { setError('Parent/Guardian email is required.'); return; }
     if (!parentEmail.includes('@')) { setError('Parent/Guardian email must be a valid email address.'); return; }
+    if (!password.trim()) { setError('Password is required.'); return; }
+    if (password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    if (!/[A-Z]/.test(password)) { setError('Password must include at least 1 uppercase letter.'); return; }
+    if (!/[0-9]/.test(password)) { setError('Password must include at least 1 number.'); return; }
+    if (!/[^A-Za-z0-9]/.test(password)) { setError('Password must include at least 1 symbol.'); return; }
+    if (password !== confirmPassword) { setError('Password and Confirm Password must match.'); return; }
     // ──────────────────────────────────────────────────────────────────────
 
     setSubmitting(true);
@@ -232,9 +236,8 @@ export default function YoungsterRegisterPage() {
         body: JSON.stringify({
           registrantType,
           teacherName: registrantType === 'TEACHER' ? teacherName : '',
+          teacherPhone: registrantType === 'TEACHER' ? teacherPhone : '',
           youngsterFirstName,
-          youngsterLastName,
-          youngsterGender,
           youngsterDateOfBirth,
           youngsterSchoolId,
           youngsterGrade,
@@ -246,6 +249,7 @@ export default function YoungsterRegisterPage() {
           parentMobileNumber,
           parentEmail,
           parentAddress,
+          password,
         }),
       });
       if (!res.ok) {
@@ -285,11 +289,7 @@ export default function YoungsterRegisterPage() {
               <span className="reg-info-value">{youngsterFirstName}</span>
             </div>
             <div className="reg-info-row">
-              <span className="reg-info-label">Student Last Name</span>
-              <span className="reg-info-value">{youngsterLastName}</span>
-            </div>
-            <div className="reg-info-row">
-              <span className="reg-info-label">Parent/Guardian Name</span>
+              <span className="reg-info-label">Parent First Name</span>
               <span className="reg-info-value">{parentFirstName}</span>
             </div>
             {successMode === 'YOUNGSTER' ? (
@@ -419,7 +419,7 @@ export default function YoungsterRegisterPage() {
     <main className="page-auth">
       <section className="auth-panel">
         <h1>Registration</h1>
-        <p className="auth-help">One registration flow handles student, family, and teacher registrations.</p>
+        <p className="auth-help">One registration flow handles student, family, and Guardian/Teacher registrations.</p>
         <form onSubmit={onSubmit} className="auth-form">
           {isReadonlyRecord ? (
             <p className="auth-help">
@@ -440,18 +440,7 @@ export default function YoungsterRegisterPage() {
           ) : null}
           <fieldset disabled={isReadonlyRecord}>
           <fieldset className="registrant-type-fieldset">
-            <legend>Are You the Student, Family, or Teacher? (required)</legend>
-            <label className="registrant-type-option">
-              <input
-                type="radio"
-                name="registrantType"
-                value="YOUNGSTER"
-                checked={registrantType === 'YOUNGSTER'}
-                onChange={() => setRegistrantType('YOUNGSTER')}
-                required
-              />
-              Student
-            </label>
+            <legend>Registrant User</legend>
             <label className="registrant-type-option">
               <input
                 type="radio"
@@ -467,17 +456,29 @@ export default function YoungsterRegisterPage() {
               <input
                 type="radio"
                 name="registrantType"
+                value="YOUNGSTER"
+                checked={registrantType === 'YOUNGSTER'}
+                onChange={() => setRegistrantType('YOUNGSTER')}
+                required
+              />
+              Student
+            </label>
+            <label className="registrant-type-option">
+              <input
+                type="radio"
+                name="registrantType"
                 value="TEACHER"
                 checked={registrantType === 'TEACHER'}
                 onChange={() => setRegistrantType('TEACHER')}
                 required
               />
-              Teacher
+              Guardian/Teacher
             </label>
           </fieldset>
           {registrantType === 'TEACHER' ? (
+            <>
             <label>
-              Teacher Name (Max 50 Characters)
+              Guardian/Teacher Name
               <input
                 value={teacherName}
                 onChange={(e) => setTeacherName(e.target.value.slice(0, 50))}
@@ -485,27 +486,38 @@ export default function YoungsterRegisterPage() {
                 required
               />
             </label>
+            <label>
+              Guardian/Teacher Phone Number
+              <input
+                value={teacherPhone}
+                onChange={(e) => setTeacherPhone(e.target.value)}
+                placeholder="+[country][area][number]"
+                required
+              />
+            </label>
+            </>
           ) : null}
+          <label>
+            Family Group Name
+            <input value={parentLastName} onChange={(e) => setParentLastName(e.target.value)} required />
+          </label>
           <label>
             Student First Name
             <input value={youngsterFirstName} onChange={(e) => setYoungsterFirstName(e.target.value)} required />
           </label>
           <label>
-            Student Last Name
-            <input value={youngsterLastName} onChange={(e) => setYoungsterLastName(e.target.value)} required />
-          </label>
-          <label>
-            Student Gender
-            <select value={youngsterGender} onChange={(e) => setYoungsterGender(e.target.value)} required>
-              <option value="MALE">Male</option>
-              <option value="FEMALE">Female</option>
-              <option value="OTHER">Other</option>
-              <option value="UNDISCLOSED">Undisclosed</option>
-            </select>
-          </label>
-          <label>
             Student Date Of Birth
             <input type="date" value={youngsterDateOfBirth} onChange={(e) => setYoungsterDateOfBirth(e.target.value)} required />
+          </label>
+          <label>
+            Student Grade on Registration Date
+            <select value={youngsterGrade} onChange={(e) => setYoungsterGrade(e.target.value)} required>
+              {GRADES.map((grade) => (
+                <option key={grade} value={grade}>
+                  {grade}
+                </option>
+              ))}
+            </select>
           </label>
           <label>
             Student School
@@ -525,22 +537,12 @@ export default function YoungsterRegisterPage() {
             </select>
           </label>
           <label>
-            Student Grade on Registration Date
-            <select value={youngsterGrade} onChange={(e) => setYoungsterGrade(e.target.value)} required>
-              {GRADES.map((grade) => (
-                <option key={grade} value={grade}>
-                  {grade}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            {youngsterPhoneLabel}
+            Student Phone
             <input
               value={youngsterPhone}
               onChange={(e) => setYoungsterPhone(e.target.value)}
               placeholder="+[country][area][number]"
-              required={youngsterPhoneRequired}
+              required
             />
             <small className="field-hint">Format: + country code + area code + number &nbsp;e.g. +628123456789</small>
           </label>
@@ -584,25 +586,40 @@ export default function YoungsterRegisterPage() {
             ) : null}
           </fieldset>
           <label>
-            Parent/Guardian Name
+            Parent First Name
             <input value={parentFirstName} onChange={(e) => setParentFirstName(e.target.value)} required />
           </label>
           <label>
-            Family Group (FG)
-            <input value={parentLastName} onChange={(e) => setParentLastName(e.target.value)} required />
-          </label>
-          <label>
-            Parent/Guardian Mobile Number
+            Parent Phone Number (also Emergency Contact)
             <input value={parentMobileNumber} onChange={(e) => setParentMobileNumber(e.target.value)} placeholder="+[country][area][number]" required />
             <small className="field-hint">Format: + country code + area code + number &nbsp;e.g. +628123456789</small>
           </label>
           <label>
-            Parent/Guardian Email
+            Parent Email
             <input type="email" value={parentEmail} onChange={(e) => setParentEmail(e.target.value)} required />
           </label>
           <label>
             Parent/Guardian Address (Optional)
             <input value={parentAddress} onChange={(e) => setParentAddress(e.target.value)} />
+          </label>
+          <label>
+            Password
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+            <small className="field-hint">Minimum 6 characters, 1 uppercase, 1 number, 1 symbol.</small>
+          </label>
+          <label>
+            Confirm Password
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+            />
           </label>
           </fieldset>
           {error ? <p className="auth-error">{error}</p> : null}
@@ -616,10 +633,10 @@ export default function YoungsterRegisterPage() {
       <style jsx>{`
         .registrant-type-fieldset {
           margin: 0;
-          padding: 0.45rem 0.55rem;
+          padding: 0.35rem 0.45rem;
           border-radius: 0.55rem;
           display: grid;
-          gap: 0.35rem;
+          gap: 0.25rem;
         }
         .registrant-type-option {
           display: inline-flex;
@@ -637,11 +654,11 @@ export default function YoungsterRegisterPage() {
         }
         .allergy-fieldset {
           margin: 0;
-          padding: 0.65rem 0.75rem;
+          padding: 0.45rem 0.55rem;
           border: 1px solid #d9ccb8;
           border-radius: 0.65rem;
           display: grid;
-          gap: 0.4rem;
+          gap: 0.25rem;
           background: #fffdf9;
         }
         .allergy-title {

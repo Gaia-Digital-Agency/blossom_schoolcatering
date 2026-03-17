@@ -123,9 +123,8 @@ export class AuthController {
     return this.authService.registerYoungsterWithParent({
       registrantType: body.registrantType,
       teacherName: body.teacherName || '',
+      teacherPhone: body.teacherPhone || '',
       youngsterFirstName: body.youngsterFirstName,
-      youngsterLastName: body.youngsterLastName,
-      youngsterGender: body.youngsterGender,
       youngsterDateOfBirth: body.youngsterDateOfBirth,
       youngsterSchoolId: body.youngsterSchoolId,
       youngsterGrade: body.youngsterGrade,
@@ -137,6 +136,7 @@ export class AuthController {
       parentMobileNumber: body.parentMobileNumber,
       parentEmail: body.parentEmail,
       parentAddress: body.parentAddress || '',
+      password: body.password,
     });
   }
 
