@@ -63,6 +63,7 @@ export default function MenuPage() {
   const [serviceDate, setServiceDate] = useState('');
   const [error, setError] = useState('');
   const [returnHref, setReturnHref] = useState('/login');
+  const [selectedSession, setSelectedSession] = useState<'LUNCH' | 'SNACK' | 'BREAKFAST'>('LUNCH');
 
   useEffect(() => {
     const load = async () => {
@@ -95,7 +96,7 @@ export default function MenuPage() {
 
   const groupedItems = useMemo(() => {
     const byCategory = new Map<string, PublicMenuItem[]>();
-    for (const item of items) {
+    for (const item of items.filter((entry) => entry.session === selectedSession)) {
       const rawCode = String(item.dish_category || 'MAIN').toUpperCase();
       const code = rawCode === 'SNACKS' ? 'SIDES' : rawCode;
       const list = byCategory.get(code) || [];
@@ -110,7 +111,7 @@ export default function MenuPage() {
           .sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { sensitivity: 'base' })),
       }))
       .filter((group) => group.items.length > 0);
-  }, [items]);
+  }, [items, selectedSession]);
 
   return (
     <main className="page-auth page-auth-mobile">
@@ -119,10 +120,30 @@ export default function MenuPage() {
         <div className="module-guide-card">
           Log in to order for students from Blossom Steakhouse Kitchen.
         </div>
+        <div className="session-filter-row" role="radiogroup" aria-label="Menu session">
+          {[
+            { value: 'LUNCH', label: 'Lunch' },
+            { value: 'SNACK', label: 'Snack' },
+            { value: 'BREAKFAST', label: 'Breakfast' },
+          ].map((option) => (
+            <label key={option.value} className="session-filter-option">
+              <input
+                type="radio"
+                name="menu-session"
+                value={option.value}
+                checked={selectedSession === option.value}
+                onChange={() => setSelectedSession(option.value as 'LUNCH' | 'SNACK' | 'BREAKFAST')}
+              />
+              <span>{option.label}</span>
+            </label>
+          ))}
+        </div>
         {error ? <p className="auth-error">{error}</p> : null}
 
         {items.length === 0 ? (
           <p className="auth-help">No active dishes available.</p>
+        ) : groupedItems.length === 0 ? (
+          <p className="auth-help">No active {selectedSession.toLowerCase()} dishes available.</p>
         ) : (
           <div className="menu-layout">
             {/* Left column: Main dishes only */}
@@ -267,6 +288,24 @@ export default function MenuPage() {
           font-size: 0.82rem;
           color: #6b5a43;
           margin-bottom: 0.85rem;
+        }
+        .session-filter-row {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.85rem;
+          align-items: center;
+          margin-bottom: 0.85rem;
+        }
+        .session-filter-option {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.4rem;
+          font-size: 0.9rem;
+          color: #5d4e3a;
+          cursor: pointer;
+        }
+        .session-filter-option input {
+          margin: 0;
         }
         @media (min-width: 900px) {
           /* Side-by-side: Main (left) | secondary categories (right) */
