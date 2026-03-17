@@ -1,10 +1,8 @@
 # Multi-Session Readiness — SchoolCatering App
 
----
+## AS IS
 
-## QUESTION
-
-Now the App works well with module Family, Student, Kitchen, Delivery, Menu, Rating, Admin, Ordering, Billing, Schools. Proven and Tested on Lunch session being active. Now check if all these 10 modules and others are ready and will function well when other session, Snacks and Breakfast is active.
+The App works well with module Family, Student, Kitchen, Delivery, Menu, Rating, Admin, Ordering, Billing, Schools. Proven and Tested on Lunch session being active. Now to enhace these 10 modules and others are ready and will function well when other session, Snacks and Breakfast is active.
 
 - Family — Can order, view bill, see menu in different sessions, multi click bill payment across sessions
 - Student — Can order, view bill, see menu in different sessions, multi click bill payment across sessions. Point calculation and accumulation for badges across sessions.
@@ -16,8 +14,6 @@ Now the App works well with module Family, Student, Kitchen, Delivery, Menu, Rat
 - Ordering — Can order based on sessions
 - Billing — Can accommodate view, submit payment proof, move between paid and unpaid with tagging on specific sessions
 - Schools — Can accommodate matching student and delivery based on specific session
-
----
 
 ## QUICK STATUS — WHAT IS ALREADY FIXED (as of latest commits)
 
@@ -39,8 +35,6 @@ These items were identified as gaps earlier but have already been resolved in th
 
 - **Admin Menu page has a session filter** — `apps/web/app/admin/menu/page.tsx` line 589 has a working session dropdown that hits `/admin/menus?session=${menuSession}`
 
----
-
 ## ASSESSMENT
 
 The app is partially ready for Breakfast and Snack, but not safe to call "multi-session ready" yet. The base data model, ordering flow, menu separation, and most order-level APIs already carry session — the foundation is there. The main gaps fall into four buckets:
@@ -51,8 +45,6 @@ The app is partially ready for Breakfast and Snack, but not safe to call "multi-
 4. **Copy/messaging gaps** — several error paths still hardcode Lunch-specific language
 
 This is from static code review combined with a live codebase exploration. Real Breakfast/Snack scenarios have not been run end-to-end.
-
----
 
 ## FINDINGS — WHAT IS CONFIRMED SESSION-READY
 
@@ -76,9 +68,7 @@ These are verified as already working correctly across all sessions:
 | Delivery assignments carry session | `core.service.ts:5500` — `o.session::text AS session` in delivery query |
 | Student billing now has own endpoints | `core.controller.ts` — `/billing/youngster/consolidated` and all related endpoints accept YOUNGSTER role |
 
----
-
-## FINDINGS — GAPS AND ISSUES
+## GAPS AND ISSUES
 
 ### CRITICAL — Schema Changes Required
 
@@ -104,8 +94,6 @@ These are verified as already working correctly across all sessions:
 - A dish served in both Lunch and Snack gets a single combined rating
 - **Impact:** Cannot distinguish whether a student rated the Nasi Goreng as Breakfast or as Lunch. Cannot compute session-specific dish satisfaction scores for kitchen/menu planning.
 - **Fix required:** Add `session session_type` column to `menu_item_ratings` and change primary key to `(menu_item_id, user_id, session)`. This allows one rating per user per dish per session. Update `createOrUpdateMenuRating()` at `core.service.ts:2680` and all rating queries.
-
----
 
 ### HIGH — Calculation Bugs and Logic Gaps
 
@@ -168,8 +156,6 @@ These are verified as already working correctly across all sessions:
 - **Impact:** A student ordering Breakfast+Lunch on the same day will show combined calorie counts with no way to split by meal type.
 - **Fix:** Add session to nutrition day rows: `days: Array<{ service_date, session, calories_display, tba_items }>` so the weekly view can show per-session nutrition.
 
----
-
 ### MEDIUM — UI and Operational Gaps (Backend already supports, frontend missing)
 
 **GAP 9: Admin Orders page has no session filter**
@@ -214,8 +200,6 @@ These are verified as already working correctly across all sessions:
 - **Note:** `selectedDayOrder` at line 241 correctly filters by date+session — the duplicate check is session-aware. Only the display section shows all sessions for the day.
 - **Fix:** Minor — ensure session badges/labels are prominent enough in the confirmed orders display so parents can distinguish between sessions at a glance (already using SessionBadge component, but may need more visual weight)
 
----
-
 ### LOW — Copy and Messaging Gaps
 
 **GAP 16: ORDER_SESSION_DISABLED error still shows "Only Lunch" copy**
@@ -238,8 +222,6 @@ These are verified as already working correctly across all sessions:
 **GAP 17: Session selector labels are raw enum values**
 - Both order pages display session values as `LUNCH | SNACK | BREAKFAST` directly in the session dropdown options
 - **Fix:** Map to readable labels: `LUNCH → Lunch`, `SNACK → Snack / Afternoon`, `BREAKFAST → Breakfast / Morning`
-
----
 
 ## MODULE READINESS SCORECARD
 
@@ -268,8 +250,6 @@ These are verified as already working correctly across all sessions:
 | **Schools** | ❌ Not Ready | No school+session delivery matching capability |
 | **Error copy / UX messaging** | ❌ Not Ready | "Only Lunch" hardcoded in two places |
 
----
-
 ## TECHNICAL REFERENCE — EXACT FILE:LINE FOR EACH GAP
 
 | Gap | File | Line(s) | Issue |
@@ -292,8 +272,6 @@ These are verified as already working correctly across all sessions:
 | "Only Lunch" error copy (student) | `apps/web/app/student/_components/student-order-page.tsx` | 430-432 | Hardcoded "Only Lunch Available" + window.alert |
 | Session labels raw enum | Both order pages | Session `<select>` options | Shows BREAKFAST not Breakfast |
 
----
-
 ## SUGGESTED CHANGES
 
 Preserving original suggestions and adding new ones:
@@ -315,8 +293,6 @@ Preserving original suggestions and adding new ones:
 12. Add session grouping/tabs to Kitchen dashboard UI
 13. Map session enum values to readable labels in all dropdowns (BREAKFAST → Breakfast)
 14. Remove `window.alert('Only Lunch Available')` from student order page — replace with proper error state
-
----
 
 ## IMPLEMENTATION PLAN
 
@@ -450,8 +426,6 @@ Validate all 10 modules together in each scenario. Include:
 - Admin filtering across all admin screens
 - Rating per dish per session
 
----
-
 ## PHASED APPROACH
 
 ### Phase 1 — UX Stabilization and Session Exposure (Fast, Low Risk)
@@ -469,8 +443,6 @@ Expose session controls where the backend is already capable. Fix misleading cop
 
 **Phase 1 outcome:** Users stop seeing misleading Lunch-only behavior. Admin and kitchen can operate per session more effectively. Kitchen numbers become trustworthy.
 
----
-
 ### Phase 2 — Calculation Correctness and Business Logic (Moderate Risk)
 
 Fix the main calculation and logic gaps. No major schema redesign yet.
@@ -483,8 +455,6 @@ Fix the main calculation and logic gaps. No major schema redesign yet.
 6. Improve Delivery dashboard session grouping within day
 
 **Phase 2 outcome:** Numbers are trustworthy. Cutoff timing is correct per session. Badge behavior matches intended rules. Admin can manage mixed-session days effectively.
-
----
 
 ### Phase 3 — Schema Changes and Full Structural Readiness (High Risk)
 
@@ -500,9 +470,7 @@ The hardest changes — schema redesign for full multi-session fulfillment.
 
 **Phase 3 outcome:** Every structural gap is closed. Delivery becomes truly multi-session capable. Ratings are meaningful per session. Blackouts can target specific sessions. The app is ready for a confident multi-session rollout.
 
----
-
-## RECOMMENDED EXECUTION ORDER
+## EXECUTION ORDER
 
 ```
 Phase 1:
@@ -532,19 +500,54 @@ Phase 3:
   3.7  Full end-to-end multi-session validation
 ```
 
----
+## IMPORTANT IMPLEMENTATION CONSTRAINTS
 
-*Last updated: deep codebase analysis — static review only, no live Breakfast/Snack scenarios run yet.*
+These constraints are mandatory for the multi-session rollout work:
 
----
+1. **Do not create new Family Group records**
+   - Use only existing current data.
 
-## DETAILED TODO LIST — TRACK PROGRESS HERE
+2. **Do not create new Student records**
+   - Use only existing current data.
+
+3. **Do not create new School records**
+   - Use only existing current data.
+
+4. **Do not create new Delivery User records**
+   - Use only existing current data.
+
+5. **Seed Snack and Breakfast menus from the current Lunch menu only**
+   - Use only:
+     - `2` items from **Main Dishes**
+     - **All** items from **Desserts**
+     - **All** items from **Sides**
+     - **All** items from **Drinks**
+
+6. **Rename seeded dishes by session prefix only**
+   - Snack session dish naming format: `snack_<existing lunch dish name>`
+   - Breakfast session dish naming format: `breakfast_<existing lunch dish name>`
+   - Keep the original Lunch dish name unchanged after the prefix.
+
+7. **Seeded Snack and Breakfast menu data must not be hard coded**
+   - After seeding, all seeded menu items must remain fully editable in the app.
+   - Admin must be able to update/delete/change them manually through normal CRUD flows.
+
+8. **Seed orders minimally**
+   - Add only `1 order per student per session`.
+   - Do not create more than the minimum needed for testing and validation.
+
+9. **Seeded orders must not be hard coded**
+   - Seeded orders must behave like normal app data.
+   - They must remain fully manageable through normal app CRUD behavior.
+
+10. **Seeding should use app-compatible data, not fixed demo-only logic**
+    - Anything seeded for Snack and Breakfast must remain usable, editable, and deletable from the live app after insertion.
+
+## DETAILED TODO LIST
 
 Mark each item: `[ ]` = not started · `[~]` = in progress · `[x]` = done
 
 Goal: seamless App where Snack and Breakfast sessions can be switched ON/OFF from Admin and the entire App — ordering, kitchen, delivery, billing, rating, badges — accommodates immediately with no broken flows.
-
----
 
 ### PHASE 1 — UX Stabilization (No Schema Changes)
 
@@ -605,12 +608,11 @@ Goal: seamless App where Snack and Breakfast sessions can be switched ON/OFF fro
 - [ ] Test: filter by BREAKFAST — confirm only Breakfast orders shown
 - [ ] Test: combine date + school + session filter simultaneously
 
----
-
 ### PHASE 2 — Calculation Correctness and Business Logic
 
 #### P2-1 · Per-Session Cutoff Times
-- [ ] **Decide:** single global cutoff vs per-session cutoff (business decision)
+- [x] **Decide:** single global cutoff vs per-session cutoff (business decision)
+  - **Decision:** Keep **one global cutoff** for all sessions
 - [ ] If per-session: add `ordering_cutoff_time_snack` and `ordering_cutoff_time_breakfast` to `site_settings` table (or use a JSONB column)
 - [ ] Update `getSiteSettings()` at `core.service.ts:7998` to return per-session cutoffs
 - [ ] Update admin site settings page to expose per-session cutoff fields
@@ -633,15 +635,16 @@ Goal: seamless App where Snack and Breakfast sessions can be switched ON/OFF fro
 - [ ] Test: student with Breakfast + Lunch on same day — confirm two nutrition rows appear
 
 #### P2-4 · Badge Rule — Decision and Implementation
-- [ ] **Decide badge accumulation rule** (per day / per session / weighted) — document decision here: `RULE: ___________`
+- [x] **Decide badge accumulation rule** (per day / per session / weighted)
+  - **Decision:** `per session`
+  - **Meaning:** `Breakfast + Snack + Lunch` on the same day counts as `3`
+  - **Weighting:** all sessions have the same weight
 - [ ] If per-session: update badge query at `core.service.ts:6565-6580` — change GROUP BY to include session
 - [ ] Update `calculateMaxConsecutiveOrderDays()` logic if semantics change
 - [ ] Update `currentMonthOrders` count to reflect new rule
 - [ ] Update badge thresholds if needed (session-based may reach levels faster)
 - [ ] Update student badge UI labels to match new semantics
 - [ ] Test: student orders Breakfast + Snack + Lunch on 3 consecutive days — verify badge level reflects rule correctly
-
----
 
 ### PHASE 3 — Schema Changes (Requires Migrations)
 
@@ -688,8 +691,6 @@ Goal: seamless App where Snack and Breakfast sessions can be switched ON/OFF fro
 - [ ] **Cutoff test per session** — each session blocks at its own cutoff independently
 - [ ] **Blackout test** — session-specific block + date-wide block both work as expected
 
----
-
 ### DONE — Already Completed
 
 - [x] Student billing own API endpoints added (`/billing/youngster/consolidated` + all proof/revert/receipt endpoints with YOUNGSTER role)
@@ -702,8 +703,6 @@ Goal: seamless App where Snack and Breakfast sessions can be switched ON/OFF fro
 - [x] `assertSessionActiveForOrdering()` blocks orders for disabled sessions
 - [x] Billing records tagged with session in all billing queries
 - [x] Kitchen summary returns per-session order counts (breakfast_orders, snack_orders, lunch_orders)
-
----
 
 *Progress tracker — update `[ ]` to `[~]` when in progress, `[x]` when done.*
 *Target: all items [x] before enabling Snack or Breakfast in production.*
