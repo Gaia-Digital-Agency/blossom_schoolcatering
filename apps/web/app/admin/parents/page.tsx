@@ -192,9 +192,9 @@ export default function AdminParentsPage() {
   return (
     <main className="page-auth page-auth-desktop">
       <section className="auth-panel">
-        <h1>Admin Parent</h1>
+        <h1>Admin Family</h1>
         <AdminNav />
-        <p className="auth-help">Parent records are view-only here. Youngster edits are managed in Admin Youngster.</p>
+        <p className="auth-help">Family records are view-only here. Student edits are managed in Admin Student.</p>
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
 
@@ -257,7 +257,7 @@ export default function AdminParentsPage() {
                 </tr>
               ))}
               {parents.length === 0 ? (
-                <tr><td colSpan={6}>No parents found.</td></tr>
+                <tr><td colSpan={6}>No family found.</td></tr>
               ) : null}
             </tbody>
           </table>
@@ -268,18 +268,18 @@ export default function AdminParentsPage() {
       {showIdInfo ? (
         <div className="pass-modal-overlay" onClick={() => setShowIdInfo(null)}>
           <div className="pass-modal-card" onClick={(e) => e.stopPropagation()}>
-            <h2 className="pass-modal-title">Parent ID</h2>
+            <h2 className="pass-modal-title">Family ID</h2>
             <div className="reg-info-list">
               <div className="reg-info-row">
-                <span className="reg-info-label">Parent Name</span>
+                <span className="reg-info-label">Family Name</span>
                 <span className="reg-info-val">{showIdInfo.parentName}</span>
               </div>
               <div className="reg-info-row">
-                <span className="reg-info-label">Parent ID</span>
+                <span className="reg-info-label">Family ID</span>
                 <code className="reg-info-code">{showIdInfo.parentId}</code>
               </div>
               <div className="reg-info-row">
-                <span className="reg-info-label">Parent Username</span>
+                <span className="reg-info-label">Family Username</span>
                 <code className="reg-info-code">{showIdInfo.parentUsername}</code>
               </div>
               <div className="reg-info-row">
@@ -334,20 +334,20 @@ export default function AdminParentsPage() {
             </p>
             <div className="reg-info-list">
               <div className="reg-info-row">
-                <span className="reg-info-label">Parent Name</span>
+                <span className="reg-info-label">Family Name</span>
                 <span className="reg-info-val">{showPassInfo.parentFirstName} {showPassInfo.parentLastName}</span>
               </div>
               <div className="reg-info-row">
-                <span className="reg-info-label">Parent Username</span>
+                <span className="reg-info-label">Family Username</span>
                 <code className="reg-info-code">{showPassInfo.parentUsername}</code>
               </div>
               <div className="reg-info-row">
-                <span className="reg-info-label">Parent Password</span>
+                <span className="reg-info-label">Family Password</span>
                 <code className="reg-info-code">{showPassInfo.parentPassword}</code>
               </div>
               {showPassInfo.youngsters.length > 0 ? (
                 <div className="reg-info-row">
-                  <span className="reg-info-label">Youngster(s)</span>
+                  <span className="reg-info-label">Student(s)</span>
                   <span className="reg-info-val reg-info-youngsters">
                     {showPassInfo.youngsters.map((y, i) => (
                       <span key={i}>{y.name} — {y.school}</span>
@@ -356,8 +356,8 @@ export default function AdminParentsPage() {
                 </div>
               ) : null}
               <div className="reg-info-row">
-                <span className="reg-info-label">Youngster Password</span>
-                <span className="reg-info-muted">Not changed — use Check Password on Admin Youngster page</span>
+                <span className="reg-info-label">Student Password</span>
+                <span className="reg-info-muted">Not changed — use Check Password on Admin Student page</span>
               </div>
             </div>
             <button className="btn btn-primary pass-modal-close" type="button" onClick={() => setShowPassInfo(null)}>
