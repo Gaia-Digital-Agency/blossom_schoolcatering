@@ -773,15 +773,52 @@ export class CoreService implements OnModuleInit {
     const mm = Number(parts.find((p) => p.type === 'month')?.value || '01');
     const dd = Number(parts.find((p) => p.type === 'day')?.value || '01');
     const hour = Number(parts.find((p) => p.type === 'hour')?.value || '00');
+    const minute = Number(parts.find((p) => p.type === 'minute')?.value || '00');
     const dateIso = new Date(Date.UTC(yyyy, mm - 1, dd)).toISOString().slice(0, 10);
-    return { dateIso, hour };
+    return { dateIso, hour, minute };
   }
 
-  private enforceParentYoungsterOrderingWindow(actor: AccessUser, serviceDate: string) {
+  private normalizeOrderingCutoffTime(raw?: string | null) {
+    const value = String(raw || '').trim() || '08:00';
+    const match = /^(\d{2}):(\d{2})$/.exec(value);
+    if (!match) throw new BadRequestException('ordering_cutoff_time must be in HH:MM format');
+    const hour = Number(match[1]);
+    const minute = Number(match[2]);
+    const totalMinutes = (hour * 60) + minute;
+    const minMinutes = 4 * 60;
+    const maxMinutes = (11 * 60) + 59;
+    if (totalMinutes < minMinutes || totalMinutes > maxMinutes) {
+      throw new BadRequestException('ordering_cutoff_time must be between 04:00 and 11:59');
+    }
+    return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+  }
+
+  private formatOrderingCutoffTimeLabel(cutoffTime: string) {
+    return `${cutoffTime} Asia/Makassar`;
+  }
+
+  private async getOrderingCutoffTime() {
+    await this.ensureSiteSettingsTable();
+    const raw = await runSql(
+      `
+      SELECT setting_value
+      FROM site_settings
+      WHERE setting_key = 'ordering_cutoff_time'
+      LIMIT 1;
+      `,
+    );
+    return this.normalizeOrderingCutoffTime(raw || '08:00');
+  }
+
+  private async enforceParentYoungsterOrderingWindow(actor: AccessUser, serviceDate: string) {
     if (!['PARENT', 'YOUNGSTER'].includes(actor.role)) return;
     const now = this.getMakassarNowContext();
-    if (now.hour < 8) {
-      throw new BadRequestException('ORDERING_AVAILABLE_FROM_0800_WITA');
+    const cutoffTime = await this.getOrderingCutoffTime();
+    const [cutoffHour, cutoffMinute] = cutoffTime.split(':').map((part) => Number(part));
+    const nowMinutes = (now.hour * 60) + now.minute;
+    const cutoffMinutes = (cutoffHour * 60) + cutoffMinute;
+    if (nowMinutes < cutoffMinutes) {
+      throw new BadRequestException(`ORDERING_AVAILABLE_FROM_${cutoffTime.replace(':', '')}_WITA`);
     }
     if (serviceDate <= now.dateIso) {
       throw new BadRequestException('ORDER_TOMORROW_ONWARDS_ONLY');
@@ -856,13 +893,14 @@ export class CoreService implements OnModuleInit {
     return { level, isBronze, isSilver, isGold, isPlatinum };
   }
 
-  private isAfterOrAtMakassarCutoff(serviceDate: string) {
-    const cutoffUtc = new Date(`${serviceDate}T00:00:00.000Z`).getTime();
+  private async isAfterOrAtMakassarCutoff(serviceDate: string) {
+    const cutoffTime = await this.getOrderingCutoffTime();
+    const cutoffUtc = new Date(`${serviceDate}T${cutoffTime}:00+08:00`).getTime();
     return Date.now() >= cutoffUtc;
   }
 
   private async lockOrdersForServiceDateIfCutoffPassed(serviceDate: string) {
-    if (!this.isAfterOrAtMakassarCutoff(serviceDate)) return { lockedCount: 0 };
+    if (!(await this.isAfterOrAtMakassarCutoff(serviceDate))) return { lockedCount: 0 };
     const lockedCount = Number(await runSql(
       `WITH locked AS (
          UPDATE orders
@@ -3574,7 +3612,7 @@ export class CoreService implements OnModuleInit {
     const session = this.normalizeSession(input.session);
     const childId = (input.childId || '').trim();
 
-    this.enforceParentYoungsterOrderingWindow(actor, serviceDate);
+    await this.enforceParentYoungsterOrderingWindow(actor, serviceDate);
     await this.validateOrderDayRules(serviceDate);
     await this.assertSessionActiveForOrdering(session);
 
@@ -3799,7 +3837,7 @@ export class CoreService implements OnModuleInit {
     if (items.length > 5) throw new BadRequestException('ORDER_ITEM_LIMIT_EXCEEDED');
 
     await this.validateOrderDayRules(cart.service_date);
-    this.enforceParentYoungsterOrderingWindow(actor, cart.service_date);
+    await this.enforceParentYoungsterOrderingWindow(actor, cart.service_date);
     await this.assertSessionActiveForOrdering(cart.session);
 
     const dietarySnapshot = await this.getOrderDietarySnapshot(cart.child_id);
@@ -3978,7 +4016,7 @@ export class CoreService implements OnModuleInit {
     return {
       ...order,
       total_price: Number(order.total_price),
-      can_edit: order.status === 'PLACED' && !this.isAfterOrAtMakassarCutoff(order.service_date),
+      can_edit: order.status === 'PLACED' && !(await this.isAfterOrAtMakassarCutoff(order.service_date)),
       items,
     };
   }
@@ -4070,13 +4108,13 @@ export class CoreService implements OnModuleInit {
       }
     }
 
-    const result: Array<Record<string, unknown>> = orders.map((order) => ({
+    const result: Array<Record<string, unknown>> = await Promise.all(orders.map(async (order) => ({
       ...order,
       total_price: Number(order.total_price),
-      can_edit: order.status === 'PLACED' && !this.isAfterOrAtMakassarCutoff(order.service_date),
+      can_edit: order.status === 'PLACED' && !(await this.isAfterOrAtMakassarCutoff(order.service_date)),
       placed_by_role: order.placed_by_role,
       items: itemsByOrder.get(order.id) || [],
-    }));
+    })));
 
     return {
       parentId,
@@ -5824,7 +5862,7 @@ export class CoreService implements OnModuleInit {
       const parentId = await this.getParentIdByUserId(actor.uid);
       if (!parentId) throw new ForbiddenException('Parent profile missing');
       await this.ensureParentOwnsChild(parentId, order.child_id);
-      if (this.isAfterOrAtMakassarCutoff(order.service_date)) {
+      if (await this.isAfterOrAtMakassarCutoff(order.service_date)) {
         throw new BadRequestException('ORDER_CUTOFF_EXCEEDED');
       }
     } else if (actor.role !== 'ADMIN') {
@@ -5837,10 +5875,10 @@ export class CoreService implements OnModuleInit {
 
     const targetServiceDate = input.serviceDate ? this.validateServiceDate(input.serviceDate) : order.service_date;
     const targetSession = input.session ? this.normalizeSession(input.session) : order.session;
-    if (actor.role === 'PARENT' && this.isAfterOrAtMakassarCutoff(targetServiceDate)) {
+    if (actor.role === 'PARENT' && await this.isAfterOrAtMakassarCutoff(targetServiceDate)) {
       throw new BadRequestException('ORDER_CUTOFF_EXCEEDED');
     }
-    this.enforceParentYoungsterOrderingWindow(actor, targetServiceDate);
+    await this.enforceParentYoungsterOrderingWindow(actor, targetServiceDate);
     const items = Array.isArray(input.items) ? input.items : [];
     if (items.length > 5) throw new BadRequestException('ORDER_ITEM_LIMIT_EXCEEDED');
 
@@ -5973,7 +6011,7 @@ export class CoreService implements OnModuleInit {
       const parentId = await this.getParentIdByUserId(actor.uid);
       if (!parentId) throw new ForbiddenException('Parent profile missing');
       await this.ensureParentOwnsChild(parentId, order.child_id);
-      if (this.isAfterOrAtMakassarCutoff(order.service_date)) {
+      if (await this.isAfterOrAtMakassarCutoff(order.service_date)) {
         throw new BadRequestException('ORDER_CUTOFF_EXCEEDED');
       }
     } else if (actor.role !== 'ADMIN') {
@@ -7818,6 +7856,11 @@ export class CoreService implements OnModuleInit {
       VALUES ('hero_image_caption', 'Enchanting Nourished Zesty Original Meals')
       ON CONFLICT (setting_key) DO NOTHING;
     `);
+    await runSql(`
+      INSERT INTO site_settings (setting_key, setting_value)
+      VALUES ('ordering_cutoff_time', '08:00')
+      ON CONFLICT (setting_key) DO NOTHING;
+    `);
   }
 
   async getSiteSettings() {
@@ -7828,26 +7871,29 @@ export class CoreService implements OnModuleInit {
         SELECT
           COALESCE(MAX(CASE WHEN setting_key = 'chef_message' THEN setting_value END), '') AS chef_message,
           COALESCE(MAX(CASE WHEN setting_key = 'hero_image_url' THEN setting_value END), '/schoolcatering/assets/hero-meal.jpg') AS hero_image_url,
-          COALESCE(MAX(CASE WHEN setting_key = 'hero_image_caption' THEN setting_value END), 'Enchanting Nourished Zesty Original Meals') AS hero_image_caption
+          COALESCE(MAX(CASE WHEN setting_key = 'hero_image_caption' THEN setting_value END), 'Enchanting Nourished Zesty Original Meals') AS hero_image_caption,
+          COALESCE(MAX(CASE WHEN setting_key = 'ordering_cutoff_time' THEN setting_value END), '08:00') AS ordering_cutoff_time
         FROM site_settings
       ) t;
     `);
     const lines = out.split('\n').map((x: string) => x.trim()).filter(Boolean);
     const data = lines[0]
-      ? (JSON.parse(lines[0]) as { chef_message?: string; hero_image_url?: string; hero_image_caption?: string })
+      ? (JSON.parse(lines[0]) as { chef_message?: string; hero_image_url?: string; hero_image_caption?: string; ordering_cutoff_time?: string })
       : {};
     return {
       chef_message: data.chef_message ?? '',
       hero_image_url: data.hero_image_url ?? '/schoolcatering/assets/hero-meal.jpg',
       hero_image_caption: data.hero_image_caption ?? 'Enchanting Nourished Zesty Original Meals',
+      ordering_cutoff_time: this.normalizeOrderingCutoffTime(data.ordering_cutoff_time ?? '08:00'),
     };
   }
 
-  async updateSiteSettings(actor: AccessUser, input: { chef_message?: string; hero_image_url?: string; hero_image_caption?: string }) {
+  async updateSiteSettings(actor: AccessUser, input: { chef_message?: string; hero_image_url?: string; hero_image_caption?: string; ordering_cutoff_time?: string }) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     const chefMessage = typeof input.chef_message === 'string' ? input.chef_message.trim() : '';
     const heroImageUrl = typeof input.hero_image_url === 'string' ? input.hero_image_url.trim() : '/schoolcatering/assets/hero-meal.jpg';
     const heroImageCaption = typeof input.hero_image_caption === 'string' ? input.hero_image_caption.trim() : 'Enchanting Nourished Zesty Original Meals';
+    const orderingCutoffTime = this.normalizeOrderingCutoffTime(input.ordering_cutoff_time ?? '08:00');
     if (chefMessage.length > 500) throw new BadRequestException('chef_message must be 500 characters or fewer');
     if (heroImageCaption.length > 200) throw new BadRequestException('hero_image_caption must be 200 characters or fewer');
     if (heroImageUrl.length > 2000) throw new BadRequestException('hero_image_url must be 2000 characters or fewer');
@@ -7857,15 +7903,17 @@ export class CoreService implements OnModuleInit {
        VALUES
          ('chef_message', $1, now()),
          ('hero_image_url', $2, now()),
-         ('hero_image_caption', $3, now())
+         ('hero_image_caption', $3, now()),
+         ('ordering_cutoff_time', $4, now())
        ON CONFLICT (setting_key)
        DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = now();`,
-      [chefMessage, heroImageUrl || '/schoolcatering/assets/hero-meal.jpg', heroImageCaption],
+      [chefMessage, heroImageUrl || '/schoolcatering/assets/hero-meal.jpg', heroImageCaption, orderingCutoffTime],
     );
     return {
       chef_message: chefMessage,
       hero_image_url: heroImageUrl || '/schoolcatering/assets/hero-meal.jpg',
       hero_image_caption: heroImageCaption,
+      ordering_cutoff_time: orderingCutoffTime,
     };
   }
 

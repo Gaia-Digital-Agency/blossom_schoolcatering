@@ -103,8 +103,8 @@ function getMakassarDateWithOffset(offset: number): string {
   d.setUTCDate(d.getUTCDate() + offset);
   return d.toISOString().slice(0, 10);
 }
-function getCutoffTimestamp(serviceDate: string) {
-  return new Date(`${serviceDate}T00:00:00.000Z`).getTime();
+function getCutoffTimestamp(serviceDate: string, cutoffTime = '08:00') {
+  return new Date(`${serviceDate}T${cutoffTime}:00+08:00`).getTime();
 }
 function formatRemaining(ms: number) {
   if (ms <= 0) return 'Cutoff passed';
@@ -114,7 +114,10 @@ function formatRemaining(ms: number) {
   const seconds = String(totalSeconds % 60).padStart(2, '0');
   return `${hours}:${minutes}:${seconds}`;
 }
-function getMakassarOrderingWindow() {
+function formatCutoffLabel(cutoffTime: string) {
+  return `${cutoffTime} Asia/Makassar`;
+}
+function getMakassarOrderingWindow(cutoffTime = '08:00') {
   const now = new Date();
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Makassar',
@@ -122,20 +125,28 @@ function getMakassarOrderingWindow() {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
+    minute: '2-digit',
     hour12: false,
   }).formatToParts(now);
   const yyyy = Number(parts.find((p) => p.type === 'year')?.value || '1970');
   const mm = Number(parts.find((p) => p.type === 'month')?.value || '01');
   const dd = Number(parts.find((p) => p.type === 'day')?.value || '01');
   const hh = Number(parts.find((p) => p.type === 'hour')?.value || '00');
+  const min = Number(parts.find((p) => p.type === 'minute')?.value || '00');
   const today = new Date(Date.UTC(yyyy, mm - 1, dd)).toISOString().slice(0, 10);
-  return { nowHour: hh, today, earliestServiceDate: nextWeekdayIsoDate(), canOrderNow: hh >= 8 };
+  const [cutoffHour, cutoffMinute] = cutoffTime.split(':').map((part) => Number(part));
+  return {
+    nowHour: hh,
+    today,
+    earliestServiceDate: nextWeekdayIsoDate(),
+    canOrderNow: (hh * 60) + min >= (cutoffHour * 60) + cutoffMinute,
+  };
 }
-function mapOrderRuleError(raw: string) {
+function mapOrderRuleError(raw: string, cutoffTime = '08:00') {
   if (raw.includes('ORDER_BLACKOUT_BLOCKED')) return 'Ordering is blocked for this date (blackout).';
   if (raw.includes('ORDER_SERVICE_BLOCKED')) return 'Service is blocked for this date (blackout).';
   if (raw.includes('ORDER_TOMORROW_ONWARDS_ONLY')) return 'Orders can only be placed for tomorrow onward.';
-  if (raw.includes('ORDERING_AVAILABLE_FROM_0800_WITA')) return 'Ordering opens daily at 08:00 Asia/Makassar.';
+  if (raw.includes('ORDERING_AVAILABLE_FROM_')) return `Ordering opens daily at ${formatCutoffLabel(cutoffTime)}.`;
   return raw;
 }
 function activeBlackoutMessage(blackout: ActiveBlackout | null) {
@@ -161,6 +172,7 @@ export default function FamilyOrderPage({
   const [serviceDate, setServiceDate] = useState(nextWeekdayIsoDate());
   const [session, setSession] = useState<SessionType>('LUNCH');
   const [sessionSettings, setSessionSettings] = useState<SessionSetting[]>([{ session: 'LUNCH', is_active: true }]);
+  const [orderingCutoffTime, setOrderingCutoffTime] = useState('08:00');
 
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [itemQty, setItemQty] = useState<Record<string, number>>({});
@@ -185,8 +197,8 @@ export default function FamilyOrderPage({
   const draftSectionRef = useRef<HTMLDivElement | null>(null);
   const autoOpenHandledRef = useRef(false);
 
-  const orderingWindow = useMemo(() => getMakassarOrderingWindow(), [nowMs]);
-  const placeCutoffMs = getCutoffTimestamp(serviceDate) - nowMs;
+  const orderingWindow = useMemo(() => getMakassarOrderingWindow(orderingCutoffTime), [nowMs, orderingCutoffTime]);
+  const placeCutoffMs = getCutoffTimestamp(serviceDate, orderingCutoffTime) - nowMs;
   const draftRemainingMs = draftExpiresAt ? new Date(draftExpiresAt).getTime() - nowMs : 0;
   const placementExpired = placeCutoffMs <= 0;
   const placementBlockedByWindow = !orderingWindow.canOrderNow || serviceDate <= orderingWindow.today;
@@ -256,11 +268,18 @@ export default function FamilyOrderPage({
     setSessionSettings(settings);
   };
 
+  const loadPublicSiteSettings = async () => {
+    const res = await fetch('/schoolcatering/api/v1/public/site-settings', { credentials: 'include', cache: 'no-cache' });
+    if (!res.ok) return;
+    const data = await res.json() as { ordering_cutoff_time?: string };
+    setOrderingCutoffTime(data.ordering_cutoff_time || '08:00');
+  };
+
   const loadBaseData = async () => {
     const childrenData = await apiFetch('/parent/me/children/pages') as { parentId: string; children: Child[] };
     setChildren(childrenData.children);
     if (childrenData.children.length > 0) setSelectedChildId(childrenData.children[0].id);
-    await Promise.all([loadOrders(), loadSessionSettings()]);
+    await Promise.all([loadOrders(), loadSessionSettings(), loadPublicSiteSettings()]);
   };
 
   useEffect(() => {
@@ -351,7 +370,7 @@ export default function FamilyOrderPage({
     }
 
     if (placementBlockedByBlackout) { setShowBlackoutModal(true); return; }
-    if (!orderingWindow.canOrderNow) return setError('Ordering opens daily at 08:00 Asia/Makassar.');
+    if (!orderingWindow.canOrderNow) return setError(`Ordering opens daily at ${formatCutoffLabel(orderingCutoffTime)}.`);
     if (serviceDate <= orderingWindow.today) return setError('Orders can only be placed for tomorrow onward.');
     if (placementExpired) return setError('ORDER_CUTOFF_EXCEEDED');
     if (items.length > 5) return setError('Maximum 5 items per order.');
@@ -396,7 +415,7 @@ export default function FamilyOrderPage({
       if (msg.includes('ORDER_SESSION_DISABLED') && session !== 'LUNCH') {
         setError('Only Lunch is currently available.');
       } else {
-        setError(mapOrderRuleError(msg));
+        setError(mapOrderRuleError(msg, orderingCutoffTime));
       }
     } finally { setSubmitting(false); }
   };
@@ -439,7 +458,7 @@ export default function FamilyOrderPage({
         menuSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 120);
     } catch (err) {
-      setError(err instanceof Error ? mapOrderRuleError(err.message) : 'Failed to open order as draft');
+        setError(err instanceof Error ? mapOrderRuleError(err.message, orderingCutoffTime) : 'Failed to open order as draft');
     }
   };
 
@@ -456,7 +475,7 @@ export default function FamilyOrderPage({
     autoOpenHandledRef.current = true;
     onOpenOrderAsDraft(order, targetDate, 'edit').catch((err) => {
       autoOpenHandledRef.current = false;
-      setError(err instanceof Error ? mapOrderRuleError(err.message) : 'Failed to open order as draft');
+      setError(err instanceof Error ? mapOrderRuleError(err.message, orderingCutoffTime) : 'Failed to open order as draft');
     });
     if (typeof window !== 'undefined') {
       const next = new URL(window.location.href);
@@ -474,7 +493,7 @@ export default function FamilyOrderPage({
       await apiFetch(`/orders/${orderId}`, { method: 'DELETE' });
       setMessage('Order deleted successfully.');
       await loadOrders();
-    } catch (err) { setError(err instanceof Error ? mapOrderRuleError(err.message) : 'Order delete failed'); }
+    } catch (err) { setError(err instanceof Error ? mapOrderRuleError(err.message, orderingCutoffTime) : 'Order delete failed'); }
   };
 
   const onRefreshOrders = async () => {
@@ -616,8 +635,8 @@ export default function FamilyOrderPage({
                 {activeSessions.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             </label>
-            <p className="auth-help">Cutoff countdown: {formatRemaining(placeCutoffMs)} (08:00 WITA)</p>
-            {!orderingWindow.canOrderNow ? <p className="auth-help">Ordering opens at 08:00 Asia/Makassar.</p> : null}
+            <p className="auth-help">Cutoff countdown: {formatRemaining(placeCutoffMs)} ({formatCutoffLabel(orderingCutoffTime)})</p>
+            {!orderingWindow.canOrderNow ? <p className="auth-help">Ordering opens at {formatCutoffLabel(orderingCutoffTime)}.</p> : null}
             {serviceDate <= orderingWindow.today ? <p className="auth-help">Select tomorrow or a later date to place an order.</p> : null}
             {draftCartId && hasOpenDraft ? <p className="auth-help">Draft cart loaded.</p> : null}
 

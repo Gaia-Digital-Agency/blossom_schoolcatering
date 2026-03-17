@@ -109,8 +109,8 @@ function nextWeekdayIsoDate() {
   return d.toISOString().slice(0, 10);
 }
 
-function getCutoffTimestamp(serviceDate: string) {
-  return new Date(`${serviceDate}T00:00:00.000Z`).getTime();
+function getCutoffTimestamp(serviceDate: string, cutoffTime = '08:00') {
+  return new Date(`${serviceDate}T${cutoffTime}:00+08:00`).getTime();
 }
 
 function formatRemaining(ms: number) {
@@ -129,7 +129,11 @@ function getMakassarDateWithOffset(offset: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-function getMakassarOrderingWindow() {
+function formatCutoffLabel(cutoffTime: string) {
+  return `${cutoffTime} Asia/Makassar`;
+}
+
+function getMakassarOrderingWindow(cutoffTime = '08:00') {
   const now = new Date();
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Makassar',
@@ -137,26 +141,28 @@ function getMakassarOrderingWindow() {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
+    minute: '2-digit',
     hour12: false,
   }).formatToParts(now);
   const yyyy = Number(parts.find((p) => p.type === 'year')?.value || '1970');
   const mm = Number(parts.find((p) => p.type === 'month')?.value || '01');
   const dd = Number(parts.find((p) => p.type === 'day')?.value || '01');
   const hh = Number(parts.find((p) => p.type === 'hour')?.value || '00');
+  const min = Number(parts.find((p) => p.type === 'minute')?.value || '00');
   const today = new Date(Date.UTC(yyyy, mm - 1, dd)).toISOString().slice(0, 10);
   return {
     nowHour: hh,
     today,
     earliestServiceDate: nextWeekdayIsoDate(),
-    canOrderNow: hh >= 8,
+    canOrderNow: (hh * 60) + min >= Number(cutoffTime.slice(0, 2)) * 60 + Number(cutoffTime.slice(3, 5)),
   };
 }
 
-function mapOrderRuleError(raw: string) {
+function mapOrderRuleError(raw: string, cutoffTime = '08:00') {
   if (raw.includes('ORDER_BLACKOUT_BLOCKED')) return 'Ordering is blocked for this date (ORDER_BLOCK/BOTH blackout).';
   if (raw.includes('ORDER_SERVICE_BLOCKED')) return 'Service is blocked for this date (SERVICE_BLOCK/BOTH blackout).';
   if (raw.includes('ORDER_TOMORROW_ONWARDS_ONLY')) return 'Orders can only be placed for tomorrow onward.';
-  if (raw.includes('ORDERING_AVAILABLE_FROM_0800_WITA')) return 'Ordering opens daily at 08:00 Asia/Makassar.';
+  if (raw.includes('ORDERING_AVAILABLE_FROM_')) return `Ordering opens daily at ${formatCutoffLabel(cutoffTime)}.`;
   return raw;
 }
 
@@ -172,6 +178,7 @@ export default function StudentOrderPage({
   const [serviceDate, setServiceDate] = useState(nextWeekdayIsoDate());
   const [session, setSession] = useState<SessionType>('LUNCH');
   const [sessionSettings, setSessionSettings] = useState<SessionSetting[]>([{ session: 'LUNCH', is_active: true }]);
+  const [orderingCutoffTime, setOrderingCutoffTime] = useState('08:00');
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [itemQty, setItemQty] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -201,8 +208,8 @@ export default function StudentOrderPage({
       .filter((x) => Boolean(x.menuItem));
   }, [itemQty, menuItems]);
   const hasDraftChanges = draftItems.length > 0;
-  const orderingWindow = useMemo(() => getMakassarOrderingWindow(), [nowMs]);
-  const cutoffRemainingMs = getCutoffTimestamp(serviceDate) - nowMs;
+  const orderingWindow = useMemo(() => getMakassarOrderingWindow(orderingCutoffTime), [nowMs, orderingCutoffTime]);
+  const cutoffRemainingMs = getCutoffTimestamp(serviceDate, orderingCutoffTime) - nowMs;
   const draftRemainingMs = draftExpiresAt ? new Date(draftExpiresAt).getTime() - nowMs : 0;
   const placementExpired = cutoffRemainingMs <= 0;
   const placementBlockedByWindow = !orderingWindow.canOrderNow || serviceDate <= orderingWindow.today;
@@ -240,6 +247,12 @@ export default function StudentOrderPage({
       .then((data) => {
         const settings = data as SessionSetting[];
         if (Array.isArray(settings) && settings.length > 0) setSessionSettings(settings);
+      })
+      .catch(() => undefined);
+    fetch('/schoolcatering/api/v1/public/site-settings', { credentials: 'include', cache: 'no-cache' })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data: { ordering_cutoff_time?: string } | null) => {
+        if (data?.ordering_cutoff_time) setOrderingCutoffTime(data.ordering_cutoff_time);
       })
       .catch(() => undefined);
     loadOrders().catch(() => undefined);
@@ -351,7 +364,7 @@ export default function StudentOrderPage({
       return;
     }
     if (!orderingWindow.canOrderNow) {
-      setError('Ordering opens daily at 08:00 Asia/Makassar.');
+      setError(`Ordering opens daily at ${formatCutoffLabel(orderingCutoffTime)}.`);
       return;
     }
     if (serviceDate <= orderingWindow.today) {
@@ -405,7 +418,7 @@ export default function StudentOrderPage({
         window.alert('Only Lunch Available');
         setError('Only Lunch Available');
       } else {
-        setError(mapOrderRuleError(msg));
+        setError(mapOrderRuleError(msg, orderingCutoffTime));
       }
     } finally {
       setSubmitting(false);
@@ -541,8 +554,8 @@ export default function StudentOrderPage({
               {activeSessions.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </label>
-          <p className="auth-help">Place-order cutoff countdown: {formatRemaining(cutoffRemainingMs)} (08:00 Asia/Makassar)</p>
-          {!orderingWindow.canOrderNow ? <p className="auth-help">Ordering opens at 08:00 Asia/Makassar.</p> : null}
+          <p className="auth-help">Place-order cutoff countdown: {formatRemaining(cutoffRemainingMs)} ({formatCutoffLabel(orderingCutoffTime)})</p>
+          {!orderingWindow.canOrderNow ? <p className="auth-help">Ordering opens at {formatCutoffLabel(orderingCutoffTime)}.</p> : null}
           {serviceDate <= orderingWindow.today ? <p className="auth-help">Select tomorrow or a later date to place an order.</p> : null}
           {draftCartId && hasOpenDraft ? <p className="auth-help">Open draft detected and loaded automatically.</p> : null}
 

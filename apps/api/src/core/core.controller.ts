@@ -97,7 +97,7 @@ export class CoreController {
   @Roles('ADMIN')
   updateAdminSiteSettings(
     @Req() req: AuthRequest,
-    @Body() body: { chef_message?: string; hero_image_url?: string; hero_image_caption?: string },
+    @Body() body: { chef_message?: string; hero_image_url?: string; hero_image_caption?: string; ordering_cutoff_time?: string },
   ) {
     return this.coreService.updateSiteSettings(req.user, body);
   }

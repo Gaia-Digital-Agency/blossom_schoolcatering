@@ -14,6 +14,7 @@ type School = {
   is_active?: boolean;
 };
 type SessionSetting = { session: 'LUNCH' | 'SNACK' | 'BREAKFAST'; is_active: boolean };
+type SiteSettings = { ordering_cutoff_time?: string };
 
 export default function AdminSchoolsPage() {
   const [schools, setSchools] = useState<School[]>([]);
@@ -22,6 +23,7 @@ export default function AdminSchoolsPage() {
   const [message, setMessage] = useState('');
   const [savingSchoolId, setSavingSchoolId] = useState('');
   const [savingSession, setSavingSession] = useState('');
+  const [savingCutoff, setSavingCutoff] = useState(false);
   const [newSchoolName, setNewSchoolName] = useState('');
   const [newSchoolCity, setNewSchoolCity] = useState('');
   const [newSchoolAddress, setNewSchoolAddress] = useState('');
@@ -33,18 +35,21 @@ export default function AdminSchoolsPage() {
   const [editCity, setEditCity] = useState('');
   const [editAddress, setEditAddress] = useState('');
   const [editPhone, setEditPhone] = useState('');
+  const [orderingCutoffTime, setOrderingCutoffTime] = useState('08:00');
   const activeSchools = schools.filter((school) => school.is_active !== false);
   const inactiveSchools = schools.filter((school) => school.is_active === false);
 
   const load = async () => {
     setError('');
-    const [activeSchools, inactiveSchools, sessionSettings] = await Promise.all([
+    const [activeSchools, inactiveSchools, sessionSettings, siteSettings] = await Promise.all([
       apiFetch('/schools?active=true') as Promise<School[]>,
       apiFetch('/schools?active=false') as Promise<School[]>,
       apiFetch('/admin/session-settings') as Promise<SessionSetting[]>,
+      apiFetch('/admin/site-settings') as Promise<SiteSettings>,
     ]);
     setSchools([...(activeSchools || []), ...(inactiveSchools || [])]);
     setSessions(sessionSettings || []);
+    setOrderingCutoffTime(siteSettings?.ordering_cutoff_time || '08:00');
   };
 
   useEffect(() => {
@@ -168,6 +173,24 @@ export default function AdminSchoolsPage() {
       setError(e instanceof Error ? e.message : 'Failed');
     } finally {
       setSavingSession('');
+    }
+  };
+
+  const onSaveCutoffTime = async () => {
+    setSavingCutoff(true);
+    setMessage('');
+    setError('');
+    try {
+      await apiFetch('/admin/site-settings', {
+        method: 'PATCH',
+        body: JSON.stringify({ ordering_cutoff_time: orderingCutoffTime }),
+      }, { skipAutoReload: true });
+      setMessage(`Cut off time updated: ${orderingCutoffTime}`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed');
+    } finally {
+      setSavingCutoff(false);
     }
   };
 
@@ -296,6 +319,28 @@ export default function AdminSchoolsPage() {
           ))}
         </div>
 
+        <div className="school-section-card">
+          <div className="school-section-head">
+            <h3>Cut Off Time</h3>
+            <span>04:00 to 11:59</span>
+          </div>
+          <div className="cutoff-card-row">
+            <label className="cutoff-field">Cut Off Time
+              <input
+                type="time"
+                min="04:00"
+                max="11:59"
+                step={60}
+                value={orderingCutoffTime}
+                onChange={(e) => setOrderingCutoffTime(e.target.value)}
+              />
+            </label>
+            <button className="btn btn-primary" type="button" onClick={onSaveCutoffTime} disabled={savingCutoff}>
+              {savingCutoff ? 'Saving...' : 'Save Cut Off Time'}
+            </button>
+          </div>
+        </div>
+
         <h2>Add School</h2>
         <div className="auth-form school-create-form">
           <label>School Name <span className="req">*</span><input value={newSchoolName} onChange={(e) => setNewSchoolName(e.target.value)} /></label>
@@ -337,6 +382,16 @@ export default function AdminSchoolsPage() {
         .session-status {
           font-size: 0.78rem;
           color: #7a6652;
+        }
+        .cutoff-card-row {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          gap: 0.8rem;
+          align-items: end;
+          margin-bottom: 1rem;
+        }
+        .cutoff-field {
+          margin: 0;
         }
         .school-create-form {
           margin-bottom: 0.75rem;
@@ -416,6 +471,9 @@ export default function AdminSchoolsPage() {
           font-size: 0.82rem;
         }
         @media (max-width: 760px) {
+          .cutoff-card-row {
+            grid-template-columns: 1fr;
+          }
           .kitchen-table th,
           .kitchen-table td {
             font-size: 0.82rem;

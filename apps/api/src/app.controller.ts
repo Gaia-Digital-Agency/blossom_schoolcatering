@@ -34,6 +34,11 @@ export class AppController {
       VALUES ('hero_image_caption', 'Enchanting Nourished Zesty Original Meals')
       ON CONFLICT (setting_key) DO NOTHING;
     `);
+    await runSql(`
+      INSERT INTO site_settings (setting_key, setting_value)
+      VALUES ('ordering_cutoff_time', '08:00')
+      ON CONFLICT (setting_key) DO NOTHING;
+    `);
   }
 
   /**
@@ -50,16 +55,18 @@ export class AppController {
         SELECT
           COALESCE(MAX(CASE WHEN setting_key = 'chef_message' THEN setting_value END), '') AS chef_message,
           COALESCE(MAX(CASE WHEN setting_key = 'hero_image_url' THEN setting_value END), '/schoolcatering/assets/hero-meal.jpg') AS hero_image_url,
-          COALESCE(MAX(CASE WHEN setting_key = 'hero_image_caption' THEN setting_value END), 'Enchanting Nourished Zesty Original Meals') AS hero_image_caption
+          COALESCE(MAX(CASE WHEN setting_key = 'hero_image_caption' THEN setting_value END), 'Enchanting Nourished Zesty Original Meals') AS hero_image_caption,
+          COALESCE(MAX(CASE WHEN setting_key = 'ordering_cutoff_time' THEN setting_value END), '08:00') AS ordering_cutoff_time
         FROM site_settings
       ) t;
     `);
     const line = out.split('\n').map((x: string) => x.trim()).find(Boolean);
-    const data = line ? (JSON.parse(line) as { chef_message?: string; hero_image_url?: string; hero_image_caption?: string }) : {};
+    const data = line ? (JSON.parse(line) as { chef_message?: string; hero_image_url?: string; hero_image_caption?: string; ordering_cutoff_time?: string }) : {};
     return {
       chef_message: data.chef_message ?? '',
       hero_image_url: data.hero_image_url ?? '/schoolcatering/assets/hero-meal.jpg',
       hero_image_caption: data.hero_image_caption ?? 'Enchanting Nourished Zesty Original Meals',
+      ordering_cutoff_time: data.ordering_cutoff_time ?? '08:00',
     };
   }
 
