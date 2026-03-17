@@ -45,6 +45,9 @@ export default function AdminOrdersPage() {
   const [deliveryUserId, setDeliveryUserId] = useState('ALL');
   const [data, setData] = useState<AdminOrdersResponse | null>(null);
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [selectedOrder, setSelectedOrder] = useState<OrderRow | null>(null);
+  const [deletingOrderId, setDeletingOrderId] = useState('');
 
   const load = async () => {
     setError('');
@@ -57,6 +60,25 @@ export default function AdminOrdersPage() {
       setData(out);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed loading orders');
+    }
+  };
+
+  const onDeleteOrder = async (order: OrderRow) => {
+    if (!window.confirm(`Delete order ${order.order_id} for ${order.child_name}? This will remove it from Family, Student, Kitchen, and Delivery views.`)) return;
+    setDeletingOrderId(order.order_id);
+    setError('');
+    setMessage('');
+    try {
+      await apiFetch(`/orders/${order.order_id}`, { method: 'DELETE' }, { skipAutoReload: true });
+      setMessage(`Deleted order ${order.order_id}.`);
+      if (selectedOrder?.order_id === order.order_id) {
+        setSelectedOrder(null);
+      }
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed deleting order');
+    } finally {
+      setDeletingOrderId('');
     }
   };
 
@@ -123,6 +145,7 @@ export default function AdminOrdersPage() {
               <button className="btn btn-outline" type="button" onClick={load}>Apply</button>
             </div>
           </div>
+          {message ? <p className="auth-help" style={{ color: '#166534' }}>{message}</p> : null}
           {error ? <p className="auth-help" style={{ color: '#a10036' }}>{error}</p> : null}
         </div>
 
@@ -144,6 +167,17 @@ export default function AdminOrdersPage() {
                   <small>Billing: {row.billing_status}</small>
                   <small>{formatMoney(row.total_price)}</small>
                   <small>Dishes: {(row.dishes || []).map((dish) => `${dish.item_name} x${dish.quantity}`).join(', ') || '-'}</small>
+                  <div className="orders-card-actions">
+                    <button className="btn btn-outline btn-sm" type="button" onClick={() => setSelectedOrder(row)}>Read</button>
+                    <button
+                      className="btn btn-outline btn-sm"
+                      type="button"
+                      onClick={() => onDeleteOrder(row)}
+                      disabled={deletingOrderId === row.order_id}
+                    >
+                      {deletingOrderId === row.order_id ? 'Deleting...' : 'Delete'}
+                    </button>
+                  </div>
                 </article>
               ))}
               {data && data.outstanding.length === 0 ? <p className="auth-help">No outstanding orders.</p> : null}
@@ -167,6 +201,17 @@ export default function AdminOrdersPage() {
                   <small>Billing: {row.billing_status}</small>
                   <small>{formatMoney(row.total_price)}</small>
                   <small>Dishes: {(row.dishes || []).map((dish) => `${dish.item_name} x${dish.quantity}`).join(', ') || '-'}</small>
+                  <div className="orders-card-actions">
+                    <button className="btn btn-outline btn-sm" type="button" onClick={() => setSelectedOrder(row)}>Read</button>
+                    <button
+                      className="btn btn-outline btn-sm"
+                      type="button"
+                      onClick={() => onDeleteOrder(row)}
+                      disabled={deletingOrderId === row.order_id}
+                    >
+                      {deletingOrderId === row.order_id ? 'Deleting...' : 'Delete'}
+                    </button>
+                  </div>
                 </article>
               ))}
               {data && data.completed.length === 0 ? <p className="auth-help">No completed orders.</p> : null}
@@ -176,6 +221,40 @@ export default function AdminOrdersPage() {
 
         <AdminReturnButton />
       </section>
+      {selectedOrder ? (
+        <div className="orders-modal-overlay" onClick={() => setSelectedOrder(null)}>
+          <div className="orders-modal-card" onClick={(e) => e.stopPropagation()}>
+            <h2>Order Details</h2>
+            <div className="orders-modal-grid">
+              <label><strong>Order ID</strong><small>{selectedOrder.order_id}</small></label>
+              <label><strong>Student</strong><small>{selectedOrder.child_name}</small></label>
+              <label><strong>School</strong><small>{selectedOrder.school_name}</small></label>
+              <label><strong>Date / Session</strong><small>{selectedOrder.service_date} · {selectedOrder.session}</small></label>
+              <label><strong>Family / Student Login</strong><small>{selectedOrder.account_name}</small></label>
+              <label><strong>Delivery</strong><small>{selectedOrder.delivery_name}</small></label>
+              <label><strong>Order Status</strong><small>{selectedOrder.status}</small></label>
+              <label><strong>Delivery Status</strong><small>{selectedOrder.delivery_status}</small></label>
+              <label><strong>Billing Status</strong><small>{selectedOrder.billing_status}</small></label>
+              <label><strong>Total</strong><small>{formatMoney(selectedOrder.total_price)}</small></label>
+              <label className="orders-modal-wide">
+                <strong>Dishes</strong>
+                <small>{(selectedOrder.dishes || []).map((dish) => `${dish.item_name} x${dish.quantity}`).join(', ') || '-'}</small>
+              </label>
+            </div>
+            <div className="orders-modal-actions">
+              <button className="btn btn-outline" type="button" onClick={() => setSelectedOrder(null)}>Close</button>
+              <button
+                className="btn btn-outline"
+                type="button"
+                onClick={() => void onDeleteOrder(selectedOrder)}
+                disabled={deletingOrderId === selectedOrder.order_id}
+              >
+                {deletingOrderId === selectedOrder.order_id ? 'Deleting...' : 'Delete Order'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <style jsx>{`
         .orders-filter-grid {
           display: grid;
@@ -235,6 +314,69 @@ export default function AdminOrdersPage() {
         }
         .orders-card small {
           color: #645647;
+        }
+        .orders-card-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.45rem;
+          margin-top: 0.35rem;
+        }
+        .orders-modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.45);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 1rem;
+          z-index: 1000;
+        }
+        .orders-modal-card {
+          width: min(560px, 100%);
+          background: #fff;
+          border-radius: 0.95rem;
+          padding: 1rem;
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+          display: grid;
+          gap: 0.85rem;
+        }
+        .orders-modal-card h2 {
+          margin: 0;
+        }
+        .orders-modal-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 0.65rem;
+        }
+        .orders-modal-grid label {
+          display: grid;
+          gap: 0.15rem;
+          padding: 0.65rem 0.75rem;
+          border: 1px solid #ddcfb8;
+          border-radius: 0.75rem;
+          background: #fffaf2;
+        }
+        .orders-modal-grid small {
+          color: #5f5244;
+          overflow-wrap: anywhere;
+        }
+        .orders-modal-wide {
+          grid-column: 1 / -1;
+        }
+        .orders-modal-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.55rem;
+          justify-content: flex-end;
+        }
+        @media (max-width: 680px) {
+          .orders-modal-grid {
+            grid-template-columns: 1fr;
+          }
+          .orders-card-actions :global(.btn),
+          .orders-modal-actions :global(.btn) {
+            width: 100%;
+          }
         }
       `}</style>
     </main>
