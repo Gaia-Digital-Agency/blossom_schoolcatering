@@ -172,6 +172,7 @@ export default function FamilyOrderPage({
   const [activeBlackout, setActiveBlackout] = useState<ActiveBlackout | null>(null);
   const [draftSourceContext, setDraftSourceContext] = useState<DraftSourceContext | null>(null);
   const [confirmedViewDate, setConfirmedViewDate] = useState(() => getMakassarDateWithOffset(0));
+  const [confirmedDateInput, setConfirmedDateInput] = useState(() => getMakassarDateWithOffset(0));
   const [refreshDedupMessage, setRefreshDedupMessage] = useState('');
 
   // Popups
@@ -527,13 +528,30 @@ export default function FamilyOrderPage({
           <div className="day-toggle-row" role="group" aria-label="View date">
             <button type="button"
               className={confirmedViewDate === yesterdayDate ? 'day-btn day-btn-active' : 'day-btn'}
-              onClick={() => setConfirmedViewDate(yesterdayDate)}>Yesterday</button>
+              onClick={() => {
+                setConfirmedDateInput(yesterdayDate);
+                setConfirmedViewDate(yesterdayDate);
+              }}>Yesterday</button>
             <button type="button"
               className={confirmedViewDate === todayDate ? 'day-btn day-btn-active' : 'day-btn'}
-              onClick={() => setConfirmedViewDate(todayDate)}>Today</button>
+              onClick={() => {
+                setConfirmedDateInput(todayDate);
+                setConfirmedViewDate(todayDate);
+              }}>Today</button>
             <button type="button"
               className={confirmedViewDate === nextServiceDate ? 'day-btn day-btn-active' : 'day-btn'}
-              onClick={() => setConfirmedViewDate(nextServiceDate)}>Tomorrow</button>
+              onClick={() => {
+                setConfirmedDateInput(nextServiceDate);
+                setConfirmedViewDate(nextServiceDate);
+              }}>Tomorrow</button>
+          </div>
+          <div className="record-filter-row">
+            <label className="record-filter-field">Service Date
+              <input type="date" value={confirmedDateInput} onChange={(e) => setConfirmedDateInput(e.target.value)} />
+            </label>
+            <button className="btn btn-outline" type="button" onClick={() => setConfirmedViewDate(confirmedDateInput)}>
+              Show Order
+            </button>
           </div>
           {confirmedOrders.length > 0 ? (
             <div className="auth-form">
@@ -736,6 +754,16 @@ export default function FamilyOrderPage({
           gap: 0.4rem;
           margin-bottom: 0.65rem;
         }
+        .record-filter-row {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          gap: 0.6rem;
+          align-items: end;
+          margin-bottom: 0.65rem;
+        }
+        .record-filter-field {
+          margin: 0;
+        }
         .day-btn {
           flex: 1;
           padding: 0.38rem 0.5rem;
@@ -752,6 +780,11 @@ export default function FamilyOrderPage({
         .day-btn:hover { background: #fff8ec; border-color: #b8860b; }
         .day-btn-active { background: #fff3d6; border-color: #9a6c1f; color: #6b4a10; font-weight: 600; }
         .muted-note { color: #888; font-size: 0.78rem; }
+        @media (max-width: 520px) {
+          .record-filter-row {
+            grid-template-columns: 1fr;
+          }
+        }
         /* ── Popups ── */
         .popup-overlay {
           position: fixed;
