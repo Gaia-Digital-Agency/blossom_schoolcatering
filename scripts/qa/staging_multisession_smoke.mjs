@@ -1,5 +1,7 @@
 const base = process.env.BASE_URL || 'http://34.124.244.233/schoolcatering/api/v1';
 const seededPassword = process.env.SEEDED_PASSWORD || 'teameditor123';
+const familyUsername = process.env.FAMILY_USERNAME || 'family01_parent01';
+const studentUsername = process.env.STUDENT_USERNAME || 'family01_student01a';
 const out = [];
 
 function add(area, name, pass, detail) {
@@ -69,11 +71,11 @@ async function main() {
 
     const parent = await req('/auth/login', {
       method: 'POST',
-      body: { username: 'parent', password: seededPassword, role: 'PARENT' },
+      body: { username: familyUsername, password: seededPassword, role: 'PARENT' },
       expect: [200, 201],
     });
     const parentToken = parent.body.accessToken;
-    add('Auth', 'Parent login', Boolean(parentToken), 'login ok');
+    add('Auth', 'Family login', Boolean(parentToken), `login ok (${familyUsername})`);
 
     const children = await req('/parent/me/children/pages', { token: parentToken, expect: [200] });
     const childId = children.body?.children?.[0]?.id || '';
@@ -97,18 +99,18 @@ async function main() {
 
     const youngster = await req('/auth/login', {
       method: 'POST',
-      body: { username: 'youngster', password: seededPassword, role: 'YOUNGSTER' },
+      body: { username: studentUsername, password: seededPassword, role: 'YOUNGSTER' },
       expect: [200, 201],
     });
     const youngsterToken = youngster.body.accessToken;
-    add('Auth', 'Youngster login', Boolean(youngsterToken), 'login ok');
+    add('Auth', 'Student login', Boolean(youngsterToken), `login ok (${studentUsername})`);
 
     if (breakfastDate) {
       const breakfastMenu = await req(`/menus?service_date=${breakfastDate}&session=BREAKFAST`, {
         token: parentToken,
         expect: [200],
       });
-      add('Family', 'Parent Breakfast menu', Array.isArray(breakfastMenu.body?.items), `items=${(breakfastMenu.body?.items || []).length}`);
+      add('Family', 'Family Breakfast menu', Array.isArray(breakfastMenu.body?.items), `items=${(breakfastMenu.body?.items || []).length}`);
 
       const breakfastOrders = await req(`/admin/orders?date=${breakfastDate}&session=BREAKFAST`, {
         token: adminToken,
@@ -163,7 +165,7 @@ async function main() {
         token: parentToken,
         expect: [200],
       });
-      add('Family', 'Parent Snack menu', Array.isArray(snackMenu.body?.items), `items=${(snackMenu.body?.items || []).length}`);
+      add('Family', 'Family Snack menu', Array.isArray(snackMenu.body?.items), `items=${(snackMenu.body?.items || []).length}`);
 
       const snackOrders = await req(`/admin/orders?date=${snackDate}&session=SNACK`, {
         token: adminToken,
@@ -196,7 +198,7 @@ async function main() {
       });
       add(
         'Student',
-        'Youngster insights load',
+        'Student insights load',
         Boolean(snackInsights.body?.badge) && Array.isArray(snackInsights.body?.week?.days),
         `weekRows=${(snackInsights.body?.week?.days || []).length}`,
       );
@@ -205,13 +207,13 @@ async function main() {
         token: youngsterToken,
         expect: [200],
       });
-      add('Student', 'Youngster billing load', Array.isArray(youngsterBilling.body), `rows=${(youngsterBilling.body || []).length}`);
+      add('Student', 'Student billing load', Array.isArray(youngsterBilling.body), `rows=${(youngsterBilling.body || []).length}`);
     }
 
     const spending = await req('/parent/me/spending-dashboard', { token: parentToken, expect: [200] });
     add(
       'Family',
-      'Spending dashboard session rows',
+      'Family spending dashboard session rows',
       Array.isArray(spending.body?.byChild) && spending.body.byChild.every((row) => typeof row.session === 'string'),
       `rows=${(spending.body?.byChild || []).length}`,
     );
