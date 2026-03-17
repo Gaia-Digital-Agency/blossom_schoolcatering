@@ -5348,6 +5348,8 @@ export class CoreService implements OnModuleInit {
           ON ddn.delivery_user_id = da.delivery_user_id
          AND ddn.service_date = o.service_date
         WHERE 1=1
+          AND o.deleted_at IS NULL
+          AND o.status <> 'CANCELLED'
           ${roleFilter}
           ${dateFilter}
         ORDER BY o.service_date DESC, da.assigned_at DESC
