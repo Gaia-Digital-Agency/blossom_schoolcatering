@@ -229,8 +229,6 @@ export default function KitchenDashboard({
           <Link className="btn btn-outline" href="/kitchen/yesterday">Yesterday</Link>
           <Link className="btn btn-outline" href="/kitchen/today">Today</Link>
           <Link className="btn btn-outline" href="/kitchen/tomorrow">Tomorrow</Link>
-          <button className="btn btn-outline" type="button" onClick={load}>Refresh</button>
-          <button className="btn btn-outline" type="button" onClick={onDownloadPdf}>Download PDF</button>
         </div>
         <div className="kitchen-date-picker-row">
           <label className="kitchen-control">
@@ -244,6 +242,8 @@ export default function KitchenDashboard({
               }}
             />
           </label>
+          <button className="btn btn-outline" type="button" onClick={load}>Refresh</button>
+          <button className="btn btn-outline" type="button" onClick={onDownloadPdf}>Download PDF</button>
         </div>
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
@@ -386,12 +386,10 @@ export default function KitchenDashboard({
           margin-bottom: 0.75rem;
         }
         .kitchen-top-actions {
-          display: flex;
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 0.8rem;
-          flex-wrap: wrap;
-          overflow-x: hidden;
-          padding-bottom: 0.35rem;
-          margin-bottom: 0.35rem;
+          margin-bottom: 0.45rem;
           max-width: 100%;
         }
         .kitchen-top-actions :global(.btn) {
@@ -403,12 +401,15 @@ export default function KitchenDashboard({
         }
         .kitchen-date-picker-row {
           display: grid;
-          grid-template-columns: 1fr;
-          gap: 0.4rem;
+          grid-template-columns: minmax(0, 1fr);
+          gap: 0.6rem;
           margin-bottom: 0.65rem;
         }
         .kitchen-control {
           margin: 0;
+        }
+        .kitchen-date-picker-row :global(.btn) {
+          width: 100%;
         }
         .kitchen-section-card {
           border: 1px solid #ddcfb8;
@@ -518,6 +519,10 @@ export default function KitchenDashboard({
           }
           .kitchen-order-columns {
             grid-template-columns: 1fr 1fr;
+          }
+          .kitchen-date-picker-row {
+            grid-template-columns: minmax(0, 1fr) auto auto;
+            align-items: end;
           }
         }
         @media (min-width: 1200px) {

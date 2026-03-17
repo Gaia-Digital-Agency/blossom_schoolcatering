@@ -283,66 +283,68 @@ export default function DeliveryPage() {
           </label>
         </div>
 
-        <div className="module-section">
-          <h2>Order Pending ({pendingRows.length})</h2>
-          {pendingRows.length === 0 ? <p className="auth-help">No pending orders in the window.</p> : (
-            <div className="auth-form">
-              {Object.entries(pendingBySchool).map(([schoolName, group]) => (
-                <div key={schoolName} className="delivery-school-group">
-                  <h3 className="delivery-school-title">{schoolName}</h3>
-                  {group.map((row) => (
-                    <label key={row.id}>
-                      <strong>{row.service_date} | Session: {row.session}</strong>
-                      <small>Student Full Name: {row.child_name}</small>
-                      <small>School: {row.school_name || '-'}</small>
-                      <small>Phone Number: {row.youngster_mobile || '-'}</small>
-                      <small>Dietary Allergies: {(row.allergen_items || '').trim() || '-'}</small>
-                      <small>Status: {row.status} | Delivery: {row.delivery_status}</small>
-                      <small>Dishes: {(row.dishes || []).map((dish) => `${dish.item_name} x${dish.quantity}`).join(', ') || '-'}</small>
-                      <button
-                        className="btn btn-primary"
-                        type="button"
-                        onClick={() => onToggleComplete(row.id)}
-                      >
-                        Mark Complete
-                      </button>
-                    </label>
-                  ))}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <div className="delivery-order-columns">
+          <div className="module-section">
+            <h2>Order Pending ({pendingRows.length})</h2>
+            {pendingRows.length === 0 ? <p className="auth-help">No pending orders in the window.</p> : (
+              <div className="auth-form">
+                {Object.entries(pendingBySchool).map(([schoolName, group]) => (
+                  <div key={schoolName} className="delivery-school-group">
+                    <h3 className="delivery-school-title">{schoolName}</h3>
+                    {group.map((row) => (
+                      <label key={row.id}>
+                        <strong>{row.service_date} | Session: {row.session}</strong>
+                        <small>Student Full Name: {row.child_name}</small>
+                        <small>School: {row.school_name || '-'}</small>
+                        <small>Phone Number: {row.youngster_mobile || '-'}</small>
+                        <small>Dietary Allergies: {(row.allergen_items || '').trim() || '-'}</small>
+                        <small>Status: {row.status} | Delivery: {row.delivery_status}</small>
+                        <small>Dishes: {(row.dishes || []).map((dish) => `${dish.item_name} x${dish.quantity}`).join(', ') || '-'}</small>
+                        <button
+                          className="btn btn-primary"
+                          type="button"
+                          onClick={() => onToggleComplete(row.id)}
+                        >
+                          Mark Complete
+                        </button>
+                      </label>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
-        <div className="module-section">
-          <h2>Order Completed ({completedRows.length})</h2>
-          {completedRows.length === 0 ? <p className="auth-help">No completed orders in the window.</p> : (
-            <div className="auth-form">
-              {Object.entries(completedBySchool).map(([schoolName, group]) => (
-                <div key={schoolName} className="delivery-school-group">
-                  <h3 className="delivery-school-title">{schoolName}</h3>
-                  {group.map((row) => (
-                    <label key={row.id}>
-                      <strong>{row.service_date} | Session: {row.session}</strong>
-                      <small>Student Full Name: {row.child_name}</small>
-                      <small>School: {row.school_name || '-'}</small>
-                      <small>Phone Number: {row.youngster_mobile || '-'}</small>
-                      <small>Dietary Allergies: {(row.allergen_items || '').trim() || '-'}</small>
-                      <small>Status: {row.status} | Delivery: {row.delivery_status}</small>
-                      <small>Dishes: {(row.dishes || []).map((dish) => `${dish.item_name} x${dish.quantity}`).join(', ') || '-'}</small>
-                      <button
-                        className="btn btn-success"
-                        type="button"
-                        onClick={() => onToggleComplete(row.id)}
-                      >
-                        Completed (Click to Undo)
-                      </button>
-                    </label>
-                  ))}
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="module-section">
+            <h2>Order Completed ({completedRows.length})</h2>
+            {completedRows.length === 0 ? <p className="auth-help">No completed orders in the window.</p> : (
+              <div className="auth-form">
+                {Object.entries(completedBySchool).map(([schoolName, group]) => (
+                  <div key={schoolName} className="delivery-school-group">
+                    <h3 className="delivery-school-title">{schoolName}</h3>
+                    {group.map((row) => (
+                      <label key={row.id}>
+                        <strong>{row.service_date} | Session: {row.session}</strong>
+                        <small>Student Full Name: {row.child_name}</small>
+                        <small>School: {row.school_name || '-'}</small>
+                        <small>Phone Number: {row.youngster_mobile || '-'}</small>
+                        <small>Dietary Allergies: {(row.allergen_items || '').trim() || '-'}</small>
+                        <small>Status: {row.status} | Delivery: {row.delivery_status}</small>
+                        <small>Dishes: {(row.dishes || []).map((dish) => `${dish.item_name} x${dish.quantity}`).join(', ') || '-'}</small>
+                        <button
+                          className="btn btn-success"
+                          type="button"
+                          onClick={() => onToggleComplete(row.id)}
+                        >
+                          Completed (Click to Undo)
+                        </button>
+                      </label>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </section>
       <style jsx>{`
@@ -402,6 +404,15 @@ export default function DeliveryPage() {
         .delivery-date-picker-row .delivery-control {
           margin: 0;
         }
+        .delivery-order-columns {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 1rem;
+          align-items: start;
+        }
+        .delivery-order-columns .module-section {
+          min-width: 0;
+        }
         @media (min-width: 720px) {
           .delivery-user-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -409,6 +420,17 @@ export default function DeliveryPage() {
           .delivery-date-picker-row {
             grid-template-columns: 1fr auto auto;
             align-items: end;
+          }
+        }
+        @media (max-width: 640px) {
+          .delivery-order-columns {
+            gap: 0.7rem;
+          }
+          .delivery-order-columns :global(.auth-form) {
+            padding: 0.7rem;
+          }
+          .delivery-order-columns :global(label) {
+            font-size: 0.8rem;
           }
         }
       `}</style>

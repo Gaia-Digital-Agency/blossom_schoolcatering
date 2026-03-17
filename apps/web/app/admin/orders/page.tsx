@@ -98,7 +98,6 @@ export default function AdminOrdersPage() {
       <section className="auth-panel">
         <div className="auth-form">
           <h1>Admin Orders</h1>
-          <p className="auth-help">Outstanding orders on the left, completed orders on the right.</p>
           <AdminNav />
         </div>
 
@@ -261,6 +260,9 @@ export default function AdminOrdersPage() {
           grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
           gap: 0.75rem;
           align-items: end;
+        }
+        .orders-filter-card {
+          margin-bottom: 0.7rem;
         }
         .orders-filter-action {
           display: flex;
