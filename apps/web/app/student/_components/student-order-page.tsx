@@ -160,7 +160,11 @@ function mapOrderRuleError(raw: string) {
   return raw;
 }
 
-export default function StudentOrderPage() {
+export default function StudentOrderPage({
+  mode = 'order',
+}: {
+  mode?: 'order' | 'record';
+}) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -446,28 +450,32 @@ export default function StudentOrderPage() {
         </div>
         {error ? <p className="auth-error">{error}</p> : null}
 
-        <div className="module-section" id="youngster-order">
-          <h2>Confirmed Orders</h2>
-          <div className="day-toggle-row" role="group" aria-label="View date">
-            <button type="button" className={confirmedViewDate === yesterdayDate ? 'day-btn day-btn-active' : 'day-btn'} onClick={() => setConfirmedViewDate(yesterdayDate)}>Yesterday</button>
-            <button type="button" className={confirmedViewDate === todayDate ? 'day-btn day-btn-active' : 'day-btn'} onClick={() => setConfirmedViewDate(todayDate)}>Today</button>
-            <button type="button" className={confirmedViewDate === nextServiceDate ? 'day-btn day-btn-active' : 'day-btn'} onClick={() => setConfirmedViewDate(nextServiceDate)}>Tomorrow</button>
-          </div>
-          {confirmedOrders.length > 0 ? (
-            <div className="auth-form">
-              {confirmedOrders.map((order) => (
-                <label key={order.id} style={getSessionCardStyle(order.session)}>
-                  <SessionBadge session={order.session} />
-                  <strong>{order.service_date}</strong>
-                  <small>Status: {order.status} | Billing: {order.billing_status || '-'} | Delivery: {order.delivery_status || '-'}</small>
-                  <small>Total: Rp {Number(order.total_price).toLocaleString('id-ID')}</small>
-                  <small>Items: {order.items.map((item) => `${item.item_name_snapshot} x${item.quantity}`).join(', ') || '-'}</small>
-                </label>
-              ))}
+        {mode === 'record' ? (
+          <div className="module-section" id="youngster-order">
+            <h2>Confirmed Orders</h2>
+            <div className="day-toggle-row" role="group" aria-label="View date">
+              <button type="button" className={confirmedViewDate === yesterdayDate ? 'day-btn day-btn-active' : 'day-btn'} onClick={() => setConfirmedViewDate(yesterdayDate)}>Yesterday</button>
+              <button type="button" className={confirmedViewDate === todayDate ? 'day-btn day-btn-active' : 'day-btn'} onClick={() => setConfirmedViewDate(todayDate)}>Today</button>
+              <button type="button" className={confirmedViewDate === nextServiceDate ? 'day-btn day-btn-active' : 'day-btn'} onClick={() => setConfirmedViewDate(nextServiceDate)}>Tomorrow</button>
             </div>
-          ) : <p className="auth-help">No confirmed order for {confirmedViewDate}.</p>}
-        </div>
+            {confirmedOrders.length > 0 ? (
+              <div className="auth-form">
+                {confirmedOrders.map((order) => (
+                  <label key={order.id} style={getSessionCardStyle(order.session)}>
+                    <SessionBadge session={order.session} />
+                    <strong>{order.service_date}</strong>
+                    <small>Status: {order.status} | Billing: {order.billing_status || '-'} | Delivery: {order.delivery_status || '-'}</small>
+                    <small>Total: Rp {Number(order.total_price).toLocaleString('id-ID')}</small>
+                    <small>Items: {order.items.map((item) => `${item.item_name_snapshot} x${item.quantity}`).join(', ') || '-'}</small>
+                  </label>
+                ))}
+              </div>
+            ) : <p className="auth-help">No confirmed order for {confirmedViewDate}.</p>}
+          </div>
+        ) : null}
 
+        {mode === 'order' ? (
+          <>
         <div className="module-section">
           <h2>Weekly Nutrition and Badge</h2>
           {insights ? (
@@ -552,6 +560,8 @@ export default function StudentOrderPage() {
             <p className="auth-help">No active dishes configured by Admin for this date/session.</p>
           )}
         </div>
+          </>
+        ) : null}
       </section>
 
       {/* ── Blackout Popup ── */}

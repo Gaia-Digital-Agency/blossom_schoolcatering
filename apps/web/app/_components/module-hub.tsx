@@ -17,6 +17,7 @@ const HUB_ITEMS: Record<ModuleType, Array<{ label: string; icon: string; href?: 
   student: [
     { label: 'Overview', icon: '📅', href: '/student/overview' },
     { label: 'Order', icon: '🛒', href: '/student/order' },
+    { label: 'Record', icon: '🧾', href: '/student/consolorder' },
     { label: 'Billing', icon: '💳', href: '/student/billing' },
     { label: 'Rating', icon: '⭐', href: '/rating' },
     { label: 'Menu', icon: '🍽️', href: '/menu' },
