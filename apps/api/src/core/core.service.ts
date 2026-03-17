@@ -66,7 +66,12 @@ export class CoreService implements OnModuleInit {
   private adminVisiblePasswordsReady = false;
   private readonly publicMenuCacheTtlMs = 60_000;
   private publicMenuCache = new Map<string, {
-    data: { serviceDate: string; session: SessionType | 'ALL'; items: unknown[] };
+    data: {
+      serviceDate: string;
+      session: SessionType | 'ALL';
+      items: unknown[];
+      sessionSettings: Array<{ session: SessionType; is_active: boolean }>;
+    };
     expiresAt: number;
   }>();
 
@@ -2418,6 +2423,7 @@ export class CoreService implements OnModuleInit {
     const cacheKey = this.getPublicMenuCacheKey(serviceDate, session);
     const cached = this.publicMenuCache.get(cacheKey);
     if (cached && Date.now() < cached.expiresAt) return cached.data;
+    const sessionSettings = await this.getSessionSettings();
     if (session) {
       const active = await this.isSessionActive(session);
       if (!active) {
@@ -2425,6 +2431,7 @@ export class CoreService implements OnModuleInit {
           serviceDate,
           session,
           items: [],
+          sessionSettings,
         };
         this.publicMenuCache.set(cacheKey, {
           data: emptyResult,
@@ -2479,10 +2486,16 @@ export class CoreService implements OnModuleInit {
       params,
     );
 
-    const result: { serviceDate: string; session: SessionType | 'ALL'; items: unknown[] } = {
+    const result: {
+      serviceDate: string;
+      session: SessionType | 'ALL';
+      items: unknown[];
+      sessionSettings: Array<{ session: SessionType; is_active: boolean }>;
+    } = {
       serviceDate,
       session: (session || 'ALL') as SessionType | 'ALL',
       items: this.parseJsonLines(out),
+      sessionSettings,
     };
     this.publicMenuCache.set(cacheKey, {
       data: result,

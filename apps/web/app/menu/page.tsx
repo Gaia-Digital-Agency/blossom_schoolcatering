@@ -24,6 +24,9 @@ type PublicMenuItem = {
   service_date: string;
 };
 
+type SessionOption = 'LUNCH' | 'SNACK' | 'BREAKFAST';
+type PublicSessionSetting = { session: SessionOption; is_active: boolean };
+
 const FALLBACK_DISH_IMAGE = '/schoolcatering/assets/hero-meal.jpg';
 
 function withCacheBust(src: string, updatedAt?: string) {
@@ -60,10 +63,11 @@ const CATEGORY_GROUPS: Array<{ code: string; label: string }> = [
 
 export default function MenuPage() {
   const [items, setItems] = useState<PublicMenuItem[]>([]);
+  const [sessionSettings, setSessionSettings] = useState<PublicSessionSetting[]>([]);
   const [serviceDate, setServiceDate] = useState('');
   const [error, setError] = useState('');
   const [returnHref, setReturnHref] = useState('/login');
-  const [selectedSession, setSelectedSession] = useState<'LUNCH' | 'SNACK' | 'BREAKFAST'>('LUNCH');
+  const [selectedSession, setSelectedSession] = useState<SessionOption>('LUNCH');
 
   useEffect(() => {
     const load = async () => {
@@ -73,9 +77,14 @@ export default function MenuPage() {
           cache: 'no-cache',
         });
         if (!res.ok) throw new Error('Failed loading menu');
-        const data = await res.json() as { serviceDate: string; items: PublicMenuItem[] };
+        const data = await res.json() as {
+          serviceDate: string;
+          items: PublicMenuItem[];
+          sessionSettings?: PublicSessionSetting[];
+        };
         setServiceDate(data.serviceDate || '');
         setItems(data.items || []);
+        setSessionSettings(Array.isArray(data.sessionSettings) ? data.sessionSettings : []);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed loading menu');
       }
@@ -93,6 +102,20 @@ export default function MenuPage() {
       setReturnHref('/student');
     }
   }, []);
+
+  const availableSessions = useMemo(() => {
+    const activeSettings = sessionSettings.filter((setting) => setting.is_active);
+    if (activeSettings.length > 0) {
+      return activeSettings.map((setting) => setting.session);
+    }
+    return ['LUNCH'] as SessionOption[];
+  }, [sessionSettings]);
+
+  useEffect(() => {
+    if (!availableSessions.includes(selectedSession)) {
+      setSelectedSession(availableSessions[0] || 'LUNCH');
+    }
+  }, [availableSessions, selectedSession]);
 
   const groupedItems = useMemo(() => {
     const byCategory = new Map<string, PublicMenuItem[]>();
@@ -120,24 +143,16 @@ export default function MenuPage() {
         <div className="module-guide-card">
           Log in to order for students from Blossom Steakhouse Kitchen.
         </div>
-        <div className="session-filter-row" role="radiogroup" aria-label="Menu session">
-          {[
-            { value: 'LUNCH', label: 'Lunch' },
-            { value: 'SNACK', label: 'Snack' },
-            { value: 'BREAKFAST', label: 'Breakfast' },
-          ].map((option) => (
-            <label key={option.value} className="session-filter-option">
-              <input
-                type="radio"
-                name="menu-session"
-                value={option.value}
-                checked={selectedSession === option.value}
-                onChange={() => setSelectedSession(option.value as 'LUNCH' | 'SNACK' | 'BREAKFAST')}
-              />
-              <span>{option.label}</span>
-            </label>
-          ))}
-        </div>
+        <label className="session-filter-select">
+          <span>Session</span>
+          <select value={selectedSession} onChange={(event) => setSelectedSession(event.target.value as SessionOption)}>
+            {availableSessions.map((session) => (
+              <option key={session} value={session}>
+                {session.charAt(0)}{session.slice(1).toLowerCase()}
+              </option>
+            ))}
+          </select>
+        </label>
         {error ? <p className="auth-error">{error}</p> : null}
 
         {items.length === 0 ? (
@@ -289,23 +304,26 @@ export default function MenuPage() {
           color: #6b5a43;
           margin-bottom: 0.85rem;
         }
-        .session-filter-row {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 0.85rem;
-          align-items: center;
+        .session-filter-select {
+          display: grid;
+          gap: 0.35rem;
           margin-bottom: 0.85rem;
         }
-        .session-filter-option {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.4rem;
-          font-size: 0.9rem;
-          color: #5d4e3a;
-          cursor: pointer;
+        .session-filter-select span {
+          font-size: 0.82rem;
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          color: #6b5a43;
         }
-        .session-filter-option input {
-          margin: 0;
+        .session-filter-select select {
+          width: 100%;
+          border: 1px solid #d7c5a4;
+          border-radius: 0.75rem;
+          background: #fffdf9;
+          color: #3b332a;
+          font: inherit;
+          padding: 0.85rem 0.95rem;
         }
         @media (min-width: 900px) {
           /* Side-by-side: Main (left) | secondary categories (right) */
