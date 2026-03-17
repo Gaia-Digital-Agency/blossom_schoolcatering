@@ -630,21 +630,19 @@ export class AuthService {
     for (const family of families) {
       const parentEmail = this.buildSeedAliasEmail(emailBase, `${family.familyGroup}-parent`);
       const parentPasswordHash = this.hashPassword('Parent@123');
-      const parentUserId = await runSql(
+      const createdParentUserId = await runSql(
         `INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email, is_active, deleted_at)
          VALUES ('PARENT', $1, $2, $3, $4, $5, $6, true, NULL)
-         ON CONFLICT (username) DO UPDATE
-         SET role = EXCLUDED.role,
-             password_hash = EXCLUDED.password_hash,
-             first_name = EXCLUDED.first_name,
-             last_name = EXCLUDED.last_name,
-             phone_number = EXCLUDED.phone_number,
-             email = EXCLUDED.email,
-             is_active = true,
-             deleted_at = NULL,
-             updated_at = now()
+         ON CONFLICT (username) DO NOTHING
          RETURNING id;`,
         [family.parentUsername, parentPasswordHash, family.parentFirstName, family.familyGroup, parentPhone, parentEmail],
+      );
+      const parentUserId = createdParentUserId || await runSql(
+        `SELECT id
+         FROM users
+         WHERE username = $1
+         LIMIT 1;`,
+        [family.parentUsername],
       );
       await runSql(
         `INSERT INTO user_preferences (user_id, onboarding_completed, dark_mode_enabled, tooltips_enabled)
@@ -652,19 +650,27 @@ export class AuthService {
          ON CONFLICT (user_id) DO NOTHING;`,
         [parentUserId],
       );
-      await this.setAdminVisiblePassword(parentUserId, 'Parent@123', 'REGISTRATION');
+      if (createdParentUserId) {
+        await this.setAdminVisiblePassword(parentUserId, 'Parent@123', 'REGISTRATION');
+      }
 
-      const parentId = await runSql(
+      const createdParentId = await runSql(
         `INSERT INTO parents (user_id, address, deleted_at)
          VALUES ($1, $2, NULL)
-         ON CONFLICT (user_id) DO UPDATE
-         SET address = EXCLUDED.address,
-             deleted_at = NULL,
-             updated_at = now()
+         ON CONFLICT (user_id) DO NOTHING
          RETURNING id;`,
         [parentUserId, family.parentAddress],
       );
-      await this.upsertParentAllergies(parentId, family.parentAllergies);
+      const parentId = createdParentId || await runSql(
+        `SELECT id
+         FROM parents
+         WHERE user_id = $1
+         LIMIT 1;`,
+        [parentUserId],
+      );
+      if (createdParentId) {
+        await this.upsertParentAllergies(parentId, family.parentAllergies);
+      }
 
       for (const student of family.students) {
         const schoolId = schools[student.schoolIndex]?.id;
@@ -673,21 +679,19 @@ export class AuthService {
         }
         const studentEmail = this.buildSeedAliasEmail(emailBase, `${student.username}`);
         const studentPasswordHash = this.hashPassword('Student@123');
-        const studentUserId = await runSql(
+        const createdStudentUserId = await runSql(
           `INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email, is_active, deleted_at)
            VALUES ('CHILD', $1, $2, $3, $4, $5, $6, true, NULL)
-           ON CONFLICT (username) DO UPDATE
-           SET role = EXCLUDED.role,
-               password_hash = EXCLUDED.password_hash,
-               first_name = EXCLUDED.first_name,
-               last_name = EXCLUDED.last_name,
-               phone_number = EXCLUDED.phone_number,
-               email = EXCLUDED.email,
-               is_active = true,
-               deleted_at = NULL,
-               updated_at = now()
+           ON CONFLICT (username) DO NOTHING
            RETURNING id;`,
           [student.username, studentPasswordHash, student.firstName, student.familyGroup, studentPhone, studentEmail],
+        );
+        const studentUserId = createdStudentUserId || await runSql(
+          `SELECT id
+           FROM users
+           WHERE username = $1
+           LIMIT 1;`,
+          [student.username],
         );
         await runSql(
           `INSERT INTO user_preferences (user_id, onboarding_completed, dark_mode_enabled, tooltips_enabled)
@@ -695,7 +699,9 @@ export class AuthService {
            ON CONFLICT (user_id) DO NOTHING;`,
           [studentUserId],
         );
-        await this.setAdminVisiblePassword(studentUserId, 'Student@123', 'REGISTRATION');
+        if (createdStudentUserId) {
+          await this.setAdminVisiblePassword(studentUserId, 'Student@123', 'REGISTRATION');
+        }
 
         const existingChildId = await runSql(`SELECT id FROM children WHERE user_id = $1 LIMIT 1;`, [studentUserId]);
         const childId = existingChildId || await runSql(
@@ -725,36 +731,9 @@ export class AuthService {
           ],
         );
         await runSql(
-          `UPDATE children
-           SET school_id = $2,
-               date_of_birth = $3::date,
-               gender = 'UNDISCLOSED'::gender_type,
-               school_grade = $4,
-               registration_actor_type = $5,
-               registration_actor_teacher_name = $6,
-               registration_actor_teacher_phone = $7,
-               is_active = true,
-               deleted_at = NULL,
-               updated_at = now()
-           WHERE id = $1;`,
-          [
-            childId,
-            schoolId,
-            student.dateOfBirth,
-            student.grade,
-            student.registrantType,
-            student.registrantType === 'TEACHER' ? (student.teacherName || 'teacher') : null,
-            student.registrantType === 'TEACHER' ? (student.teacherPhone || teacherPhone) : null,
-          ],
-        );
-        await runSql(
           `INSERT INTO child_dietary_restrictions (child_id, restriction_label, restriction_details, is_active)
            VALUES ($1, 'ALLERGIES', $2, true)
-           ON CONFLICT (child_id, restriction_label)
-           DO UPDATE SET restriction_details = EXCLUDED.restriction_details,
-                         is_active = true,
-                         deleted_at = NULL,
-                         updated_at = now();`,
+           ON CONFLICT (child_id, restriction_label) DO NOTHING;`,
           [childId, this.normalizeAllergies(student.allergies)],
         );
         await runSql(
