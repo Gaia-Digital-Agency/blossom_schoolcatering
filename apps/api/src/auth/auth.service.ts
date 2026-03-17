@@ -413,18 +413,29 @@ export class AuthService {
     const schools = this.parseJsonLines<{ id: string; name: string }>(existingOut);
     for (let index = schools.length; index < requiredCount; index += 1) {
       const schoolNumber = index + 1;
-      const createdId = await runSql(
+      const schoolName = `Seed School ${String(schoolNumber).padStart(2, '0')}`;
+      let schoolId = await runSql(
         `INSERT INTO schools (name, address, city, contact_phone, is_active)
          VALUES ($1, $2, $3, $4, true)
+         ON CONFLICT DO NOTHING
          RETURNING id;`,
         [
-          `Seed School ${String(schoolNumber).padStart(2, '0')}`,
+          schoolName,
           `Seed Address ${schoolNumber}`,
           'Makassar',
           `+620000000${String(schoolNumber).padStart(2, '0')}`,
         ],
       );
-      schools.push({ id: createdId, name: `Seed School ${String(schoolNumber).padStart(2, '0')}` });
+      if (!schoolId) {
+        schoolId = await runSql(
+          `SELECT id
+           FROM schools
+           WHERE lower(name) = lower($1)
+           LIMIT 1;`,
+          [schoolName],
+        );
+      }
+      schools.push({ id: schoolId, name: schoolName });
     }
     return schools;
   }
