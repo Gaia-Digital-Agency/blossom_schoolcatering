@@ -29,12 +29,6 @@ export default function DraftExitGuard({
       setPendingAction('back');
     };
 
-    const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (bypassRef.current) return;
-      event.preventDefault();
-      event.returnValue = '';
-    };
-
     const onKeyDown = (event: KeyboardEvent) => {
       const wantsRefresh = event.key === 'F5' || ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'r');
       if (!wantsRefresh || bypassRef.current) return;
@@ -51,12 +45,10 @@ export default function DraftExitGuard({
     };
 
     window.addEventListener('popstate', onPopState);
-    window.addEventListener('beforeunload', onBeforeUnload);
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('blossom:draft-exit-intent', onExitIntent as EventListener);
     return () => {
       window.removeEventListener('popstate', onPopState);
-      window.removeEventListener('beforeunload', onBeforeUnload);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('blossom:draft-exit-intent', onExitIntent as EventListener);
     };
