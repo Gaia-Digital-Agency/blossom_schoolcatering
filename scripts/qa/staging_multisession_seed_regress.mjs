@@ -573,8 +573,8 @@ async function main() {
   add(
     'Family',
     'Family consolidated orders',
-    Array.isArray(parentOrders) && parentOrders.some((row) => row.session === 'BREAKFAST') && parentOrders.some((row) => row.session === 'SNACK'),
-    `rows=${Array.isArray(parentOrders) ? parentOrders.length : 0}`,
+    Array.isArray(parentOrders.orders) && parentOrders.orders.some((row) => row.session === 'BREAKFAST') && parentOrders.orders.some((row) => row.session === 'SNACK'),
+    `rows=${Array.isArray(parentOrders.orders) ? parentOrders.orders.length : 0}`,
   );
 
   const parentBilling = await api('/billing/parent/consolidated', { token: familyToken, expect: [200] });
@@ -601,13 +601,22 @@ async function main() {
     `monthlyOrders=${studentInsights.badge?.monthlyOrders ?? '-'}`,
   );
 
-  const studentBilling = await api('/billing/youngster/consolidated', { token: studentToken, expect: [200] });
-  add(
-    'Billing',
-    'Student billing loads across sessions',
-    Array.isArray(studentBilling) && studentBilling.some((row) => row.session === 'BREAKFAST') && studentBilling.some((row) => row.session === 'SNACK'),
-    `rows=${Array.isArray(studentBilling) ? studentBilling.length : 0}`,
-  );
+  try {
+    const studentBilling = await api('/billing/youngster/consolidated', { token: studentToken, expect: [200] });
+    add(
+      'Billing',
+      'Student billing loads across sessions',
+      Array.isArray(studentBilling) && studentBilling.some((row) => row.session === 'BREAKFAST') && studentBilling.some((row) => row.session === 'SNACK'),
+      `rows=${Array.isArray(studentBilling) ? studentBilling.length : 0}`,
+    );
+  } catch (error) {
+    add(
+      'Billing',
+      'Student billing loads across sessions',
+      false,
+      error instanceof Error ? error.message : String(error),
+    );
+  }
 
   const adminBreakfastOrders = await api(`/admin/orders?date=${TARGET_DATE}&session=BREAKFAST`, { token: adminToken, expect: [200] });
   const adminSnackOrders = await api(`/admin/orders?date=${TARGET_DATE}&session=SNACK`, { token: adminToken, expect: [200] });
