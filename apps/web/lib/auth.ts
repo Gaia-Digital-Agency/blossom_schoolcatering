@@ -28,8 +28,14 @@ export function setAuthState(accessToken: string, role: Role) {
 export function clearAuthState() {
   localStorage.removeItem(ACCESS_KEY);
   localStorage.removeItem(ROLE_KEY);
-  document.cookie = `${AUTH_COOKIE}=; path=/; max-age=0`;
-  document.cookie = `${ROLE_COOKIE}=; path=/; max-age=0`;
+  const expireCookie = (name: string, path: string) => {
+    document.cookie = `${name}=; path=${path}; max-age=0; SameSite=Lax`;
+    document.cookie = `${name}=; path=${path}; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
+  };
+  expireCookie(AUTH_COOKIE, '/');
+  expireCookie(ROLE_COOKIE, '/');
+  expireCookie(AUTH_COOKIE, '/schoolcatering');
+  expireCookie(ROLE_COOKIE, '/schoolcatering');
 }
 
 function publishNetworkState() {

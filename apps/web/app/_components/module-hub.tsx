@@ -1,7 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { clearBrowserSession } from '../../lib/auth';
+import { clearBrowserSession, getAppBase } from '../../lib/auth';
 
 type ModuleType = 'family' | 'student';
 
@@ -31,11 +30,9 @@ export default function ModuleHub({
   module: ModuleType;
   title: string;
 }) {
-  const router = useRouter();
-
   const onHome = async () => {
     await clearBrowserSession();
-    router.push('/');
+    window.location.href = `${getAppBase()}/`;
   };
 
   return (
@@ -53,7 +50,7 @@ export default function ModuleHub({
                   void onHome();
                   return;
                 }
-                if (item.href) router.push(item.href);
+                if (item.href) window.location.href = `${getAppBase()}${item.href}`;
               }}
               aria-label={item.label}
             >
