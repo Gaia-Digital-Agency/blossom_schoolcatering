@@ -2298,6 +2298,15 @@ export class CoreService implements OnModuleInit {
     };
   }
 
+  async getYoungsterChildrenPages(actor: AccessUser) {
+    if (actor.role !== 'YOUNGSTER') throw new ForbiddenException('Role not allowed');
+    const me = await this.getYoungsterMe(actor);
+    return {
+      parentId: null,
+      children: [me],
+    };
+  }
+
   async linkParentChild(actor: AccessUser, parentId: string, childId: string) {
     if (!['PARENT', 'ADMIN'].includes(actor.role)) {
       throw new ForbiddenException('Role not allowed');
@@ -4652,19 +4661,80 @@ export class CoreService implements OnModuleInit {
     }));
   }
 
-  async uploadBillingProof(actor: AccessUser, billingId: string, proofImageData?: string) {
-    if (actor.role !== 'PARENT') throw new ForbiddenException('Role not allowed');
-    const parentId = await this.getParentIdByUserId(actor.uid);
-    if (!parentId) throw new BadRequestException('Parent profile not found');
-    const proof = (proofImageData || '').trim();
-    const exists = await runSql(
-      `SELECT EXISTS (
-         SELECT 1 FROM billing_records
-         WHERE id = $1
-           AND parent_id = $2
-       );`,
-      [billingId, parentId],
+  async getYoungsterConsolidatedBilling(actor: AccessUser) {
+    if (actor.role !== 'YOUNGSTER') throw new ForbiddenException('Role not allowed');
+    await this.ensureBillingReviewColumns();
+    const childId = await this.getChildIdByUserId(actor.uid);
+    if (!childId) throw new NotFoundException('Youngster profile not found');
+    const out = await runSql(`
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT br.id,
+               br.order_id,
+               o.child_id,
+               br.status::text AS status,
+               br.delivery_status::text AS delivery_status,
+               br.proof_image_url,
+               br.proof_uploaded_at::text AS proof_uploaded_at,
+               br.delivered_at::text AS delivered_at,
+               br.created_at::text AS created_at,
+               br.admin_note,
+               o.service_date::text AS service_date,
+               o.session::text AS session,
+               o.total_price,
+               (u.first_name || ' ' || u.last_name) AS child_name,
+               dr.receipt_number,
+               dr.pdf_url,
+               dr.generated_at::text AS generated_at
+        FROM billing_records br
+        JOIN orders o ON o.id = br.order_id
+        JOIN children c ON c.id = o.child_id
+        JOIN users u ON u.id = c.user_id
+        LEFT JOIN digital_receipts dr ON dr.billing_record_id = br.id
+        WHERE o.child_id = $1
+        ORDER BY br.created_at DESC
+      ) t;
+    `,
+      [childId],
     );
+    return this.parseJsonLines<Record<string, unknown> & { total_price?: string | number }>(out).map((row) => ({
+      ...row,
+      total_price: Number(row.total_price || 0),
+    }));
+  }
+
+  async uploadBillingProof(actor: AccessUser, billingId: string, proofImageData?: string) {
+    if (!['PARENT', 'YOUNGSTER'].includes(actor.role)) throw new ForbiddenException('Role not allowed');
+    const proof = (proofImageData || '').trim();
+    let ownerFolderId = actor.uid;
+    let exists = '';
+    if (actor.role === 'PARENT') {
+      const parentId = await this.getParentIdByUserId(actor.uid);
+      if (!parentId) throw new BadRequestException('Parent profile not found');
+      ownerFolderId = parentId;
+      exists = await runSql(
+        `SELECT EXISTS (
+           SELECT 1 FROM billing_records
+           WHERE id = $1
+             AND parent_id = $2
+         );`,
+        [billingId, parentId],
+      );
+    } else {
+      const childId = await this.getChildIdByUserId(actor.uid);
+      if (!childId) throw new NotFoundException('Youngster profile not found');
+      ownerFolderId = childId;
+      exists = await runSql(
+        `SELECT EXISTS (
+           SELECT 1
+           FROM billing_records br
+           JOIN orders o ON o.id = br.order_id
+           WHERE br.id = $1
+             AND o.child_id = $2
+         );`,
+        [billingId, childId],
+      );
+    }
     if (exists !== 't') throw new NotFoundException('Billing record not found');
     let proofUrl = proof;
     if (proof.startsWith('data:')) {
@@ -4676,7 +4746,7 @@ export class CoreService implements OnModuleInit {
         label: 'Proof image',
       });
       const ext = this.getFileExtFromContentType(parsed.contentType);
-      const objectName = `${this.getGcsCategoryFolder('payment-proofs')}/${parentId}/${billingId}-${Date.now()}.${ext}`;
+      const objectName = `${this.getGcsCategoryFolder('payment-proofs')}/${ownerFolderId}/${billingId}-${Date.now()}.${ext}`;
       try {
         const uploaded = await this.uploadToGcs({
           objectName,
@@ -4707,24 +4777,44 @@ export class CoreService implements OnModuleInit {
   }
 
   async uploadBillingProofBatch(actor: AccessUser, billingIdsRaw: string[], proofImageData?: string) {
-    if (actor.role !== 'PARENT') throw new ForbiddenException('Role not allowed');
-    const parentId = await this.getParentIdByUserId(actor.uid);
-    if (!parentId) throw new BadRequestException('Parent profile not found');
+    if (!['PARENT', 'YOUNGSTER'].includes(actor.role)) throw new ForbiddenException('Role not allowed');
     const billingIds = (billingIdsRaw || []).map((x) => String(x || '').trim()).filter(Boolean);
     if (billingIds.length === 0) throw new BadRequestException('billingIds is required');
     if (billingIds.length > 50) throw new BadRequestException('Maximum 50 billing records per batch');
 
     const ph = billingIds.map((_, i) => `$${i + 1}`).join(', ');
-    const allowedOut = await runSql(
-      `SELECT row_to_json(t)::text
-       FROM (
-         SELECT id
-         FROM billing_records
-         WHERE id IN (${ph})
-           AND parent_id = $${billingIds.length + 1}
-       ) t;`,
-      [...billingIds, parentId],
-    );
+    let allowedOut = '';
+    let ownerParams: unknown[] = [];
+    if (actor.role === 'PARENT') {
+      const parentId = await this.getParentIdByUserId(actor.uid);
+      if (!parentId) throw new BadRequestException('Parent profile not found');
+      ownerParams = [parentId];
+      allowedOut = await runSql(
+        `SELECT row_to_json(t)::text
+         FROM (
+           SELECT id
+           FROM billing_records
+           WHERE id IN (${ph})
+             AND parent_id = $${billingIds.length + 1}
+         ) t;`,
+        [...billingIds, parentId],
+      );
+    } else {
+      const childId = await this.getChildIdByUserId(actor.uid);
+      if (!childId) throw new NotFoundException('Youngster profile not found');
+      ownerParams = [childId];
+      allowedOut = await runSql(
+        `SELECT row_to_json(t)::text
+         FROM (
+           SELECT br.id
+           FROM billing_records br
+           JOIN orders o ON o.id = br.order_id
+           WHERE br.id IN (${ph})
+             AND o.child_id = $${billingIds.length + 1}
+         ) t;`,
+        [...billingIds, childId],
+      );
+    }
     const allowedIds = new Set(this.parseJsonLines<{ id: string }>(allowedOut).map((x) => x.id));
     if (allowedIds.size !== billingIds.length) {
       throw new NotFoundException('One or more billing records not found');
@@ -4745,17 +4835,33 @@ export class CoreService implements OnModuleInit {
 
     const restIds = billingIds.slice(1);
     const restPh = restIds.map((_, i) => `$${i + 2}`).join(', ');
-    await runSql(
-      `UPDATE billing_records
-       SET proof_image_url = $1,
-           proof_uploaded_at = now(),
-           status = 'PENDING_VERIFICATION',
-           admin_note = NULL,
-           updated_at = now()
-       WHERE id IN (${restPh})
-         AND parent_id = $${restIds.length + 2};`,
-      [proofUrl, ...restIds, parentId],
-    );
+    if (actor.role === 'PARENT') {
+      await runSql(
+        `UPDATE billing_records
+         SET proof_image_url = $1,
+             proof_uploaded_at = now(),
+             status = 'PENDING_VERIFICATION',
+             admin_note = NULL,
+             updated_at = now()
+         WHERE id IN (${restPh})
+           AND parent_id = $${restIds.length + 2};`,
+        [proofUrl, ...restIds, ...ownerParams],
+      );
+    } else {
+      await runSql(
+        `UPDATE billing_records br
+         SET proof_image_url = $1,
+             proof_uploaded_at = now(),
+             status = 'PENDING_VERIFICATION',
+             admin_note = NULL,
+             updated_at = now()
+         FROM orders o
+         WHERE br.order_id = o.id
+           AND br.id IN (${restPh})
+           AND o.child_id = $${restIds.length + 2};`,
+        [proofUrl, ...restIds, ...ownerParams],
+      );
+    }
     return { ok: true, updatedCount: billingIds.length };
   }
 
@@ -4778,6 +4884,16 @@ export class CoreService implements OnModuleInit {
       if (!parentId) throw new BadRequestException('Parent profile not found');
       params.push(parentId);
       sql += ` AND br.parent_id = $2`;
+    } else if (actor.role === 'YOUNGSTER') {
+      const childId = await this.getChildIdByUserId(actor.uid);
+      if (!childId) throw new NotFoundException('Youngster profile not found');
+      params.push(childId);
+      sql += ` AND EXISTS (
+        SELECT 1
+        FROM orders o
+        WHERE o.id = br.order_id
+          AND o.child_id = $2
+      )`;
     } else if (actor.role !== 'ADMIN') {
       throw new ForbiddenException('Role not allowed');
     }
@@ -5056,8 +5172,9 @@ export class CoreService implements OnModuleInit {
       `
       SELECT row_to_json(t)::text
       FROM (
-        SELECT br.id, br.parent_id, dr.receipt_number, dr.pdf_url, dr.generated_at::text AS generated_at
+        SELECT br.id, br.parent_id, o.child_id, dr.receipt_number, dr.pdf_url, dr.generated_at::text AS generated_at
         FROM billing_records br
+        JOIN orders o ON o.id = br.order_id
         LEFT JOIN digital_receipts dr ON dr.billing_record_id = br.id
         WHERE br.id = $1
         LIMIT 1
@@ -5066,10 +5183,13 @@ export class CoreService implements OnModuleInit {
       [billingId],
     );
     if (!out) throw new NotFoundException('Billing record not found');
-    const row = this.parseJsonLine<{ id: string; parent_id: string; receipt_number?: string; pdf_url?: string }>(out);
+    const row = this.parseJsonLine<{ id: string; parent_id: string; child_id: string; receipt_number?: string; pdf_url?: string }>(out);
     if (actor.role === 'PARENT') {
       const parentId = await this.getParentIdByUserId(actor.uid);
       if (!parentId || parentId !== row.parent_id) throw new ForbiddenException('Role not allowed');
+    } else if (actor.role === 'YOUNGSTER') {
+      const childId = await this.getChildIdByUserId(actor.uid);
+      if (!childId || childId !== row.child_id) throw new ForbiddenException('Role not allowed');
     } else if (actor.role !== 'ADMIN') {
       throw new ForbiddenException('Role not allowed');
     }
@@ -5088,13 +5208,35 @@ export class CoreService implements OnModuleInit {
   }
 
   async revertBillingProof(actor: AccessUser, billingId: string) {
-    if (actor.role !== 'PARENT') throw new ForbiddenException('Role not allowed');
-    const parentId = await this.getParentIdByUserId(actor.uid);
-    if (!parentId) throw new BadRequestException('Parent profile not found');
-    const out = await runSql(
-      `SELECT row_to_json(t)::text FROM (SELECT id, status::text AS status FROM billing_records WHERE id = $1 AND parent_id = $2 LIMIT 1) t;`,
-      [billingId, parentId],
-    );
+    if (!['PARENT', 'YOUNGSTER'].includes(actor.role)) throw new ForbiddenException('Role not allowed');
+    let out = '';
+    if (actor.role === 'PARENT') {
+      const parentId = await this.getParentIdByUserId(actor.uid);
+      if (!parentId) throw new BadRequestException('Parent profile not found');
+      out = await runSql(
+        `SELECT row_to_json(t)::text FROM (
+           SELECT id, status::text AS status
+           FROM billing_records
+           WHERE id = $1 AND parent_id = $2
+           LIMIT 1
+         ) t;`,
+        [billingId, parentId],
+      );
+    } else {
+      const childId = await this.getChildIdByUserId(actor.uid);
+      if (!childId) throw new NotFoundException('Youngster profile not found');
+      out = await runSql(
+        `SELECT row_to_json(t)::text FROM (
+           SELECT br.id, br.status::text AS status
+           FROM billing_records br
+           JOIN orders o ON o.id = br.order_id
+           WHERE br.id = $1
+             AND o.child_id = $2
+           LIMIT 1
+         ) t;`,
+        [billingId, childId],
+      );
+    }
     const parsed = this.parseJsonLine<{ id: string; status: string }>(out);
     if (!parsed) throw new NotFoundException('Billing record not found');
     if (parsed.status !== 'PENDING_VERIFICATION') {
@@ -5107,8 +5249,8 @@ export class CoreService implements OnModuleInit {
            status = 'UNPAID',
            admin_note = NULL,
            updated_at = now()
-       WHERE id = $1 AND parent_id = $2;`,
-      [billingId, parentId],
+       WHERE id = $1;`,
+      [billingId],
     );
     return { ok: true };
   }
@@ -6415,6 +6557,71 @@ export class CoreService implements OnModuleInit {
         total_spend: Number(r.total_spend || 0),
       })),
       birthdayHighlights,
+    };
+  }
+
+  async getYoungsterSpendingDashboard(actor: AccessUser, monthRaw?: string) {
+    if (actor.role !== 'YOUNGSTER') throw new ForbiddenException('Role not allowed');
+    const childId = await this.getChildIdByUserId(actor.uid);
+    if (!childId) throw new NotFoundException('Youngster profile not found');
+    const month = monthRaw && /^\d{4}-\d{2}$/.test(monthRaw) ? monthRaw : await runSql(`SELECT to_char((now() AT TIME ZONE 'Asia/Makassar')::date, 'YYYY-MM');`);
+    const monthStart = `${month}-01`;
+    const monthEnd = await runSql(`SELECT ($1::date + INTERVAL '1 month - 1 day')::date::text;`, [monthStart]);
+
+    const me = await this.getYoungsterMe(actor);
+    const childName = `${me.first_name} ${me.last_name}`.trim();
+    const byChildOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT c.id AS child_id,
+               (u.first_name || ' ' || u.last_name) AS child_name,
+               o.session::text AS session,
+               COUNT(DISTINCT o.id)::int AS orders_count,
+               COALESCE(SUM(o.total_price), 0)::numeric AS total_spend
+        FROM orders o
+        JOIN children c ON c.id = o.child_id
+        JOIN users u ON u.id = c.user_id
+        WHERE c.id = $1
+          AND o.service_date BETWEEN $2::date AND $3::date
+          AND o.status <> 'CANCELLED'
+          AND o.deleted_at IS NULL
+        GROUP BY c.id, u.first_name, u.last_name, o.session
+        ORDER BY CASE o.session
+                 WHEN 'BREAKFAST' THEN 1
+                 WHEN 'SNACK' THEN 2
+                 ELSE 3
+               END ASC
+      ) t;
+    `,
+      [childId, monthStart, monthEnd],
+    );
+    const totalMonthSpend = Number(await runSql(
+      `
+      SELECT COALESCE(SUM(o.total_price), 0)::numeric
+      FROM orders o
+      WHERE o.child_id = $1
+        AND o.service_date BETWEEN $2::date AND $3::date
+        AND o.status <> 'CANCELLED'
+        AND o.deleted_at IS NULL;
+    `,
+      [childId, monthStart, monthEnd],
+    ) || 0);
+
+    const today = new Date();
+    const dob = new Date(String(me.date_of_birth));
+    const next = new Date(today.getFullYear(), dob.getMonth(), dob.getDate());
+    if (next < today) next.setFullYear(today.getFullYear() + 1);
+    const daysUntil = Math.ceil((next.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+
+    return {
+      month,
+      totalMonthSpend,
+      byChild: this.parseJsonLines<Record<string, unknown> & { total_spend?: string | number }>(byChildOut).map((r) => ({
+        ...r,
+        total_spend: Number(r.total_spend || 0),
+      })),
+      birthdayHighlights: daysUntil <= 30 ? [{ child_id: childId, child_name: childName, days_until: daysUntil }] : [],
     };
   }
 

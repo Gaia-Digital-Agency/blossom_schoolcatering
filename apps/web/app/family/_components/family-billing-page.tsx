@@ -91,17 +91,20 @@ export default function FamilyBillingPage() {
     () => (spending?.byChild || []).reduce((sum, row) => sum + Number(row.orders_count || 0), 0),
     [spending],
   );
+  const billingListPath = isStudentView ? '/billing/youngster/consolidated' : '/billing/parent/consolidated';
+  const spendingPath = isStudentView ? '/youngster/me/spending-dashboard' : '/parent/me/spending-dashboard';
+  const childrenPath = isStudentView ? '/youngster/me/children/pages' : '/parent/me/children/pages';
 
   const loadBilling = async () => {
-    const data = await apiFetch('/billing/parent/consolidated') as BillingRow[];
+    const data = await apiFetch(billingListPath) as BillingRow[];
     setBillings(data || []);
   };
   const loadSpending = async () => {
-    const data = await apiFetch('/parent/me/spending-dashboard') as SpendingDashboard;
+    const data = await apiFetch(spendingPath) as SpendingDashboard;
     setSpending(data);
   };
   const loadBaseData = async () => {
-    const childrenData = await apiFetch('/parent/me/children/pages') as { parentId: string; children: Child[] };
+    const childrenData = await apiFetch(childrenPath) as { parentId: string | null; children: Child[] };
     setChildren(childrenData.children);
     if (childrenData.children.length > 0) setSelectedChildId(childrenData.children[0].id);
     await Promise.all([loadBilling(), loadSpending()]);
@@ -196,15 +199,19 @@ export default function FamilyBillingPage() {
         <h1>{moduleTitle}</h1>
         <div className="module-guide-card">
           {isStudentView
-            ? 'Review the same live billing data used by the Family Group account.'
+            ? 'Review your own live billing records across sessions and upload proof only for your own bills.'
             : 'Review Family Group billing, payment proof, and monthly spending.'}
         </div>
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
 
         <div className="module-section" id="parent-billing">
-          <h2>Linked Students</h2>
-          <p className="auth-help">Registration is done on `/register`. Linked students are available immediately for Order and Billing.</p>
+          <h2>{isStudentView ? 'Student Profile' : 'Linked Students'}</h2>
+          <p className="auth-help">
+            {isStudentView
+              ? 'This view is limited to your own billing records.'
+              : 'Registration is done on `/register`. Linked students are available immediately for Order and Billing.'}
+          </p>
           {children.length > 1 ? (
             <label>Select Student
               <select value={selectedChildId} onChange={(e) => setSelectedChildId(e.target.value)}>
@@ -304,7 +311,7 @@ export default function FamilyBillingPage() {
               {visibleSpendingByChild.map((row) => (
                 <label key={`${row.child_id}-${row.session}`} style={getSessionCardStyle(row.session)}>
                   <SessionBadge session={row.session} />
-                  <strong>Family Group ({row.child_name})</strong>
+                  <strong>{isStudentView ? `Student (${row.child_name})` : `Family Group (${row.child_name})`}</strong>
                   <small>Session: {getSessionLabel(row.session)}</small>
                   <small>Student Month Orders: {row.orders_count}</small>
                   <small>Student Monthly Spend: Rp {Number(row.total_spend).toLocaleString('id-ID')}</small>

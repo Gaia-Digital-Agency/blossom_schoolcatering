@@ -489,6 +489,18 @@ export class CoreController {
     return this.coreService.getParentChildrenPages(req.user);
   }
 
+  @Get('youngster/me/children/pages')
+  @Roles('YOUNGSTER')
+  getYoungsterChildrenPages(@Req() req: AuthRequest) {
+    return this.coreService.getYoungsterChildrenPages(req.user);
+  }
+
+  @Get('student/me/children/pages')
+  @Roles('YOUNGSTER')
+  getYoungsterChildrenPagesStudentAlias(@Req() req: AuthRequest) {
+    return this.coreService.getYoungsterChildrenPages(req.user);
+  }
+
   @Post('parents/:parentId/children/:childId/link')
   @Roles('PARENT', 'ADMIN')
   linkParentChild(@Req() req: AuthRequest, @Param('parentId', ParseUUIDPipe) parentId: string, @Param('childId', ParseUUIDPipe) childId: string) {
@@ -569,10 +581,22 @@ export class CoreController {
     return this.coreService.getParentConsolidatedBilling(req.user);
   }
 
+  @Get('billing/youngster/consolidated')
+  @Roles('YOUNGSTER')
+  getYoungsterConsolidatedBilling(@Req() req: AuthRequest) {
+    return this.coreService.getYoungsterConsolidatedBilling(req.user);
+  }
+
+  @Get('billing/student/consolidated')
+  @Roles('YOUNGSTER')
+  getStudentConsolidatedBilling(@Req() req: AuthRequest) {
+    return this.coreService.getYoungsterConsolidatedBilling(req.user);
+  }
+
   // POST billing/:billingId/proof-upload moved to archived.controller.ts
 
   @Post('billing/proof-upload-batch')
-  @Roles('PARENT')
+  @Roles('PARENT', 'YOUNGSTER')
   uploadBillingProofBatch(
     @Req() req: AuthRequest,
     @Body() body: UploadBillingProofBatchDto,
@@ -581,7 +605,7 @@ export class CoreController {
   }
 
   @Get('billing/:billingId/proof-image')
-  @Roles('PARENT')
+  @Roles('PARENT', 'YOUNGSTER')
   async getParentBillingProofImage(
     @Req() req: AuthRequest,
     @Param('billingId', ParseUUIDPipe) billingId: string,
@@ -594,13 +618,13 @@ export class CoreController {
   }
 
   @Get('billing/:billingId/receipt')
-  @Roles('PARENT', 'ADMIN')
+  @Roles('PARENT', 'YOUNGSTER', 'ADMIN')
   getBillingReceipt(@Req() req: AuthRequest, @Param('billingId', ParseUUIDPipe) billingId: string) {
     return this.coreService.getBillingReceipt(req.user, billingId);
   }
 
   @Post('billing/:billingId/revert-proof')
-  @Roles('PARENT')
+  @Roles('PARENT', 'YOUNGSTER')
   revertBillingProof(@Req() req: AuthRequest, @Param('billingId', ParseUUIDPipe) billingId: string) {
     return this.coreService.revertBillingProof(req.user, billingId);
   }
@@ -854,6 +878,18 @@ export class CoreController {
   @Roles('PARENT')
   getParentSpendingDashboardSingular(@Req() req: AuthRequest, @Query('month') month?: string) {
     return this.coreService.getParentSpendingDashboard(req.user, month);
+  }
+
+  @Get('youngster/me/spending-dashboard')
+  @Roles('YOUNGSTER')
+  getYoungsterSpendingDashboard(@Req() req: AuthRequest, @Query('month') month?: string) {
+    return this.coreService.getYoungsterSpendingDashboard(req.user, month);
+  }
+
+  @Get('student/me/spending-dashboard')
+  @Roles('YOUNGSTER')
+  getStudentSpendingDashboard(@Req() req: AuthRequest, @Query('month') month?: string) {
+    return this.coreService.getYoungsterSpendingDashboard(req.user, month);
   }
 
   @Patch('orders/:orderId')
