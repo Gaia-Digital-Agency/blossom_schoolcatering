@@ -39,24 +39,6 @@ type DraftCart = {
   status: 'OPEN' | 'SUBMITTED' | 'EXPIRED';
   expires_at: string;
 };
-type YoungsterInsights = {
-  week: {
-    start: string;
-    end: string;
-    totalCalories: number;
-    totalOrders?: number;
-    totalDishes?: number;
-    days: Array<{ service_date: string; calories_display: string; tba_items: number }>;
-  };
-  badge: {
-    level: 'NONE' | 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM';
-    maxConsecutiveOrderDays: number;
-    maxConsecutiveOrderWeeks?: number;
-    currentMonthOrders: number;
-  };
-  birthdayHighlight: { date_of_birth: string; days_until: number };
-};
-
 type ConsolidatedOrder = {
   id: string;
   child_id: string;
@@ -198,7 +180,6 @@ export default function StudentOrderPage({
   const [nowMs, setNowMs] = useState(Date.now());
   const [draftCartId, setDraftCartId] = useState('');
   const [draftExpiresAt, setDraftExpiresAt] = useState('');
-  const [insights, setInsights] = useState<YoungsterInsights | null>(null);
   const [orders, setOrders] = useState<ConsolidatedOrder[]>([]);
   const [activeBlackout, setActiveBlackout] = useState<ActiveBlackout | null>(null);
   const [confirmedViewDate, setConfirmedViewDate] = useState(() => getMakassarDateWithOffset(0));
@@ -253,9 +234,6 @@ export default function StudentOrderPage({
       .then((data) => setYoungster(data as Youngster))
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed loading student profile'))
       .finally(() => setLoading(false));
-    apiFetch('/youngster/me/insights')
-      .then((data) => setInsights(data as YoungsterInsights))
-      .catch(() => undefined);
     apiFetch('/session-settings')
       .then((data) => {
         const settings = data as SessionSetting[];
@@ -424,7 +402,6 @@ export default function StudentOrderPage({
       setDraftExpiresAt('');
       setConfirmedViewDate(serviceDate);
       setShowSuccessPopup(true);
-      apiFetch('/youngster/me/insights').then((x) => setInsights(x as YoungsterInsights)).catch(() => undefined);
       return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Order placement failed';
@@ -539,27 +516,6 @@ export default function StudentOrderPage({
 
         {mode === 'order' ? (
           <>
-        <div className="module-section">
-          <h2>Weekly Nutrition and Badge</h2>
-          {insights ? (
-            <div className="auth-form">
-              <label>
-                <strong>Clean Plate Club Badge: {insights.badge.level}</strong>
-                <small>Max consecutive order days: {insights.badge.maxConsecutiveOrderDays}</small>
-                <small>Max consecutive order weeks: {insights.badge.maxConsecutiveOrderWeeks ?? '-'}</small>
-                <small>Current month orders: {insights.badge.currentMonthOrders}</small>
-                <small>Birthday in {insights.birthdayHighlight.days_until} day(s)</small>
-              </label>
-              <label>
-                <strong>Current Week ({insights.week.start} to {insights.week.end})</strong>
-                <small>Total Calories: {insights.week.totalCalories}</small>
-                <small>Total Orders: {insights.week.totalOrders ?? '-'}</small>
-                <small>Total Dishes: {insights.week.totalDishes ?? '-'}</small>
-              </label>
-            </div>
-          ) : <p className="auth-help">Insights loading...</p>}
-        </div>
-
         <div className="module-section">
           <h2>Menu and Cart</h2>
           <label>Service Date<input type="date" value={serviceDate} min={orderingWindow.earliestServiceDate} onChange={(e) => setServiceDate(e.target.value)} /></label>

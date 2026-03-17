@@ -196,8 +196,6 @@ export default function FamilyOrderPage({
   const [draftExpiresAt, setDraftExpiresAt] = useState('');
   const [activeBlackout, setActiveBlackout] = useState<ActiveBlackout | null>(null);
   const [draftSourceContext, setDraftSourceContext] = useState<DraftSourceContext | null>(null);
-  const [confirmedViewDate, setConfirmedViewDate] = useState(() => getMakassarDateWithOffset(0));
-  const [confirmedDateInput, setConfirmedDateInput] = useState(() => getMakassarDateWithOffset(0));
   const [refreshDedupMessage, setRefreshDedupMessage] = useState('');
 
   // Popups
@@ -218,20 +216,11 @@ export default function FamilyOrderPage({
   const hasOpenDraft = Boolean(draftCartId) && draftRemainingMs > 0;
   const placementBlockedByBlackout = Boolean(activeBlackout);
 
-  // Dates for confirmed orders tab buttons
-  const yesterdayDate = getMakassarDateWithOffset(-1);
-  const todayDate = getMakassarDateWithOffset(0);
-  const nextServiceDate = nextWeekdayIsoDate(); // next business day
-
   const selectedCount = useMemo(() => Object.values(itemQty).filter((qty) => qty > 0).length, [itemQty]);
 
   const visibleOrders = useMemo(
     () => (selectedChildId ? orders.filter((o) => o.child_id === selectedChildId) : orders),
     [orders, selectedChildId],
-  );
-  const confirmedOrders = useMemo(
-    () => visibleOrders.filter((o) => o.service_date === confirmedViewDate && (o.status === 'PLACED' || o.status === 'LOCKED')),
-    [visibleOrders, confirmedViewDate],
   );
   const sortedVisibleOrders = useMemo(
     () => [...visibleOrders].sort((a, b) => String(a.service_date).localeCompare(String(b.service_date))),
@@ -598,54 +587,6 @@ export default function FamilyOrderPage({
             </label>
           </div>
         )}
-
-        {/* ── 1. Confirmed Orders ── */}
-        <div className="module-section" id="parent-order">
-          <h2>Confirmed Orders</h2>
-          <div className="day-toggle-row" role="group" aria-label="View date">
-            <button type="button"
-              className={confirmedViewDate === yesterdayDate ? 'day-btn day-btn-active' : 'day-btn'}
-              onClick={() => {
-                setConfirmedDateInput(yesterdayDate);
-                setConfirmedViewDate(yesterdayDate);
-              }}>Yesterday</button>
-            <button type="button"
-              className={confirmedViewDate === todayDate ? 'day-btn day-btn-active' : 'day-btn'}
-              onClick={() => {
-                setConfirmedDateInput(todayDate);
-                setConfirmedViewDate(todayDate);
-              }}>Today</button>
-            <button type="button"
-              className={confirmedViewDate === nextServiceDate ? 'day-btn day-btn-active' : 'day-btn'}
-              onClick={() => {
-                setConfirmedDateInput(nextServiceDate);
-                setConfirmedViewDate(nextServiceDate);
-              }}>Tomorrow</button>
-          </div>
-          <div className="record-filter-row">
-            <label className="record-filter-field">Service Date
-              <input type="date" value={confirmedDateInput} onChange={(e) => setConfirmedDateInput(e.target.value)} />
-            </label>
-            <button className="btn btn-outline" type="button" onClick={() => setConfirmedViewDate(confirmedDateInput)}>
-              Show Order
-            </button>
-          </div>
-          {confirmedOrders.length > 0 ? (
-            <div className="auth-form">
-              {confirmedOrders.map((order) => (
-                <label key={order.id} style={getSessionCardStyle(order.session)}>
-                  <SessionBadge session={order.session} />
-                  <strong>{order.child_name} — {order.service_date}</strong>
-                  <small>Status: {order.status} | Billing: {order.billing_status || '-'} | Delivery: {order.delivery_status || '-'}</small>
-                  <small>Total: Rp {Number(order.total_price).toLocaleString('id-ID')}</small>
-                  <small>Items: {order.items.map((item) => `${item.item_name_snapshot} x${item.quantity}`).join(', ') || '-'}</small>
-                </label>
-              ))}
-            </div>
-          ) : (
-            <p className="auth-help">No confirmed order for {confirmedViewDate}.</p>
-          )}
-        </div>
 
         {mode === 'order' ? (
           <div className="module-section" ref={menuSectionRef}>
