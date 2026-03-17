@@ -168,8 +168,8 @@ export default function AdminReportsPage() {
             </div>
           ) : null}
         </div>
+        <AdminReturnButton />
       </section>
-      <AdminReturnButton />
       <style jsx>{`
         .reports-card {
           border: 1px solid #ccbda2;

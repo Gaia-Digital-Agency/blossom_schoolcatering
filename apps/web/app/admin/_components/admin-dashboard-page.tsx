@@ -469,9 +469,9 @@ export default function AdminPage() {
         ) : null}
         </div>{/* end dash-card--orders */}
 
+        <AdminReturnButton />
       </section>
       {/* Scoped CSS for styling the admin dashboard */}
-      <AdminReturnButton />
       <style jsx>{`
         /* ── Three-card layout ── */
         .dash-card {

@@ -183,9 +183,9 @@ export default function AdminBlackoutDatesPage() {
             ))}
           </div>
         )}
+        <AdminReturnButton />
       </section>
       {/* Scoped CSS for the component */}
-      <AdminReturnButton />
       <style jsx>{`
         .blackout-type-guide {
           background: #f8f5f0;

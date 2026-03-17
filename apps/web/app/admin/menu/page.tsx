@@ -33,19 +33,6 @@ type AdminMenuItem = {
   ingredients: string[];
 };
 
-type MenuRatingSummary = {
-  menu_item_id: string;
-  name: string;
-  session: 'LUNCH' | 'SNACK' | 'BREAKFAST';
-  service_date: string;
-  star_1_votes: number;
-  star_2_votes: number;
-  star_3_votes: number;
-  star_4_votes: number;
-  star_5_votes: number;
-  total_votes: number;
-};
-
 type MasterIngredientFile = {
   ingredients: Array<{ name: string; category: string }>;
 };
@@ -114,7 +101,6 @@ export default function AdminMenuPage() {
   const [menuSession, setMenuSession] = useState<'LUNCH' | 'SNACK' | 'BREAKFAST'>('LUNCH');
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [menuItems, setMenuItems] = useState<AdminMenuItem[]>([]);
-  const [menuRatings, setMenuRatings] = useState<MenuRatingSummary[]>([]);
   const [editingItemId, setEditingItemId] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -192,14 +178,12 @@ export default function AdminMenuPage() {
   }, [itemName, mergedDishOptions]);
 
   const loadMenuData = async () => {
-    const [ings, menu, ratings] = await Promise.all([
+    const [ings, menu] = await Promise.all([
       apiFetch('/admin/ingredients') as Promise<Ingredient[]>,
       apiFetch(`/admin/menus?session=${menuSession}`) as Promise<{ items: AdminMenuItem[] }>,
-      apiFetch('/admin/menu-ratings') as Promise<{ items: MenuRatingSummary[] }>,
     ]);
     setIngredients(ings);
     setMenuItems(menu.items || []);
-    setMenuRatings(ratings.items || []);
   };
 
   const clearUploadSelection = () => {
@@ -883,26 +867,8 @@ export default function AdminMenuPage() {
             </div>
           </div>
         </div>
-
-        <div className="menu-ratings-shell">
-          <h2>Menu Ratings</h2>
-          <div className="auth-form menu-list-card">
-            {menuRatings.map((rating) => (
-              <article key={rating.menu_item_id} className="menu-item-card">
-                <strong>{rating.name}</strong>
-                <small>1 Star &gt; {rating.star_1_votes} Votes</small>
-                <small>2 Stars &gt; {rating.star_2_votes} Votes</small>
-                <small>3 Stars &gt; {rating.star_3_votes} Votes</small>
-                <small>4 Stars &gt; {rating.star_4_votes} Votes</small>
-                <small>5 Stars &gt; {rating.star_5_votes} Votes</small>
-                <small>Total Votes: {rating.total_votes}</small>
-              </article>
-            ))}
-            {menuRatings.length === 0 ? <p className="auth-help">No menu ratings found.</p> : null}
-          </div>
-        </div>
+        <AdminReturnButton />
       </section>
-      <AdminReturnButton />
       <style jsx>{`
         .menu-item-card {
           display: grid;

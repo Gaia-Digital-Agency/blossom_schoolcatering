@@ -177,8 +177,8 @@ export default function AdminKitchenPage() {
             </div>
           </>
         ) : null}
+        <AdminReturnButton />
       </section>
-      <AdminReturnButton />
       <style jsx>{`
         .admin-kitchen-card {
           border: 1px solid #d6c8b0;

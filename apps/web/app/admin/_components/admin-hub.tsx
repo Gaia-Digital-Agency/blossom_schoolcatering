@@ -9,11 +9,12 @@ const HUB_ITEMS = [
   { label: 'Student', icon: '🎓', href: '/admin/student' },
   { label: 'Schools', icon: '🏫', href: '/admin/schools' },
   { label: 'Delivery', icon: '🚚', href: '/admin/delivery' },
+  { label: 'Menu', icon: '🍽️', href: '/admin/menu' },
   { label: 'Orders', icon: '📦', href: '/admin/orders' },
   { label: 'Billing', icon: '💳', href: '/admin/billing' },
-  { label: 'Menu', icon: '🍽️', href: '/admin/menu' },
-  { label: 'Kitchen', icon: '👩‍🍳', href: '/admin/kitchen' },
   { label: 'Blackout', icon: '📅', href: '/admin/blackout-dates' },
+  { label: 'Kitchen', icon: '👩‍🍳', href: '/admin/kitchen' },
+  { label: 'Rating', icon: '⭐', href: '/admin/rating' },
   { label: 'Reports', icon: '📈', href: '/admin/reports' },
 ];
 
@@ -68,7 +69,7 @@ export default function AdminHub() {
         }
         .admin-hub-grid {
           display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
+          grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 0.75rem;
         }
         .admin-hub-card {

@@ -312,8 +312,8 @@ export default function AdminSchoolsPage() {
           {renderSchoolTable('Active Schools', activeSchools)}
           {renderSchoolTable('Deactivated Schools', inactiveSchools)}
         </div>
+        <AdminReturnButton />
       </section>
-      <AdminReturnButton />
       <style jsx>{`
         .sessions-row {
           display: flex;
