@@ -568,12 +568,12 @@ export default function AdminYoungstersPage() {
           </div>
         </form>
 
-        <h2>Existing Youngsters</h2>
+        <h2>Existing Students</h2>
         <div className="kitchen-table-wrap">
           <table className="kitchen-table">
             <thead>
               <tr>
-                <th>Last Name</th>
+                <th>Family Group</th>
                 <th>First Name</th>
                 <th>User Name</th>
                 <th>School</th>

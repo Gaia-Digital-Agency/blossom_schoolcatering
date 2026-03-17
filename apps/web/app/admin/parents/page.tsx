@@ -165,15 +165,15 @@ export default function AdminParentsPage() {
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
 
-        <h2>Existing Parents</h2>
+        <h2>Existing Family</h2>
         <div className="kitchen-table-wrap">
           <table className="kitchen-table admin-parents-table">
             <thead>
               <tr>
-                <th>Last Name</th>
+                <th>Family Group</th>
                 <th>First Name</th>
                 <th>User Name</th>
-                <th>Youngster</th>
+                <th>Student</th>
                 <th>School</th>
                 <th>Action</th>
               </tr>
