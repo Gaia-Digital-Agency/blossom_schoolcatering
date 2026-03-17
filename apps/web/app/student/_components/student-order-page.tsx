@@ -182,6 +182,7 @@ export default function StudentOrderPage({
   const [orders, setOrders] = useState<ConsolidatedOrder[]>([]);
   const [activeBlackout, setActiveBlackout] = useState<ActiveBlackout | null>(null);
   const [confirmedViewDate, setConfirmedViewDate] = useState(() => getMakassarDateWithOffset(0));
+  const [confirmedDateInput, setConfirmedDateInput] = useState(() => getMakassarDateWithOffset(0));
 
   // Popups
   const [showBlackoutModal, setShowBlackoutModal] = useState(false);
@@ -207,11 +208,6 @@ export default function StudentOrderPage({
   const placementBlockedByWindow = !orderingWindow.canOrderNow || serviceDate <= orderingWindow.today;
   const hasOpenDraft = Boolean(draftCartId) && draftRemainingMs > 0;
   const placementBlockedByBlackout = Boolean(activeBlackout);
-
-  // Dates for confirmed order buttons
-  const yesterdayDate = getMakassarDateWithOffset(-1);
-  const todayDate = getMakassarDateWithOffset(0);
-  const nextServiceDate = nextWeekdayIsoDate();
 
   const confirmedOrders = useMemo(
     () => orders.filter((o) => o.service_date === confirmedViewDate && (o.status === 'PLACED' || o.status === 'LOCKED')),
@@ -453,10 +449,14 @@ export default function StudentOrderPage({
         {mode === 'record' ? (
           <div className="module-section" id="youngster-order">
             <h2>Confirmed Orders</h2>
-            <div className="day-toggle-row" role="group" aria-label="View date">
-              <button type="button" className={confirmedViewDate === yesterdayDate ? 'day-btn day-btn-active' : 'day-btn'} onClick={() => setConfirmedViewDate(yesterdayDate)}>Yesterday</button>
-              <button type="button" className={confirmedViewDate === todayDate ? 'day-btn day-btn-active' : 'day-btn'} onClick={() => setConfirmedViewDate(todayDate)}>Today</button>
-              <button type="button" className={confirmedViewDate === nextServiceDate ? 'day-btn day-btn-active' : 'day-btn'} onClick={() => setConfirmedViewDate(nextServiceDate)}>Tomorrow</button>
+            <div className="record-filter-row">
+              <label className="record-filter-field">
+                Service Date
+                <input type="date" value={confirmedDateInput} onChange={(e) => setConfirmedDateInput(e.target.value)} />
+              </label>
+              <button className="btn btn-outline" type="button" onClick={() => setConfirmedViewDate(confirmedDateInput)}>
+                Show Order
+              </button>
             </div>
             {confirmedOrders.length > 0 ? (
               <div className="auth-form">
@@ -620,6 +620,16 @@ export default function StudentOrderPage({
           gap: 0.4rem;
           margin-bottom: 0.65rem;
         }
+        .record-filter-row {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          gap: 0.6rem;
+          align-items: end;
+          margin-bottom: 0.65rem;
+        }
+        .record-filter-field {
+          margin: 0;
+        }
         .day-btn {
           flex: 1;
           padding: 0.38rem 0.5rem;
@@ -685,6 +695,11 @@ export default function StudentOrderPage({
         .popup-close {
           width: 100%;
           margin-top: 0.25rem;
+        }
+        @media (max-width: 520px) {
+          .record-filter-row {
+            grid-template-columns: 1fr;
+          }
         }
       `}</style>
     </main>
