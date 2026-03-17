@@ -449,6 +449,41 @@ export default function StudentOrderPage({
         {mode === 'record' ? (
           <div className="module-section" id="youngster-order">
             <h2>Confirmed Orders</h2>
+            <div className="day-toggle-row" role="group" aria-label="Quick view date">
+              <button
+                type="button"
+                className={confirmedViewDate === getMakassarDateWithOffset(-1) ? 'day-btn day-btn-active' : 'day-btn'}
+                onClick={() => {
+                  const date = getMakassarDateWithOffset(-1);
+                  setConfirmedDateInput(date);
+                  setConfirmedViewDate(date);
+                }}
+              >
+                Yesterday
+              </button>
+              <button
+                type="button"
+                className={confirmedViewDate === getMakassarDateWithOffset(0) ? 'day-btn day-btn-active' : 'day-btn'}
+                onClick={() => {
+                  const date = getMakassarDateWithOffset(0);
+                  setConfirmedDateInput(date);
+                  setConfirmedViewDate(date);
+                }}
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                className={confirmedViewDate === getMakassarDateWithOffset(1) ? 'day-btn day-btn-active' : 'day-btn'}
+                onClick={() => {
+                  const date = getMakassarDateWithOffset(1);
+                  setConfirmedDateInput(date);
+                  setConfirmedViewDate(date);
+                }}
+              >
+                Tomorrow
+              </button>
+            </div>
             <div className="record-filter-row">
               <label className="record-filter-field">
                 Service Date
