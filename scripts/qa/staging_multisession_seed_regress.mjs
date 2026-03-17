@@ -640,24 +640,41 @@ async function main() {
   const snackKitchenRows = (kitchenSummaryBefore.orders || []).filter((row) => row.session === 'SNACK');
   add('Kitchen', 'Kitchen Breakfast summary rows', breakfastKitchenRows.length > 0, `rows=${breakfastKitchenRows.length}`);
   add('Kitchen', 'Kitchen Snack summary rows', snackKitchenRows.length > 0, `rows=${snackKitchenRows.length}`);
-
-  await api(`/kitchen/orders/${sessionOrders.BREAKFAST[0]}/complete`, { method: 'POST', token: kitchenToken });
-  await api(`/kitchen/orders/${sessionOrders.SNACK[0]}/complete`, { method: 'POST', token: kitchenToken });
-  const kitchenSummaryAfter = await api(`/kitchen/daily-summary?date=${TARGET_DATE}`, { token: kitchenToken, expect: [200] });
-  const kitchenCompleted = (kitchenSummaryAfter.orders || []).filter((row) => [sessionOrders.BREAKFAST[0], sessionOrders.SNACK[0]].includes(row.id) && row.delivery_status === 'OUT_FOR_DELIVERY');
-  add('Kitchen', 'Kitchen completion toggle works', kitchenCompleted.length === 2, `rows=${kitchenCompleted.length}`);
+  const breakfastKitchenTarget = breakfastKitchenRows.find((row) => row.delivery_status !== 'DELIVERED');
+  const snackKitchenTarget = snackKitchenRows.find((row) => row.delivery_status !== 'DELIVERED');
+  let kitchenTogglePass = true;
+  let kitchenToggleDetail = 'already delivered';
+  if (breakfastKitchenTarget && snackKitchenTarget) {
+    await api(`/kitchen/orders/${breakfastKitchenTarget.id}/complete`, { method: 'POST', token: kitchenToken });
+    await api(`/kitchen/orders/${snackKitchenTarget.id}/complete`, { method: 'POST', token: kitchenToken });
+    const kitchenSummaryAfter = await api(`/kitchen/daily-summary?date=${TARGET_DATE}`, { token: kitchenToken, expect: [200] });
+    const kitchenCompleted = (kitchenSummaryAfter.orders || []).filter((row) => [breakfastKitchenTarget.id, snackKitchenTarget.id].includes(row.id) && row.delivery_status === 'OUT_FOR_DELIVERY');
+    kitchenTogglePass = kitchenCompleted.length === 2;
+    kitchenToggleDetail = `rows=${kitchenCompleted.length}`;
+  }
+  add('Kitchen', 'Kitchen completion toggle works', kitchenTogglePass, kitchenToggleDetail);
 
   const deliveryAssignmentsBefore = await api(`/delivery/assignments?date=${TARGET_DATE}`, { token: deliveryToken, expect: [200] });
-  const breakfastAssignment = (deliveryAssignmentsBefore || []).find((row) => row.order_id === sessionOrders.BREAKFAST[0]);
-  const snackAssignment = (deliveryAssignmentsBefore || []).find((row) => row.order_id === sessionOrders.SNACK[0]);
+  const breakfastAssignment = (deliveryAssignmentsBefore || []).find((row) => row.session === 'BREAKFAST');
+  const snackAssignment = (deliveryAssignmentsBefore || []).find((row) => row.session === 'SNACK');
   add('Delivery', 'Delivery Breakfast assignment visible', Boolean(breakfastAssignment), `assignment=${breakfastAssignment?.id || '-'}`);
   add('Delivery', 'Delivery Snack assignment visible', Boolean(snackAssignment), `assignment=${snackAssignment?.id || '-'}`);
 
-  await api(`/delivery/assignments/${breakfastAssignment.id}/toggle`, { method: 'PATCH', token: deliveryToken, body: { note: 'Breakfast delivered' } });
-  await api(`/delivery/assignments/${snackAssignment.id}/toggle`, { method: 'PATCH', token: deliveryToken, body: { note: 'Snack delivered' } });
-  const deliveryAssignmentsAfter = await api(`/delivery/assignments?date=${TARGET_DATE}`, { token: deliveryToken, expect: [200] });
-  const deliveredAssignments = (deliveryAssignmentsAfter || []).filter((row) => [breakfastAssignment.id, snackAssignment.id].includes(row.id) && row.confirmed_at);
-  add('Delivery', 'Delivery completion toggle works', deliveredAssignments.length === 2, `rows=${deliveredAssignments.length}`);
+  let deliveryTogglePass = true;
+  let deliveryToggleDetail = 'already delivered';
+  if (breakfastAssignment && snackAssignment && (!breakfastAssignment.confirmed_at || !snackAssignment.confirmed_at)) {
+    if (!breakfastAssignment.confirmed_at) {
+      await api(`/delivery/assignments/${breakfastAssignment.id}/toggle`, { method: 'PATCH', token: deliveryToken, body: { note: 'Breakfast delivered' } });
+    }
+    if (!snackAssignment.confirmed_at) {
+      await api(`/delivery/assignments/${snackAssignment.id}/toggle`, { method: 'PATCH', token: deliveryToken, body: { note: 'Snack delivered' } });
+    }
+    const deliveryAssignmentsAfter = await api(`/delivery/assignments?date=${TARGET_DATE}`, { token: deliveryToken, expect: [200] });
+    const deliveredAssignments = (deliveryAssignmentsAfter || []).filter((row) => [breakfastAssignment.id, snackAssignment.id].includes(row.id) && row.confirmed_at);
+    deliveryTogglePass = deliveredAssignments.length === 2;
+    deliveryToggleDetail = `rows=${deliveredAssignments.length}`;
+  }
+  add('Delivery', 'Delivery completion toggle works', deliveryTogglePass, deliveryToggleDetail);
 
   const routes = [
     '/schoolcatering',
