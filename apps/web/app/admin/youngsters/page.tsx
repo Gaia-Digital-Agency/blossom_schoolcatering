@@ -624,10 +624,10 @@ export default function AdminYoungstersPage() {
       {showIdInfo ? (
         <div className="pass-modal-overlay" onClick={() => setShowIdInfo(null)}>
           <div className="pass-modal-card" onClick={(e) => e.stopPropagation()}>
-            <h2 className="pass-modal-title">Youngster ID</h2>
+            <h2 className="pass-modal-title">Student ID</h2>
             <div className="reg-info-list">
               <div className="reg-info-row">
-                <span className="reg-info-label">Youngster Name</span>
+                <span className="reg-info-label">Student Name</span>
                 <span className="reg-info-val">{showIdInfo.youngsterName}</span>
               </div>
               <div className="reg-info-row">
@@ -664,17 +664,17 @@ export default function AdminYoungstersPage() {
             </p>
             <div className="reg-info-list">
               <div className="reg-info-row">
-                <span className="reg-info-label">Youngster Name</span>
+                <span className="reg-info-label">Student Name</span>
                 <span className="reg-info-val">
                   {showPassInfo.youngsterFirstName} {showPassInfo.youngsterLastName}
                 </span>
               </div>
               <div className="reg-info-row">
-                <span className="reg-info-label">Youngster Username</span>
+                <span className="reg-info-label">Student Username</span>
                 <code className="reg-info-code">{showPassInfo.youngsterUsername}</code>
               </div>
               <div className="reg-info-row">
-                <span className="reg-info-label">Youngster Password</span>
+                <span className="reg-info-label">Student Password</span>
                 <code className="reg-info-code">{showPassInfo.youngsterPassword}</code>
               </div>
               <div className="reg-info-row">
@@ -682,7 +682,7 @@ export default function AdminYoungstersPage() {
                 <span className="reg-info-val">{showPassInfo.schoolName}</span>
               </div>
               <div className="reg-info-row">
-                <span className="reg-info-label">Linked Parent</span>
+                <span className="reg-info-label">Linked Family</span>
                 <span className="reg-info-val">{showPassInfo.parentLabel}</span>
               </div>
             </div>
