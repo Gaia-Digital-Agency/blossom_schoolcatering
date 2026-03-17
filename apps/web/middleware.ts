@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { AUTH_COOKIE, ROLE_COOKIE, Role } from './lib/auth';
 
 const BASE_PATH = '/schoolcatering';
+const LEGACY_LOGIN_PATHS = new Set([
+  '/admin/login',
+  '/kitchen/login',
+  '/delivery/login',
+  '/family/login',
+  '/student/login',
+  '/delivery/family/login',
+]);
 
 /**
  * Determines the required role for a given path.
@@ -76,12 +84,11 @@ export function middleware(request: NextRequest) {
     normalizedPath.startsWith('/guide/') ||
     normalizedPath === '/login' ||
     normalizedPath === '/register' ||
-    normalizedPath.startsWith('/register/') ||
-    normalizedPath === '/admin/login' ||
-    normalizedPath === '/kitchen/login' ||
-    normalizedPath === '/delivery/login' ||
-    normalizedPath === '/family/login' ||
-    normalizedPath === '/student/login';
+    normalizedPath.startsWith('/register/');
+
+  if (LEGACY_LOGIN_PATHS.has(normalizedPath)) {
+    return NextResponse.redirect(new URL(`${BASE_PATH}/login`, request.url));
+  }
 
   // Special handling for rating paths.
   if (isRatingPath) {

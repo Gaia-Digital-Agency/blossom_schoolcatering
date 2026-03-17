@@ -259,12 +259,14 @@ export default function DeliveryDashboard({
     acc[key].push(row);
     return acc;
   }, {});
+  const deliveryFirstName = (profile?.displayName || '').trim().split(/\s+/).filter(Boolean)[0] || '';
 
   return (
     <>
       <main className="page-auth page-auth-mobile delivery-page">
         <section className="auth-panel">
           <h1>{title}</h1>
+          {deliveryFirstName ? <p className="module-login-label">Logged In as {deliveryFirstName}</p> : null}
           {message ? <p className="auth-help">{message}</p> : null}
           {error ? <p className="auth-error">{error}</p> : null}
 
@@ -386,6 +388,13 @@ export default function DeliveryDashboard({
           </div>
         </section>
         <style jsx>{`
+          .module-login-label {
+            margin: -0.55rem 0 0;
+            font-size: 1rem;
+            font-style: italic;
+            font-weight: 800;
+            color: #5d4e3a;
+          }
           .module-guide-card {
             background: #fffbf4;
             border: 1px solid #e8d9c0;

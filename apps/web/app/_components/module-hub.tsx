@@ -1,9 +1,15 @@
 'use client';
 
-import { getAppBase } from '../../lib/auth';
+import { useEffect, useState } from 'react';
+import { apiFetch, getAppBase } from '../../lib/auth';
 import LogoutButton from './logout-button';
 
 type ModuleType = 'family' | 'student';
+
+type StudentProfile = {
+  first_name?: string;
+  school_name?: string;
+};
 
 const HUB_ITEMS: Record<ModuleType, Array<{ label: string; icon: string; href?: string }>> = {
   family: [
@@ -31,10 +37,43 @@ export default function ModuleHub({
   module: ModuleType;
   title: string;
 }) {
+  const [subtitle, setSubtitle] = useState('');
+
+  useEffect(() => {
+    let active = true;
+
+    const loadSubtitle = async () => {
+      try {
+        if (module === 'family') {
+          const me = await apiFetch('/auth/me') as { displayName?: string };
+          const fullName = (me.displayName || '').trim();
+          const firstName = fullName.split(/\s+/).filter(Boolean)[0] || '';
+          if (active && firstName) setSubtitle(`Logged In as ${firstName}`);
+          return;
+        }
+
+        const profile = await apiFetch('/children/me') as StudentProfile;
+        const firstName = (profile.first_name || '').trim();
+        const schoolName = (profile.school_name || '').trim();
+        if (!active || !firstName) return;
+        setSubtitle(schoolName ? `Logged In as ${firstName} in ${schoolName}` : `Logged In as ${firstName}`);
+      } catch {
+        if (active) setSubtitle('');
+      }
+    };
+
+    void loadSubtitle();
+
+    return () => {
+      active = false;
+    };
+  }, [module]);
+
   return (
     <main className="page-auth page-auth-mobile">
       <section className="auth-panel">
         <h1>{title}</h1>
+        {subtitle ? <p className="module-login-label">{subtitle}</p> : null}
         <div className="module-hub-grid">
           {HUB_ITEMS[module].map((item) => (
             <button
@@ -70,6 +109,13 @@ export default function ModuleHub({
         .auth-panel h1 {
           margin: 0;
           line-height: 1;
+        }
+        .module-login-label {
+          margin: -0.55rem 0 0;
+          font-size: 1rem;
+          font-style: italic;
+          font-weight: 800;
+          color: #5d4e3a;
         }
         .module-hub-grid {
           display: grid;
