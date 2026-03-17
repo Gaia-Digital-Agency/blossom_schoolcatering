@@ -6945,8 +6945,46 @@ export class CoreService implements OnModuleInit {
        WHERE id = $1;`,
       [userId],
     );
-    await runSql(`DELETE FROM order_carts WHERE child_id = $1 OR created_by_user_id = $2;`, [youngsterId, userId]);
-    await runSql(`DELETE FROM favourite_meals WHERE child_id = $1 OR created_by_user_id = $2;`, [youngsterId, userId]);
+    const cartIdsOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT oc.id
+        FROM order_carts oc
+        WHERE (oc.child_id = $1 OR oc.created_by_user_id = $2)
+          AND NOT EXISTS (
+            SELECT 1
+            FROM orders o
+            WHERE o.cart_id = oc.id
+          )
+      ) t;
+      `,
+      [youngsterId, userId],
+    );
+    const cartIds = this.parseJsonLines<{ id: string }>(cartIdsOut).map((row) => row.id);
+    if (cartIds.length > 0) {
+      const cartIdPlaceholders = cartIds.map((_, index) => `$${index + 1}`).join(', ');
+      await runSql(`DELETE FROM cart_items WHERE cart_id IN (${cartIdPlaceholders});`, cartIds);
+      await runSql(`DELETE FROM order_carts WHERE id IN (${cartIdPlaceholders});`, cartIds);
+    }
+
+    const favouriteIdsOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT fm.id
+        FROM favourite_meals fm
+        WHERE fm.child_id = $1 OR fm.created_by_user_id = $2
+      ) t;
+      `,
+      [youngsterId, userId],
+    );
+    const favouriteIds = this.parseJsonLines<{ id: string }>(favouriteIdsOut).map((row) => row.id);
+    if (favouriteIds.length > 0) {
+      const favouriteIdPlaceholders = favouriteIds.map((_, index) => `$${index + 1}`).join(', ');
+      await runSql(`DELETE FROM favourite_meal_items WHERE favourite_meal_id IN (${favouriteIdPlaceholders});`, favouriteIds);
+      await runSql(`DELETE FROM favourite_meals WHERE id IN (${favouriteIdPlaceholders});`, favouriteIds);
+    }
     await runSql(`DELETE FROM auth_refresh_sessions WHERE user_id = $1;`, [userId]);
   }
 
@@ -7075,7 +7113,9 @@ export class CoreService implements OnModuleInit {
     const child = this.parseJsonLine<{ id: string; user_id: string }>(out);
     const blocker = await this.getYoungsterDeleteBlockers(youngsterId, child.user_id);
     if (blocker.activeOrdersCount > 0 || blocker.activeBillingCount > 0) {
-      throw new BadRequestException('Cannot delete student with active orders or billing');
+      throw new BadRequestException(
+        `Cannot delete student with active orders or billing (orders: ${blocker.activeOrdersCount}, billing: ${blocker.activeBillingCount})`,
+      );
     }
     if (
       blocker.totalOrdersCount > 0 ||
