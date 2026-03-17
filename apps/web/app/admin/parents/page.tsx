@@ -6,6 +6,11 @@ import AdminNav from '../_components/admin-nav';
 import AdminReturnButton from '../_components/admin-return-button';
 
 type ParentYoungster = { id: string; name: string; school_name?: string | null };
+type ParentTeacherGuardian = {
+  student_name?: string | null;
+  teacher_name?: string | null;
+  teacher_phone?: string | null;
+};
 type ParentRow = {
   id: string;
   user_id: string;
@@ -16,6 +21,7 @@ type ParentRow = {
   linked_children_count: number;
   billing_count: number;
   youngsters: ParentYoungster[];
+  teacher_guardians: ParentTeacherGuardian[];
   schools: string[];
 };
 
@@ -34,12 +40,22 @@ type ShowIdInfo = {
   parentPassword: string;
 };
 
+type ShowTeacherGuardianInfo = {
+  familyGroup: string;
+  entries: Array<{
+    studentName: string;
+    teacherName: string;
+    teacherPhone: string;
+  }>;
+};
+
 export default function AdminParentsPage() {
   const [parents, setParents] = useState<ParentRow[]>([]);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [showPassInfo, setShowPassInfo] = useState<ShowPassInfo | null>(null);
   const [showIdInfo, setShowIdInfo] = useState<ShowIdInfo | null>(null);
+  const [showTeacherGuardianInfo, setShowTeacherGuardianInfo] = useState<ShowTeacherGuardianInfo | null>(null);
 
   const load = async () => {
     const p = await apiFetch('/admin/parent') as ParentRow[];
@@ -156,6 +172,23 @@ export default function AdminParentsPage() {
     }
   };
 
+  const teacherGuardianEntries = (p: ParentRow) => (p.teacher_guardians || [])
+    .map((entry) => ({
+      studentName: String(entry.student_name || '').trim(),
+      teacherName: String(entry.teacher_name || '').trim(),
+      teacherPhone: String(entry.teacher_phone || '').trim(),
+    }))
+    .filter((entry) => entry.teacherName);
+
+  const onShowTeacherGuardian = (p: ParentRow) => {
+    const entries = teacherGuardianEntries(p);
+    if (entries.length === 0) return;
+    setShowTeacherGuardianInfo({
+      familyGroup: p.last_name,
+      entries,
+    });
+  };
+
   return (
     <main className="page-auth page-auth-desktop">
       <section className="auth-panel">
@@ -204,6 +237,15 @@ export default function AdminParentsPage() {
                       <button
                         className="btn btn-outline"
                         type="button"
+                        onClick={() => onShowTeacherGuardian(p)}
+                        disabled={teacherGuardianEntries(p).length === 0}
+                        title={teacherGuardianEntries(p).length === 0 ? 'No Teacher/Guardian registration info' : 'Show Teacher/Guardian'}
+                      >
+                        Show Teacher/Guardian
+                      </button>
+                      <button
+                        className="btn btn-outline"
+                        type="button"
                         onClick={() => onDeleteParent(p)}
                         disabled={deleteDisabled(p)}
                         title={deleteTitle(p)}
@@ -246,6 +288,36 @@ export default function AdminParentsPage() {
               </div>
             </div>
             <button className="btn btn-primary pass-modal-close" type="button" onClick={() => setShowIdInfo(null)}>
+              Close
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {showTeacherGuardianInfo ? (
+        <div className="pass-modal-overlay" onClick={() => setShowTeacherGuardianInfo(null)}>
+          <div className="pass-modal-card" onClick={(e) => e.stopPropagation()}>
+            <h2 className="pass-modal-title">Teacher / Guardian</h2>
+            <div className="reg-info-list">
+              <div className="reg-info-row">
+                <span className="reg-info-label">Family Group</span>
+                <span className="reg-info-val">{showTeacherGuardianInfo.familyGroup}</span>
+              </div>
+              {showTeacherGuardianInfo.entries.map((entry) => (
+                <div className="reg-info-row" key={`${entry.studentName}-${entry.teacherName}-${entry.teacherPhone}`}>
+                  <span className="reg-info-label">{entry.studentName || 'Student'}</span>
+                  <div className="reg-info-youngsters">
+                    <span className="reg-info-val">{entry.teacherName}</span>
+                    <span className="reg-info-val">{entry.teacherPhone || '-'}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button
+              className="btn btn-primary pass-modal-close"
+              type="button"
+              onClick={() => setShowTeacherGuardianInfo(null)}
+            >
               Close
             </button>
           </div>

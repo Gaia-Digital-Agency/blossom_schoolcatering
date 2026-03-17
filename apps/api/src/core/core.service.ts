@@ -1525,6 +1525,19 @@ export class CoreService implements OnModuleInit {
                  '[]'::json
                ) AS youngsters,
                COALESCE(
+                 json_agg(
+                   DISTINCT jsonb_build_object(
+                     'student_name', (uc.first_name || ' ' || uc.last_name),
+                     'teacher_name', c.registration_actor_teacher_name,
+                     'teacher_phone', c.registration_actor_teacher_phone
+                   )
+                 ) FILTER (
+                   WHERE c.id IS NOT NULL
+                     AND COALESCE(NULLIF(TRIM(c.registration_actor_teacher_name), ''), NULL) IS NOT NULL
+                 ),
+                 '[]'::json
+               ) AS teacher_guardians,
+               COALESCE(
                  array_agg(DISTINCT s.name) FILTER (WHERE s.name IS NOT NULL),
                  '{}'::text[]
                ) AS schools
