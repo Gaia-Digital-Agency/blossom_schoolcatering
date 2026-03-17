@@ -112,9 +112,9 @@ const KITCHEN_PASSWORD = 'teameditor123';
 const DELIVERY_USERNAME = 'delivery';
 const DELIVERY_PASSWORD = 'teameditor123';
 const PARENT_USERNAME = 'parent';
-const PARENT_PASSWORD = 'teameditor123';
+const PARENT_PASSWORD = 'Teameditor@123';
 const YOUNGSTER_USERNAME = 'youngster';
-const YOUNGSTER_PASSWORD = 'teameditor123';
+const YOUNGSTER_PASSWORD = 'Teameditor@123';
 const ACCESS_TTL = '15m';
 const REFRESH_TTL = '7d';
 
