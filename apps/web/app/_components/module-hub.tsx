@@ -9,6 +9,7 @@ const HUB_ITEMS: Record<ModuleType, Array<{ label: string; icon: string; href?: 
   family: [
     { label: 'Overview', icon: '📅', href: '/family/overview' },
     { label: 'Order', icon: '🛒', href: '/family/order' },
+    { label: 'Record', icon: '🧾', href: '/family/consolorder' },
     { label: 'Billing', icon: '💳', href: '/family/billing' },
     { label: 'Rating', icon: '⭐', href: '/rating' },
     { label: 'Menu', icon: '🍽️', href: '/menu' },

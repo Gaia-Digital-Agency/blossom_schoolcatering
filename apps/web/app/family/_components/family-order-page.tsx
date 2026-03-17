@@ -144,7 +144,11 @@ function activeBlackoutMessage(blackout: ActiveBlackout | null) {
   return mapOrderRuleError('ORDER_BLACKOUT_BLOCKED');
 }
 
-export default function FamilyOrderPage() {
+export default function FamilyOrderPage({
+  mode = 'order',
+}: {
+  mode?: 'order' | 'record';
+}) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -548,120 +552,122 @@ export default function FamilyOrderPage() {
           )}
         </div>
 
-        {/* ── 2. Menu and Cart (ABOVE Consolidated Orders) ── */}
-        <div className="module-section" ref={menuSectionRef}>
-          <h2>Menu and Cart</h2>
-          {draftSourceContext
-            && selectedChildId === draftSourceContext.childId
-            && serviceDate === draftSourceContext.targetServiceDate
-            && session === draftSourceContext.session ? (
-              <p className="auth-help">
-                {draftSourceContext.mode === 'edit' ? '✏️ Editing order' : '🛒 Quick reorder from'}: #{draftSourceContext.orderId}
-                {' | '}Student: {draftSourceContext.childName}
-                {' | '}Date: {draftSourceContext.targetServiceDate}
-              </p>
-            ) : null}
-          <label>Service Date
-            <input type="date" value={serviceDate} min={orderingWindow.earliestServiceDate} onChange={(e) => setServiceDate(e.target.value)} />
-          </label>
-          <label>Session
-            <select value={session} onChange={(e) => setSession(e.target.value as SessionType)}>
-              {activeSessions.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </label>
-          <p className="auth-help">Cutoff countdown: {formatRemaining(placeCutoffMs)} (08:00 WITA)</p>
-          {!orderingWindow.canOrderNow ? <p className="auth-help">Ordering opens at 08:00 Asia/Makassar.</p> : null}
-          {serviceDate <= orderingWindow.today ? <p className="auth-help">Select tomorrow or a later date to place an order.</p> : null}
-          {draftCartId && hasOpenDraft ? <p className="auth-help">Draft cart loaded.</p> : null}
+        {mode === 'order' ? (
+          <div className="module-section" ref={menuSectionRef}>
+            <h2>Menu and Cart</h2>
+            {draftSourceContext
+              && selectedChildId === draftSourceContext.childId
+              && serviceDate === draftSourceContext.targetServiceDate
+              && session === draftSourceContext.session ? (
+                <p className="auth-help">
+                  {draftSourceContext.mode === 'edit' ? '✏️ Editing order' : '🛒 Quick reorder from'}: #{draftSourceContext.orderId}
+                  {' | '}Student: {draftSourceContext.childName}
+                  {' | '}Date: {draftSourceContext.targetServiceDate}
+                </p>
+              ) : null}
+            <label>Service Date
+              <input type="date" value={serviceDate} min={orderingWindow.earliestServiceDate} onChange={(e) => setServiceDate(e.target.value)} />
+            </label>
+            <label>Session
+              <select value={session} onChange={(e) => setSession(e.target.value as SessionType)}>
+                {activeSessions.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </label>
+            <p className="auth-help">Cutoff countdown: {formatRemaining(placeCutoffMs)} (08:00 WITA)</p>
+            {!orderingWindow.canOrderNow ? <p className="auth-help">Ordering opens at 08:00 Asia/Makassar.</p> : null}
+            {serviceDate <= orderingWindow.today ? <p className="auth-help">Select tomorrow or a later date to place an order.</p> : null}
+            {draftCartId && hasOpenDraft ? <p className="auth-help">Draft cart loaded.</p> : null}
 
-          {menuItems.length > 0 ? (
-            <div className="menu-flow-grid">
-              <div className="menu-search-section">
-                <h3>Menu Section</h3>
-                <div className="auth-form">
-                  {menuItems.map((item) => (
-                    <label key={item.id} style={getSessionCardStyle(session)}>
-                      <SessionBadge session={session} />
-                      <span><strong>{item.name}</strong> — Rp {Number(item.price).toLocaleString('id-ID')}</span>
-                      <small>Category: {formatDishCategoryLabel(item.dish_category)}</small>
-                      <small>Dietary: {formatDishDietaryTags(item)}</small>
-                      <small>{item.description}</small>
-                      <small>{item.nutrition_facts_text}</small>
-                      <small>Ingredients: {item.ingredients.join(', ') || '-'}</small>
-                      <button className="btn btn-outline" type="button"
-                        onClick={() => onAddDraftItem(item.id)}
-                        disabled={placementBlockedByBlackout}>Add</button>
-                    </label>
-                  ))}
-                </div>
-              </div>
-              <div className="menu-draft-section" ref={draftSectionRef}>
-                <h3>Draft Section</h3>
-                {draftItems.length === 0 ? (
-                  <p className="auth-help">No dishes in draft. Add from Menu Section.</p>
-                ) : (
+            {menuItems.length > 0 ? (
+              <div className="menu-flow-grid">
+                <div className="menu-search-section">
+                  <h3>Menu Section</h3>
                   <div className="auth-form">
-                    {draftItems.map((d) => (
-                      <label key={d.id} style={getSessionCardStyle(session)}>
+                    {menuItems.map((item) => (
+                      <label key={item.id} style={getSessionCardStyle(session)}>
                         <SessionBadge session={session} />
-                        <span><strong>{d.menuItem?.name}</strong> — Rp {Number(d.menuItem?.price || 0).toLocaleString('id-ID')}</span>
-                        <small>Category: {d.menuItem ? formatDishCategoryLabel(d.menuItem.dish_category) : '-'}</small>
-                        <small>{d.menuItem?.description}</small>
-                        <button className="btn btn-outline btn-sm" type="button" onClick={() => onRemoveDraftItem(d.id)}>Remove</button>
+                        <span><strong>{item.name}</strong> — Rp {Number(item.price).toLocaleString('id-ID')}</span>
+                        <small>Category: {formatDishCategoryLabel(item.dish_category)}</small>
+                        <small>Dietary: {formatDishDietaryTags(item)}</small>
+                        <small>{item.description}</small>
+                        <small>{item.nutrition_facts_text}</small>
+                        <small>Ingredients: {item.ingredients.join(', ') || '-'}</small>
+                        <button className="btn btn-outline" type="button"
+                          onClick={() => onAddDraftItem(item.id)}
+                          disabled={placementBlockedByBlackout}>Add</button>
                       </label>
                     ))}
                   </div>
-                )}
-                <div className="draft-actions">
-                  <p className="auth-help">Selected items: {selectedCount} / 5</p>
-                  <button
-                    className="btn btn-primary"
-                    type="button"
-                    disabled={submitting || placementExpired || placementBlockedByBlackout || placementBlockedByWindow}
-                    onClick={onPlaceOrder}
-                  >
-                    {submitting ? 'Placing...' : (draftSourceContext?.mode === 'edit' ? 'Save Changes' : 'Place Order')}
-                  </button>
+                </div>
+                <div className="menu-draft-section" ref={draftSectionRef}>
+                  <h3>Draft Section</h3>
+                  {draftItems.length === 0 ? (
+                    <p className="auth-help">No dishes in draft. Add from Menu Section.</p>
+                  ) : (
+                    <div className="auth-form">
+                      {draftItems.map((d) => (
+                        <label key={d.id} style={getSessionCardStyle(session)}>
+                          <SessionBadge session={session} />
+                          <span><strong>{d.menuItem?.name}</strong> — Rp {Number(d.menuItem?.price || 0).toLocaleString('id-ID')}</span>
+                          <small>Category: {d.menuItem ? formatDishCategoryLabel(d.menuItem.dish_category) : '-'}</small>
+                          <small>{d.menuItem?.description}</small>
+                          <button className="btn btn-outline btn-sm" type="button" onClick={() => onRemoveDraftItem(d.id)}>Remove</button>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  <div className="draft-actions">
+                    <p className="auth-help">Selected items: {selectedCount} / 5</p>
+                    <button
+                      className="btn btn-primary"
+                      type="button"
+                      disabled={submitting || placementExpired || placementBlockedByBlackout || placementBlockedByWindow}
+                      onClick={onPlaceOrder}
+                    >
+                      {submitting ? 'Placing...' : (draftSourceContext?.mode === 'edit' ? 'Save Changes' : 'Place Order')}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ) : (
-            <p className="auth-help">No active dishes configured by Admin for this date/session.</p>
-          )}
-        </div>
+            ) : (
+              <p className="auth-help">No active dishes configured by Admin for this date/session.</p>
+            )}
+          </div>
+        ) : null}
 
-        {/* ── 3. Consolidated Orders ── */}
-        <div className="module-section">
-          <h2>Consolidated Orders</h2>
-          <button className="btn btn-outline" type="button" onClick={onRefreshOrders} disabled={loadingOrders}>
-            {loadingOrders ? 'Refreshing...' : 'Refresh Orders'}
-          </button>
-          {sortedVisibleOrders.length === 0 ? (
-            <p className="auth-help">No orders yet for the selected student.</p>
-          ) : (
-            <div className="auth-form">
-              {sortedVisibleOrders.map((order) => (
-                <div key={order.id} className="order-row-card" style={getSessionCardStyle(order.session)}>
-                  <SessionBadge session={order.session} />
-                  <span><strong>{order.child_name}</strong> — {order.service_date}</span>
-                  <small>Order: {order.id}</small>
-                  <small>Status: {order.status} | Billing: {order.billing_status || '-'} | Delivery: {order.delivery_status || '-'}</small>
-                  <small>Total: Rp {Number(order.total_price).toLocaleString('id-ID')}</small>
-                  <small>Items: {order.items.map((item) => `${item.item_name_snapshot} x${item.quantity}`).join(', ') || '-'}</small>
-                  <div className="order-row-actions">
-                    <button className="btn btn-outline" type="button"
-                      onClick={() => onOpenOrderAsDraft(order, order.service_date, 'edit')}
-                      disabled={!order.can_edit || submitting}>Edit Before Cutoff</button>
-                    <button className="btn btn-outline" type="button"
-                      onClick={() => onDeleteOrder(order.id)}
-                      disabled={!order.can_edit || submitting}>Delete Before Cutoff</button>
+        {mode === 'record' ? (
+          <div className="module-section">
+            <h2>Consolidated Orders</h2>
+            <button className="btn btn-outline" type="button" onClick={onRefreshOrders} disabled={loadingOrders}>
+              {loadingOrders ? 'Refreshing...' : 'Refresh Orders'}
+            </button>
+            {sortedVisibleOrders.length === 0 ? (
+              <p className="auth-help">No orders yet for the selected student.</p>
+            ) : (
+              <div className="auth-form">
+                {sortedVisibleOrders.map((order) => (
+                  <div key={order.id} className="order-row-card" style={getSessionCardStyle(order.session)}>
+                    <SessionBadge session={order.session} />
+                    <span><strong>{order.child_name}</strong> — {order.service_date}</span>
+                    <small>Order: {order.id}</small>
+                    <small>Status: {order.status} | Billing: {order.billing_status || '-'} | Delivery: {order.delivery_status || '-'}</small>
+                    <small>Total: Rp {Number(order.total_price).toLocaleString('id-ID')}</small>
+                    <small>Items: {order.items.map((item) => `${item.item_name_snapshot} x${item.quantity}`).join(', ') || '-'}</small>
+                    <div className="order-row-actions">
+                      <button className="btn btn-outline" type="button"
+                        onClick={() => onOpenOrderAsDraft(order, order.service_date, 'edit')}
+                        disabled={!order.can_edit || submitting}>Edit Before Cutoff</button>
+                      <button className="btn btn-outline" type="button"
+                        onClick={() => onDeleteOrder(order.id)}
+                        disabled={!order.can_edit || submitting}>Delete Before Cutoff</button>
+                    </div>
+                    {!order.can_edit ? <small className="muted-note">Cutoff passed — order locked.</small> : null}
                   </div>
-                  {!order.can_edit ? <small className="muted-note">Cutoff passed — order locked.</small> : null}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
       </section>
 
       {/* ── Success Popup ── */}
