@@ -155,6 +155,19 @@ function activeBlackoutMessage(blackout: ActiveBlackout | null) {
   return mapOrderRuleError('ORDER_BLACKOUT_BLOCKED');
 }
 
+function getSelectedMenuCardStyle(session: SessionType, isSelected: boolean) {
+  return {
+    ...getSessionCardStyle(session),
+    ...(isSelected
+      ? {
+          borderColor: '#2f6f3e',
+          background: 'linear-gradient(180deg, #eefbe8 0%, #dcf4d3 100%)',
+          boxShadow: '0 0 0 2px rgba(47, 111, 62, 0.16)',
+        }
+      : {}),
+  };
+}
+
 export default function FamilyOrderPage({
   mode = 'order',
 }: {
@@ -358,22 +371,40 @@ export default function FamilyOrderPage({
   };
 
   const onPlaceOrder = async () => {
-    if (!selectedChildId) return setError('Please select a student first.');
+    if (!selectedChildId) {
+      setError('Please select a student first.');
+      return false;
+    }
     const items = Object.entries(itemQty).filter(([, qty]) => qty > 0).map(([menuItemId, quantity]) => ({ menuItemId, quantity }));
-    if (items.length === 0) return setError('Select at least one menu item.');
+    if (items.length === 0) {
+      setError('Select at least one menu item.');
+      return false;
+    }
 
     // Duplicate check: show popup if an order exists for this day/session and we are NOT editing that exact order
     const isEditingThisOrder = draftSourceContext?.mode === 'edit' && selectedDayOrder?.id === draftSourceContext?.orderId;
     if (selectedDayOrder && !isEditingThisOrder) {
       setShowDuplicatePopup(true);
-      return;
+      return false;
     }
 
-    if (placementBlockedByBlackout) { setShowBlackoutModal(true); return; }
-    if (!orderingWindow.canOrderNow) return setError(`Ordering opens daily at ${formatCutoffLabel(orderingCutoffTime)}.`);
-    if (serviceDate <= orderingWindow.today) return setError('Orders can only be placed for tomorrow onward.');
-    if (placementExpired) return setError('ORDER_CUTOFF_EXCEEDED');
-    if (items.length > 5) return setError('Maximum 5 items per order.');
+    if (placementBlockedByBlackout) { setShowBlackoutModal(true); return false; }
+    if (!orderingWindow.canOrderNow) {
+      setError(`Ordering opens daily at ${formatCutoffLabel(orderingCutoffTime)}.`);
+      return false;
+    }
+    if (serviceDate <= orderingWindow.today) {
+      setError('Orders can only be placed for tomorrow onward.');
+      return false;
+    }
+    if (placementExpired) {
+      setError('ORDER_CUTOFF_EXCEEDED');
+      return false;
+    }
+    if (items.length > 5) {
+      setError('Maximum 5 items per order.');
+      return false;
+    }
 
     setSubmitting(true); setError(''); setMessage('');
     try {
@@ -406,10 +437,11 @@ export default function FamilyOrderPage({
       if (typeof window !== 'undefined') {
         window.sessionStorage.setItem(ORDER_SUCCESS_POPUP_KEY, '1');
         window.location.reload();
-        return;
+        return true;
       }
       setShowSuccessPopup(true);
       await loadOrders();
+      return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Order placement failed';
       if (msg.includes('ORDER_SESSION_DISABLED') && session !== 'LUNCH') {
@@ -417,6 +449,7 @@ export default function FamilyOrderPage({
       } else {
         setError(mapOrderRuleError(msg, orderingCutoffTime));
       }
+      return false;
     } finally { setSubmitting(false); }
   };
 
@@ -646,7 +679,7 @@ export default function FamilyOrderPage({
                   <h3>Menu Section</h3>
                   <div className="auth-form">
                     {menuItems.map((item) => (
-                      <label key={item.id} style={getSessionCardStyle(session)}>
+                      <label key={item.id} style={getSelectedMenuCardStyle(session, Boolean(itemQty[item.id]))}>
                         <SessionBadge session={session} />
                         <span><strong>{item.name}</strong> — Rp {Number(item.price).toLocaleString('id-ID')}</span>
                         <small>Category: {formatDishCategoryLabel(item.dish_category)}</small>
@@ -656,7 +689,7 @@ export default function FamilyOrderPage({
                         <small>Ingredients: {item.ingredients.join(', ') || '-'}</small>
                         <button className="btn btn-outline" type="button"
                           onClick={() => onAddDraftItem(item.id)}
-                          disabled={placementBlockedByBlackout}>Add</button>
+                          disabled={placementBlockedByBlackout}>{itemQty[item.id] ? 'Selected' : 'Add'}</button>
                       </label>
                     ))}
                   </div>
@@ -867,7 +900,7 @@ export default function FamilyOrderPage({
         .popup-close { width: 100%; margin-top: 0.25rem; }
       `}</style>
     </main>
-    <DraftExitGuard active={hasDraftChanges} onDiscard={discardDraftAndContinue} subjectLabel="family" />
+    <DraftExitGuard active={hasDraftChanges} onDiscard={discardDraftAndContinue} onSave={onPlaceOrder} subjectLabel="family" />
     <LogoutButton returnHref="/family" showRecord={false} showLogout={false} sticky={false} />
     </>
   );

@@ -77,7 +77,17 @@ export default function LogoutButton({
           <button
             type="button"
             className="record-btn"
-            onClick={() => router.push(returnHref)}
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                const exitIntent = new CustomEvent('blossom:draft-exit-intent', {
+                  cancelable: true,
+                  detail: { href: returnHref },
+                });
+                window.dispatchEvent(exitIntent);
+                if (exitIntent.defaultPrevented) return;
+              }
+              router.push(returnHref);
+            }}
             aria-label="Return to module"
           >
             Return

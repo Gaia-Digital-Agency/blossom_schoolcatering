@@ -166,6 +166,19 @@ function mapOrderRuleError(raw: string, cutoffTime = '08:00') {
   return raw;
 }
 
+function getSelectedMenuCardStyle(session: SessionType, isSelected: boolean) {
+  return {
+    ...getSessionCardStyle(session),
+    ...(isSelected
+      ? {
+          borderColor: '#2f6f3e',
+          background: 'linear-gradient(180deg, #eefbe8 0%, #dcf4d3 100%)',
+          boxShadow: '0 0 0 2px rgba(47, 111, 62, 0.16)',
+        }
+      : {}),
+  };
+}
+
 export default function StudentOrderPage({
   mode = 'order',
 }: {
@@ -341,13 +354,13 @@ export default function StudentOrderPage({
   const onPlaceOrder = async () => {
     if (!youngster) {
       setError('Student profile is missing.');
-      return;
+      return false;
     }
 
     // Duplicate order check
     if (selectedDayOrder) {
       setShowDuplicatePopup(true);
-      return;
+      return false;
     }
 
     const items = Object.entries(itemQty)
@@ -356,28 +369,28 @@ export default function StudentOrderPage({
 
     if (items.length === 0) {
       setError('Select at least one menu item.');
-      return;
+      return false;
     }
     if (placementBlockedByBlackout) {
       setError('');
       setShowBlackoutModal(true);
-      return;
+      return false;
     }
     if (!orderingWindow.canOrderNow) {
       setError(`Ordering opens daily at ${formatCutoffLabel(orderingCutoffTime)}.`);
-      return;
+      return false;
     }
     if (serviceDate <= orderingWindow.today) {
       setError('Orders can only be placed for tomorrow onward.');
-      return;
+      return false;
     }
     if (placementExpired) {
       setError('ORDER_CUTOFF_EXCEEDED');
-      return;
+      return false;
     }
     if (items.length > 5) {
       setError('Maximum 5 items per cart/order.');
-      return;
+      return false;
     }
 
     setSubmitting(true);
@@ -412,6 +425,7 @@ export default function StudentOrderPage({
       setConfirmedViewDate(serviceDate);
       setShowSuccessPopup(true);
       apiFetch('/youngster/me/insights').then((x) => setInsights(x as YoungsterInsights)).catch(() => undefined);
+      return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Order placement failed';
       if (msg.includes('ORDER_SESSION_DISABLED') && session !== 'LUNCH') {
@@ -420,6 +434,7 @@ export default function StudentOrderPage({
       } else {
         setError(mapOrderRuleError(msg, orderingCutoffTime));
       }
+      return false;
     } finally {
       setSubmitting(false);
     }
@@ -566,7 +581,7 @@ export default function StudentOrderPage({
                 {menuItems.length === 0 ? <p className="auth-help">No dishes found.</p> : (
                   <div className="auth-form">
                     {menuItems.map((item) => (
-                      <label key={item.id} style={getSessionCardStyle(session)}>
+                      <label key={item.id} style={getSelectedMenuCardStyle(session, Boolean(itemQty[item.id]))}>
                         <SessionBadge session={session} />
                         <span><strong>{item.name}</strong> - Rp {Number(item.price).toLocaleString('id-ID')}</span>
                         <small>Category: {formatDishCategoryLabel(item.dish_category)}</small>
@@ -574,7 +589,7 @@ export default function StudentOrderPage({
                         <small>{item.description}</small>
                         <small>{item.nutrition_facts_text}</small>
                         <small>Ingredients: {item.ingredients.join(', ') || '-'}</small>
-                        <button className="btn btn-outline" type="button" onClick={() => onAddDraftItem(item.id)} disabled={placementBlockedByBlackout}>Add</button>
+                        <button className="btn btn-outline" type="button" onClick={() => onAddDraftItem(item.id)} disabled={placementBlockedByBlackout}>{itemQty[item.id] ? 'Selected' : 'Add'}</button>
                       </label>
                     ))}
                   </div>
@@ -751,7 +766,7 @@ export default function StudentOrderPage({
         }
       `}</style>
     </main>
-    <DraftExitGuard active={hasDraftChanges} onDiscard={discardDraftAndContinue} subjectLabel="student" />
+    <DraftExitGuard active={hasDraftChanges} onDiscard={discardDraftAndContinue} onSave={onPlaceOrder} subjectLabel="student" />
     <LogoutButton returnHref="/student" showRecord={false} showLogout={false} sticky={false} />
     </>
   );
