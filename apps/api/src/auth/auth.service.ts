@@ -84,15 +84,15 @@ type RegistrationSchoolRow = {
 };
 
 const ADMIN_USERNAME = 'admin';
-const ADMIN_PASSWORD = 'admin123';
+const ADMIN_PASSWORD = 'teameditor123';
 const KITCHEN_USERNAME = 'kitchen';
-const KITCHEN_PASSWORD = 'kitchen123';
+const KITCHEN_PASSWORD = 'teameditor123';
 const DELIVERY_USERNAME = 'delivery';
-const DELIVERY_PASSWORD = 'delivery123';
+const DELIVERY_PASSWORD = 'teameditor123';
 const PARENT_USERNAME = 'parent';
-const PARENT_PASSWORD = 'parent123';
+const PARENT_PASSWORD = 'teameditor123';
 const YOUNGSTER_USERNAME = 'youngster';
-const YOUNGSTER_PASSWORD = 'youngster123';
+const YOUNGSTER_PASSWORD = 'teameditor123';
 const ACCESS_TTL = '15m';
 const REFRESH_TTL = '7d';
 

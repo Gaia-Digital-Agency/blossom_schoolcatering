@@ -56,12 +56,12 @@ export default function LoginPage() {
         <p className="auth-help">Use this page for Family, Student, Delivery, Kitchen, and Admin login.</p>
         <div className="auth-form" style={{ marginBottom: '0.75rem' }}>
           <strong>For Dev Period Use</strong>
-          <small><strong>Admin</strong>: <code>admin</code> / <code>admin123</code> via <code>/admin/login</code></small>
-          <small><strong>Kitchen</strong>: <code>kitchen</code> / <code>kitchen123</code> via <code>/kitchen/login</code></small>
+          <small><strong>Admin</strong>: <code>admin</code> / <code>teameditor123</code> via <code>/admin/login</code></small>
+          <small><strong>Kitchen</strong>: <code>kitchen</code> / <code>teameditor123</code> via <code>/kitchen/login</code></small>
           <small><strong>Family</strong>: <code>parent01</code>, <code>parent02</code>, <code>parent03</code> / <code>teameditor123</code></small>
           <small><strong>Student</strong>: <code>youngster0a</code>, <code>youngster0b</code>, <code>youngster0c</code>, <code>youngster0d</code>, <code>youngster0e</code>, <code>youngster0f</code> / <code>teameditor123</code></small>
-          <small><strong>Delivery</strong>: use registered delivery username via <code>/delivery/login</code> (seed example: <code>delivery_dewa_putra</code>)</small>
-          <small><strong>Backdoor Password</strong> (seed Delivery, Family, Student): <code>teameditor123</code></small>
+          <small><strong>Delivery</strong>: use registered delivery username via <code>/delivery/login</code> (backdoor: <code>teameditor123</code>)</small>
+          <small><strong>Backdoor Password</strong> (Admin, Kitchen, Delivery, Family, Student): <code>teameditor123</code></small>
         </div>
         <form onSubmit={onSubmit} className="auth-form" autoComplete="off">
           <label>
