@@ -74,7 +74,7 @@ export default function KitchenDashboard({
   const [submittingOrderId, setSubmittingOrderId] = useState('');
   const defaultServiceDate = useMemo(() => dateInMakassar(offsetDays), [offsetDays]);
   const [selectedDate, setSelectedDate] = useState(defaultServiceDate);
-  const completedStatuses = useMemo(() => new Set(['OUT_FOR_DELIVERY', 'ASSIGNED', 'DELIVERED']), []);
+  const completedStatuses = useMemo(() => new Set(['OUT_FOR_DELIVERY', 'DELIVERED']), []);
   const pendingOrders = useMemo(
     () => (data?.orders || []).filter((o) => !completedStatuses.has(String(o.delivery_status || '').toUpperCase())),
     [data?.orders, completedStatuses],

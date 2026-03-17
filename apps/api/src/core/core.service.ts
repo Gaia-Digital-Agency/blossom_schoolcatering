@@ -6543,7 +6543,7 @@ export class CoreService implements OnModuleInit {
       FROM (
         SELECT COUNT(*)::int AS total_orders,
                COUNT(*) FILTER (
-                 WHERE o.delivery_status IN ('OUT_FOR_DELIVERY', 'ASSIGNED', 'DELIVERED')
+                 WHERE o.delivery_status IN ('OUT_FOR_DELIVERY', 'DELIVERED')
                )::int AS total_orders_complete,
                COALESCE(SUM(oi.quantity), 0)::int AS total_dishes,
                COUNT(*) FILTER (WHERE o.session = 'BREAKFAST')::int AS breakfast_orders,
@@ -6723,7 +6723,7 @@ export class CoreService implements OnModuleInit {
       throw new BadRequestException('ORDER_NOT_READY_FOR_KITCHEN_COMPLETE');
     }
     const currentDeliveryStatus = String(order.delivery_status || '').toUpperCase();
-    const isCompleted = ['OUT_FOR_DELIVERY', 'ASSIGNED', 'DELIVERED'].includes(currentDeliveryStatus);
+    const isCompleted = ['OUT_FOR_DELIVERY', 'DELIVERED'].includes(currentDeliveryStatus);
 
     if (!isCompleted) {
       await runSql(
