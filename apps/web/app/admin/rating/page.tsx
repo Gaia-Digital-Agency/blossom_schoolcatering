@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { apiFetch } from '../../../lib/auth';
 import AdminNav from '../_components/admin-nav';
 import AdminReturnButton from '../_components/admin-return-button';
+import { getSessionLabel } from '../../../lib/session-theme';
 
 type MenuRatingSummary = {
   menu_item_id: string;
@@ -20,12 +21,17 @@ type MenuRatingSummary = {
 
 export default function AdminRatingPage() {
   const [ratings, setRatings] = useState<MenuRatingSummary[]>([]);
+  const [serviceDate, setServiceDate] = useState('');
+  const [session, setSession] = useState<'ALL' | 'LUNCH' | 'SNACK' | 'BREAKFAST'>('ALL');
   const [error, setError] = useState('');
 
   const load = async () => {
     setError('');
     try {
-      const out = await apiFetch('/admin/menu-ratings') as { items: MenuRatingSummary[] };
+      const query = new URLSearchParams();
+      if (serviceDate) query.set('service_date', serviceDate);
+      if (session !== 'ALL') query.set('session', session);
+      const out = await apiFetch(`/admin/menu-ratings${query.toString() ? `?${query.toString()}` : ''}`) as { items: MenuRatingSummary[] };
       setRatings(out.items || []);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed loading ratings');
@@ -43,13 +49,26 @@ export default function AdminRatingPage() {
         </div>
         {error ? <p className="auth-error">{error}</p> : null}
         <div className="auth-form rating-actions">
+          <label>
+            Service Date
+            <input type="date" value={serviceDate} onChange={(e) => setServiceDate(e.target.value)} />
+          </label>
+          <label>
+            Session
+            <select value={session} onChange={(e) => setSession(e.target.value as 'ALL' | 'LUNCH' | 'SNACK' | 'BREAKFAST')}>
+              <option value="ALL">All sessions</option>
+              <option value="BREAKFAST">{getSessionLabel('BREAKFAST')}</option>
+              <option value="SNACK">{getSessionLabel('SNACK')}</option>
+              <option value="LUNCH">{getSessionLabel('LUNCH')}</option>
+            </select>
+          </label>
           <button className="btn btn-outline" type="button" onClick={load}>Refresh</button>
         </div>
         <div className="auth-form rating-list-card">
           {ratings.map((rating) => (
             <article key={rating.menu_item_id} className="rating-item-card">
               <strong>{rating.name}</strong>
-              <small>Date / Session: {rating.service_date || '-'} / {rating.session || '-'}</small>
+              <small>Date / Session: {rating.service_date || '-'} / {getSessionLabel(rating.session || '-')}</small>
               <small>1 Star &gt; {rating.star_1_votes} Votes</small>
               <small>2 Stars &gt; {rating.star_2_votes} Votes</small>
               <small>3 Stars &gt; {rating.star_3_votes} Votes</small>
@@ -65,6 +84,7 @@ export default function AdminRatingPage() {
       <style jsx>{`
         .rating-actions {
           margin-bottom: 0.7rem;
+          align-items: end;
         }
         .rating-list-card {
           display: grid;

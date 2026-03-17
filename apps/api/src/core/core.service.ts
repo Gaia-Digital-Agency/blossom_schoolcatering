@@ -853,7 +853,8 @@ export class CoreService implements OnModuleInit {
     let currentStreak = 0;
     let prev: Date | null = null;
     for (const raw of orderDates) {
-      const now = new Date(`${raw}T00:00:00.000Z`);
+      const dateIso = String(raw).slice(0, 10);
+      const now = new Date(`${dateIso}T00:00:00.000Z`);
       if (!prev) currentStreak = 1;
       else {
         const diff = Math.round((now.getTime() - prev.getTime()) / (24 * 60 * 60 * 1000));
@@ -875,7 +876,7 @@ export class CoreService implements OnModuleInit {
 
   private calculateMonthOrderStats(monthDates: string[], month: string) {
     const inMonth = monthDates.filter((d) => d.startsWith(month));
-    const weeks = [...new Set(inMonth.map((d) => this.getIsoWeek(d)))].sort((a, b) => a - b);
+    const weeks = [...new Set(inMonth.map((d) => this.getIsoWeek(String(d).slice(0, 10))))].sort((a, b) => a - b);
     let longest = 0;
     let current = 0;
     let prevWeek: number | null = null;
@@ -2058,7 +2059,7 @@ export class CoreService implements OnModuleInit {
 
   async getAdminOrders(
     actor: AccessUser,
-    input?: { dateRaw?: string; schoolId?: string; deliveryUserId?: string },
+    input?: { dateRaw?: string; schoolId?: string; deliveryUserId?: string; session?: string },
   ) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     const serviceDate = input?.dateRaw ? this.validateServiceDate(input.dateRaw) : '';
@@ -2080,6 +2081,10 @@ export class CoreService implements OnModuleInit {
         params.push(input.deliveryUserId);
         filters.push(`da.delivery_user_id = $${params.length}::uuid`);
       }
+    }
+    if (input?.session && input.session !== 'ALL') {
+      params.push(this.normalizeSession(input.session));
+      filters.push(`o.session = $${params.length}::session_type`);
     }
 
     const whereSql = `WHERE ${filters.join('\n          AND ')}`;
@@ -4802,12 +4807,20 @@ export class CoreService implements OnModuleInit {
     return this.fetchProofImageBinary(proofImageUrl);
   }
 
-  async getAdminBilling(status?: string) {
+  async getAdminBilling(status?: string, sessionRaw?: string) {
     await this.ensureBillingReviewColumns();
     const statusFilter = (status || '').toUpperCase();
-    const whereStatus = ['UNPAID', 'PENDING_VERIFICATION', 'VERIFIED', 'REJECTED'].includes(statusFilter)
-      ? 'AND br.status = $1::payment_status'
-      : '';
+    const session = sessionRaw && sessionRaw !== 'ALL' ? this.normalizeSession(sessionRaw) : null;
+    const params: unknown[] = [];
+    const clauses: string[] = [];
+    if (['UNPAID', 'PENDING_VERIFICATION', 'VERIFIED', 'REJECTED'].includes(statusFilter)) {
+      params.push(statusFilter);
+      clauses.push(`AND br.status = $${params.length}::payment_status`);
+    }
+    if (session) {
+      params.push(session);
+      clauses.push(`AND o.session = $${params.length}::session_type`);
+    }
     const out = await runSql(
       `
       SELECT row_to_json(t)::text
@@ -4839,11 +4852,11 @@ export class CoreService implements OnModuleInit {
         JOIN users up ON up.id = p.user_id
         LEFT JOIN digital_receipts dr ON dr.billing_record_id = br.id
         WHERE 1=1
-          ${whereStatus}
+          ${clauses.join('\n          ')}
         ORDER BY br.created_at DESC
       ) t;
     `,
-      whereStatus ? [statusFilter] : [],
+      params,
     );
     return this.parseJsonLines<Record<string, unknown> & { total_price?: string | number }>(out).map((row) => ({
       ...row,
@@ -6332,7 +6345,8 @@ export class CoreService implements OnModuleInit {
       FROM (
         SELECT c.id AS child_id,
                (u.first_name || ' ' || u.last_name) AS child_name,
-               COUNT(o.id)::int AS orders_count,
+               o.session::text AS session,
+               COUNT(DISTINCT o.id)::int AS orders_count,
                COALESCE(SUM(o.total_price), 0)::numeric AS total_spend
         FROM orders o
         JOIN children c ON c.id = o.child_id
@@ -6342,8 +6356,13 @@ export class CoreService implements OnModuleInit {
           AND o.service_date BETWEEN $2::date AND $3::date
           AND o.status <> 'CANCELLED'
           AND o.deleted_at IS NULL
-        GROUP BY c.id, u.first_name, u.last_name
-        ORDER BY total_spend DESC, child_name ASC
+        GROUP BY c.id, u.first_name, u.last_name, o.session
+        ORDER BY child_name ASC,
+                 CASE o.session
+                   WHEN 'BREAKFAST' THEN 1
+                   WHEN 'SNACK' THEN 2
+                   ELSE 3
+                 END ASC
       ) t;
     `,
       [parentId, monthStart, monthEnd],
@@ -6415,6 +6434,7 @@ export class CoreService implements OnModuleInit {
       SELECT row_to_json(t)::text
       FROM (
         SELECT o.service_date::text AS service_date,
+               o.session::text AS session,
                COALESCE(SUM(oi.quantity * COALESCE(mi.calories_kcal, 0)), 0)::int AS calories_total,
                COUNT(*) FILTER (WHERE mi.calories_kcal IS NULL)::int AS tba_items
         FROM orders o
@@ -6424,44 +6444,47 @@ export class CoreService implements OnModuleInit {
           AND o.service_date BETWEEN $2::date AND $3::date
           AND o.status <> 'CANCELLED'
           AND o.deleted_at IS NULL
-        GROUP BY o.service_date
-        ORDER BY o.service_date ASC
+        GROUP BY o.service_date, o.session
+        ORDER BY o.service_date ASC,
+                 CASE o.session
+                   WHEN 'BREAKFAST' THEN 1
+                   WHEN 'SNACK' THEN 2
+                   ELSE 3
+                 END ASC
       ) t;
     `,
       [childId, weekStart, weekEnd],
     );
-    const nutritionRows = this.parseJsonLines<{ service_date: string; calories_total: number; tba_items: number }>(nutritionOut);
-    const byDate = new Map(nutritionRows.map((r) => [r.service_date, r]));
-    const days: Array<{ service_date: string; calories_display: string; tba_items: number }> = [];
-    const weekBase = new Date(`${weekStart}T00:00:00.000Z`);
-    for (let i = 0; i < 7; i += 1) {
-      const d = new Date(weekBase);
-      d.setUTCDate(weekBase.getUTCDate() + i);
-      const iso = d.toISOString().slice(0, 10);
-      const row = byDate.get(iso);
-      days.push({
-        service_date: iso,
-        calories_display: row ? `${Number(row.calories_total || 0)} kcal` : 'TBA',
-        tba_items: row ? Number(row.tba_items || 0) : 0,
-      });
-    }
+    const nutritionRows = this.parseJsonLines<{ service_date: string; session: string; calories_total: number; tba_items: number }>(nutritionOut);
+    const days = nutritionRows.map((row) => ({
+      service_date: row.service_date,
+      session: row.session,
+      calories_display: `${Number(row.calories_total || 0)} kcal`,
+      tba_items: Number(row.tba_items || 0),
+    }));
     const weekCalories = nutritionRows.reduce((sum, r) => sum + Number(r.calories_total || 0), 0);
 
     const orderDatesOut = await runSql(
       `
-      SELECT to_char(o.service_date, 'YYYY-MM-DD')
+      SELECT (to_char(o.service_date, 'YYYY-MM-DD') || '|' || o.session::text)
       FROM orders o
       WHERE o.child_id = $1
         AND o.service_date >= ($2::date - INTERVAL '70 day')
         AND o.status <> 'CANCELLED'
         AND o.deleted_at IS NULL
-      GROUP BY o.service_date
-      ORDER BY o.service_date ASC;
+      GROUP BY o.service_date, o.session
+      ORDER BY o.service_date ASC,
+               CASE o.session
+                 WHEN 'BREAKFAST' THEN 1
+                 WHEN 'SNACK' THEN 2
+                 ELSE 3
+               END ASC;
     `,
       [childId, refDate],
     );
     const orderDates = orderDatesOut ? orderDatesOut.split('\n').map((x) => x.trim()).filter(Boolean) : [];
-    const maxStreak = this.calculateMaxConsecutiveOrderDays(orderDates);
+    const streakDates = [...new Set(orderDates.map((x) => x.slice(0, 10)))];
+    const maxStreak = this.calculateMaxConsecutiveOrderDays(streakDates);
     const currentMonth = refDate.slice(0, 7);
     const refDateObj = new Date(`${refDate}T00:00:00.000Z`);
     const currentMonthStartDate = new Date(Date.UTC(refDateObj.getUTCFullYear(), refDateObj.getUTCMonth(), 1));
@@ -6475,7 +6498,7 @@ export class CoreService implements OnModuleInit {
     const previousMonthEnd = previousMonthEndDate.toISOString().slice(0, 10);
     const monthRowsOut = await runSql(
       `
-      SELECT to_char(service_date, 'YYYY-MM-DD')
+      SELECT (to_char(service_date, 'YYYY-MM-DD') || '|' || session::text)
       FROM orders
       WHERE child_id = $1
         AND (
@@ -6484,8 +6507,13 @@ export class CoreService implements OnModuleInit {
         )
         AND status <> 'CANCELLED'
         AND deleted_at IS NULL
-      GROUP BY service_date
-      ORDER BY service_date ASC;
+      GROUP BY service_date, session
+      ORDER BY service_date ASC,
+               CASE session
+                 WHEN 'BREAKFAST' THEN 1
+                 WHEN 'SNACK' THEN 2
+                 ELSE 3
+               END ASC;
     `,
       [childId, currentMonthStart, currentMonthEnd, previousMonthStart, previousMonthEnd],
     );
@@ -6557,14 +6585,14 @@ export class CoreService implements OnModuleInit {
       `
       SELECT row_to_json(t)::text
       FROM (
-        SELECT COUNT(*)::int AS total_orders,
-               COUNT(*) FILTER (
+        SELECT COUNT(DISTINCT o.id)::int AS total_orders,
+               COUNT(DISTINCT o.id) FILTER (
                  WHERE o.delivery_status IN ('OUT_FOR_DELIVERY', 'DELIVERED')
                )::int AS total_orders_complete,
                COALESCE(SUM(oi.quantity), 0)::int AS total_dishes,
-               COUNT(*) FILTER (WHERE o.session = 'BREAKFAST')::int AS breakfast_orders,
-               COUNT(*) FILTER (WHERE o.session = 'SNACK')::int AS snack_orders,
-               COUNT(*) FILTER (WHERE o.session = 'LUNCH')::int AS lunch_orders
+               COUNT(DISTINCT o.id) FILTER (WHERE o.session = 'BREAKFAST')::int AS breakfast_orders,
+               COUNT(DISTINCT o.id) FILTER (WHERE o.session = 'SNACK')::int AS snack_orders,
+               COUNT(DISTINCT o.id) FILTER (WHERE o.session = 'LUNCH')::int AS lunch_orders
         FROM orders o
         LEFT JOIN order_items oi ON oi.order_id = o.id
         WHERE o.service_date = $1::date

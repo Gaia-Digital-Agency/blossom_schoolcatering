@@ -613,38 +613,34 @@ Goal: seamless App where Snack and Breakfast sessions can be switched ON/OFF fro
 #### P2-1 · Per-Session Cutoff Times
 - [x] **Decide:** single global cutoff vs per-session cutoff (business decision)
   - **Decision:** Keep **one global cutoff** for all sessions
-- [ ] If per-session: add `ordering_cutoff_time_snack` and `ordering_cutoff_time_breakfast` to `site_settings` table (or use a JSONB column)
-- [ ] Update `getSiteSettings()` at `core.service.ts:7998` to return per-session cutoffs
-- [ ] Update admin site settings page to expose per-session cutoff fields
-- [ ] Update `getMakassarOrderingWindow()` in `family-order-page.tsx` to accept and use session-specific cutoff
-- [ ] Update same in `student-order-page.tsx`
-- [ ] Update `assertSessionActiveForOrdering()` / cutoff validation in `core.service.ts:1230-1248`
-- [ ] Test: set Breakfast cutoff to 07:00, Lunch to 08:30 — confirm each session blocks correctly at its own time
+- [x] No per-session cutoff implementation needed
+- [x] Existing single global cutoff retained in backend and frontend
+- [x] Phase 2 conclusion: cutoff logic remains intentionally shared across Breakfast, Snack, and Lunch
 
 #### P2-2 · Spending Dashboard — Add Session Breakdown
-- [ ] `apps/api/src/core/core.service.ts` — update `getParentSpendingDashboard()` at line 6424 to GROUP BY child + session
-- [ ] New response shape: `byChild: Array<{ child_name, session, orders_count, total_spend }>` plus a total rollup
-- [ ] Update `apps/web/app/family/_components/family-billing-page.tsx` spending dashboard display to show per-session rows
-- [ ] Test: child with Lunch + Snack orders — confirm two rows per child in dashboard
+- [x] `apps/api/src/core/core.service.ts` — `getParentSpendingDashboard()` now groups by child + session
+- [x] Response shape updated to `byChild: Array<{ child_id, child_name, session, orders_count, total_spend }>` with total month rollup retained
+- [x] `apps/web/app/family/_components/family-billing-page.tsx` spending dashboard now shows per-session rows
+- [x] Build-validated; ready for manual Lunch + Snack scenario verification
 
 #### P2-3 · Nutrition / Weekly Insights — Session Per Day Row
-- [ ] `apps/api/src/core/core.service.ts:6510-6545` — add `o.session::text AS session` to nutrition query
-- [ ] Change `GROUP BY o.service_date` to `GROUP BY o.service_date, o.session`
-- [ ] Update response type: `days: Array<{ service_date, session, calories_display, tba_items }>`
-- [ ] Update student overview page to display per-session rows within a day
-- [ ] Test: student with Breakfast + Lunch on same day — confirm two nutrition rows appear
+- [x] `apps/api/src/core/core.service.ts` — nutrition query now includes `o.session::text AS session`
+- [x] Weekly nutrition grouping changed to `service_date + session`
+- [x] Response type updated to `days: Array<{ service_date, session, calories_display, tba_items }>`
+- [x] Student overview now displays per-session nutrition rows within the week
+- [x] Build-validated; ready for manual Breakfast + Lunch scenario verification
 
 #### P2-4 · Badge Rule — Decision and Implementation
 - [x] **Decide badge accumulation rule** (per day / per session / weighted)
   - **Decision:** `per session`
   - **Meaning:** `Breakfast + Snack + Lunch` on the same day counts as `3`
   - **Weighting:** all sessions have the same weight
-- [ ] If per-session: update badge query at `core.service.ts:6565-6580` — change GROUP BY to include session
-- [ ] Update `calculateMaxConsecutiveOrderDays()` logic if semantics change
-- [ ] Update `currentMonthOrders` count to reflect new rule
-- [ ] Update badge thresholds if needed (session-based may reach levels faster)
-- [ ] Update student badge UI labels to match new semantics
-- [ ] Test: student orders Breakfast + Snack + Lunch on 3 consecutive days — verify badge level reflects rule correctly
+- [x] Badge order queries now group by `service_date + session` where session accumulation matters
+- [x] `currentMonthOrders` now reflects per-session counting
+- [x] Consecutive-day streak kept intentionally day-based; duplicate same-day sessions no longer collapse monthly order count
+- [x] Student badge UI labels updated to reflect session-based monthly accumulation
+- [x] Badge thresholds left unchanged for now
+- [x] Build-validated; ready for manual 3-session x 3-day badge verification
 
 ### PHASE 3 — Schema Changes (Requires Migrations)
 

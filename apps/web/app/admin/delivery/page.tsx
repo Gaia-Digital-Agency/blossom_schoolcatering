@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '../../../lib/auth';
+import { getSessionLabel } from '../../../lib/session-theme';
 import AdminNav from '../_components/admin-nav';
 import AdminReturnButton from '../_components/admin-return-button';
 import PasswordInput from '../../_components/password-input';
@@ -72,6 +73,7 @@ export default function AdminDeliveryPage() {
   const [mappings, setMappings] = useState<Mapping[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [assignDate, setAssignDate] = useState(todayIsoLocal());
+  const [sessionFilter, setSessionFilter] = useState<'ALL' | 'BREAKFAST' | 'SNACK' | 'LUNCH'>('ALL');
   const [selectedDeliveryUserId, setSelectedDeliveryUserId] = useState('');
   const [selectedSchoolId, setSelectedSchoolId] = useState('');
   const [error, setError] = useState('');
@@ -381,6 +383,11 @@ export default function AdminDeliveryPage() {
     return map;
   }, [users]);
 
+  const filteredAssignments = useMemo(
+    () => assignments.filter((row) => sessionFilter === 'ALL' || String(row.session || '').toUpperCase() === sessionFilter),
+    [assignments, sessionFilter],
+  );
+
   const autoAssignmentSummary = useMemo(() => {
     const grouped = new Map<string, {
       schools: Set<string>;
@@ -388,7 +395,7 @@ export default function AdminDeliveryPage() {
       orderCount: number;
       orders: Assignment[];
     }>();
-    for (const row of assignments) {
+    for (const row of filteredAssignments) {
       const key = row.delivery_user_id || 'UNASSIGNED';
       if (!grouped.has(key)) {
         grouped.set(key, { schools: new Set<string>(), youngsters: new Set<string>(), orderCount: 0, orders: [] });
@@ -414,7 +421,7 @@ export default function AdminDeliveryPage() {
         ),
       };
     }).sort((a, b) => b.orderCount - a.orderCount || a.deliveryName.localeCompare(b.deliveryName));
-  }, [assignments, usersById]);
+  }, [filteredAssignments, usersById]);
 
   const onDownloadSummary = async () => {
     setError('');
@@ -658,6 +665,15 @@ export default function AdminDeliveryPage() {
             Service Date
             <input type="date" value={assignDate} onChange={(e) => setAssignDate(e.target.value)} />
           </label>
+          <label>
+            Session
+            <select value={sessionFilter} onChange={(e) => setSessionFilter(e.target.value as 'ALL' | 'BREAKFAST' | 'SNACK' | 'LUNCH')}>
+              <option value="ALL">All sessions</option>
+              <option value="BREAKFAST">{getSessionLabel('BREAKFAST')}</option>
+              <option value="SNACK">{getSessionLabel('SNACK')}</option>
+              <option value="LUNCH">{getSessionLabel('LUNCH')}</option>
+            </select>
+          </label>
           <button className="btn btn-outline" type="button" onClick={() => setAssignDate(todayIsoLocal())}>Show Today</button>
           <button className="btn btn-primary" type="button" onClick={onAutoAssign}>Auto Assign by School</button>
           <button className="btn btn-outline" type="button" onClick={onShowServiceDate}>Show Service Date</button>
@@ -690,7 +706,7 @@ export default function AdminDeliveryPage() {
                     <div className="auto-order-list">
                       {row.orders.map((order) => (
                         <div key={order.id}>
-                          {order.school_name} | {order.service_date} {order.session} | {order.child_name} / {order.parent_name} | {order.delivery_status} | {order.order_id}
+                          {order.school_name} | {order.service_date} {getSessionLabel(order.session)} | {order.child_name} / {order.parent_name} | {order.delivery_status} | {order.order_id}
                         </div>
                       ))}
                     </div>

@@ -28,6 +28,10 @@ export function getSessionTheme(session: string) {
   return SESSION_THEME[isMealSession(session) ? session : 'LUNCH'];
 }
 
+export function getSessionLabel(session: string) {
+  return getSessionTheme(session).label;
+}
+
 export function getSessionCardStyle(session: string) {
   const theme = getSessionTheme(session);
   return {
@@ -40,5 +44,5 @@ export function getSessionCardStyle(session: string) {
 }
 
 export function getSessionBadgeLabel(session: string) {
-  return getSessionTheme(session).label;
+  return getSessionLabel(session);
 }

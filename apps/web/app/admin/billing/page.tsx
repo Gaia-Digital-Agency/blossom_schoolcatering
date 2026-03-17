@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch, apiFetchResponse } from '../../../lib/auth';
+import { getSessionLabel } from '../../../lib/session-theme';
 import AdminNav from '../_components/admin-nav';
 import AdminReturnButton from '../_components/admin-return-button';
 
@@ -89,6 +90,7 @@ export default function AdminBillingPage() {
   const [message, setMessage] = useState('');
   // State for loading status.
   const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState<'ALL' | 'BREAKFAST' | 'SNACK' | 'LUNCH'>('ALL');
   // State for the payment proof image preview modal.
   const [proofPreviewUrl, setProofPreviewUrl] = useState('');
   // State for the receipt generation/information modal.
@@ -101,7 +103,9 @@ export default function AdminBillingPage() {
     setLoading(true);
     setError('');
     try {
-      const data = await apiFetch('/admin/billing') as BillingRow[];
+      const query = new URLSearchParams();
+      if (session !== 'ALL') query.set('session', session);
+      const data = await apiFetch(`/admin/billing${query.toString() ? `?${query.toString()}` : ''}`) as BillingRow[];
       setRows(data || []);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed loading billing');
@@ -111,7 +115,7 @@ export default function AdminBillingPage() {
   };
 
   // Load data on initial component mount.
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [session]);
 
   // Memoized lists of unpaid and paid rows for performance.
   const unpaidRows = useMemo(
@@ -203,7 +207,7 @@ export default function AdminBillingPage() {
       setError('Cannot approve: parent has not uploaded a payment proof yet.');
       return;
     }
-    if (!window.confirm(`Approve payment for ${row.parent_name} - ${row.service_date} ${row.session}?`)) return;
+    if (!window.confirm(`Approve payment for ${row.parent_name} - ${row.service_date} ${getSessionLabel(row.session)}?`)) return;
     await onDecision(row.id, 'VERIFIED');
   };
 
@@ -393,6 +397,15 @@ export default function AdminBillingPage() {
         {/* Page header and navigation */}
         <div className="billing-topbar">
           <h1>Admin Billing</h1>
+          <label className="billing-filter-control">
+            <span>Session</span>
+            <select value={session} onChange={(e) => setSession(e.target.value as 'ALL' | 'BREAKFAST' | 'SNACK' | 'LUNCH')}>
+              <option value="ALL">All sessions</option>
+              <option value="BREAKFAST">{getSessionLabel('BREAKFAST')}</option>
+              <option value="SNACK">{getSessionLabel('SNACK')}</option>
+              <option value="LUNCH">{getSessionLabel('LUNCH')}</option>
+            </select>
+          </label>
           <button className="btn btn-outline" type="button" onClick={load} disabled={loading}>
             {loading ? 'Loading…' : 'Refresh'}
           </button>
@@ -439,7 +452,7 @@ export default function AdminBillingPage() {
                         <tr>
                           <th>Last Name</th>
                           <th>Youngster Name</th>
-                          <th>Date Of Order</th>
+                          <th>Date / Session</th>
                           <th>Order/Bill Reference</th>
                           <th>Bill Amount</th>
                           <th>Image Proof Name</th>
@@ -455,6 +468,7 @@ export default function AdminBillingPage() {
                             <td>{getFirstName(row.child_name)}</td>
                             <td>
                               {row.service_date}
+                              <small>{getSessionLabel(row.session)}</small>
                             </td>
                             <td>{renderRef(row)}</td>
                             <td>{formatMoney(row.total_price)}</td>
@@ -491,7 +505,7 @@ export default function AdminBillingPage() {
                         <tr>
                           <th>Last Name</th>
                           <th>Youngster Name</th>
-                          <th>Date Of Order</th>
+                          <th>Date / Session</th>
                           <th>Order/Bill Reference</th>
                           <th>Bill Amount</th>
                           <th>Image Proof Name</th>
@@ -505,6 +519,7 @@ export default function AdminBillingPage() {
                             <td>{getFirstName(row.child_name)}</td>
                             <td>
                               {row.service_date}
+                              <small>{getSessionLabel(row.session)}</small>
                             </td>
                             <td>
                               {renderRef(row)}
@@ -570,12 +585,23 @@ export default function AdminBillingPage() {
         <style jsx>{`
           .billing-topbar {
             display: flex;
-            align-items: center;
+            flex-wrap: wrap;
+            align-items: end;
             justify-content: space-between;
+            gap: 0.6rem;
             margin-bottom: 0.1rem;
           }
           .billing-topbar h1 {
             margin: 0;
+          }
+          .billing-filter-control {
+            display: grid;
+            gap: 0.25rem;
+            min-width: 180px;
+          }
+          .billing-filter-control span {
+            font-size: 0.8rem;
+            color: #6b5a43;
           }
           .billing-summary-bar {
             display: flex;

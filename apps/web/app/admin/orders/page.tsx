@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../../../lib/auth';
+import { getSessionLabel } from '../../../lib/session-theme';
 import AdminNav from '../_components/admin-nav';
 import AdminReturnButton from '../_components/admin-return-button';
 
@@ -39,10 +40,10 @@ function formatMoney(value: number) {
 }
 
 export default function AdminOrdersPage() {
-  const [filterMode, setFilterMode] = useState<'ALL' | 'DATE' | 'SCHOOL' | 'DELIVERY'>('ALL');
   const [date, setDate] = useState(todayIsoLocal());
   const [schoolId, setSchoolId] = useState('ALL');
   const [deliveryUserId, setDeliveryUserId] = useState('ALL');
+  const [session, setSession] = useState<'ALL' | 'BREAKFAST' | 'SNACK' | 'LUNCH'>('ALL');
   const [data, setData] = useState<AdminOrdersResponse | null>(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -53,9 +54,10 @@ export default function AdminOrdersPage() {
     setError('');
     try {
       const query = new URLSearchParams();
-      if (filterMode === 'DATE') query.set('date', date);
-      if (filterMode === 'SCHOOL' && schoolId !== 'ALL') query.set('school_id', schoolId);
-      if (filterMode === 'DELIVERY' && deliveryUserId !== 'ALL') query.set('delivery_user_id', deliveryUserId);
+      query.set('date', date);
+      if (schoolId !== 'ALL') query.set('school_id', schoolId);
+      if (deliveryUserId !== 'ALL') query.set('delivery_user_id', deliveryUserId);
+      if (session !== 'ALL') query.set('session', session);
       const out = await apiFetch(`/admin/orders${query.toString() ? `?${query.toString()}` : ''}`) as AdminOrdersResponse;
       setData(out);
     } catch (e) {
@@ -82,7 +84,7 @@ export default function AdminOrdersPage() {
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [filterMode]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [date, schoolId, deliveryUserId, session]);
 
   const outstandingTotal = useMemo(
     () => (data?.outstanding || []).reduce((sum, row) => sum + Number(row.total_price || 0), 0),
@@ -104,42 +106,36 @@ export default function AdminOrdersPage() {
         <div className="auth-form orders-filter-card">
           <div className="orders-filter-grid">
             <label>
-              <span>Filter</span>
-              <select value={filterMode} onChange={(e) => setFilterMode(e.target.value as 'ALL' | 'DATE' | 'SCHOOL' | 'DELIVERY')}>
-                <option value="ALL">All</option>
-                <option value="DATE">By Date</option>
-                <option value="SCHOOL">By School</option>
-                <option value="DELIVERY">By Delivery</option>
+              <span>Service Date</span>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </label>
+            <label>
+              <span>School</span>
+              <select value={schoolId} onChange={(e) => setSchoolId(e.target.value)}>
+                <option value="ALL">All schools</option>
+                {(data?.filters.schools || []).map((school) => (
+                  <option key={school.id} value={school.id}>{school.name}</option>
+                ))}
               </select>
             </label>
-            {filterMode === 'DATE' ? (
-              <label>
-                <span>Service Date</span>
-                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-              </label>
-            ) : null}
-            {filterMode === 'SCHOOL' ? (
-              <label>
-                <span>School</span>
-                <select value={schoolId} onChange={(e) => setSchoolId(e.target.value)}>
-                  <option value="ALL">All schools</option>
-                  {(data?.filters.schools || []).map((school) => (
-                    <option key={school.id} value={school.id}>{school.name}</option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
-            {filterMode === 'DELIVERY' ? (
-              <label>
-                <span>Delivery</span>
-                <select value={deliveryUserId} onChange={(e) => setDeliveryUserId(e.target.value)}>
-                  <option value="ALL">All delivery</option>
-                  {(data?.filters.deliveryUsers || []).map((user) => (
-                    <option key={user.user_id} value={user.user_id}>{user.name}</option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
+            <label>
+              <span>Delivery</span>
+              <select value={deliveryUserId} onChange={(e) => setDeliveryUserId(e.target.value)}>
+                <option value="ALL">All delivery</option>
+                {(data?.filters.deliveryUsers || []).map((user) => (
+                  <option key={user.user_id} value={user.user_id}>{user.name}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Session</span>
+              <select value={session} onChange={(e) => setSession(e.target.value as 'ALL' | 'BREAKFAST' | 'SNACK' | 'LUNCH')}>
+                <option value="ALL">All sessions</option>
+                <option value="BREAKFAST">{getSessionLabel('BREAKFAST')}</option>
+                <option value="SNACK">{getSessionLabel('SNACK')}</option>
+                <option value="LUNCH">{getSessionLabel('LUNCH')}</option>
+              </select>
+            </label>
             <div className="orders-filter-action">
               <button className="btn btn-outline" type="button" onClick={load}>Apply</button>
             </div>
@@ -159,7 +155,7 @@ export default function AdminOrdersPage() {
                 <article key={row.order_id} className="orders-card">
                   <strong>{row.child_name}</strong>
                   <small>{row.school_name}</small>
-                  <small>{row.service_date} · {row.session}</small>
+                  <small>{row.service_date} · {getSessionLabel(row.session)}</small>
                   <small>Family/Student: {row.account_name}</small>
                   <small>Delivery: {row.delivery_name}</small>
                   <small>Status: {row.status} · {row.delivery_status}</small>
@@ -193,7 +189,7 @@ export default function AdminOrdersPage() {
                 <article key={row.order_id} className="orders-card orders-card-complete">
                   <strong>{row.child_name}</strong>
                   <small>{row.school_name}</small>
-                  <small>{row.service_date} · {row.session}</small>
+                  <small>{row.service_date} · {getSessionLabel(row.session)}</small>
                   <small>Family/Student: {row.account_name}</small>
                   <small>Delivery: {row.delivery_name}</small>
                   <small>Status: {row.status} · {row.delivery_status}</small>
@@ -228,7 +224,7 @@ export default function AdminOrdersPage() {
               <label><strong>Order ID</strong><small>{selectedOrder.order_id}</small></label>
               <label><strong>Student</strong><small>{selectedOrder.child_name}</small></label>
               <label><strong>School</strong><small>{selectedOrder.school_name}</small></label>
-              <label><strong>Date / Session</strong><small>{selectedOrder.service_date} · {selectedOrder.session}</small></label>
+              <label><strong>Date / Session</strong><small>{selectedOrder.service_date} · {getSessionLabel(selectedOrder.session)}</small></label>
               <label><strong>Family / Student Login</strong><small>{selectedOrder.account_name}</small></label>
               <label><strong>Delivery</strong><small>{selectedOrder.delivery_name}</small></label>
               <label><strong>Order Status</strong><small>{selectedOrder.status}</small></label>

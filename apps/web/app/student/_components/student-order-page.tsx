@@ -6,7 +6,7 @@ import { formatDishCategoryLabel, formatDishDietaryTags } from '../../../lib/dis
 import DraftExitGuard from '../../_components/draft-exit-guard';
 import LogoutButton from '../../_components/logout-button';
 import SessionBadge from '../../_components/session-badge';
-import { getSessionCardStyle } from '../../../lib/session-theme';
+import { getSessionCardStyle, getSessionLabel } from '../../../lib/session-theme';
 
 type Youngster = {
   id: string;
@@ -405,9 +405,8 @@ export default function StudentOrderPage({
       return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Order placement failed';
-      if (msg.includes('ORDER_SESSION_DISABLED') && session !== 'LUNCH') {
-        window.alert('Only Lunch Available');
-        setError('Only Lunch Available');
+      if (msg.includes('ORDER_SESSION_DISABLED')) {
+        setError('This session is not currently available for ordering.');
       } else {
         setError(mapOrderRuleError(msg, orderingCutoffTime));
       }
@@ -522,7 +521,7 @@ export default function StudentOrderPage({
           <label>
             Session
             <select value={session} onChange={(e) => setSession(e.target.value as SessionType)}>
-              {activeSessions.map((s) => <option key={s} value={s}>{s}</option>)}
+              {activeSessions.map((s) => <option key={s} value={s}>{getSessionLabel(s)}</option>)}
             </select>
           </label>
           <p className="auth-help">Place-order cutoff countdown: {formatRemaining(cutoffRemainingMs)} ({formatCutoffLabel(orderingCutoffTime)})</p>

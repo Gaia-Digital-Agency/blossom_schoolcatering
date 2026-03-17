@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../../../lib/auth';
+import { getSessionLabel } from '../../../lib/session-theme';
 import LogoutButton from '../../_components/logout-button';
 
 type KitchenDish = {
@@ -75,16 +76,25 @@ export default function KitchenDashboard({
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [submittingOrderId, setSubmittingOrderId] = useState('');
+  const [sessionFilter, setSessionFilter] = useState<'ALL' | 'BREAKFAST' | 'SNACK' | 'LUNCH'>('ALL');
   const defaultServiceDate = useMemo(() => dateInMakassar(offsetDays), [offsetDays]);
   const [selectedDate, setSelectedDate] = useState(defaultServiceDate);
   const completedStatuses = useMemo(() => new Set(['OUT_FOR_DELIVERY', 'DELIVERED']), []);
+  const sessionFilteredOrders = useMemo(
+    () => (data?.orders || []).filter((o) => sessionFilter === 'ALL' || String(o.session || '').toUpperCase() === sessionFilter),
+    [data?.orders, sessionFilter],
+  );
+  const filteredAlerts = useMemo(
+    () => (data?.allergenAlerts || []).filter((o) => sessionFilter === 'ALL' || String(o.session || '').toUpperCase() === sessionFilter),
+    [data?.allergenAlerts, sessionFilter],
+  );
   const pendingOrders = useMemo(
-    () => (data?.orders || []).filter((o) => !completedStatuses.has(String(o.delivery_status || '').toUpperCase())),
-    [data?.orders, completedStatuses],
+    () => sessionFilteredOrders.filter((o) => !completedStatuses.has(String(o.delivery_status || '').toUpperCase())),
+    [sessionFilteredOrders, completedStatuses],
   );
   const completedOrders = useMemo(
-    () => (data?.orders || []).filter((o) => completedStatuses.has(String(o.delivery_status || '').toUpperCase())),
-    [data?.orders, completedStatuses],
+    () => sessionFilteredOrders.filter((o) => completedStatuses.has(String(o.delivery_status || '').toUpperCase())),
+    [sessionFilteredOrders, completedStatuses],
   );
 
   const load = async () => {
@@ -120,7 +130,7 @@ export default function KitchenDashboard({
 
   const onDownloadPdf = () => {
     if (!data) return;
-    const allOrders = data.orders || [];
+    const allOrders = sessionFilteredOrders;
     if (allOrders.length === 0) {
       setMessage('No orders available to export.');
       return;
@@ -146,7 +156,7 @@ export default function KitchenDashboard({
 
     const renderOrder = (o: KitchenOrder) => `
       <article class=\"order-card\">
-        <div><strong>Session:</strong> ${escapeHtml(o.session)}</div>
+        <div><strong>Session:</strong> ${escapeHtml(getSessionLabel(o.session))}</div>
         <div><strong>Student:</strong> ${escapeHtml(o.child_name)}</div>
         <div><strong>School:</strong> ${escapeHtml(o.school_name || '-')}</div>
         <div><strong>Phone Number:</strong> ${escapeHtml(o.youngster_mobile || '-')}</div>
@@ -247,6 +257,15 @@ export default function KitchenDashboard({
               <strong>{selectedDate}</strong>
             </div>
           )}
+          <label className="kitchen-control">
+            Session
+            <select value={sessionFilter} onChange={(e) => setSessionFilter(e.target.value as 'ALL' | 'BREAKFAST' | 'SNACK' | 'LUNCH')}>
+              <option value="ALL">All sessions</option>
+              <option value="BREAKFAST">{getSessionLabel('BREAKFAST')}</option>
+              <option value="SNACK">{getSessionLabel('SNACK')}</option>
+              <option value="LUNCH">{getSessionLabel('LUNCH')}</option>
+            </select>
+          </label>
           <button className="btn btn-outline" type="button" onClick={load}>Refresh</button>
           <button className="btn btn-outline" type="button" onClick={onDownloadPdf}>Download PDF</button>
         </div>
@@ -309,11 +328,11 @@ export default function KitchenDashboard({
 
             <div className="kitchen-section-card">
               <h2>Dietary Alerts</h2>
-              {data.allergenAlerts.length === 0 ? <p className="auth-help">No dietary-alert orders.</p> : (
+              {filteredAlerts.length === 0 ? <p className="auth-help">No dietary-alert orders.</p> : (
                 <div className="kitchen-alert-grid">
-                  {data.allergenAlerts.map((o) => (
+                  {filteredAlerts.map((o) => (
                     <article className="kitchen-alert-card" key={o.id}>
-                      <strong>{o.session} - {o.child_name}</strong>
+                      <strong>{getSessionLabel(o.session)} - {o.child_name}</strong>
                       <small>Family: {o.parent_name}</small>
                       <small>Dietary Allergies: {o.allergen_items || '-'}</small>
                       <small>Dishes: {o.dish_count}</small>
@@ -325,7 +344,7 @@ export default function KitchenDashboard({
 
             <div className="kitchen-section-card">
               <h2>Orders</h2>
-              {data.orders.length === 0 ? <p className="auth-help">No orders for this day.</p> : (
+              {sessionFilteredOrders.length === 0 ? <p className="auth-help">No orders for this day.</p> : (
                 <div className="kitchen-order-columns">
                   <section className="kitchen-order-panel">
                     <h3>Order Pending</h3>
@@ -333,7 +352,7 @@ export default function KitchenDashboard({
                       <div className="kitchen-order-list">
                         {pendingOrders.map((o) => (
                           <button className="kitchen-order-card" key={o.id} type="button" onClick={() => onMarkKitchenComplete(o.id)}>
-                            <small>Session: {o.session}</small>
+                            <small>Session: {getSessionLabel(o.session)}</small>
                             <small>Student: {o.child_name}</small>
                             <small>School: {o.school_name || '-'}</small>
                             <small>Phone Number: {o.youngster_mobile || '-'}</small>
@@ -356,7 +375,7 @@ export default function KitchenDashboard({
                       <div className="kitchen-order-list">
                         {completedOrders.map((o) => (
                           <button className="kitchen-order-card kitchen-order-card-complete" key={o.id} type="button" onClick={() => onMarkKitchenComplete(o.id)}>
-                            <small>Session: {o.session}</small>
+                            <small>Session: {getSessionLabel(o.session)}</small>
                             <small>Student: {o.child_name}</small>
                             <small>School: {o.school_name || '-'}</small>
                             <small>Phone Number: {o.youngster_mobile || '-'}</small>
@@ -392,7 +411,7 @@ export default function KitchenDashboard({
         }
         .kitchen-date-picker-row {
           display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
+          grid-template-columns: repeat(4, minmax(0, 1fr));
           gap: 0.6rem;
           margin-bottom: 0.65rem;
           align-items: end;

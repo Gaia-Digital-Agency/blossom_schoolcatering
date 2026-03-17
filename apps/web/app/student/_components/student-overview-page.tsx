@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../../../lib/auth';
+import { getSessionLabel } from '../../../lib/session-theme';
 import ModuleOverviewCalendar from '../../_components/module-overview-calendar';
 import LogoutButton from '../../_components/logout-button';
 
@@ -25,7 +26,7 @@ type StudentInsights = {
     totalCalories: number;
     totalOrders?: number;
     totalDishes?: number;
-    days: Array<{ service_date: string; calories_display: string; tba_items: number }>;
+    days: Array<{ service_date: string; session: string; calories_display: string; tba_items: number }>;
   };
   badge: {
     level: 'NONE' | 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM';
@@ -134,9 +135,9 @@ export default function StudentOverviewPage() {
                 <div className="auth-form student-overview-insights-details">
                   <label>
                     <strong>Clean Plate Club Badge: {insights.badge.level}</strong>
-                    <small>Max consecutive order days: {insights.badge.maxConsecutiveOrderDays}</small>
+                    <small>Max consecutive ordering days: {insights.badge.maxConsecutiveOrderDays}</small>
                     <small>Max consecutive order weeks: {insights.badge.maxConsecutiveOrderWeeks ?? '-'}</small>
-                    <small>Current month orders: {insights.badge.currentMonthOrders}</small>
+                    <small>Current month session orders: {insights.badge.currentMonthOrders}</small>
                     <small>Birthday in {insights.birthdayHighlight.days_until} day(s)</small>
                   </label>
                   <label>
@@ -145,6 +146,19 @@ export default function StudentOverviewPage() {
                     <small>Total Orders: {insights.week.totalOrders ?? '-'}</small>
                     <small>Total Dishes: {insights.week.totalDishes ?? '-'}</small>
                   </label>
+                </div>
+                <div className="auth-form student-overview-week-rows">
+                  <strong>Week Session Nutrition Rows</strong>
+                  {insights.week.days.length === 0 ? (
+                    <small>No session nutrition rows yet this week.</small>
+                  ) : insights.week.days.map((day) => (
+                    <label key={`${day.service_date}-${day.session}`}>
+                      <strong>{day.service_date}</strong>
+                      <small>Session: {getSessionLabel(day.session)}</small>
+                      <small>Calories: {day.calories_display}</small>
+                      <small>TBA dishes: {day.tba_items}</small>
+                    </label>
+                  ))}
                 </div>
               </div>
             ) : <p className="auth-help">Insights loading...</p>}
@@ -183,6 +197,10 @@ export default function StudentOverviewPage() {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 1rem;
+        }
+
+        .student-overview-week-rows {
+          grid-column: 1 / -1;
         }
 
         @media (max-width: 720px) {

@@ -6,7 +6,7 @@ import { formatDishCategoryLabel, formatDishDietaryTags } from '../../../lib/dis
 import DraftExitGuard from '../../_components/draft-exit-guard';
 import LogoutButton from '../../_components/logout-button';
 import SessionBadge from '../../_components/session-badge';
-import { getSessionCardStyle } from '../../../lib/session-theme';
+import { getSessionCardStyle, getSessionLabel } from '../../../lib/session-theme';
 
 const ORDER_SUCCESS_POPUP_KEY = 'blossom_parent_order_success_popup';
 
@@ -433,8 +433,8 @@ export default function FamilyOrderPage({
       return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Order placement failed';
-      if (msg.includes('ORDER_SESSION_DISABLED') && session !== 'LUNCH') {
-        setError('Only Lunch is currently available.');
+      if (msg.includes('ORDER_SESSION_DISABLED')) {
+        setError('This session is not currently available for ordering.');
       } else {
         setError(mapOrderRuleError(msg, orderingCutoffTime));
       }
@@ -606,7 +606,7 @@ export default function FamilyOrderPage({
             </label>
             <label>Session
               <select value={session} onChange={(e) => setSession(e.target.value as SessionType)}>
-                {activeSessions.map((s) => <option key={s} value={s}>{s}</option>)}
+                {activeSessions.map((s) => <option key={s} value={s}>{getSessionLabel(s)}</option>)}
               </select>
             </label>
             <p className="auth-help">Cutoff countdown: {formatRemaining(placeCutoffMs)} ({formatCutoffLabel(orderingCutoffTime)})</p>

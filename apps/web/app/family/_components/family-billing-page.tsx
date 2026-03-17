@@ -6,7 +6,7 @@ import { apiFetch, apiFetchResponse } from '../../../lib/auth';
 import { fileToWebpDataUrl } from '../../../lib/image';
 import LogoutButton from '../../_components/logout-button';
 import SessionBadge from '../../_components/session-badge';
-import { getSessionCardStyle } from '../../../lib/session-theme';
+import { getSessionCardStyle, getSessionLabel } from '../../../lib/session-theme';
 
 type Child = {
   id: string;
@@ -32,7 +32,7 @@ type BillingRow = {
 type SpendingDashboard = {
   month: string;
   totalMonthSpend: number;
-  byChild: Array<{ child_name: string; orders_count: number; total_spend: number }>;
+  byChild: Array<{ child_id: string; child_name: string; session: string; orders_count: number; total_spend: number }>;
   birthdayHighlights: Array<{ child_name: string; days_until: number }>;
 };
 
@@ -85,11 +85,8 @@ export default function FamilyBillingPage() {
   const visibleSpendingByChild = useMemo(() => {
     if (!spending) return [];
     if (!selectedChildId) return spending.byChild || [];
-    const selected = children.find((c) => c.id === selectedChildId);
-    if (!selected) return spending.byChild || [];
-    const fullName = `${selected.first_name} ${selected.last_name}`.trim();
-    return (spending.byChild || []).filter((row) => row.child_name === fullName);
-  }, [spending, selectedChildId, children]);
+    return (spending.byChild || []).filter((row) => row.child_id === selectedChildId);
+  }, [spending, selectedChildId]);
   const totalMonthOrders = useMemo(
     () => (spending?.byChild || []).reduce((sum, row) => sum + Number(row.orders_count || 0), 0),
     [spending],
@@ -305,8 +302,10 @@ export default function FamilyBillingPage() {
                 <small>Total Monthly Spend: Rp {Number(spending.totalMonthSpend).toLocaleString('id-ID')}</small>
               </label>
               {visibleSpendingByChild.map((row) => (
-                <label key={row.child_name}>
+                <label key={`${row.child_id}-${row.session}`} style={getSessionCardStyle(row.session)}>
+                  <SessionBadge session={row.session} />
                   <strong>Family Group ({row.child_name})</strong>
+                  <small>Session: {getSessionLabel(row.session)}</small>
                   <small>Student Month Orders: {row.orders_count}</small>
                   <small>Student Monthly Spend: Rp {Number(row.total_spend).toLocaleString('id-ID')}</small>
                 </label>

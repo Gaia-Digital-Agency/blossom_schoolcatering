@@ -301,11 +301,13 @@ export class CoreController {
     @Query('date') date?: string,
     @Query('school_id') schoolId?: string,
     @Query('delivery_user_id') deliveryUserId?: string,
+    @Query('session') session?: string,
   ) {
     return this.coreService.getAdminOrders(req.user, {
       dateRaw: date,
       schoolId,
       deliveryUserId,
+      session,
     });
   }
 
@@ -605,8 +607,8 @@ export class CoreController {
 
   @Get('admin/billing')
   @Roles('ADMIN')
-  getAdminBilling(@Query('status') status?: string) {
-    return this.coreService.getAdminBilling(status);
+  getAdminBilling(@Query('status') status?: string, @Query('session') session?: string) {
+    return this.coreService.getAdminBilling(status, session);
   }
 
   @Get('admin/billing/:billingId/proof-image')

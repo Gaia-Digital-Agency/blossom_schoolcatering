@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../../../lib/auth';
+import { getSessionLabel } from '../../../lib/session-theme';
 import AdminNav from '../_components/admin-nav';
 import AdminReturnButton from '../_components/admin-return-button';
 
@@ -50,6 +51,7 @@ function todayIsoLocal() {
 
 export default function AdminKitchenPage() {
   const [serviceDate, setServiceDate] = useState(todayIsoLocal());
+  const [session, setSession] = useState<'ALL' | 'BREAKFAST' | 'SNACK' | 'LUNCH'>('ALL');
   const [data, setData] = useState<KitchenData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -72,7 +74,14 @@ export default function AdminKitchenPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serviceDate]);
 
-  const orders = useMemo(() => data?.orders || [], [data?.orders]);
+  const orders = useMemo(
+    () => (data?.orders || []).filter((row) => session === 'ALL' || String(row.session || '').toUpperCase() === session),
+    [data?.orders, session],
+  );
+  const allergenAlerts = useMemo(
+    () => (data?.allergenAlerts || []).filter((row) => session === 'ALL' || String(row.session || '').toUpperCase() === session),
+    [data?.allergenAlerts, session],
+  );
 
   return (
     <main className="page-auth page-auth-desktop">
@@ -85,6 +94,15 @@ export default function AdminKitchenPage() {
           <label>
             Service Date
             <input type="date" value={serviceDate} onChange={(e) => setServiceDate(e.target.value)} />
+          </label>
+          <label>
+            Session
+            <select value={session} onChange={(e) => setSession(e.target.value as 'ALL' | 'BREAKFAST' | 'SNACK' | 'LUNCH')}>
+              <option value="ALL">All sessions</option>
+              <option value="BREAKFAST">{getSessionLabel('BREAKFAST')}</option>
+              <option value="SNACK">{getSessionLabel('SNACK')}</option>
+              <option value="LUNCH">{getSessionLabel('LUNCH')}</option>
+            </select>
           </label>
           <button className="btn btn-outline" type="button" onClick={load} disabled={loading}>
             {loading ? 'Refreshing...' : 'Refresh'}
@@ -145,11 +163,11 @@ export default function AdminKitchenPage() {
 
             <div className="admin-kitchen-card">
               <h2>Dietary Alerts</h2>
-              {data.allergenAlerts.length === 0 ? <p className="auth-help">No dietary-alert orders.</p> : (
+              {allergenAlerts.length === 0 ? <p className="auth-help">No dietary-alert orders.</p> : (
                 <div className="kitchen-alert-grid">
-                  {data.allergenAlerts.map((o) => (
+                  {allergenAlerts.map((o) => (
                     <article className="kitchen-alert-card" key={o.id}>
-                      <strong>{o.session} - {o.child_name}</strong>
+                      <strong>{getSessionLabel(o.session)} - {o.child_name}</strong>
                       <small>Parent: {o.parent_name}</small>
                       <small>Dietary Allergies: {o.allergen_items || '-'}</small>
                       <small>Dishes: {o.dish_count}</small>
@@ -165,7 +183,7 @@ export default function AdminKitchenPage() {
                 <div className="kitchen-order-list">
                   {orders.map((o) => (
                     <article className="kitchen-order-card" key={o.id}>
-                      <strong>{o.session} - {o.child_name}</strong>
+                      <strong>{getSessionLabel(o.session)} - {o.child_name}</strong>
                       <small>Parent: {o.parent_name}</small>
                       <small>Dietary Allergies: {o.allergen_items || '-'}</small>
                       <small>Status: {o.status} | Delivery: {o.delivery_status}</small>
@@ -268,7 +286,7 @@ export default function AdminKitchenPage() {
         }
         @media (min-width: 860px) {
           .admin-kitchen-controls {
-            grid-template-columns: 1fr auto;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
             align-items: end;
           }
         }
