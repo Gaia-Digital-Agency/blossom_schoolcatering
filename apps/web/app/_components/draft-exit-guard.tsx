@@ -67,15 +67,15 @@ export default function DraftExitGuard({
     <div className="popup-overlay" onClick={() => setPendingAction(null)}>
       <div className="popup-card" onClick={(event) => event.stopPropagation()}>
         <div className="popup-icon">📝</div>
-        <h3 className="popup-title">Save Order First</h3>
+        <h3 className="popup-title">Place Order Or Discard Draft</h3>
         <p className="popup-body">
-          Your {subjectLabel} draft still has unsaved items. Save the order first, or cancel the draft and continue.
+          Your {subjectLabel} draft still has items. Place the order first, or discard the draft and continue.
         </p>
         <button className="btn btn-outline popup-close" type="button" onClick={() => setPendingAction(null)}>
-          Save Order First
+          Place Order
         </button>
         <button className="btn btn-primary popup-close" type="button" onClick={() => void onCancelDraftAndContinue()}>
-          Cancel Draft and Continue
+          Discard Draft
         </button>
       </div>
     </div>
