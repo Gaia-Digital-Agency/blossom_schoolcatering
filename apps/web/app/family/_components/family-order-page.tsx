@@ -183,6 +183,7 @@ export default function FamilyOrderPage({
 
   const menuSectionRef = useRef<HTMLDivElement | null>(null);
   const draftSectionRef = useRef<HTMLDivElement | null>(null);
+  const autoOpenHandledRef = useRef(false);
 
   const orderingWindow = useMemo(() => getMakassarOrderingWindow(), [nowMs]);
   const placeCutoffMs = getCutoffTimestamp(serviceDate) - nowMs;
@@ -442,6 +443,30 @@ export default function FamilyOrderPage({
     }
   };
 
+  useEffect(() => {
+    if (mode !== 'order' || loading || autoOpenHandledRef.current) return;
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const action = params.get('action');
+    const orderId = params.get('orderId');
+    const targetDate = params.get('serviceDate');
+    if (action !== 'edit' || !orderId || !targetDate) return;
+    const order = orders.find((entry) => entry.id === orderId);
+    if (!order) return;
+    autoOpenHandledRef.current = true;
+    onOpenOrderAsDraft(order, targetDate, 'edit').catch((err) => {
+      autoOpenHandledRef.current = false;
+      setError(err instanceof Error ? mapOrderRuleError(err.message) : 'Failed to open order as draft');
+    });
+    if (typeof window !== 'undefined') {
+      const next = new URL(window.location.href);
+      next.searchParams.delete('action');
+      next.searchParams.delete('orderId');
+      next.searchParams.delete('serviceDate');
+      window.history.replaceState({}, '', `${next.pathname}${next.search}`);
+    }
+  }, [loading, mode, orders]);
+
   const onDeleteOrder = async (orderId: string) => {
     if (!window.confirm('Confirm delete this order before cutoff?')) return;
     setError(''); setMessage('');
@@ -673,7 +698,15 @@ export default function FamilyOrderPage({
                     <small>Items: {order.items.map((item) => `${item.item_name_snapshot} x${item.quantity}`).join(', ') || '-'}</small>
                     <div className="order-row-actions">
                       <button className="btn btn-outline" type="button"
-                        onClick={() => onOpenOrderAsDraft(order, order.service_date, 'edit')}
+                        onClick={() => {
+                          if (typeof window === 'undefined') return;
+                          const params = new URLSearchParams({
+                            action: 'edit',
+                            orderId: order.id,
+                            serviceDate: order.service_date,
+                          });
+                          window.location.href = `/schoolcatering/family/order?${params.toString()}`;
+                        }}
                         disabled={!order.can_edit || submitting}>Edit Before Cutoff</button>
                       <button className="btn btn-outline" type="button"
                         onClick={() => onDeleteOrder(order.id)}
