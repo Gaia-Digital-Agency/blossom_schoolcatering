@@ -6879,17 +6879,28 @@ export class CoreService implements OnModuleInit {
     return { ok: true };
   }
 
-  private async hardDeleteYoungsterIfSafe(youngsterId: string, userId: string) {
+  private async getYoungsterDeleteBlockers(youngsterId: string, userId: string) {
     const blockerRaw = await runSql(
       `
       SELECT row_to_json(t)::text
       FROM (
         SELECT
-          (SELECT COUNT(*)::int FROM orders WHERE child_id = $1) AS orders_count,
+          (SELECT COUNT(*)::int
+             FROM orders
+            WHERE child_id = $1
+              AND deleted_at IS NULL
+              AND status <> 'CANCELLED') AS active_orders_count,
+          (SELECT COUNT(*)::int FROM orders WHERE child_id = $1) AS total_orders_count,
           (SELECT COUNT(*)::int
              FROM billing_records br
              JOIN orders o ON o.id = br.order_id
-            WHERE o.child_id = $1) AS billing_count,
+            WHERE o.child_id = $1
+              AND o.deleted_at IS NULL
+              AND o.status <> 'CANCELLED') AS active_billing_count,
+          (SELECT COUNT(*)::int
+             FROM billing_records br
+             JOIN orders o ON o.id = br.order_id
+            WHERE o.child_id = $1) AS total_billing_count,
           (SELECT COUNT(*)::int FROM order_carts WHERE child_id = $1 OR created_by_user_id = $2) AS carts_count,
           (SELECT COUNT(*)::int FROM favourite_meals WHERE child_id = $1 OR created_by_user_id = $2) AS favourites_count,
           (SELECT COUNT(*)::int FROM admin_audit_logs WHERE actor_user_id = $2) AS audit_count
@@ -6898,18 +6909,55 @@ export class CoreService implements OnModuleInit {
       [youngsterId, userId],
     );
     const blocker = this.parseJsonLine<{
-      orders_count: number;
-      billing_count: number;
+      active_orders_count: number;
+      total_orders_count: number;
+      active_billing_count: number;
+      total_billing_count: number;
       carts_count: number;
       favourites_count: number;
       audit_count: number;
     }>(blockerRaw);
+    return {
+      activeOrdersCount: Number(blocker?.active_orders_count || 0),
+      totalOrdersCount: Number(blocker?.total_orders_count || 0),
+      activeBillingCount: Number(blocker?.active_billing_count || 0),
+      totalBillingCount: Number(blocker?.total_billing_count || 0),
+      cartsCount: Number(blocker?.carts_count || 0),
+      favouritesCount: Number(blocker?.favourites_count || 0),
+      auditCount: Number(blocker?.audit_count || 0),
+    };
+  }
+
+  private async softDeleteYoungster(youngsterId: string, userId: string) {
+    await runSql(
+      `UPDATE children
+       SET is_active = false,
+           deleted_at = now(),
+           updated_at = now()
+       WHERE id = $1;`,
+      [youngsterId],
+    );
+    await runSql(
+      `UPDATE users
+       SET is_active = false,
+           deleted_at = now(),
+           updated_at = now()
+       WHERE id = $1;`,
+      [userId],
+    );
+    await runSql(`DELETE FROM order_carts WHERE child_id = $1 OR created_by_user_id = $2;`, [youngsterId, userId]);
+    await runSql(`DELETE FROM favourite_meals WHERE child_id = $1 OR created_by_user_id = $2;`, [youngsterId, userId]);
+    await runSql(`DELETE FROM auth_refresh_sessions WHERE user_id = $1;`, [userId]);
+  }
+
+  private async hardDeleteYoungsterIfSafe(youngsterId: string, userId: string) {
+    const blocker = await this.getYoungsterDeleteBlockers(youngsterId, userId);
     if (
-      Number(blocker?.orders_count || 0) > 0 ||
-      Number(blocker?.billing_count || 0) > 0 ||
-      Number(blocker?.carts_count || 0) > 0 ||
-      Number(blocker?.favourites_count || 0) > 0 ||
-      Number(blocker?.audit_count || 0) > 0
+      blocker.totalOrdersCount > 0 ||
+      blocker.totalBillingCount > 0 ||
+      blocker.cartsCount > 0 ||
+      blocker.favouritesCount > 0 ||
+      blocker.auditCount > 0
     ) {
       throw new BadRequestException('Cannot hard-delete youngster with order or billing history');
     }
@@ -7025,7 +7073,19 @@ export class CoreService implements OnModuleInit {
     );
     if (!out) throw new NotFoundException('Youngster not found');
     const child = this.parseJsonLine<{ id: string; user_id: string }>(out);
-    await this.hardDeleteYoungsterIfSafe(youngsterId, child.user_id);
+    const blocker = await this.getYoungsterDeleteBlockers(youngsterId, child.user_id);
+    if (blocker.activeOrdersCount > 0 || blocker.activeBillingCount > 0) {
+      throw new BadRequestException('Cannot delete student with active orders or billing');
+    }
+    if (
+      blocker.totalOrdersCount > 0 ||
+      blocker.totalBillingCount > 0 ||
+      blocker.auditCount > 0
+    ) {
+      await this.softDeleteYoungster(youngsterId, child.user_id);
+    } else {
+      await this.hardDeleteYoungsterIfSafe(youngsterId, child.user_id);
+    }
     await this.recordAdminAudit(actor, 'YOUNGSTER_DELETED', 'youngster', youngsterId);
     return { ok: true };
   }
