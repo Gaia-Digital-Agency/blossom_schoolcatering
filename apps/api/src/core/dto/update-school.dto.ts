@@ -11,6 +11,10 @@ export class UpdateSchoolDto {
 
   @IsOptional()
   @IsString()
+  shortName?: string;
+
+  @IsOptional()
+  @IsString()
   city?: string;
 
   @IsOptional()

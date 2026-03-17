@@ -9,6 +9,7 @@ type ModuleType = 'family' | 'student';
 type StudentProfile = {
   first_name?: string;
   school_name?: string;
+  school_short_name?: string;
 };
 
 const HUB_ITEMS: Record<ModuleType, Array<{ label: string; icon: string; href?: string }>> = {
@@ -54,7 +55,7 @@ export default function ModuleHub({
 
         const profile = await apiFetch('/children/me') as StudentProfile;
         const firstName = (profile.first_name || '').trim();
-        const schoolName = (profile.school_name || '').trim();
+        const schoolName = (profile.school_short_name || '').trim();
         if (!active || !firstName) return;
         setSubtitle(schoolName ? `Logged In as ${firstName} in ${schoolName}` : `Logged In as ${firstName}`);
       } catch {

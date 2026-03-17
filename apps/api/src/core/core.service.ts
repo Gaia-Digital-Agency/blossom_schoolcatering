@@ -28,6 +28,7 @@ type ChildRow = {
   last_name: string;
   school_id: string;
   school_name: string;
+  school_short_name?: string;
   school_grade: string;
   date_of_birth: string;
   gender: string;
@@ -62,6 +63,7 @@ export class CoreService implements OnModuleInit {
   private deliverySchoolAssignmentsReady = false;
   private deliveryDailyNotesReady = false;
   private billingReviewColumnsReady = false;
+  private schoolShortNameReady = false;
   private adminAuditTrailReady = false;
   private adminVisiblePasswordsReady = false;
   private readonly publicMenuCacheTtlMs = 60_000;
@@ -83,8 +85,18 @@ export class CoreService implements OnModuleInit {
     await this.ensureChildRegistrationSourceColumns();
     await this.ensureDeliveryDailyNotesTable();
     await this.ensureBillingReviewColumns();
+    await this.ensureSchoolShortNameColumn();
     await this.ensureAdminAuditTrailTable();
     await this.ensureMenuItemTextDefaults();
+  }
+
+  private async ensureSchoolShortNameColumn() {
+    if (this.schoolShortNameReady) return;
+    await runSql(`
+      ALTER TABLE schools
+      ADD COLUMN IF NOT EXISTS short_name varchar(30);
+    `);
+    this.schoolShortNameReady = true;
   }
 
   private async ensureAdminVisiblePasswordsTable() {
@@ -1328,28 +1340,31 @@ export class CoreService implements OnModuleInit {
   }
 
   async getSchools(active = true) {
+    await this.ensureSchoolShortNameColumn();
     const out = await runSql(
       `
       SELECT row_to_json(t)::text
       FROM (
-        SELECT id, name, city, address, contact_phone, is_active
+        SELECT id, name, short_name, city, address, contact_phone, is_active
         FROM schools
         WHERE deleted_at IS NULL
           AND is_active = ${active ? 'true' : 'false'}
         ORDER BY name ASC
       ) t;
     `);
-    return this.parseJsonLines<{ id: string; name: string; city: string | null; address: string | null; contact_phone: string | null; is_active: boolean }>(out);
+    return this.parseJsonLines<{ id: string; name: string; short_name: string | null; city: string | null; address: string | null; contact_phone: string | null; is_active: boolean }>(out);
   }
 
-  async updateSchool(actor: AccessUser, schoolId: string, input: { isActive?: boolean; name?: string; city?: string; address?: string; contactPhone?: string }) {
+  async updateSchool(actor: AccessUser, schoolId: string, input: { isActive?: boolean; name?: string; shortName?: string; city?: string; address?: string; contactPhone?: string }) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    await this.ensureSchoolShortNameColumn();
     const id = schoolId.trim();
     const sets: string[] = ['updated_at = now()'];
     const params: unknown[] = [];
 
     if (input.isActive !== undefined) { params.push(input.isActive); sets.push(`is_active = $${params.length}`); }
     if (input.name !== undefined) { params.push(input.name.trim()); sets.push(`name = $${params.length}`); }
+    if (input.shortName !== undefined) { params.push(input.shortName.trim() || null); sets.push(`short_name = $${params.length}`); }
     if (input.city !== undefined) { params.push(input.city.trim()); sets.push(`city = $${params.length}`); }
     if (input.address !== undefined) { params.push(input.address.trim()); sets.push(`address = $${params.length}`); }
     if (input.contactPhone !== undefined) { params.push(input.contactPhone.trim()); sets.push(`contact_phone = $${params.length}`); }
@@ -1361,7 +1376,7 @@ export class CoreService implements OnModuleInit {
          SET ${sets.join(', ')}
          WHERE id = $${params.length}
            AND deleted_at IS NULL
-         RETURNING id, name, city, address, contact_phone, is_active
+         RETURNING id, name, short_name, city, address, contact_phone, is_active
        )
        SELECT row_to_json(updated)::text
        FROM updated;`,
@@ -3573,11 +3588,12 @@ export class CoreService implements OnModuleInit {
 
   async getYoungsterMe(actor: AccessUser) {
     if (actor.role !== 'YOUNGSTER') throw new ForbiddenException('Role not allowed');
+    await this.ensureSchoolShortNameColumn();
     const out = await runSql(
       `
       SELECT row_to_json(t)::text
       FROM (
-        SELECT c.id, c.user_id, u.first_name, u.last_name, c.school_id, s.name AS school_name,
+        SELECT c.id, c.user_id, u.first_name, u.last_name, c.school_id, s.name AS school_name, s.short_name AS school_short_name,
                c.school_grade, c.date_of_birth::text AS date_of_birth, c.gender::text AS gender,
                COALESCE((
                  SELECT cdr.restriction_details
@@ -6772,26 +6788,29 @@ export class CoreService implements OnModuleInit {
 
   // ─── Schools CRUD ────────────────────────────────────────────────────────
 
-  async createSchool(actor: AccessUser, input: { name?: string; address?: string; city?: string; contactPhone?: string }) {
+  async createSchool(actor: AccessUser, input: { name?: string; shortName?: string; address?: string; city?: string; contactPhone?: string }) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    await this.ensureSchoolShortNameColumn();
     const name = (input.name || '').trim();
+    const shortName = (input.shortName || '').trim();
     const address = (input.address || '').trim();
     const city = (input.city || '').trim();
     const contactPhone = (input.contactPhone || '').trim();
     if (!name) throw new BadRequestException('School name is required');
+    if (!shortName) throw new BadRequestException('Short name is required');
     if (!city) throw new BadRequestException('City is required');
     if (!address) throw new BadRequestException('Address is required');
     if (!contactPhone) throw new BadRequestException('Phone number is required');
     const out = await runSql(
       `
       WITH inserted AS (
-        INSERT INTO schools (name, address, city, contact_phone, is_active)
-        VALUES ($1, $2, $3, $4, true)
-        RETURNING id, name, city, address, contact_phone, is_active
+        INSERT INTO schools (name, short_name, address, city, contact_phone, is_active)
+        VALUES ($1, $2, $3, $4, $5, true)
+        RETURNING id, name, short_name, city, address, contact_phone, is_active
       )
       SELECT row_to_json(inserted)::text FROM inserted;
     `,
-      [name, address, city, contactPhone],
+      [name, shortName, address, city, contactPhone],
     );
     if (!out) throw new BadRequestException('Failed to create school');
     const school = this.parseJsonLine<{ id: string; name: string }>(out);

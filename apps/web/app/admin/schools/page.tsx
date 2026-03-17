@@ -8,6 +8,7 @@ import AdminReturnButton from '../_components/admin-return-button';
 type School = {
   id: string;
   name: string;
+  short_name?: string | null;
   city?: string | null;
   address?: string | null;
   contact_phone?: string | null;
@@ -25,6 +26,7 @@ export default function AdminSchoolsPage() {
   const [savingSession, setSavingSession] = useState('');
   const [savingCutoff, setSavingCutoff] = useState(false);
   const [newSchoolName, setNewSchoolName] = useState('');
+  const [newSchoolShortName, setNewSchoolShortName] = useState('');
   const [newSchoolCity, setNewSchoolCity] = useState('');
   const [newSchoolAddress, setNewSchoolAddress] = useState('');
   const [newSchoolPhone, setNewSchoolPhone] = useState('');
@@ -32,6 +34,7 @@ export default function AdminSchoolsPage() {
   const [deletingSchoolId, setDeletingSchoolId] = useState('');
   const [editingSchoolId, setEditingSchoolId] = useState('');
   const [editName, setEditName] = useState('');
+  const [editShortName, setEditShortName] = useState('');
   const [editCity, setEditCity] = useState('');
   const [editAddress, setEditAddress] = useState('');
   const [editPhone, setEditPhone] = useState('');
@@ -79,6 +82,7 @@ export default function AdminSchoolsPage() {
     setError('');
     setMessage('');
     if (!newSchoolName.trim()) { setError('School name is required'); return; }
+    if (!newSchoolShortName.trim()) { setError('Short name is required'); return; }
     if (!newSchoolCity.trim()) { setError('City is required'); return; }
     if (!newSchoolAddress.trim()) { setError('Address is required'); return; }
     if (!newSchoolPhone.trim()) { setError('Phone number is required'); return; }
@@ -88,12 +92,14 @@ export default function AdminSchoolsPage() {
         method: 'POST',
         body: JSON.stringify({
           name: newSchoolName.trim(),
+          shortName: newSchoolShortName.trim(),
           city: newSchoolCity.trim(),
           address: newSchoolAddress.trim(),
           contactPhone: newSchoolPhone.trim(),
         }),
       }, { skipAutoReload: true });
       setNewSchoolName('');
+      setNewSchoolShortName('');
       setNewSchoolCity('');
       setNewSchoolAddress('');
       setNewSchoolPhone('');
@@ -124,6 +130,7 @@ export default function AdminSchoolsPage() {
   const beginEdit = (school: School) => {
     setEditingSchoolId(school.id);
     setEditName(school.name || '');
+    setEditShortName(school.short_name || '');
     setEditCity(school.city || '');
     setEditAddress(school.address || '');
     setEditPhone(school.contact_phone || '');
@@ -133,6 +140,7 @@ export default function AdminSchoolsPage() {
     setError('');
     setMessage('');
     if (!editName.trim()) { setError('School name is required'); return; }
+    if (!editShortName.trim()) { setError('Short name is required'); return; }
     if (!editCity.trim()) { setError('City is required'); return; }
     if (!editAddress.trim()) { setError('Address is required'); return; }
     if (!editPhone.trim()) { setError('Phone number is required'); return; }
@@ -142,6 +150,7 @@ export default function AdminSchoolsPage() {
         method: 'PATCH',
         body: JSON.stringify({
           name: editName.trim(),
+          shortName: editShortName.trim(),
           city: editCity.trim(),
           address: editAddress.trim(),
           contactPhone: editPhone.trim(),
@@ -205,6 +214,7 @@ export default function AdminSchoolsPage() {
           <thead>
             <tr>
               <th>School</th>
+              <th>ShortName</th>
               <th>City</th>
               <th>Address</th>
               <th>Phone</th>
@@ -217,6 +227,7 @@ export default function AdminSchoolsPage() {
                 {editingSchoolId === school.id ? (
                   <>
                     <td><input value={editName} onChange={(e) => setEditName(e.target.value)} /></td>
+                    <td><input value={editShortName} onChange={(e) => setEditShortName(e.target.value)} /></td>
                     <td><input value={editCity} onChange={(e) => setEditCity(e.target.value)} /></td>
                     <td><input value={editAddress} onChange={(e) => setEditAddress(e.target.value)} /></td>
                     <td><input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} placeholder="+[country][area][number]" /></td>
@@ -232,6 +243,7 @@ export default function AdminSchoolsPage() {
                 ) : (
                   <>
                     <td>{school.name}</td>
+                    <td>{school.short_name || '-'}</td>
                     <td>{school.city || '-'}</td>
                     <td>{school.address || '-'}</td>
                     <td>{school.contact_phone || '-'}</td>
@@ -274,7 +286,7 @@ export default function AdminSchoolsPage() {
               </tr>
             ))}
             {list.length === 0 ? (
-              <tr><td colSpan={5}>No schools found.</td></tr>
+              <tr><td colSpan={6}>No schools found.</td></tr>
             ) : null}
           </tbody>
         </table>
@@ -344,6 +356,7 @@ export default function AdminSchoolsPage() {
         <h2>Add School</h2>
         <div className="auth-form school-create-form">
           <label>School Name <span className="req">*</span><input value={newSchoolName} onChange={(e) => setNewSchoolName(e.target.value)} /></label>
+          <label>ShortName <span className="req">*</span><input value={newSchoolShortName} onChange={(e) => setNewSchoolShortName(e.target.value)} /></label>
           <label>City <span className="req">*</span><input value={newSchoolCity} onChange={(e) => setNewSchoolCity(e.target.value)} /></label>
           <label>Address <span className="req">*</span><input value={newSchoolAddress} onChange={(e) => setNewSchoolAddress(e.target.value)} /></label>
           <label>Phone Number <span className="req">*</span><input value={newSchoolPhone} onChange={(e) => setNewSchoolPhone(e.target.value)} placeholder="+[country][area][number]" /><small className="field-hint">Format: + country code + area code + number &nbsp;e.g. +628123456789</small></label>

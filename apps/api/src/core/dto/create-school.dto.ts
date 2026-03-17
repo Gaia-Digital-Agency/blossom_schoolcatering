@@ -7,6 +7,10 @@ export class CreateSchoolDto {
 
   @IsString()
   @IsNotEmpty()
+  shortName!: string;
+
+  @IsString()
+  @IsNotEmpty()
   city!: string;
 
   @IsString()
