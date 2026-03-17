@@ -368,6 +368,12 @@ export class AuthService {
          ON CONFLICT (username) DO UPDATE
          SET password_hash = EXCLUDED.password_hash,
              role = EXCLUDED.role,
+             first_name = EXCLUDED.first_name,
+             last_name = EXCLUDED.last_name,
+             phone_number = EXCLUDED.phone_number,
+             email = EXCLUDED.email,
+             is_active = true,
+             deleted_at = NULL,
              updated_at = now()
          RETURNING id;`,
         [spec.role, spec.username, hashed, spec.firstName, spec.lastName, spec.phoneNumber, spec.email],
