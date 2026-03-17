@@ -45,6 +45,7 @@ type Assignment = {
   parent_name: string;
   delivery_status: string;
   confirmed_at?: string | null;
+  daily_note?: string | null;
 };
 
 function todayIsoLocal() {
@@ -668,6 +669,7 @@ export default function AdminDeliveryPage() {
             <thead>
               <tr>
                 <th>Delivery User</th>
+                <th>Confirmation Note</th>
                 <th>Schools</th>
                 <th className="count-col">Number of Youngsters</th>
                 <th className="count-col">Number of Orders</th>
@@ -676,10 +678,11 @@ export default function AdminDeliveryPage() {
             </thead>
             <tbody>
               {autoAssignmentSummary.length === 0 ? (
-                <tr><td colSpan={5}>No auto-assignment data for selected date.</td></tr>
+                <tr><td colSpan={6}>No auto-assignment data for selected date.</td></tr>
               ) : autoAssignmentSummary.map((row) => (
                 <tr key={row.deliveryUserId}>
                   <td>{row.deliveryName}</td>
+                  <td>{row.orders.find((order) => String(order.daily_note || '').trim())?.daily_note || '-'}</td>
                   <td>{row.schools.join(', ') || '-'}</td>
                   <td className="count-col">{row.youngsterCount}</td>
                   <td className="count-col">{row.orderCount}</td>

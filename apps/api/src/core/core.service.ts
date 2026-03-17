@@ -60,6 +60,7 @@ type DishCategory = (typeof DISH_CATEGORIES)[number];
 export class CoreService implements OnModuleInit {
   private parentDietaryRestrictionsReady = false;
   private deliverySchoolAssignmentsReady = false;
+  private deliveryDailyNotesReady = false;
   private billingReviewColumnsReady = false;
   private adminAuditTrailReady = false;
   private adminVisiblePasswordsReady = false;
@@ -75,6 +76,7 @@ export class CoreService implements OnModuleInit {
     await this.ensureSessionSettingsTable();
     await this.ensureMenuRatingsTable();
     await this.ensureChildRegistrationSourceColumns();
+    await this.ensureDeliveryDailyNotesTable();
     await this.ensureBillingReviewColumns();
     await this.ensureAdminAuditTrailTable();
     await this.ensureMenuItemTextDefaults();
@@ -91,6 +93,21 @@ export class CoreService implements OnModuleInit {
       );
     `);
     this.adminVisiblePasswordsReady = true;
+  }
+
+  private async ensureDeliveryDailyNotesTable() {
+    if (this.deliveryDailyNotesReady) return;
+    await runSql(`
+      CREATE TABLE IF NOT EXISTS delivery_daily_notes (
+        delivery_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        service_date date NOT NULL,
+        note text NOT NULL DEFAULT '',
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        PRIMARY KEY (delivery_user_id, service_date)
+      );
+    `);
+    this.deliveryDailyNotesReady = true;
   }
 
   private async setAdminVisiblePassword(userId: string, password: string, source: 'REGISTRATION' | 'RESET' | 'MANUAL_CREATE') {
@@ -5261,6 +5278,7 @@ export class CoreService implements OnModuleInit {
 
   async getDeliveryAssignments(actor: AccessUser, dateRaw?: string) {
     if (!['DELIVERY', 'ADMIN'].includes(actor.role)) throw new ForbiddenException('Role not allowed');
+    await this.ensureDeliveryDailyNotesTable();
     const serviceDate = dateRaw ? this.validateServiceDate(dateRaw) : null;
     await this.autoAssignDeliveriesForDate(serviceDate || this.makassarTodayIsoDate());
     const params: unknown[] = [];
@@ -5294,6 +5312,7 @@ export class CoreService implements OnModuleInit {
                da.assigned_at::text AS assigned_at,
                da.confirmed_at::text AS confirmed_at,
                da.confirmation_note,
+               COALESCE(ddn.note, '') AS daily_note,
                o.service_date::text AS service_date,
                o.session::text AS session,
                o.status::text AS status,
@@ -5325,6 +5344,9 @@ export class CoreService implements OnModuleInit {
         JOIN schools s ON s.id = c.school_id
         JOIN users uc ON uc.id = c.user_id
         LEFT JOIN users up ON up.id = o.placed_by_user_id
+        LEFT JOIN delivery_daily_notes ddn
+          ON ddn.delivery_user_id = da.delivery_user_id
+         AND ddn.service_date = o.service_date
         WHERE 1=1
           ${roleFilter}
           ${dateFilter}
@@ -5334,6 +5356,70 @@ export class CoreService implements OnModuleInit {
       params,
     );
     return this.parseJsonLines(out);
+  }
+
+  async getDeliveryDailyNote(actor: AccessUser, dateRaw?: string) {
+    await this.ensureDeliveryDailyNotesTable();
+    const serviceDate = dateRaw ? this.validateServiceDate(dateRaw) : this.makassarTodayIsoDate();
+    if (actor.role === 'DELIVERY') {
+      const out = await runSql(
+        `
+        SELECT row_to_json(t)::text
+        FROM (
+          SELECT delivery_user_id::text AS delivery_user_id,
+                 service_date::text AS service_date,
+                 note,
+                 updated_at::text AS updated_at
+          FROM delivery_daily_notes
+          WHERE delivery_user_id = $1
+            AND service_date = $2::date
+          LIMIT 1
+        ) t;
+        `,
+        [actor.uid, serviceDate],
+      );
+      return out
+        ? this.parseJsonLine(out)
+        : { delivery_user_id: actor.uid, service_date: serviceDate, note: '', updated_at: null };
+    }
+    if (actor.role === 'ADMIN') {
+      const out = await runSql(
+        `
+        SELECT row_to_json(t)::text
+        FROM (
+          SELECT ddn.delivery_user_id::text AS delivery_user_id,
+                 (u.first_name || ' ' || u.last_name) AS delivery_name,
+                 ddn.service_date::text AS service_date,
+                 ddn.note,
+                 ddn.updated_at::text AS updated_at
+          FROM delivery_daily_notes ddn
+          JOIN users u ON u.id = ddn.delivery_user_id
+          WHERE ddn.service_date = $1::date
+          ORDER BY delivery_name ASC
+        ) t;
+        `,
+        [serviceDate],
+      );
+      return this.parseJsonLines(out);
+    }
+    throw new ForbiddenException('Role not allowed');
+  }
+
+  async updateDeliveryDailyNote(actor: AccessUser, dateRaw: string, note?: string) {
+    if (actor.role !== 'DELIVERY') throw new ForbiddenException('Role not allowed');
+    await this.ensureDeliveryDailyNotesTable();
+    const serviceDate = this.validateServiceDate(dateRaw);
+    const cleanNote = (note || '').trim().slice(0, 500);
+    await runSql(
+      `
+      INSERT INTO delivery_daily_notes (delivery_user_id, service_date, note, updated_at)
+      VALUES ($1, $2::date, $3, now())
+      ON CONFLICT (delivery_user_id, service_date)
+      DO UPDATE SET note = EXCLUDED.note, updated_at = now();
+      `,
+      [actor.uid, serviceDate, cleanNote],
+    );
+    return { ok: true, serviceDate, note: cleanNote };
   }
 
   async sendDeliveryNotificationEmails(actor: AccessUser) {

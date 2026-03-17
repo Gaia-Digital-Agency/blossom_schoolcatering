@@ -747,6 +747,18 @@ export class CoreController {
     return this.coreService.getDeliveryAssignments(req.user, date);
   }
 
+  @Get('delivery/daily-note')
+  @Roles('ADMIN', 'DELIVERY')
+  getDeliveryDailyNote(@Req() req: AuthRequest, @Query('date') date?: string) {
+    return this.coreService.getDeliveryDailyNote(req.user, date);
+  }
+
+  @Patch('delivery/daily-note')
+  @Roles('DELIVERY')
+  updateDeliveryDailyNote(@Req() req: AuthRequest, @Query('date') date: string, @Body() body: NoteDto) {
+    return this.coreService.updateDeliveryDailyNote(req.user, date, body.note);
+  }
+
   @Get('delivery/summary')
   @Roles('ADMIN', 'DELIVERY')
   getDeliverySummary(@Req() req: AuthRequest, @Query('date') date?: string) {

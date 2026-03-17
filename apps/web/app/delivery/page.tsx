@@ -18,6 +18,7 @@ type Assignment = {
   parent_name: string;
   delivery_status: string;
   confirmed_at?: string | null;
+  daily_note?: string | null;
 };
 
 type DeliveryProfile = {
@@ -50,6 +51,7 @@ export default function DeliveryPage() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [note, setNote] = useState('');
+  const [noteState, setNoteState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [loading, setLoading] = useState(false);
 
   const yesterday = dateInMakassar(-1);
@@ -185,6 +187,40 @@ export default function DeliveryPage() {
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
 
   useEffect(() => {
+    let active = true;
+    apiFetch(`/delivery/daily-note?date=${encodeURIComponent(selectedDate)}`)
+      .then((row) => {
+        if (!active) return;
+        setNote(String((row as { note?: string | null })?.note || ''));
+        setNoteState('idle');
+      })
+      .catch(() => {
+        if (!active) return;
+        setNote('');
+        setNoteState('error');
+      });
+    return () => {
+      active = false;
+    };
+  }, [selectedDate]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(async () => {
+      setNoteState('saving');
+      try {
+        await apiFetch(`/delivery/daily-note?date=${encodeURIComponent(selectedDate)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ note }),
+        }, { skipAutoReload: true });
+        setNoteState('saved');
+      } catch {
+        setNoteState('error');
+      }
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [note, selectedDate]);
+
+  useEffect(() => {
     apiFetch('/auth/me')
       .then((data) => setProfile(data as DeliveryProfile))
       .catch((e) => {
@@ -280,6 +316,15 @@ export default function DeliveryPage() {
           <label className="delivery-control delivery-note">
             Confirmation Note (optional)
             <input value={note} onChange={(e) => setNote(e.target.value)} />
+            <small className="field-hint">
+              {noteState === 'saving'
+                ? 'Saving...'
+                : noteState === 'saved'
+                  ? `Saved for ${selectedDate}.`
+                  : noteState === 'error'
+                    ? 'Save failed.'
+                    : `Autosaved daily for ${selectedDate}.`}
+            </small>
           </label>
         </div>
 
@@ -403,6 +448,9 @@ export default function DeliveryPage() {
         }
         .delivery-date-picker-row .delivery-control {
           margin: 0;
+        }
+        .delivery-note :global(.field-hint) {
+          color: #7b6952;
         }
         .delivery-order-columns {
           display: grid;

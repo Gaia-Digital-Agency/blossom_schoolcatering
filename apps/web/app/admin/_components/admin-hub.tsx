@@ -10,6 +10,7 @@ const HUB_ITEMS = [
   { label: 'Schools', icon: '🏫', href: '/admin/schools' },
   { label: 'Delivery', icon: '🚚', href: '/admin/delivery' },
   { label: 'Orders', icon: '📦', href: '/admin/orders' },
+  { label: 'Billing', icon: '💳', href: '/admin/billing' },
   { label: 'Menu', icon: '🍽️', href: '/admin/menu' },
   { label: 'Kitchen', icon: '👩‍🍳', href: '/admin/kitchen' },
   { label: 'Blackout', icon: '📅', href: '/admin/blackout-dates' },

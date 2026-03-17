@@ -401,9 +401,10 @@ export default function KitchenDashboard({
         }
         .kitchen-date-picker-row {
           display: grid;
-          grid-template-columns: minmax(0, 1fr);
+          grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 0.6rem;
           margin-bottom: 0.65rem;
+          align-items: end;
         }
         .kitchen-control {
           margin: 0;
@@ -519,10 +520,6 @@ export default function KitchenDashboard({
           }
           .kitchen-order-columns {
             grid-template-columns: 1fr 1fr;
-          }
-          .kitchen-date-picker-row {
-            grid-template-columns: minmax(0, 1fr) auto auto;
-            align-items: end;
           }
         }
         @media (min-width: 1200px) {
