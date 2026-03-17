@@ -1,5 +1,5 @@
-import KitchenDashboard from './_components/kitchen-dashboard';
+import KitchenOverview from './_components/kitchen-overview';
 
 export default function KitchenIndexPage() {
-  return <KitchenDashboard offsetDays={0} title="Kitchen Today" />;
+  return <KitchenOverview />;
 }
