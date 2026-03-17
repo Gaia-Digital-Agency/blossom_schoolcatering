@@ -417,6 +417,10 @@ export default function KitchenDashboard({
           letter-spacing: 0.04em;
           text-transform: uppercase;
           color: #7a6652;
+          white-space: nowrap;
+        }
+        .kitchen-fixed-date-card strong {
+          white-space: nowrap;
         }
         .kitchen-date-picker-row :global(.btn) {
           width: 100%;
@@ -456,8 +460,8 @@ export default function KitchenDashboard({
           white-space: nowrap;
         }
         .kitchen-table td {
-          overflow-wrap: anywhere;
-          word-break: break-word;
+          overflow-wrap: normal;
+          word-break: normal;
         }
         .kitchen-table tbody tr:last-child td {
           border-bottom: none;

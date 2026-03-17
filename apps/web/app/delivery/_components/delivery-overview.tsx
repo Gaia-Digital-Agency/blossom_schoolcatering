@@ -88,12 +88,12 @@ export default function DeliveryOverview() {
         }
         .module-hub-label {
           width: 100%;
-          font-size: clamp(0.84rem, 3.4vw, 1rem);
+          font-size: clamp(0.76rem, 3vw, 0.95rem);
           font-weight: 700;
           color: #5d4e3a;
           text-align: center;
           line-height: 1.15;
-          text-wrap: balance;
+          white-space: nowrap;
         }
       `}</style>
     </main>

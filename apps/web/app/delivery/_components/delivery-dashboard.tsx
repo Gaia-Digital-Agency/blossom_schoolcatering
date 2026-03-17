@@ -450,6 +450,10 @@ export default function DeliveryDashboard({
             letter-spacing: 0.04em;
             text-transform: uppercase;
             color: #7a6652;
+            white-space: nowrap;
+          }
+          .delivery-fixed-date-card strong {
+            white-space: nowrap;
           }
           .delivery-note :global(.field-hint) {
             color: #7b6952;
