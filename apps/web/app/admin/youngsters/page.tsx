@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '../../../lib/auth';
 import AdminNav from '../_components/admin-nav';
+import AdminReturnButton from '../_components/admin-return-button';
 
 type School = { id: string; name: string; city?: string | null };
 type ParentRow = {
@@ -617,6 +618,7 @@ export default function AdminYoungstersPage() {
             </tbody>
           </table>
         </div>
+        <AdminReturnButton />
       </section>
 
       {showIdInfo ? (

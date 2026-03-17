@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '../../../lib/auth';
 import AdminNav from '../_components/admin-nav';
+import AdminReturnButton from '../_components/admin-return-button';
 
 type School = {
   id: string;
@@ -312,6 +313,7 @@ export default function AdminSchoolsPage() {
           {renderSchoolTable('Deactivated Schools', inactiveSchools)}
         </div>
       </section>
+      <AdminReturnButton />
       <style jsx>{`
         .sessions-row {
           display: flex;

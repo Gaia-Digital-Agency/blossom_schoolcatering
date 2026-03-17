@@ -294,6 +294,21 @@ export class CoreController {
     return this.coreService.getAdminDashboard(date);
   }
 
+  @Get('admin/orders')
+  @Roles('ADMIN')
+  getAdminOrders(
+    @Req() req: AuthRequest,
+    @Query('date') date?: string,
+    @Query('school_id') schoolId?: string,
+    @Query('delivery_user_id') deliveryUserId?: string,
+  ) {
+    return this.coreService.getAdminOrders(req.user, {
+      dateRaw: date,
+      schoolId,
+      deliveryUserId,
+    });
+  }
+
   @Get('admin/revenue')
   @Roles('ADMIN')
   getAdminRevenue(

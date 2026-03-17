@@ -52,16 +52,14 @@ export default function LoginPage() {
   return (
     <main className="page-auth">
       <section className="auth-panel">
-        <h1>Single Login</h1>
-        <p className="auth-help">Use this page for Family, Student, Delivery, Kitchen, and Admin login.</p>
+        <h1>SINGLE SIGN ON (SSO)</h1>
+        <p className="auth-help">Use this page for Family, Student, Delivery, Kitchen, and Admin login. (For Dev Period Use)</p>
         <div className="auth-form" style={{ marginBottom: '0.75rem' }}>
-          <strong>For Dev Period Use</strong>
-          <small><strong>Admin</strong>: <code>admin</code> / <code>teameditor123</code> via <code>/admin/login</code></small>
-          <small><strong>Kitchen</strong>: <code>kitchen</code> / <code>teameditor123</code> via <code>/kitchen/login</code></small>
-          <small><strong>Family</strong>: <code>parent01</code>, <code>parent02</code>, <code>parent03</code> / <code>teameditor123</code></small>
-          <small><strong>Student</strong>: <code>youngster0a</code>, <code>youngster0b</code>, <code>youngster0c</code>, <code>youngster0d</code>, <code>youngster0e</code>, <code>youngster0f</code> / <code>teameditor123</code></small>
-          <small><strong>Delivery</strong>: use registered delivery username via <code>/delivery/login</code> (backdoor: <code>teameditor123</code>)</small>
-          <small><strong>Backdoor Password</strong> (Admin, Kitchen, Delivery, Family, Student): <code>teameditor123</code></small>
+          <small><strong>Admin</strong>: <code>admin</code> / <code>teameditor123</code></small>
+          <small><strong>Kitchen</strong>: <code>kitchen</code> / <code>teameditor123</code></small>
+          <small><strong>Delivery</strong>: <code>delivery_username</code> / <code>teameditor123</code></small>
+          <small><strong>Family</strong>: <code>familyName_parenttName</code> / <code>teameditor123</code></small>
+          <small><strong>Student</strong>: <code>familyName_studentName</code> / <code>teameditor123</code></small>
         </div>
         <form onSubmit={onSubmit} className="auth-form" autoComplete="off">
           <label>

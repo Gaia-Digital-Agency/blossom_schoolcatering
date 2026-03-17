@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '../../../lib/auth';
 import AdminNav from '../_components/admin-nav';
+import AdminReturnButton from '../_components/admin-return-button';
 
 type Revenue = {
   fromDate: string;
@@ -168,6 +169,7 @@ export default function AdminReportsPage() {
           ) : null}
         </div>
       </section>
+      <AdminReturnButton />
       <style jsx>{`
         .reports-card {
           border: 1px solid #ccbda2;

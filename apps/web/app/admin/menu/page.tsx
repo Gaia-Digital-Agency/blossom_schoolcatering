@@ -7,6 +7,7 @@ import { ACCESS_KEY, apiFetch, fetchWithTimeout, getApiBase } from '../../../lib
 import { formatDishCategoryLabel, formatDishDietaryTags } from '../../../lib/dish-tags';
 import { fileToWebpDataUrl } from '../../../lib/image';
 import AdminNav from '../_components/admin-nav';
+import AdminReturnButton from '../_components/admin-return-button';
 
 type Ingredient = { id: string; name: string; allergen_flag: boolean; is_active: boolean };
 type AdminMenuItem = {
@@ -901,6 +902,7 @@ export default function AdminMenuPage() {
           </div>
         </div>
       </section>
+      <AdminReturnButton />
       <style jsx>{`
         .menu-item-card {
           display: grid;

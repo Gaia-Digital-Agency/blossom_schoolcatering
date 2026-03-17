@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch, apiFetchResponse } from '../../../lib/auth';
 import AdminNav from '../_components/admin-nav';
+import AdminReturnButton from '../_components/admin-return-button';
 
 /**
  * Type definition for a single row in the billing table.
@@ -765,6 +766,7 @@ export default function AdminBillingPage() {
             }
           }
         `}</style>
+        <AdminReturnButton />
       </section>
     </main>
   );

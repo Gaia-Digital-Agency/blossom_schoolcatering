@@ -62,9 +62,11 @@ function dateInMakassar(offsetDays = 0) {
 export default function KitchenDashboard({
   offsetDays,
   title,
+  returnHref,
 }: {
   offsetDays: number;
   title: string;
+  returnHref?: string;
 }) {
   const [data, setData] = useState<KitchenData | null>(null);
   const [error, setError] = useState('');
@@ -530,7 +532,12 @@ export default function KitchenDashboard({
         }
       `}</style>
     </main>
-    <LogoutButton />
+    <LogoutButton
+      returnHref={returnHref}
+      showRecord={false}
+      showLogout={!returnHref}
+      sticky={false}
+    />
     </>
   );
 }

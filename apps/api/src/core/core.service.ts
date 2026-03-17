@@ -1968,6 +1968,127 @@ export class CoreService implements OnModuleInit {
     };
   }
 
+  async getAdminOrders(
+    actor: AccessUser,
+    input?: { dateRaw?: string; schoolId?: string; deliveryUserId?: string },
+  ) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    const serviceDate = input?.dateRaw ? this.validateServiceDate(input.dateRaw) : '';
+    const params: unknown[] = [];
+    const filters: string[] = ['o.deleted_at IS NULL', `o.status <> 'CANCELLED'`];
+
+    if (serviceDate) {
+      params.push(serviceDate);
+      filters.push(`o.service_date = $${params.length}::date`);
+    }
+    if (input?.schoolId && input.schoolId !== 'ALL') {
+      params.push(input.schoolId);
+      filters.push(`s.id = $${params.length}::uuid`);
+    }
+    if (input?.deliveryUserId && input.deliveryUserId !== 'ALL') {
+      if (input.deliveryUserId === 'UNASSIGNED') {
+        filters.push('da.delivery_user_id IS NULL');
+      } else {
+        params.push(input.deliveryUserId);
+        filters.push(`da.delivery_user_id = $${params.length}::uuid`);
+      }
+    }
+
+    const whereSql = `WHERE ${filters.join('\n          AND ')}`;
+    const rowsOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT o.id AS order_id,
+               o.service_date::text AS service_date,
+               o.session::text AS session,
+               o.status::text AS status,
+               o.delivery_status::text AS delivery_status,
+               o.total_price,
+               c.id AS child_id,
+               s.id AS school_id,
+               s.name AS school_name,
+               (uc.first_name || ' ' || uc.last_name) AS child_name,
+               COALESCE((up.first_name || ' ' || up.last_name), '-') AS account_name,
+               da.delivery_user_id::text AS delivery_user_id,
+               COALESCE((du.first_name || ' ' || du.last_name), 'Unassigned') AS delivery_name,
+               COALESCE(br.status::text, 'UNBILLED') AS billing_status,
+               COALESCE((
+                 SELECT json_agg(row_to_json(d) ORDER BY d.item_name)
+                 FROM (
+                   SELECT oi.item_name_snapshot AS item_name,
+                          SUM(oi.quantity)::int AS quantity
+                   FROM order_items oi
+                   WHERE oi.order_id = o.id
+                   GROUP BY oi.item_name_snapshot
+                 ) d
+               ), '[]'::json) AS dishes
+        FROM orders o
+        JOIN children c ON c.id = o.child_id
+        JOIN users uc ON uc.id = c.user_id
+        JOIN schools s ON s.id = c.school_id
+        LEFT JOIN users up ON up.id = o.placed_by_user_id
+        LEFT JOIN LATERAL (
+          SELECT da1.delivery_user_id
+          FROM delivery_assignments da1
+          WHERE da1.order_id = o.id
+          ORDER BY da1.assigned_at DESC NULLS LAST, da1.created_at DESC NULLS LAST
+          LIMIT 1
+        ) da ON true
+        LEFT JOIN users du ON du.id = da.delivery_user_id
+        LEFT JOIN billing_records br ON br.order_id = o.id
+        ${whereSql}
+        ORDER BY o.service_date DESC, s.name ASC, o.session ASC, child_name ASC
+      ) t;
+      `,
+      params,
+    );
+
+    const schoolsOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT id, name
+        FROM schools
+        WHERE deleted_at IS NULL
+        ORDER BY name ASC
+      ) t;
+      `,
+    );
+    const deliveryUsersOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT u.id AS user_id,
+               (u.first_name || ' ' || u.last_name) AS name
+        FROM users u
+        WHERE u.role = 'DELIVERY'
+          AND u.deleted_at IS NULL
+        ORDER BY name ASC
+      ) t;
+      `,
+    );
+
+    const rows = this.parseJsonLines<Record<string, unknown> & { total_price?: string | number; delivery_status?: string }>(rowsOut)
+      .map((row) => ({
+        ...row,
+        total_price: Number(row.total_price || 0),
+        is_completed: String(row.delivery_status || '').toUpperCase() === 'DELIVERED',
+      }));
+
+    return {
+      filters: {
+        schools: this.parseJsonLines(schoolsOut),
+        deliveryUsers: [
+          { user_id: 'UNASSIGNED', name: 'Unassigned' },
+          ...this.parseJsonLines(deliveryUsersOut),
+        ],
+      },
+      outstanding: rows.filter((row) => !row.is_completed),
+      completed: rows.filter((row) => row.is_completed),
+    };
+  }
+
   async getBlackoutDays(query: { fromDate?: string; toDate?: string }) {
     const params: string[] = [];
     const conditions: string[] = [];

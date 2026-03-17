@@ -450,7 +450,7 @@ export default function YoungsterRegisterPage() {
                 onChange={() => setRegistrantType('PARENT')}
                 required
               />
-              Family
+              Parent
             </label>
             <label className="registrant-type-option">
               <input

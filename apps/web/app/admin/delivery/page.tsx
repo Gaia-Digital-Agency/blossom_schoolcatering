@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '../../../lib/auth';
 import AdminNav from '../_components/admin-nav';
+import AdminReturnButton from '../_components/admin-return-button';
 import PasswordInput from '../../_components/password-input';
 
 type DeliveryUser = {
@@ -697,6 +698,7 @@ export default function AdminDeliveryPage() {
           </table>
         </div>
 
+        <AdminReturnButton />
       </section>
       {showPassInfo ? (
         <div className="pass-modal-overlay" onClick={() => setShowPassInfo(null)}>

@@ -1,17 +1,17 @@
 'use client';
 
-import { clearBrowserSession, getAppBase } from '../../lib/auth';
+import { getAppBase } from '../../lib/auth';
+import LogoutButton from './logout-button';
 
 type ModuleType = 'family' | 'student';
 
-const HUB_ITEMS: Record<ModuleType, Array<{ label: string; icon: string; href?: string; logsOut?: boolean }>> = {
+const HUB_ITEMS: Record<ModuleType, Array<{ label: string; icon: string; href?: string }>> = {
   family: [
     { label: 'Overview', icon: '📅', href: '/family/overview' },
     { label: 'Order', icon: '🛒', href: '/family/order' },
     { label: 'Billing', icon: '💳', href: '/family/billing' },
     { label: 'Rating', icon: '⭐', href: '/rating' },
     { label: 'Menu', icon: '🍽️', href: '/menu' },
-    { label: 'Logout', icon: '🏠', logsOut: true },
   ],
   student: [
     { label: 'Overview', icon: '📅', href: '/student/overview' },
@@ -19,7 +19,6 @@ const HUB_ITEMS: Record<ModuleType, Array<{ label: string; icon: string; href?: 
     { label: 'Billing', icon: '💳', href: '/student/billing' },
     { label: 'Rating', icon: '⭐', href: '/rating' },
     { label: 'Menu', icon: '🍽️', href: '/menu' },
-    { label: 'Logout', icon: '🏠', logsOut: true },
   ],
 };
 
@@ -30,11 +29,6 @@ export default function ModuleHub({
   module: ModuleType;
   title: string;
 }) {
-  const onHome = async () => {
-    await clearBrowserSession();
-    window.location.href = `${getAppBase()}/`;
-  };
-
   return (
     <main className="page-auth page-auth-mobile">
       <section className="auth-panel">
@@ -46,10 +40,6 @@ export default function ModuleHub({
               type="button"
               className="module-hub-card"
               onClick={() => {
-                if (item.logsOut) {
-                  void onHome();
-                  return;
-                }
                 if (item.href) window.location.href = `${getAppBase()}${item.href}`;
               }}
               aria-label={item.label}
@@ -59,6 +49,7 @@ export default function ModuleHub({
             </button>
           ))}
         </div>
+        <LogoutButton showRecord={false} sticky={false} />
       </section>
       <style jsx>{`
         .page-auth {

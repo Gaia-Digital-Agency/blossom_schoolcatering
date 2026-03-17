@@ -413,7 +413,7 @@ export default function DeliveryPage() {
         }
       `}</style>
     </main>
-    <LogoutButton />
+    <LogoutButton showRecord={false} sticky={false} />
     </>
   );
 }

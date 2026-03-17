@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../../../lib/auth';
 import AdminNav from '../_components/admin-nav';
+import AdminReturnButton from '../_components/admin-return-button';
 
 type KitchenDish = {
   menu_item_id: string;
@@ -177,6 +178,7 @@ export default function AdminKitchenPage() {
           </>
         ) : null}
       </section>
+      <AdminReturnButton />
       <style jsx>{`
         .admin-kitchen-card {
           border: 1px solid #d6c8b0;

@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { apiFetch, SessionExpiredError } from '../../../lib/auth';
 import AdminNav from '../_components/admin-nav';
+import AdminReturnButton from '../_components/admin-return-button';
 
 /**
  * Type definition for a single blackout day entry.
@@ -184,6 +185,7 @@ export default function AdminBlackoutDatesPage() {
         )}
       </section>
       {/* Scoped CSS for the component */}
+      <AdminReturnButton />
       <style jsx>{`
         .blackout-type-guide {
           background: #f8f5f0;
