@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../../../lib/auth';
 import LogoutButton from '../../_components/logout-button';
@@ -63,10 +62,14 @@ export default function KitchenDashboard({
   offsetDays,
   title,
   returnHref,
+  dateMode = 'fixed',
+  fixedDateLabel = 'Today',
 }: {
   offsetDays: number;
   title: string;
   returnHref?: string;
+  dateMode?: 'fixed' | 'select';
+  fixedDateLabel?: string;
 }) {
   const [data, setData] = useState<KitchenData | null>(null);
   const [error, setError] = useState('');
@@ -225,23 +228,25 @@ export default function KitchenDashboard({
         <div className="module-guide-card">
           💡 See Orders and Summary, Allergens, Mark ordered as prepared, print order tags. Press Refresh Button for latest updates.
         </div>
-        <div className="kitchen-top-actions">
-          <Link className="btn btn-outline" href="/kitchen/yesterday">Yesterday</Link>
-          <Link className="btn btn-outline" href="/kitchen/today">Today</Link>
-          <Link className="btn btn-outline" href="/kitchen/tomorrow">Tomorrow</Link>
-        </div>
         <div className="kitchen-date-picker-row">
-          <label className="kitchen-control">
-            Service Date
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => {
-                setMessage('');
-                setSelectedDate(e.target.value);
-              }}
-            />
-          </label>
+          {dateMode === 'select' ? (
+            <label className="kitchen-control">
+              Service Date
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => {
+                  setMessage('');
+                  setSelectedDate(e.target.value);
+                }}
+              />
+            </label>
+          ) : (
+            <div className="kitchen-fixed-date-card">
+              <span className="kitchen-fixed-date-label">{fixedDateLabel}</span>
+              <strong>{selectedDate}</strong>
+            </div>
+          )}
           <button className="btn btn-outline" type="button" onClick={load}>Refresh</button>
           <button className="btn btn-outline" type="button" onClick={onDownloadPdf}>Download PDF</button>
         </div>
@@ -385,20 +390,6 @@ export default function KitchenDashboard({
           color: #6b5a43;
           margin-bottom: 0.75rem;
         }
-        .kitchen-top-actions {
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 0.8rem;
-          margin-bottom: 0.45rem;
-          max-width: 100%;
-        }
-        .kitchen-top-actions :global(.btn) {
-          white-space: normal;
-          min-height: 2.4rem;
-          padding-inline: 0.95rem;
-          border-radius: 0.65rem;
-          max-width: 100%;
-        }
         .kitchen-date-picker-row {
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -408,6 +399,24 @@ export default function KitchenDashboard({
         }
         .kitchen-control {
           margin: 0;
+        }
+        .kitchen-fixed-date-card {
+          border: 1px solid #d8cab1;
+          border-radius: 0.7rem;
+          background: #fffdf8;
+          padding: 0.7rem 0.85rem;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 0.2rem;
+          min-height: 100%;
+        }
+        .kitchen-fixed-date-label {
+          font-size: 0.78rem;
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          color: #7a6652;
         }
         .kitchen-date-picker-row :global(.btn) {
           width: 100%;
