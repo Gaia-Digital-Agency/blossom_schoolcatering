@@ -83,6 +83,28 @@ type RegistrationSchoolRow = {
   city: string | null;
 };
 
+type SeedStudentSpec = {
+  username: string;
+  firstName: string;
+  familyGroup: string;
+  schoolIndex: number;
+  dateOfBirth: string;
+  grade: string;
+  allergies: string;
+  registrantType: 'PARENT' | 'YOUNGSTER' | 'TEACHER';
+  teacherName?: string;
+  teacherPhone?: string;
+};
+
+type SeedFamilySpec = {
+  familyGroup: string;
+  parentUsername: string;
+  parentFirstName: string;
+  parentAddress: string;
+  parentAllergies: string;
+  students: SeedStudentSpec[];
+};
+
 const ADMIN_USERNAME = 'admin';
 const ADMIN_PASSWORD = 'teameditor123';
 const KITCHEN_USERNAME = 'kitchen';
@@ -364,6 +386,374 @@ export class AuthService {
           updated_at = now()
       WHERE username = 'teameditor';
     `);
+
+    await this.ensureSeededFamiliesAndStudents();
+  }
+
+  private buildSeedAliasEmail(baseEmail: string, tag: string) {
+    const trimmed = (baseEmail || '').trim().toLowerCase();
+    const [localRaw, domainRaw] = trimmed.includes('@') ? trimmed.split('@') : [trimmed, 'example.com'];
+    const local = this.sanitizeUsernamePart(localRaw || 'seed');
+    const domain = (domainRaw || 'example.com').trim().toLowerCase();
+    const aliasTag = this.sanitizeUsernamePart(tag).replace(/_/g, '-');
+    return `${local}+${aliasTag}@${domain}`;
+  }
+
+  private async ensureSeedSchools(requiredCount: number) {
+    const existingOut = await runSql(
+      `SELECT row_to_json(t)::text
+       FROM (
+         SELECT id, name
+         FROM schools
+         WHERE is_active = true
+           AND deleted_at IS NULL
+         ORDER BY name ASC
+       ) t;`,
+    );
+    const schools = this.parseJsonLines<{ id: string; name: string }>(existingOut);
+    for (let index = schools.length; index < requiredCount; index += 1) {
+      const schoolNumber = index + 1;
+      const createdId = await runSql(
+        `INSERT INTO schools (name, address, city, contact_phone, is_active)
+         VALUES ($1, $2, $3, $4, true)
+         RETURNING id;`,
+        [
+          `Seed School ${String(schoolNumber).padStart(2, '0')}`,
+          `Seed Address ${schoolNumber}`,
+          'Makassar',
+          `+620000000${String(schoolNumber).padStart(2, '0')}`,
+        ],
+      );
+      schools.push({ id: createdId, name: `Seed School ${String(schoolNumber).padStart(2, '0')}` });
+    }
+    return schools;
+  }
+
+  private async retireLegacyFamilyStudentSeedUsers() {
+    const legacyOut = await runSql(
+      `SELECT row_to_json(t)::text
+       FROM (
+         SELECT id, username, role::text AS role
+         FROM users
+         WHERE username IN ($1, $2)
+       ) t;`,
+      [PARENT_USERNAME, YOUNGSTER_USERNAME],
+    );
+    const legacyUsers = this.parseJsonLines<{ id: string; username: string; role: string }>(legacyOut);
+    const parentIds: string[] = [];
+    const childIds: string[] = [];
+
+    for (const user of legacyUsers) {
+      if (user.role === 'PARENT') {
+        const parentId = await runSql(`SELECT id FROM parents WHERE user_id = $1 LIMIT 1;`, [user.id]);
+        if (parentId) parentIds.push(parentId);
+      }
+      if (user.role === 'CHILD') {
+        const childId = await runSql(`SELECT id FROM children WHERE user_id = $1 LIMIT 1;`, [user.id]);
+        if (childId) childIds.push(childId);
+      }
+    }
+
+    if (parentIds.length > 0) {
+      const ph = parentIds.map((_, i) => `$${i + 1}`).join(', ');
+      await runSql(`DELETE FROM parent_children WHERE parent_id IN (${ph});`, parentIds);
+      await runSql(`UPDATE parents SET deleted_at = now(), updated_at = now() WHERE id IN (${ph});`, parentIds);
+    }
+    if (childIds.length > 0) {
+      const ph = childIds.map((_, i) => `$${i + 1}`).join(', ');
+      await runSql(`DELETE FROM parent_children WHERE child_id IN (${ph});`, childIds);
+      await runSql(
+        `UPDATE children
+         SET is_active = false,
+             deleted_at = now(),
+             updated_at = now()
+         WHERE id IN (${ph});`,
+        childIds,
+      );
+    }
+    if (legacyUsers.length > 0) {
+      const userIds = legacyUsers.map((row) => row.id);
+      const ph = userIds.map((_, i) => `$${i + 1}`).join(', ');
+      await runSql(
+        `UPDATE users
+         SET is_active = false,
+             deleted_at = now(),
+             updated_at = now()
+         WHERE id IN (${ph});`,
+        userIds,
+      );
+    }
+  }
+
+  private async ensureSeededFamiliesAndStudents() {
+    await this.ensureChildRegistrationSourceColumns();
+    await this.ensureParentDietaryRestrictionsTable();
+    await this.ensureAdminVisiblePasswordsTable();
+    await this.retireLegacyFamilyStudentSeedUsers();
+
+    const schools = await this.ensureSeedSchools(7);
+    const parentPhone = '+628172345678';
+    const studentPhone = '+628171234567';
+    const teacherPhone = '+628173456789';
+    const emailBase = 'azlan@net1io.com';
+    const families: SeedFamilySpec[] = [
+      {
+        familyGroup: 'family01',
+        parentUsername: 'family01_parent01',
+        parentFirstName: 'parent01',
+        parentAddress: 'Family 01 Address',
+        parentAllergies: 'No Allergies',
+        students: [
+          {
+            username: 'family01_student01a',
+            firstName: 'student01a',
+            familyGroup: 'family01',
+            schoolIndex: 0,
+            dateOfBirth: '2016-02-14',
+            grade: '4',
+            allergies: 'Peanut Allergy',
+            registrantType: 'PARENT',
+          },
+        ],
+      },
+      {
+        familyGroup: 'family02',
+        parentUsername: 'family02_parent02',
+        parentFirstName: 'parent02',
+        parentAddress: 'Family 02 Address',
+        parentAllergies: 'No Allergies',
+        students: [
+          {
+            username: 'family02_student02a',
+            firstName: 'student02a',
+            familyGroup: 'family02',
+            schoolIndex: 1,
+            dateOfBirth: '2015-04-09',
+            grade: '5',
+            allergies: 'No Allergies',
+            registrantType: 'PARENT',
+          },
+          {
+            username: 'family02_student02b',
+            firstName: 'student02b',
+            familyGroup: 'family02',
+            schoolIndex: 2,
+            dateOfBirth: '2014-06-21',
+            grade: '6',
+            allergies: 'Shellfish Allergy',
+            registrantType: 'PARENT',
+          },
+        ],
+      },
+      {
+        familyGroup: 'family03',
+        parentUsername: 'family03_parent03',
+        parentFirstName: 'parent03',
+        parentAddress: 'Family 03 Address',
+        parentAllergies: 'No Allergies',
+        students: [
+          {
+            username: 'family03_student03a',
+            firstName: 'student03a',
+            familyGroup: 'family03',
+            schoolIndex: 3,
+            dateOfBirth: '2013-08-11',
+            grade: '7',
+            allergies: 'No Allergies',
+            registrantType: 'YOUNGSTER',
+          },
+        ],
+      },
+      {
+        familyGroup: 'family04',
+        parentUsername: 'family04_parent04',
+        parentFirstName: 'parent04',
+        parentAddress: 'Family 04 Address',
+        parentAllergies: 'No Allergies',
+        students: [
+          {
+            username: 'family04_student04a',
+            firstName: 'student04a',
+            familyGroup: 'family04',
+            schoolIndex: 4,
+            dateOfBirth: '2012-10-03',
+            grade: '8',
+            allergies: 'Dairy Allergy',
+            registrantType: 'TEACHER',
+            teacherName: 'teacher04',
+            teacherPhone,
+          },
+        ],
+      },
+      {
+        familyGroup: 'family05',
+        parentUsername: 'family05_parent05',
+        parentFirstName: 'parent05',
+        parentAddress: 'Family 05 Address',
+        parentAllergies: 'No Allergies',
+        students: [
+          {
+            username: 'family05_student05a',
+            firstName: 'student05a',
+            familyGroup: 'family05',
+            schoolIndex: 5,
+            dateOfBirth: '2011-12-18',
+            grade: '9',
+            allergies: 'Egg Allergy',
+            registrantType: 'YOUNGSTER',
+          },
+          {
+            username: 'family05_student05b',
+            firstName: 'student05b',
+            familyGroup: 'family05',
+            schoolIndex: 6,
+            dateOfBirth: '2014-01-26',
+            grade: '6',
+            allergies: 'No Allergies',
+            registrantType: 'YOUNGSTER',
+          },
+        ],
+      },
+    ];
+
+    for (const family of families) {
+      const parentEmail = this.buildSeedAliasEmail(emailBase, `${family.familyGroup}-parent`);
+      const parentPasswordHash = this.hashPassword('Parent@123');
+      const parentUserId = await runSql(
+        `INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email, is_active, deleted_at)
+         VALUES ('PARENT', $1, $2, $3, $4, $5, $6, true, NULL)
+         ON CONFLICT (username) DO UPDATE
+         SET role = EXCLUDED.role,
+             password_hash = EXCLUDED.password_hash,
+             first_name = EXCLUDED.first_name,
+             last_name = EXCLUDED.last_name,
+             phone_number = EXCLUDED.phone_number,
+             email = EXCLUDED.email,
+             is_active = true,
+             deleted_at = NULL,
+             updated_at = now()
+         RETURNING id;`,
+        [family.parentUsername, parentPasswordHash, family.parentFirstName, family.familyGroup, parentPhone, parentEmail],
+      );
+      await runSql(
+        `INSERT INTO user_preferences (user_id, onboarding_completed, dark_mode_enabled, tooltips_enabled)
+         VALUES ($1, false, false, true)
+         ON CONFLICT (user_id) DO NOTHING;`,
+        [parentUserId],
+      );
+      await this.setAdminVisiblePassword(parentUserId, 'Parent@123', 'REGISTRATION');
+
+      const parentId = await runSql(
+        `INSERT INTO parents (user_id, address, deleted_at)
+         VALUES ($1, $2, NULL)
+         ON CONFLICT (user_id) DO UPDATE
+         SET address = EXCLUDED.address,
+             deleted_at = NULL,
+             updated_at = now()
+         RETURNING id;`,
+        [parentUserId, family.parentAddress],
+      );
+      await this.upsertParentAllergies(parentId, family.parentAllergies);
+
+      for (const student of family.students) {
+        const schoolId = schools[student.schoolIndex]?.id;
+        if (!schoolId) {
+          throw new BadRequestException(`Seed school missing for ${student.username}`);
+        }
+        const studentEmail = this.buildSeedAliasEmail(emailBase, `${student.username}`);
+        const studentPasswordHash = this.hashPassword('Student@123');
+        const studentUserId = await runSql(
+          `INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email, is_active, deleted_at)
+           VALUES ('CHILD', $1, $2, $3, $4, $5, $6, true, NULL)
+           ON CONFLICT (username) DO UPDATE
+           SET role = EXCLUDED.role,
+               password_hash = EXCLUDED.password_hash,
+               first_name = EXCLUDED.first_name,
+               last_name = EXCLUDED.last_name,
+               phone_number = EXCLUDED.phone_number,
+               email = EXCLUDED.email,
+               is_active = true,
+               deleted_at = NULL,
+               updated_at = now()
+           RETURNING id;`,
+          [student.username, studentPasswordHash, student.firstName, student.familyGroup, studentPhone, studentEmail],
+        );
+        await runSql(
+          `INSERT INTO user_preferences (user_id, onboarding_completed, dark_mode_enabled, tooltips_enabled)
+           VALUES ($1, false, false, true)
+           ON CONFLICT (user_id) DO NOTHING;`,
+          [studentUserId],
+        );
+        await this.setAdminVisiblePassword(studentUserId, 'Student@123', 'REGISTRATION');
+
+        const existingChildId = await runSql(`SELECT id FROM children WHERE user_id = $1 LIMIT 1;`, [studentUserId]);
+        const childId = existingChildId || await runSql(
+          `INSERT INTO children (
+             user_id,
+             school_id,
+             date_of_birth,
+             gender,
+             school_grade,
+             photo_url,
+             registration_actor_type,
+             registration_actor_teacher_name,
+             registration_actor_teacher_phone,
+             is_active,
+             deleted_at
+           )
+           VALUES ($1, $2, $3::date, 'UNDISCLOSED'::gender_type, $4, NULL, $5, $6, $7, true, NULL)
+           RETURNING id;`,
+          [
+            studentUserId,
+            schoolId,
+            student.dateOfBirth,
+            student.grade,
+            student.registrantType,
+            student.registrantType === 'TEACHER' ? (student.teacherName || 'teacher') : null,
+            student.registrantType === 'TEACHER' ? (student.teacherPhone || teacherPhone) : null,
+          ],
+        );
+        await runSql(
+          `UPDATE children
+           SET school_id = $2,
+               date_of_birth = $3::date,
+               gender = 'UNDISCLOSED'::gender_type,
+               school_grade = $4,
+               registration_actor_type = $5,
+               registration_actor_teacher_name = $6,
+               registration_actor_teacher_phone = $7,
+               is_active = true,
+               deleted_at = NULL,
+               updated_at = now()
+           WHERE id = $1;`,
+          [
+            childId,
+            schoolId,
+            student.dateOfBirth,
+            student.grade,
+            student.registrantType,
+            student.registrantType === 'TEACHER' ? (student.teacherName || 'teacher') : null,
+            student.registrantType === 'TEACHER' ? (student.teacherPhone || teacherPhone) : null,
+          ],
+        );
+        await runSql(
+          `INSERT INTO child_dietary_restrictions (child_id, restriction_label, restriction_details, is_active)
+           VALUES ($1, 'ALLERGIES', $2, true)
+           ON CONFLICT (child_id, restriction_label)
+           DO UPDATE SET restriction_details = EXCLUDED.restriction_details,
+                         is_active = true,
+                         deleted_at = NULL,
+                         updated_at = now();`,
+          [childId, this.normalizeAllergies(student.allergies)],
+        );
+        await runSql(
+          `INSERT INTO parent_children (parent_id, child_id)
+           VALUES ($1, $2)
+           ON CONFLICT (parent_id, child_id) DO NOTHING;`,
+          [parentId, childId],
+        );
+      }
+    }
   }
 
   private async ensurePasswordResetTable() {
