@@ -635,11 +635,19 @@ export class AuthService {
 
     for (const family of families) {
       const parentEmail = this.buildSeedAliasEmail(emailBase, `${family.familyGroup}-parent`);
-      const parentPasswordHash = this.hashPassword('Parent@123');
+      const parentPasswordHash = this.hashPassword('Teameditor@123');
       const createdParentUserId = await runSql(
         `INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email, is_active, deleted_at)
          VALUES ('PARENT', $1, $2, $3, $4, $5, $6, true, NULL)
-         ON CONFLICT (username) DO NOTHING
+         ON CONFLICT (username) DO UPDATE
+         SET password_hash = EXCLUDED.password_hash,
+             first_name = EXCLUDED.first_name,
+             last_name = EXCLUDED.last_name,
+             phone_number = EXCLUDED.phone_number,
+             email = EXCLUDED.email,
+             is_active = true,
+             deleted_at = NULL,
+             updated_at = now()
          RETURNING id;`,
         [family.parentUsername, parentPasswordHash, family.parentFirstName, family.familyGroup, parentPhone, parentEmail],
       );
@@ -656,9 +664,7 @@ export class AuthService {
          ON CONFLICT (user_id) DO NOTHING;`,
         [parentUserId],
       );
-      if (createdParentUserId) {
-        await this.setAdminVisiblePassword(parentUserId, 'Parent@123', 'REGISTRATION');
-      }
+      await this.setAdminVisiblePassword(parentUserId, 'Teameditor@123', 'REGISTRATION');
 
       const createdParentId = await runSql(
         `INSERT INTO parents (user_id, address, deleted_at)
@@ -684,11 +690,19 @@ export class AuthService {
           throw new BadRequestException(`Seed school missing for ${student.username}`);
         }
         const studentEmail = this.buildSeedAliasEmail(emailBase, `${student.username}`);
-        const studentPasswordHash = this.hashPassword('Student@123');
+        const studentPasswordHash = this.hashPassword('Teameditor@123');
         const createdStudentUserId = await runSql(
           `INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email, is_active, deleted_at)
            VALUES ('CHILD', $1, $2, $3, $4, $5, $6, true, NULL)
-           ON CONFLICT (username) DO NOTHING
+           ON CONFLICT (username) DO UPDATE
+           SET password_hash = EXCLUDED.password_hash,
+               first_name = EXCLUDED.first_name,
+               last_name = EXCLUDED.last_name,
+               phone_number = EXCLUDED.phone_number,
+               email = EXCLUDED.email,
+               is_active = true,
+               deleted_at = NULL,
+               updated_at = now()
            RETURNING id;`,
           [student.username, studentPasswordHash, student.firstName, student.familyGroup, studentPhone, studentEmail],
         );
@@ -705,9 +719,7 @@ export class AuthService {
            ON CONFLICT (user_id) DO NOTHING;`,
           [studentUserId],
         );
-        if (createdStudentUserId) {
-          await this.setAdminVisiblePassword(studentUserId, 'Student@123', 'REGISTRATION');
-        }
+        await this.setAdminVisiblePassword(studentUserId, 'Teameditor@123', 'REGISTRATION');
 
         const existingChildId = await runSql(`SELECT id FROM children WHERE user_id = $1 LIMIT 1;`, [studentUserId]);
         const childId = existingChildId || await runSql(
