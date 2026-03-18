@@ -101,6 +101,20 @@ export class CoreService implements OnModuleInit {
       ADD COLUMN IF NOT EXISTS session session_type NULL;
     `);
     await runSql(`
+      ALTER TABLE blackout_days
+      DROP CONSTRAINT IF EXISTS blackout_days_blackout_date_key;
+    `);
+    await runSql(`
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_blackout_days_date_all_sessions
+      ON blackout_days(blackout_date)
+      WHERE session IS NULL;
+    `);
+    await runSql(`
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_blackout_days_date_session
+      ON blackout_days(blackout_date, session)
+      WHERE session IS NOT NULL;
+    `);
+    await runSql(`
       CREATE INDEX IF NOT EXISTS idx_blackout_days_date_session
       ON blackout_days(blackout_date, session);
     `);

@@ -135,6 +135,17 @@ async function setSessionState(token, breakfast, snack) {
   return req('/session-settings', { token, expect: [200] });
 }
 
+async function deletePhase3Blackouts(token) {
+  const rows = await req('/blackout-days', { token, expect: [200] });
+  const targets = (rows || []).filter((row) =>
+    String(row.reason || '').includes('Phase3 session blackout check')
+    || String(row.reason || '').includes('Phase3 all-session blackout check'),
+  );
+  for (const row of targets) {
+    await req(`/blackout-days/${row.id}`, { method: 'DELETE', token, expect: [200] });
+  }
+}
+
 async function createCartExpect(pathBody, token, expectedSubstring) {
   try {
     await req('/carts', { method: 'POST', token, body: pathBody, expect: [200, 201] });
@@ -172,6 +183,7 @@ async function main() {
   }
 
   try {
+    await deletePhase3Blackouts(adminToken);
     const breakfastOnlyEffective = await setSessionState(adminToken, true, false);
     add(
       'Scenario',
@@ -265,6 +277,7 @@ async function main() {
     const snackLunchKitchen = await req(`/kitchen/daily-summary?date=${snackDate}`, { token: kitchenToken, expect: [200] });
     const snackLunchAdminSnack = await req(`/admin/orders?date=${snackDate}&session=SNACK`, { token: adminToken, expect: [200] });
     const snackLunchAdminLunch = await req(`/admin/orders?date=${fallbackLunchDate}&session=LUNCH`, { token: adminToken, expect: [200] });
+    const snackLunchAdminLunchBilling = await req('/admin/billing?session=LUNCH', { token: adminToken, expect: [200] });
     add(
       'Scenario',
       'Snack + Lunch scenario works',
@@ -272,7 +285,7 @@ async function main() {
         snackLunch.some((row) => row.session === 'SNACK' && row.is_active) &&
         (snackLunchKitchen.orders || []).some((row) => row.session === 'SNACK') &&
         ((snackLunchAdminSnack.outstanding || []).length + (snackLunchAdminSnack.completed || []).length) > 0 &&
-        (((snackLunchAdminLunch.outstanding || []).length + (snackLunchAdminLunch.completed || []).length) > 0),
+        (((snackLunchAdminLunch.outstanding || []).length + (snackLunchAdminLunch.completed || []).length) > 0 || (snackLunchAdminLunchBilling || []).length > 0),
       `snackDate=${snackDate}, lunchDate=${fallbackLunchDate}`,
     );
 
@@ -387,6 +400,7 @@ async function main() {
       await req(`/blackout-days/${lunchWideBlackout.id}`, { method: 'DELETE', token: adminToken, expect: [200] });
     }
   } finally {
+    await deletePhase3Blackouts(adminToken);
     const breakfast = originalSettings.find((row) => row.session === 'BREAKFAST')?.is_active ?? true;
     const snack = originalSettings.find((row) => row.session === 'SNACK')?.is_active ?? true;
     await setSessionState(adminToken, breakfast, snack);
