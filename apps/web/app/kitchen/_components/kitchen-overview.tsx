@@ -91,7 +91,7 @@ export default function KitchenOverview() {
           justify-content: center;
         }
         .module-hub-icon-image {
-          width: 65%;
+          width: 82%;
           height: auto;
           object-fit: contain;
         }
