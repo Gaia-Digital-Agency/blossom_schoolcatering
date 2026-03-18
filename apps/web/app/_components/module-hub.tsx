@@ -130,7 +130,7 @@ export default function ModuleHub({
           border: none;
           border-radius: 1.1rem;
           background:
-            radial-gradient(circle at 30% 20%, rgba(255, 251, 240, 0.98), rgba(255, 240, 210, 0.94));
+            transparent;
           display: flex;
           flex-direction: column;
           align-items: center;
