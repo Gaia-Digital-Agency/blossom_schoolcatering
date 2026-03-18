@@ -48,6 +48,7 @@ export default function FamilyBillingPage() {
   const [spending, setSpending] = useState<SpendingDashboard | null>(null);
   const [batchProofData, setBatchProofData] = useState('');
   const [selectedBillingIds, setSelectedBillingIds] = useState<string[]>([]);
+  const [sessionFilter, setSessionFilter] = useState<'ALL' | 'BREAKFAST' | 'SNACK' | 'LUNCH'>('ALL');
   const isStudentView = pathname.startsWith('/student');
   const moduleTitle = isStudentView ? 'Student Billing' : 'Family Billing';
   const returnHref = isStudentView ? '/student' : '/family';
@@ -95,8 +96,10 @@ export default function FamilyBillingPage() {
   const spendingPath = isStudentView ? '/youngster/me/spending-dashboard' : '/parent/me/spending-dashboard';
   const childrenPath = isStudentView ? '/youngster/me/children/pages' : '/parent/me/children/pages';
 
-  const loadBilling = async () => {
-    const data = await apiFetch(billingListPath) as BillingRow[];
+  const loadBilling = async (session?: 'ALL' | 'BREAKFAST' | 'SNACK' | 'LUNCH') => {
+    const active = session ?? sessionFilter;
+    const path = active !== 'ALL' ? `${billingListPath}?session=${active}` : billingListPath;
+    const data = await apiFetch(path) as BillingRow[];
     setBillings(data || []);
   };
   const loadSpending = async () => {
@@ -114,6 +117,12 @@ export default function FamilyBillingPage() {
     loadBaseData().catch((err) => setError(err instanceof Error ? err.message : 'Failed loading billing data')).finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const onSessionFilterChange = (next: 'ALL' | 'BREAKFAST' | 'SNACK' | 'LUNCH') => {
+    setSessionFilter(next);
+    setSelectedBillingIds([]);
+    loadBilling(next).catch((err) => setError(err instanceof Error ? err.message : 'Failed refreshing billing'));
+  };
 
   const onProofImageUpload = async (file?: File | null) => {
     if (!file) return;
@@ -225,7 +234,21 @@ export default function FamilyBillingPage() {
 
         <div className="module-section">
           <h2>Consolidated Billing</h2>
-          <button className="btn btn-outline" type="button" onClick={loadBilling}>Refresh Billing</button>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+              Session
+              <select
+                value={sessionFilter}
+                onChange={(e) => onSessionFilterChange(e.target.value as 'ALL' | 'BREAKFAST' | 'SNACK' | 'LUNCH')}
+              >
+                <option value="ALL">All Sessions</option>
+                <option value="BREAKFAST">{getSessionLabel('BREAKFAST')}</option>
+                <option value="SNACK">{getSessionLabel('SNACK')}</option>
+                <option value="LUNCH">{getSessionLabel('LUNCH')}</option>
+              </select>
+            </label>
+            <button className="btn btn-outline" type="button" onClick={() => loadBilling()}>Refresh Billing</button>
+          </div>
 
           <div className="auth-form billing-proof-batch">
             <label>

@@ -4772,11 +4772,14 @@ export class CoreService implements OnModuleInit {
     return { cartId: cart.id, excludedItemIds };
   }
 
-  async getParentConsolidatedBilling(actor: AccessUser) {
+  async getParentConsolidatedBilling(actor: AccessUser, sessionFilter?: string) {
     if (actor.role !== 'PARENT') throw new ForbiddenException('Role not allowed');
     await this.ensureBillingReviewColumns();
     const parentId = await this.getParentIdByUserId(actor.uid);
     if (!parentId) throw new BadRequestException('Parent profile not found');
+    const session = sessionFilter ? this.normalizeSession(sessionFilter) : null;
+    const params: unknown[] = [parentId];
+    const sessionClause = session ? `AND o.session = $${params.push(session)}::session_type` : '';
     const out = await runSql(`
       SELECT row_to_json(t)::text
       FROM (
@@ -4803,10 +4806,11 @@ export class CoreService implements OnModuleInit {
         JOIN users u ON u.id = c.user_id
         LEFT JOIN digital_receipts dr ON dr.billing_record_id = br.id
         WHERE br.parent_id = $1
+        ${sessionClause}
         ORDER BY br.created_at DESC
       ) t;
     `,
-      [parentId],
+      params,
     );
     return this.parseJsonLines<Record<string, unknown> & { total_price?: string | number }>(out).map((row) => ({
       ...row,
@@ -4814,11 +4818,14 @@ export class CoreService implements OnModuleInit {
     }));
   }
 
-  async getYoungsterConsolidatedBilling(actor: AccessUser) {
+  async getYoungsterConsolidatedBilling(actor: AccessUser, sessionFilter?: string) {
     if (actor.role !== 'YOUNGSTER') throw new ForbiddenException('Role not allowed');
     await this.ensureBillingReviewColumns();
     const childId = await this.getChildIdByUserId(actor.uid);
     if (!childId) throw new NotFoundException('Youngster profile not found');
+    const session = sessionFilter ? this.normalizeSession(sessionFilter) : null;
+    const params: unknown[] = [childId];
+    const sessionClause = session ? `AND o.session = $${params.push(session)}::session_type` : '';
     const out = await runSql(`
       SELECT row_to_json(t)::text
       FROM (
@@ -4845,10 +4852,11 @@ export class CoreService implements OnModuleInit {
         JOIN users u ON u.id = c.user_id
         LEFT JOIN digital_receipts dr ON dr.billing_record_id = br.id
         WHERE o.child_id = $1
+        ${sessionClause}
         ORDER BY br.created_at DESC
       ) t;
     `,
-      [childId],
+      params,
     );
     return this.parseJsonLines<Record<string, unknown> & { total_price?: string | number }>(out).map((row) => ({
       ...row,

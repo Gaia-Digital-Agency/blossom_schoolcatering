@@ -581,20 +581,20 @@ export class CoreController {
 
   @Get('billing/parent/consolidated')
   @Roles('PARENT')
-  getParentConsolidatedBilling(@Req() req: AuthRequest) {
-    return this.coreService.getParentConsolidatedBilling(req.user);
+  getParentConsolidatedBilling(@Req() req: AuthRequest, @Query('session') session?: string) {
+    return this.coreService.getParentConsolidatedBilling(req.user, session);
   }
 
   @Get('billing/youngster/consolidated')
   @Roles('YOUNGSTER')
-  getYoungsterConsolidatedBilling(@Req() req: AuthRequest) {
-    return this.coreService.getYoungsterConsolidatedBilling(req.user);
+  getYoungsterConsolidatedBilling(@Req() req: AuthRequest, @Query('session') session?: string) {
+    return this.coreService.getYoungsterConsolidatedBilling(req.user, session);
   }
 
   @Get('billing/student/consolidated')
   @Roles('YOUNGSTER')
-  getStudentConsolidatedBilling(@Req() req: AuthRequest) {
-    return this.coreService.getYoungsterConsolidatedBilling(req.user);
+  getStudentConsolidatedBilling(@Req() req: AuthRequest, @Query('session') session?: string) {
+    return this.coreService.getYoungsterConsolidatedBilling(req.user, session);
   }
 
   // POST billing/:billingId/proof-upload moved to archived.controller.ts
