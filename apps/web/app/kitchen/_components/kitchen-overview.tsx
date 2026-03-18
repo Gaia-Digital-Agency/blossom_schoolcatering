@@ -85,17 +85,14 @@ export default function KitchenOverview() {
           background: radial-gradient(circle at 30% 20%, rgba(255, 248, 225, 0.98), rgba(255, 230, 180, 0.96));
         }
         .module-hub-icon {
-          width: 100%;
-          min-height: 7rem;
+          flex: 1;
           display: flex;
           align-items: center;
           justify-content: center;
         }
         .module-hub-icon-image {
-          width: 100%;
-          max-width: 6.8rem;
-          max-height: 6.8rem;
-          height: 100%;
+          width: 65%;
+          height: auto;
           object-fit: contain;
         }
       `}</style>
