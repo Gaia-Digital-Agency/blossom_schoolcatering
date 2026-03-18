@@ -1,8 +1,8 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../../../lib/auth';
-import { getSessionLabel } from '../../../lib/session-theme';
 import ModuleOverviewCalendar from '../../_components/module-overview-calendar';
 import LogoutButton from '../../_components/logout-button';
 
@@ -40,13 +40,13 @@ type StudentInsights = {
 function getBadgeDisplay(level: StudentInsights['badge']['level']) {
   switch (level) {
     case 'BRONZE':
-      return { icon: '🏆', tone: '#b7791f', label: 'Bronze Trophy' };
+      return { imageSrc: '/schoolcatering/assets/trophies/bronze.jpeg', tone: '#b7791f', label: 'Bronze Trophy' };
     case 'SILVER':
-      return { icon: '🏆', tone: '#718096', label: 'Silver Trophy' };
+      return { imageSrc: '/schoolcatering/assets/trophies/silver.jpeg', tone: '#718096', label: 'Silver Trophy' };
     case 'GOLD':
-      return { icon: '🏆', tone: '#d69e2e', label: 'Gold Trophy' };
+      return { imageSrc: '/schoolcatering/assets/trophies/gold.jpeg', tone: '#d69e2e', label: 'Gold Trophy' };
     case 'PLATINUM':
-      return { icon: '🏆', tone: '#4a5568', label: 'Platinum Trophy' };
+      return { imageSrc: '/schoolcatering/assets/trophies/platinum.jpeg', tone: '#4a5568', label: 'Platinum Trophy' };
     default:
       return { icon: '✨', tone: '#dd6b20', label: 'Multi Star' };
   }
@@ -121,14 +121,30 @@ export default function StudentOverviewPage() {
             {insights ? (
               <div className="student-overview-insights">
                 <div className="student-overview-badge-card">
-                  <div
-                    className="student-overview-badge-icon"
-                    aria-label={badgeDisplay.label}
-                    title={badgeDisplay.label}
-                    style={{ color: badgeDisplay.tone }}
-                  >
-                    {badgeDisplay.icon}
-                  </div>
+                  {badgeDisplay.imageSrc ? (
+                    <div
+                      className="student-overview-badge-image-wrap"
+                      aria-label={badgeDisplay.label}
+                      title={badgeDisplay.label}
+                    >
+                      <Image
+                        src={badgeDisplay.imageSrc}
+                        alt={badgeDisplay.label}
+                        width={180}
+                        height={180}
+                        className="student-overview-badge-image"
+                      />
+                    </div>
+                  ) : (
+                    <div
+                      className="student-overview-badge-icon"
+                      aria-label={badgeDisplay.label}
+                      title={badgeDisplay.label}
+                      style={{ color: badgeDisplay.tone }}
+                    >
+                      {badgeDisplay.icon}
+                    </div>
+                  )}
                   <strong>Clean Plate Club Badge</strong>
                   <small>{insights.badge.level === 'NONE' ? 'NONE' : insights.badge.level}</small>
                 </div>
@@ -178,6 +194,20 @@ export default function StudentOverviewPage() {
           font-size: 4rem;
           line-height: 1;
           filter: drop-shadow(0 6px 12px rgba(15, 23, 42, 0.12));
+        }
+
+        .student-overview-badge-image-wrap {
+          width: min(100%, 9.5rem);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .student-overview-badge-image {
+          width: 100%;
+          height: auto;
+          object-fit: contain;
+          filter: drop-shadow(0 8px 16px rgba(15, 23, 42, 0.14));
         }
 
         .student-overview-insights-details {
