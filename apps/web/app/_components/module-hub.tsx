@@ -136,7 +136,7 @@ export default function ModuleHub({
           align-items: center;
           justify-content: center;
           gap: 0.45rem;
-          padding: 0.6rem 0.4rem 0.65rem;
+          padding: 0.8rem 0.55rem;
           cursor: pointer;
           transition: transform 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
           box-shadow: 0 4px 14px rgba(122, 106, 88, 0.12);
@@ -148,15 +148,15 @@ export default function ModuleHub({
         }
         .module-hub-icon {
           width: 100%;
-          min-height: 7rem;
+          min-height: 5.8rem;
           display: flex;
           align-items: center;
           justify-content: center;
         }
         .module-hub-icon-image {
           width: 100%;
-          max-width: 6.8rem;
-          max-height: 6.8rem;
+          max-width: 5.4rem;
+          max-height: 5.4rem;
           height: 100%;
           object-fit: contain;
         }
