@@ -88,7 +88,7 @@ export default function ModuleHub({
             >
               <span style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-hidden="true">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={item.iconSrc} alt="" style={{ width: '90%', height: 'auto', objectFit: 'contain', display: 'block' }} />
+                <img src={item.iconSrc} alt="" style={{ width: '95%', height: 'auto', objectFit: 'contain', display: 'block' }} />
               </span>
             </button>
           ))}
