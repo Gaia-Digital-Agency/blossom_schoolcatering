@@ -100,7 +100,7 @@ export default function AdminHub() {
           justify-content: center;
         }
         .admin-hub-icon-image {
-          width: 55%;
+          width: 50%;
           height: auto;
           object-fit: contain;
         }

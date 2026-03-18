@@ -152,7 +152,7 @@ export default function ModuleHub({
           justify-content: center;
         }
         .module-hub-icon-image {
-          width: 55%;
+          width: 50%;
           height: auto;
           object-fit: contain;
         }
