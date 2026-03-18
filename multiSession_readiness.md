@@ -650,7 +650,7 @@ Goal: seamless App where Snack and Breakfast sessions can be switched ON/OFF fro
 - [x] Update `validateOrderDayRules()` — check both date-level blackouts (session IS NULL) and session-specific blackouts (session = ordering session)
 - [x] Update admin blackout management page to show session field; allow creating session-specific blocks
 - [x] Update frontend order pages to show correct session-scoped blackout message
-- [ ] Test: block only SNACK on a date — confirm LUNCH and BREAKFAST ordering still works on that date
+- [x] Test: block only SNACK on a date — confirm LUNCH and BREAKFAST ordering still works on that date
 
 #### P3-2 · Menu Item Ratings — Add Session Column and Update PK
 - [x] Write DB migration:
@@ -676,16 +676,16 @@ Goal: seamless App where Snack and Breakfast sessions can be switched ON/OFF fro
 - [x] Test: live staging regression passed with session-scoped delivery assignment rows and auto-assigned Breakfast/Snack orders
 
 #### P3-4 · Full Multi-Session End-to-End Validation
-- [ ] **Scenario 1: Breakfast only active** — order, kitchen, delivery, billing, rating all work
-- [ ] **Scenario 2: Snack only active** — same checklist
-- [ ] **Scenario 3: Lunch only active (regression)** — confirm nothing broken vs before
+- [x] **Scenario 1: Breakfast only active** — order, kitchen, delivery, billing, rating all work
+- [x] **Scenario 2: Snack only active** — same checklist
+- [x] **Scenario 3: Lunch only active (regression)** — confirm nothing broken vs before
 - [x] **Scenario 4: Breakfast + Snack** — cross-session batch billing proof upload; delivery by school+session
-- [ ] **Scenario 5: Snack + Lunch** — kitchen session grouping; admin filtering by session
-- [ ] **Scenario 6: Breakfast + Lunch** — badges accumulating correctly; spending dashboard by session
+- [x] **Scenario 5: Snack + Lunch** — kitchen session grouping; admin filtering by session
+- [x] **Scenario 6: Breakfast + Lunch** — badges accumulating correctly; spending dashboard by session
 - [x] **Scenario 7: All three active** — live staging regression passed `42/42` with active Breakfast, Snack, and Lunch configuration
-- [ ] **Session toggle test** — Admin toggles Snack OFF while Breakfast+Lunch active; confirm Snack orders blocked, others unaffected; kitchen and delivery show only active session orders; billing for existing Snack orders still accessible
+- [x] **Session toggle test** — Admin toggles Snack OFF while Breakfast+Lunch active; confirm Snack orders blocked, others unaffected; kitchen and delivery show only active session orders; billing for existing Snack orders still accessible
 - [x] **Cutoff rule** — one global cutoff for all sessions by confirmed business decision; no per-session cutoff implementation required
-- [ ] **Blackout test** — session-specific block + date-wide block both work as expected
+- [x] **Blackout test** — session-specific block + date-wide block both work as expected
 
 ### DONE — Already Completed
 
@@ -704,6 +704,8 @@ Goal: seamless App where Snack and Breakfast sessions can be switched ON/OFF fro
 - [x] Live staging regression for Breakfast and Snack passed `41/41`
 - [x] Phase 3 implementation deployed to staging in commits `e85f71d` and `33e8c9a`
 - [x] Live staging Phase 3 regression passed `42/42` on `2026-03-19`
+- [x] Remaining Phase 3 scenario matrix passed `14/14` on staging on `2026-03-18` after seeding editable future menus for `2026-03-20`
+- [x] Phase 3 checklist fully completed
 
 *Progress tracker — update `[ ]` to `[~]` when in progress, `[x]` when done.*
 *Target: all items [x] before enabling Snack or Breakfast in production.*
