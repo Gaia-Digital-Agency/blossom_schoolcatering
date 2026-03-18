@@ -92,6 +92,13 @@ function latestDateWithMenuAndOrders(session) {
           AND o.deleted_at IS NULL
           AND o.status <> 'CANCELLED'
       )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM blackout_days b
+        WHERE b.blackout_date = m.service_date
+          AND b.type = 'ORDER_BLOCK'
+          AND (b.session IS NULL OR b.session = m.session)
+      )
     ORDER BY m.service_date DESC
     LIMIT 1;
   `);
@@ -109,6 +116,13 @@ function latestDateWithMenu(session) {
         WHERE mi.menu_id = m.id
           AND mi.deleted_at IS NULL
           AND mi.is_available = true
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM blackout_days b
+        WHERE b.blackout_date = m.service_date
+          AND b.type = 'ORDER_BLOCK'
+          AND (b.session IS NULL OR b.session = m.session)
       )
     ORDER BY m.service_date DESC
     LIMIT 1;
