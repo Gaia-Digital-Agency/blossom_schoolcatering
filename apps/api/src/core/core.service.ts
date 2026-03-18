@@ -1285,8 +1285,11 @@ export class CoreService implements OnModuleInit {
         ADD CONSTRAINT delivery_school_assignments_pkey PRIMARY KEY (school_id, session);
       `);
     }
+    // Drop-and-recreate so the index always includes the session column
+    // even if an older version was created without it.
+    await runSql(`DROP INDEX IF EXISTS idx_delivery_school_assignments_school;`);
     await runSql(`
-      CREATE INDEX IF NOT EXISTS idx_delivery_school_assignments_school
+      CREATE INDEX idx_delivery_school_assignments_school
       ON delivery_school_assignments(school_id, session, is_active);
     `);
     await runSql(`
@@ -2354,47 +2357,31 @@ export class CoreService implements OnModuleInit {
       throw new BadRequestException('Invalid blackout type');
     }
 
-    const existingOut = await runSql(
-      `
-      SELECT row_to_json(t)::text
-      FROM (
-        SELECT id
-        FROM blackout_days
-        WHERE blackout_date = $1::date
-          AND (
-            ($2::session_type IS NULL AND session IS NULL)
-            OR session = $2::session_type
-          )
-        LIMIT 1
-      ) t;
-      `,
-      [blackoutDate, session],
-    );
-    const existing = existingOut ? this.parseJsonLine<{ id: string }>(existingOut) : null;
-    const out = await runSql(
-      existing
-        ? `WITH updated AS (
-             UPDATE blackout_days
-             SET type = $2::blackout_type,
-                 session = $3::session_type,
-                 reason = $4,
-                 updated_at = now()
-             WHERE id = $1
-             RETURNING id, blackout_date::text AS blackout_date, type::text AS type, session::text AS session, reason
-           )
-           SELECT row_to_json(updated)::text
-           FROM updated;`
-        : `WITH inserted AS (
+    // Single atomic UPSERT — picks the correct partial-index ON CONFLICT clause
+    // based on whether session is scoped (NOT NULL) or covers all sessions (NULL).
+    const upsertSql =
+      session !== null
+        ? `WITH upserted AS (
              INSERT INTO blackout_days (blackout_date, type, session, reason, created_by)
              VALUES ($1::date, $2::blackout_type, $3::session_type, $4, $5)
+             ON CONFLICT (blackout_date, session) WHERE session IS NOT NULL
+             DO UPDATE SET type = EXCLUDED.type,
+                           reason = EXCLUDED.reason,
+                           updated_at = now()
              RETURNING id, blackout_date::text AS blackout_date, type::text AS type, session::text AS session, reason
            )
-           SELECT row_to_json(inserted)::text
-           FROM inserted;`,
-      existing
-        ? [existing.id, type, session, reason || null]
-        : [blackoutDate, type, session, reason || null, actor.uid],
-    );
+           SELECT row_to_json(upserted)::text FROM upserted;`
+        : `WITH upserted AS (
+             INSERT INTO blackout_days (blackout_date, type, session, reason, created_by)
+             VALUES ($1::date, $2::blackout_type, NULL, $4, $5)
+             ON CONFLICT (blackout_date) WHERE session IS NULL
+             DO UPDATE SET type = EXCLUDED.type,
+                           reason = EXCLUDED.reason,
+                           updated_at = now()
+             RETURNING id, blackout_date::text AS blackout_date, type::text AS type, session::text AS session, reason
+           )
+           SELECT row_to_json(upserted)::text FROM upserted;`;
+    const out = await runSql(upsertSql, [blackoutDate, type, session, reason || null, actor.uid]);
     const entry = this.parseJsonLine<{ id: string; blackout_date: string; type: string; session?: SessionType | null }>(out);
     await this.recordAdminAudit(actor, 'BLACKOUT_DAY_UPSERTED', 'blackout-day', entry.id, {
       blackoutDate: entry.blackout_date,
