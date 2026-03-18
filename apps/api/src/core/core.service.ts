@@ -85,6 +85,7 @@ export class CoreService implements OnModuleInit {
     await this.ensureMenuItemNameUniquenessScope();
     await this.ensureSessionSettingsTable();
     await this.ensureMenuRatingsTable();
+    await this.ensureDeliverySchoolAssignmentsTable();
     await this.ensureChildRegistrationSourceColumns();
     await this.ensureDeliveryDailyNotesTable();
     await this.ensureBillingReviewColumns();
