@@ -129,6 +129,32 @@ function latestDateWithMenu(session) {
   `);
 }
 
+function nextOrderableDateWithMenu(session) {
+  return db(`
+    SELECT m.service_date::text
+    FROM menus m
+    WHERE m.session = ${q(session)}::session_type
+      AND m.deleted_at IS NULL
+      AND m.service_date > CURRENT_DATE
+      AND EXISTS (
+        SELECT 1
+        FROM menu_items mi
+        WHERE mi.menu_id = m.id
+          AND mi.deleted_at IS NULL
+          AND mi.is_available = true
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM blackout_days b
+        WHERE b.blackout_date = m.service_date
+          AND b.type = 'ORDER_BLOCK'
+          AND (b.session IS NULL OR b.session = m.session)
+      )
+    ORDER BY m.service_date ASC
+    LIMIT 1;
+  `);
+}
+
 function errorMessage(error) {
   return String(error?.message || error || '');
 }
@@ -192,8 +218,11 @@ async function main() {
   const snackDate = latestDateWithMenuAndOrders('SNACK');
   const lunchDate = latestDateWithMenuAndOrders('LUNCH');
   const fallbackLunchDate = lunchDate || latestDateWithMenu('LUNCH');
-  if (!breakfastDate || !snackDate || !fallbackLunchDate) {
-    throw new Error(`Missing scenario dates breakfast=${breakfastDate} snack=${snackDate} lunch=${fallbackLunchDate}`);
+  const breakfastOrderableDate = nextOrderableDateWithMenu('BREAKFAST');
+  const snackOrderableDate = nextOrderableDateWithMenu('SNACK');
+  const lunchOrderableDate = nextOrderableDateWithMenu('LUNCH');
+  if (!breakfastDate || !snackDate || !fallbackLunchDate || !breakfastOrderableDate || !snackOrderableDate || !lunchOrderableDate) {
+    throw new Error(`Missing scenario dates breakfast=${breakfastDate}/${breakfastOrderableDate} snack=${snackDate}/${snackOrderableDate} lunch=${fallbackLunchDate}/${lunchOrderableDate}`);
   }
 
   try {
@@ -339,7 +368,7 @@ async function main() {
       expect: [200],
     });
     const toggleBlocked = await createCartExpect(
-      { childId, serviceDate: snackDate, session: 'SNACK' },
+      { childId, serviceDate: snackOrderableDate, session: 'SNACK' },
       familyToken,
       'ORDER_SESSION_DISABLED',
     );
@@ -350,7 +379,7 @@ async function main() {
       toggled.is_active === false &&
         toggleBlocked.pass &&
         (toggleBilling || []).some((row) => row.service_date === snackDate && row.session === 'SNACK'),
-      `${toggleBlocked.detail}`,
+      `orderDate=${snackOrderableDate} :: ${toggleBlocked.detail}`,
     );
 
     const restoredAfterToggle = await setSessionState(adminToken, true, true);
@@ -360,7 +389,7 @@ async function main() {
       method: 'POST',
       token: adminToken,
       body: {
-        blackoutDate: snackDate,
+        blackoutDate: snackOrderableDate,
         session: 'SNACK',
         type: 'ORDER_BLOCK',
         reason: 'Phase3 session blackout check',
@@ -368,35 +397,35 @@ async function main() {
       expect: [200, 201],
     });
     const snackBlocked = await createCartExpect(
-      { childId, serviceDate: snackDate, session: 'SNACK' },
+      { childId, serviceDate: snackOrderableDate, session: 'SNACK' },
       familyToken,
       'ORDER_BLACKOUT_BLOCKED',
     );
     const breakfastAllowedCart = await req('/carts', {
       method: 'POST',
       token: familyToken,
-      body: { childId, serviceDate: breakfastDate, session: 'BREAKFAST' },
+      body: { childId, serviceDate: breakfastOrderableDate, session: 'BREAKFAST' },
       expect: [200, 201],
     });
     add(
       'Scenario',
       'Session-specific blackout blocks only the targeted session',
       snackBlocked.pass && Boolean(breakfastAllowedCart.id),
-      `snack=${snackBlocked.detail}`,
+      `snackOrderDate=${snackOrderableDate}, breakfastOrderDate=${breakfastOrderableDate}, snack=${snackBlocked.detail}`,
     );
 
     const lunchWideBlackout = await req('/blackout-days', {
       method: 'POST',
       token: adminToken,
       body: {
-        blackoutDate: fallbackLunchDate,
+        blackoutDate: lunchOrderableDate,
         type: 'ORDER_BLOCK',
         reason: 'Phase3 all-session blackout check',
       },
       expect: [200, 201],
     });
     const lunchBlocked = await createCartExpect(
-      { childId, serviceDate: fallbackLunchDate, session: 'LUNCH' },
+      { childId, serviceDate: lunchOrderableDate, session: 'LUNCH' },
       familyToken,
       'ORDER_BLACKOUT_BLOCKED',
     );
