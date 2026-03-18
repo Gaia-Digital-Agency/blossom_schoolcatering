@@ -26,6 +26,7 @@ type School = { id: string; name: string };
 type Mapping = {
   delivery_user_id: string;
   school_id: string;
+  session: 'BREAKFAST' | 'SNACK' | 'LUNCH';
   is_active: boolean;
   delivery_name: string;
   delivery_username: string;
@@ -61,9 +62,6 @@ function mapDeliveryAdminError(raw: string) {
   if (raw.includes('Cannot delete delivery user with active assignments')) {
     return 'user still has active delivery assignments';
   }
-  if (raw.includes('maximum 3 active delivery personnel')) {
-    return 'Cannot activate assignment: this school already has 3 active delivery personnel.';
-  }
   return raw || 'Operation failed';
 }
 
@@ -74,6 +72,7 @@ export default function AdminDeliveryPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [assignDate, setAssignDate] = useState(todayIsoLocal());
   const [sessionFilter, setSessionFilter] = useState<'ALL' | 'BREAKFAST' | 'SNACK' | 'LUNCH'>('ALL');
+  const [selectedMappingSession, setSelectedMappingSession] = useState<'BREAKFAST' | 'SNACK' | 'LUNCH'>('LUNCH');
   const [selectedDeliveryUserId, setSelectedDeliveryUserId] = useState('');
   const [selectedSchoolId, setSelectedSchoolId] = useState('');
   const [error, setError] = useState('');
@@ -125,7 +124,12 @@ export default function AdminDeliveryPage() {
     try {
       await apiFetch('/delivery/school-assignments', {
         method: 'POST',
-        body: JSON.stringify({ deliveryUserId: selectedDeliveryUserId, schoolId: selectedSchoolId, isActive: true }),
+        body: JSON.stringify({
+          deliveryUserId: selectedDeliveryUserId,
+          schoolId: selectedSchoolId,
+          session: selectedMappingSession,
+          isActive: true,
+        }),
       }, { skipAutoReload: true });
       setMessage('School assignment saved.');
       await load();
@@ -140,7 +144,12 @@ export default function AdminDeliveryPage() {
     try {
       await apiFetch('/delivery/school-assignments', {
         method: 'POST',
-        body: JSON.stringify({ deliveryUserId: row.delivery_user_id, schoolId: row.school_id, isActive }),
+        body: JSON.stringify({
+          deliveryUserId: row.delivery_user_id,
+          schoolId: row.school_id,
+          session: row.session,
+          isActive,
+        }),
       }, { skipAutoReload: true });
       setMessage(isActive ? 'Mapping activated.' : 'Mapping deactivated.');
       await load();
@@ -152,12 +161,12 @@ export default function AdminDeliveryPage() {
   const onDeleteMapping = async (row: Mapping) => {
     const ok = window.confirm(`Delete mapping "${row.school_name}" -> "${row.delivery_name}"?`);
     if (!ok) return;
-    const key = `${row.delivery_user_id}-${row.school_id}`;
+    const key = `${row.delivery_user_id}-${row.school_id}-${row.session}`;
     setDeletingMappingKey(key);
     setError('');
     setMessage('');
     try {
-      await apiFetch(`/delivery/school-assignments/${row.delivery_user_id}/${row.school_id}`, {
+      await apiFetch(`/delivery/school-assignments/${row.delivery_user_id}/${row.school_id}?session=${row.session}`, {
         method: 'DELETE',
       }, { skipAutoReload: true });
       setMessage('Mapping deleted.');
@@ -583,7 +592,7 @@ export default function AdminDeliveryPage() {
 
         <div className="admin-section-card">
           <h2>Delivery vs School Assignment</h2>
-          <p className="auth-help">One school can have maximum 3 active delivery personnel assignments.</p>
+          <p className="auth-help">Each school can have one delivery user per session. Use separate rows for Breakfast, Snack, and Lunch.</p>
           <div className="assignment-notification-row">
             <button className="btn btn-outline" type="button" onClick={onSendNotificationEmail}>
               SEND NOTIFICATION EMAIL
@@ -595,6 +604,14 @@ export default function AdminDeliveryPage() {
               <select value={selectedSchoolId} onChange={(e) => setSelectedSchoolId(e.target.value)}>
                 <option value="">Select...</option>
                 {schools.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </label>
+            <label>
+              Session
+              <select value={selectedMappingSession} onChange={(e) => setSelectedMappingSession(e.target.value as 'BREAKFAST' | 'SNACK' | 'LUNCH')}>
+                <option value="BREAKFAST">{getSessionLabel('BREAKFAST')}</option>
+                <option value="SNACK">{getSessionLabel('SNACK')}</option>
+                <option value="LUNCH">{getSessionLabel('LUNCH')}</option>
               </select>
             </label>
             <label>
@@ -612,6 +629,7 @@ export default function AdminDeliveryPage() {
               <thead>
                 <tr>
                   <th>School</th>
+                  <th>Session</th>
                   <th>Delivery User</th>
                   <th>Username</th>
                   <th>Status</th>
@@ -620,10 +638,11 @@ export default function AdminDeliveryPage() {
               </thead>
               <tbody>
                 {mappings.length === 0 ? (
-                  <tr><td colSpan={5}>No delivery-school mappings yet.</td></tr>
+                  <tr><td colSpan={6}>No delivery-school mappings yet.</td></tr>
                 ) : mappings.map((m) => (
-                  <tr key={`${m.delivery_user_id}-${m.school_id}`}>
+                  <tr key={`${m.delivery_user_id}-${m.school_id}-${m.session}`}>
                     <td>{m.school_name}</td>
+                    <td>{getSessionLabel(m.session)}</td>
                     <td>{m.delivery_name}</td>
                     <td>{m.delivery_username}</td>
                     <td>{m.is_active ? 'ACTIVE' : 'INACTIVE'}</td>
@@ -634,6 +653,7 @@ export default function AdminDeliveryPage() {
                           type="button"
                           onClick={() => {
                             setSelectedSchoolId(m.school_id);
+                            setSelectedMappingSession(m.session);
                             setSelectedDeliveryUserId(m.delivery_user_id);
                           }}
                         >
@@ -646,9 +666,9 @@ export default function AdminDeliveryPage() {
                           className="btn btn-outline"
                           type="button"
                           onClick={() => onDeleteMapping(m)}
-                          disabled={deletingMappingKey === `${m.delivery_user_id}-${m.school_id}`}
+                          disabled={deletingMappingKey === `${m.delivery_user_id}-${m.school_id}-${m.session}`}
                         >
-                          {deletingMappingKey === `${m.delivery_user_id}-${m.school_id}` ? 'Deleting...' : 'Delete'}
+                          {deletingMappingKey === `${m.delivery_user_id}-${m.school_id}-${m.session}` ? 'Deleting...' : 'Delete'}
                         </button>
                       </div>
                     </td>

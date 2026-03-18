@@ -1,4 +1,5 @@
-import { IsBoolean, IsOptional, IsUUID } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsBoolean, IsIn, IsOptional, IsUUID } from 'class-validator';
 
 export class UpsertDeliveryAssignmentDto {
   @IsUUID('4')
@@ -10,4 +11,8 @@ export class UpsertDeliveryAssignmentDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @Transform(({ value }) => String(value || '').trim().toUpperCase())
+  @IsIn(['BREAKFAST', 'SNACK', 'LUNCH'])
+  session!: 'BREAKFAST' | 'SNACK' | 'LUNCH';
 }

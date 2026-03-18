@@ -299,12 +299,14 @@ function ensureDeliveryCoverage() {
       AND u.username LIKE 'family%_student%';
   `).split('\n').map((row) => row.trim()).filter(Boolean);
   for (const schoolId of schoolIds) {
-    db(`
-      INSERT INTO delivery_school_assignments (delivery_user_id, school_id, is_active, updated_at)
-      VALUES (${q(deliveryUserId)}, ${q(schoolId)}, true, now())
-      ON CONFLICT (delivery_user_id, school_id)
-      DO UPDATE SET is_active = true, updated_at = now();
-    `);
+    for (const session of ['BREAKFAST', 'SNACK', 'LUNCH']) {
+      db(`
+        INSERT INTO delivery_school_assignments (delivery_user_id, school_id, session, is_active, updated_at)
+        VALUES (${q(deliveryUserId)}, ${q(schoolId)}, ${q(session)}::session_type, true, now())
+        ON CONFLICT (school_id, session)
+        DO UPDATE SET delivery_user_id = EXCLUDED.delivery_user_id, is_active = true, updated_at = now();
+      `);
+    }
   }
   return schoolIds.length;
 }
@@ -565,6 +567,22 @@ async function main() {
     body: { menuItemId: snackMenu.items[0].id, stars: 5 },
   });
   add('Rating', 'Breakfast and Snack ratings submitted', true, `items=${breakfastMenu.items[0].id},${snackMenu.items[0].id}`);
+  const ratingRows = dbJson(`
+    SELECT row_to_json(t)::text
+    FROM (
+      SELECT menu_item_id, session::text AS session, stars
+      FROM menu_item_ratings
+      WHERE menu_item_id IN (${q(breakfastMenu.items[0].id)}, ${q(snackMenu.items[0].id)})
+      ORDER BY menu_item_id, session
+    ) t;
+  `);
+  add(
+    'Rating',
+    'Ratings persist with session scope',
+    ratingRows.some((row) => row.menu_item_id === breakfastMenu.items[0].id && row.session === 'BREAKFAST')
+      && ratingRows.some((row) => row.menu_item_id === snackMenu.items[0].id && row.session === 'SNACK'),
+    JSON.stringify(ratingRows),
+  );
 
   const familyChildren = await api('/parent/me/children/pages', { token: familyToken, expect: [200] });
   add('Family', 'Family children list', Array.isArray(familyChildren.children) && familyChildren.children.length > 0, `children=${(familyChildren.children || []).length}`);

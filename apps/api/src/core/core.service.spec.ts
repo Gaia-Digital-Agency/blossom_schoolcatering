@@ -106,6 +106,21 @@ describe('CoreService ownership and cutoff rules', () => {
     ).rejects.toThrow('ORDER_SERVICE_BLOCKED');
   });
 
+  it('prefers the matching session blackout over all-session rows', async () => {
+    mockedRunSql.mockResolvedValueOnce(
+      JSON.stringify({
+        blackout_date: '2099-01-12',
+        type: 'ORDER_BLOCK',
+        reason: 'Snack blocked',
+        session: 'SNACK',
+      }),
+    );
+
+    await expect(
+      (service as any).getBlackoutRuleForDate('2099-01-12', 'SNACK'),
+    ).resolves.toMatchObject({ session: 'SNACK', type: 'ORDER_BLOCK' });
+  });
+
   it('uses blackout guard in createCart flow', async () => {
     jest
       .spyOn(service as any, 'validateOrderDayRules')
@@ -120,7 +135,7 @@ describe('CoreService ownership and cutoff rules', () => {
   });
 
   it('blocks parent cart creation before 08:00 Asia/Makassar', async () => {
-    jest.spyOn(service as any, 'getMakassarNowContext').mockReturnValue({ dateIso: '2026-03-01', hour: 7 });
+    jest.spyOn(service as any, 'getMakassarNowContext').mockReturnValue({ dateIso: '2026-03-01', hour: 7, minute: 0 });
 
     await expect(
       service.createCart(
@@ -131,7 +146,7 @@ describe('CoreService ownership and cutoff rules', () => {
   });
 
   it('blocks youngster cart creation for same-day service date', async () => {
-    jest.spyOn(service as any, 'getMakassarNowContext').mockReturnValue({ dateIso: '2026-03-01', hour: 9 });
+    jest.spyOn(service as any, 'getMakassarNowContext').mockReturnValue({ dateIso: '2026-03-01', hour: 9, minute: 0 });
 
     await expect(
       service.createCart(

@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { apiFetch, SessionExpiredError } from '../../../lib/auth';
+import { getSessionLabel } from '../../../lib/session-theme';
 import AdminNav from '../_components/admin-nav';
 import AdminReturnButton from '../_components/admin-return-button';
 
@@ -12,6 +13,7 @@ type BlackoutDay = {
   id: string;
   blackout_date: string;
   type: 'ORDER_BLOCK' | 'SERVICE_BLOCK' | 'BOTH';
+  session?: 'BREAKFAST' | 'SNACK' | 'LUNCH' | null;
   reason?: string | null;
   created_at: string;
   created_by_username: string;
@@ -49,7 +51,9 @@ export default function AdminBlackoutDatesPage() {
   // State for the new blackout date form fields.
   const [blackoutDate, setBlackoutDate] = useState(todayIsoLocal());
   const [type, setType] = useState<'ORDER_BLOCK' | 'SERVICE_BLOCK' | 'BOTH'>('BOTH');
+  const [session, setSession] = useState<'ALL' | 'BREAKFAST' | 'SNACK' | 'LUNCH'>('ALL');
   const [reason, setReason] = useState('');
+  const [sessionFilter, setSessionFilter] = useState<'ALL' | 'BREAKFAST' | 'SNACK' | 'LUNCH'>('ALL');
 
   /**
    * Fetches the list of blackout dates from the API, optionally applying date filters.
@@ -61,6 +65,7 @@ export default function AdminBlackoutDatesPage() {
       const qs = new URLSearchParams();
       if (fromDate) qs.set('from_date', fromDate);
       if (toDate) qs.set('to_date', toDate);
+      if (sessionFilter !== 'ALL') qs.set('session', sessionFilter);
       const suffix = qs.toString() ? `?${qs.toString()}` : '';
       const data = await apiFetch(`/blackout-days${suffix}`) as BlackoutDay[];
       setRows(data);
@@ -87,7 +92,12 @@ export default function AdminBlackoutDatesPage() {
     try {
       await apiFetch('/blackout-days', {
         method: 'POST',
-        body: JSON.stringify({ blackoutDate, type, reason: reason || undefined }),
+        body: JSON.stringify({
+          blackoutDate,
+          type,
+          session: session === 'ALL' ? undefined : session,
+          reason: reason || undefined,
+        }),
       });
       setMessage('Blackout date saved. Ordering rules now use this immediately.');
       await load();
@@ -139,6 +149,15 @@ export default function AdminBlackoutDatesPage() {
             <input type="date" value={blackoutDate} onChange={(e) => setBlackoutDate(e.target.value)} required />
           </label>
           <label>
+            Session
+            <select value={session} onChange={(e) => setSession(e.target.value as 'ALL' | 'BREAKFAST' | 'SNACK' | 'LUNCH')}>
+              <option value="ALL">All sessions</option>
+              <option value="BREAKFAST">{getSessionLabel('BREAKFAST')}</option>
+              <option value="SNACK">{getSessionLabel('SNACK')}</option>
+              <option value="LUNCH">{getSessionLabel('LUNCH')}</option>
+            </select>
+          </label>
+          <label>
             Type
             <select value={type} onChange={(e) => setType(e.target.value as 'ORDER_BLOCK' | 'SERVICE_BLOCK' | 'BOTH')}>
               <option value="ORDER_BLOCK">ORDER_BLOCK — Block new orders only</option>
@@ -160,6 +179,15 @@ export default function AdminBlackoutDatesPage() {
           <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
         </label>
         <label>
+          Session
+          <select value={sessionFilter} onChange={(e) => setSessionFilter(e.target.value as 'ALL' | 'BREAKFAST' | 'SNACK' | 'LUNCH')}>
+            <option value="ALL">All sessions</option>
+            <option value="BREAKFAST">{getSessionLabel('BREAKFAST')}</option>
+            <option value="SNACK">{getSessionLabel('SNACK')}</option>
+            <option value="LUNCH">{getSessionLabel('LUNCH')}</option>
+          </select>
+        </label>
+        <label>
           To Date
           <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
         </label>
@@ -175,7 +203,7 @@ export default function AdminBlackoutDatesPage() {
           <div className="auth-form">
             {rows.map((row) => (
               <label key={row.id}>
-                <strong>{row.blackout_date} - {row.type}</strong>
+                <strong>{row.blackout_date} - {row.session ? getSessionLabel(row.session) : 'All sessions'} - {row.type}</strong>
                 <small>Reason: {row.reason || '-'}</small>
                 <small>Created by: {row.created_by_username}</small>
                 <button className="btn btn-outline" type="button" onClick={() => onDelete(row.id)}>Delete</button>

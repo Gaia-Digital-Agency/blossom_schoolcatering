@@ -347,8 +347,12 @@ export class CoreController {
 
   @Get('blackout-days')
   @Roles('ADMIN', 'PARENT', 'YOUNGSTER', 'KITCHEN')
-  getBlackoutDays(@Query('from_date') fromDate?: string, @Query('to_date') toDate?: string) {
-    return this.coreService.getBlackoutDays({ fromDate, toDate });
+  getBlackoutDays(
+    @Query('from_date') fromDate?: string,
+    @Query('to_date') toDate?: string,
+    @Query('session') session?: string,
+  ) {
+    return this.coreService.getBlackoutDays({ fromDate, toDate, session });
   }
 
   @Post('blackout-days')
@@ -748,8 +752,9 @@ export class CoreController {
     @Req() req: AuthRequest,
     @Param('deliveryUserId', ParseUUIDPipe) deliveryUserId: string,
     @Param('schoolId', ParseUUIDPipe) schoolId: string,
+    @Query('session') session?: string,
   ) {
-    return this.coreService.deleteDeliverySchoolAssignment(req.user, deliveryUserId, schoolId);
+    return this.coreService.deleteDeliverySchoolAssignment(req.user, deliveryUserId, schoolId, session);
   }
 
   @Post('delivery/auto-assign')

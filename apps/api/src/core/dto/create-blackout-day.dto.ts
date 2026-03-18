@@ -14,4 +14,13 @@ export class CreateBlackoutDayDto {
   @IsOptional()
   @IsString()
   reason?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === undefined || value === null) return undefined;
+    const trimmed = String(value).trim().toUpperCase();
+    return trimmed || undefined;
+  })
+  @IsIn(['BREAKFAST', 'SNACK', 'LUNCH'])
+  session?: 'BREAKFAST' | 'SNACK' | 'LUNCH';
 }

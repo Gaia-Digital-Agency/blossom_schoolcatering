@@ -60,11 +60,13 @@ type DraftCart = { id: string; status: 'OPEN' | 'SUBMITTED' | 'EXPIRED'; expires
 type BlackoutDay = {
   blackout_date: string;
   type: 'ORDER_BLOCK' | 'SERVICE_BLOCK' | 'BOTH';
+  session?: SessionType | null;
   reason?: string | null;
 };
 type ActiveBlackout = {
   type: 'ORDER_BLOCK' | 'SERVICE_BLOCK' | 'BOTH';
   reason: string | null;
+  session?: SessionType | null;
 };
 type DraftSourceContext = {
   mode: 'edit' | 'quick-reorder';
@@ -151,8 +153,15 @@ function mapOrderRuleError(raw: string, cutoffTime = '08:00') {
 }
 function activeBlackoutMessage(blackout: ActiveBlackout | null) {
   if (!blackout) return '';
-  if (blackout.type === 'SERVICE_BLOCK') return mapOrderRuleError('ORDER_SERVICE_BLOCKED');
-  return mapOrderRuleError('ORDER_BLACKOUT_BLOCKED');
+  const scope = blackout.session ? ` for ${getSessionLabel(blackout.session)}` : '';
+  if (blackout.type === 'SERVICE_BLOCK') return `${mapOrderRuleError('ORDER_SERVICE_BLOCKED')}${scope}`;
+  return `${mapOrderRuleError('ORDER_BLACKOUT_BLOCKED')}${scope}`;
+}
+
+function resolveBlackoutForSession(rows: BlackoutDay[], serviceDate: string, session: SessionType) {
+  return rows.find((row) => row.blackout_date === serviceDate && row.session === session)
+    || rows.find((row) => row.blackout_date === serviceDate && !row.session)
+    || null;
 }
 
 function getSelectedMenuCardStyle(session: SessionType, isSelected: boolean) {
@@ -330,12 +339,16 @@ export default function FamilyOrderPage({
     const [menuData, cartsData, blackoutRows] = await Promise.all([
       apiFetch(`/menus?session=${session}`) as Promise<{ items: MenuItem[] }>,
       apiFetch(`/carts?child_id=${selectedChildId}&service_date=${serviceDate}&session=${session}`) as Promise<DraftCart[]>,
-      apiFetch(`/blackout-days?from_date=${serviceDate}&to_date=${serviceDate}`) as Promise<BlackoutDay[]>,
+      apiFetch(`/blackout-days?from_date=${serviceDate}&to_date=${serviceDate}&session=${session}`) as Promise<BlackoutDay[]>,
     ]);
     setMenuItems(menuData.items || []);
-    const currentDay = (blackoutRows || []).find((row) => row.blackout_date === serviceDate);
+    const currentDay = resolveBlackoutForSession(blackoutRows || [], serviceDate, session);
     if (currentDay && ['ORDER_BLOCK', 'SERVICE_BLOCK', 'BOTH'].includes(currentDay.type)) {
-      setActiveBlackout({ type: currentDay.type, reason: (currentDay.reason || '').trim() || null });
+      setActiveBlackout({
+        type: currentDay.type,
+        session: currentDay.session || null,
+        reason: (currentDay.reason || '').trim() || null,
+      });
     } else {
       setActiveBlackout(null);
     }

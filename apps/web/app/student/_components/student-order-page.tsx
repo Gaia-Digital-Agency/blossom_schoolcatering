@@ -59,11 +59,13 @@ type ConsolidatedOrder = {
 type BlackoutDay = {
   blackout_date: string;
   type: 'ORDER_BLOCK' | 'SERVICE_BLOCK' | 'BOTH';
+  session?: SessionType | null;
   reason?: string | null;
 };
 type ActiveBlackout = {
   type: 'ORDER_BLOCK' | 'SERVICE_BLOCK' | 'BOTH';
   reason: string | null;
+  session?: SessionType | null;
 };
 
 function todayMakassarIsoDate() {
@@ -146,6 +148,12 @@ function mapOrderRuleError(raw: string, cutoffTime = '08:00') {
   if (raw.includes('ORDER_TOMORROW_ONWARDS_ONLY')) return 'Orders can only be placed for tomorrow onward.';
   if (raw.includes('ORDERING_AVAILABLE_FROM_')) return `Ordering opens daily at ${formatCutoffLabel(cutoffTime)}.`;
   return raw;
+}
+
+function resolveBlackoutForSession(rows: BlackoutDay[], serviceDate: string, session: SessionType) {
+  return rows.find((row) => row.blackout_date === serviceDate && row.session === session)
+    || rows.find((row) => row.blackout_date === serviceDate && !row.session)
+    || null;
 }
 
 function getSelectedMenuCardStyle(session: SessionType, isSelected: boolean) {
@@ -301,13 +309,14 @@ export default function StudentOrderPage({
     const [menuData, cartsData, blackoutRows] = await Promise.all([
       apiFetch(`/menus?session=${session}`) as Promise<{ items: MenuItem[] }>,
       apiFetch(`/carts?child_id=${childId}&service_date=${serviceDate}&session=${session}`) as Promise<DraftCart[]>,
-      apiFetch(`/blackout-days?from_date=${serviceDate}&to_date=${serviceDate}`) as Promise<BlackoutDay[]>,
+      apiFetch(`/blackout-days?from_date=${serviceDate}&to_date=${serviceDate}&session=${session}`) as Promise<BlackoutDay[]>,
     ]);
     setMenuItems(menuData.items || []);
-    const currentDay = (blackoutRows || []).find((row) => row.blackout_date === serviceDate);
+    const currentDay = resolveBlackoutForSession(blackoutRows || [], serviceDate, session);
     if (currentDay && ['ORDER_BLOCK', 'SERVICE_BLOCK', 'BOTH'].includes(currentDay.type)) {
       setActiveBlackout({
         type: currentDay.type,
+        session: currentDay.session || null,
         reason: (currentDay.reason || '').trim() || null,
       });
     } else {
@@ -591,7 +600,8 @@ export default function StudentOrderPage({
             <p className="popup-body">
               {activeBlackout.type === 'SERVICE_BLOCK'
                 ? 'Service is blocked'
-                : 'Ordering is blocked'} on {serviceDate}{activeBlackout.reason ? `: ${activeBlackout.reason}` : ''}.
+                : 'Ordering is blocked'} on {serviceDate}
+              {activeBlackout.session ? ` for ${getSessionLabel(activeBlackout.session)}` : ''}{activeBlackout.reason ? `: ${activeBlackout.reason}` : ''}.
             </p>
             <button className="btn btn-primary popup-close" type="button" onClick={() => setShowBlackoutModal(false)}>OK</button>
           </div>

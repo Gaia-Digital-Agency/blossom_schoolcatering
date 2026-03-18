@@ -41,22 +41,43 @@ describe('CoreService rules, pricing, and badge logic', () => {
     );
   });
 
-  it('enforces parent/youngster ordering window', () => {
-    jest.spyOn(service as any, 'getMakassarNowContext').mockReturnValue({ dateIso: '2026-03-02', hour: 7 });
-    expect(() =>
+  it('blocks only the targeted session when blackout is session-specific', async () => {
+    mockedRunSql
+      .mockResolvedValueOnce('3')
+      .mockResolvedValueOnce(JSON.stringify({
+        blackout_date: '2026-03-18',
+        type: 'ORDER_BLOCK',
+        reason: 'snack only',
+        session: 'SNACK',
+      }));
+    await expect((service as any).validateOrderDayRules('2026-03-18', 'SNACK')).rejects.toThrow(
+      'ORDER_BLACKOUT_BLOCKED',
+    );
+  });
+
+  it('does not block other sessions when the blackout is for a different session', async () => {
+    mockedRunSql
+      .mockResolvedValueOnce('3')
+      .mockResolvedValueOnce(null);
+    await expect((service as any).validateOrderDayRules('2026-03-18', 'LUNCH')).resolves.toBeUndefined();
+  });
+
+  it('enforces parent/youngster ordering window', async () => {
+    jest.spyOn(service as any, 'getMakassarNowContext').mockReturnValue({ dateIso: '2026-03-02', hour: 7, minute: 0 });
+    await expect(
       (service as any).enforceParentYoungsterOrderingWindow(
         { uid: 'u', role: 'PARENT', sub: 'x' },
         '2026-03-03',
       ),
-    ).toThrow('ORDERING_AVAILABLE_FROM_0800_WITA');
+    ).rejects.toThrow('ORDERING_AVAILABLE_FROM_0800_WITA');
 
-    jest.spyOn(service as any, 'getMakassarNowContext').mockReturnValue({ dateIso: '2026-03-02', hour: 9 });
-    expect(() =>
+    jest.spyOn(service as any, 'getMakassarNowContext').mockReturnValue({ dateIso: '2026-03-02', hour: 9, minute: 0 });
+    await expect(
       (service as any).enforceParentYoungsterOrderingWindow(
         { uid: 'u', role: 'YOUNGSTER', sub: 'x' },
         '2026-03-02',
       ),
-    ).toThrow('ORDER_TOMORROW_ONWARDS_ONLY');
+    ).rejects.toThrow('ORDER_TOMORROW_ONWARDS_ONLY');
   });
 
   it('computes badge levels from history', () => {

@@ -51,6 +51,7 @@ type BlackoutRule = {
   blackout_date: string;
   type: BlackoutType;
   reason: string | null;
+  session?: SessionType | null;
 };
 
 const SESSIONS: SessionType[] = ['LUNCH', 'SNACK', 'BREAKFAST'];
@@ -59,6 +60,7 @@ type DishCategory = (typeof DISH_CATEGORIES)[number];
 
 @Injectable()
 export class CoreService implements OnModuleInit {
+  private blackoutDaysSessionReady = false;
   private parentDietaryRestrictionsReady = false;
   private deliverySchoolAssignmentsReady = false;
   private deliveryDailyNotesReady = false;
@@ -78,6 +80,7 @@ export class CoreService implements OnModuleInit {
   }>();
 
   async onModuleInit() {
+    await this.ensureBlackoutDaysSessionColumn();
     await this.ensureMenuItemExtendedColumns();
     await this.ensureMenuItemNameUniquenessScope();
     await this.ensureSessionSettingsTable();
@@ -88,6 +91,19 @@ export class CoreService implements OnModuleInit {
     await this.ensureSchoolShortNameColumn();
     await this.ensureAdminAuditTrailTable();
     await this.ensureMenuItemTextDefaults();
+  }
+
+  private async ensureBlackoutDaysSessionColumn() {
+    if (this.blackoutDaysSessionReady) return;
+    await runSql(`
+      ALTER TABLE blackout_days
+      ADD COLUMN IF NOT EXISTS session session_type NULL;
+    `);
+    await runSql(`
+      CREATE INDEX IF NOT EXISTS idx_blackout_days_date_session
+      ON blackout_days(blackout_date, session);
+    `);
+    this.blackoutDaysSessionReady = true;
   }
 
   private async ensureSchoolShortNameColumn() {
@@ -1072,13 +1088,13 @@ export class CoreService implements OnModuleInit {
     return cart;
   }
 
-  private async validateOrderDayRules(serviceDate: string) {
+  private async validateOrderDayRules(serviceDate: string, session?: SessionType) {
     const weekday = await runSql(`SELECT extract(isodow FROM $1::date)::int;`, [serviceDate]);
     if (!weekday || Number(weekday) > 5) {
       throw new BadRequestException('ORDER_WEEKEND_SERVICE_BLOCKED');
     }
 
-    const blackout = await this.getBlackoutRuleForDate(serviceDate);
+    const blackout = await this.getBlackoutRuleForDate(serviceDate, session);
     if (!blackout) return;
     if (blackout.type === 'ORDER_BLOCK' || blackout.type === 'BOTH') {
       throw new BadRequestException('ORDER_BLACKOUT_BLOCKED');
@@ -1088,18 +1104,25 @@ export class CoreService implements OnModuleInit {
     }
   }
 
-  private async getBlackoutRuleForDate(serviceDate: string): Promise<BlackoutRule | null> {
+  private async getBlackoutRuleForDate(serviceDate: string, session?: SessionType): Promise<BlackoutRule | null> {
     const out = await runSql(
       `
       SELECT row_to_json(t)::text
       FROM (
-        SELECT blackout_date::text AS blackout_date, type::text AS type, reason
+        SELECT blackout_date::text AS blackout_date,
+               type::text AS type,
+               reason,
+               session::text AS session
         FROM blackout_days
         WHERE blackout_date = $1::date
+          AND (session = $2::session_type OR session IS NULL)
+        ORDER BY CASE WHEN session = $2::session_type THEN 0 ELSE 1 END,
+                 updated_at DESC,
+                 created_at DESC
         LIMIT 1
       ) t;
     `,
-      [serviceDate],
+      [serviceDate, session || 'LUNCH'],
     );
     if (!out) return null;
     return this.parseJsonLine<BlackoutRule>(out);
@@ -1145,16 +1168,51 @@ export class CoreService implements OnModuleInit {
       CREATE TABLE IF NOT EXISTS menu_item_ratings (
         menu_item_id uuid NOT NULL REFERENCES menu_items(id) ON DELETE CASCADE,
         user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        session session_type NOT NULL DEFAULT 'LUNCH',
         user_role text NOT NULL,
         stars smallint NOT NULL CHECK (stars BETWEEN 1 AND 5),
         created_at timestamptz NOT NULL DEFAULT now(),
         updated_at timestamptz NOT NULL DEFAULT now(),
-        PRIMARY KEY (menu_item_id, user_id)
+        PRIMARY KEY (menu_item_id, user_id, session)
       );
     `);
     await runSql(`
+      ALTER TABLE menu_item_ratings
+      ADD COLUMN IF NOT EXISTS session session_type NOT NULL DEFAULT 'LUNCH';
+    `);
+    await runSql(`
+      UPDATE menu_item_ratings mir
+      SET session = m.session
+      FROM menu_items mi
+      JOIN menus m ON m.id = mi.menu_id
+      WHERE mir.menu_item_id = mi.id
+        AND mir.session IS DISTINCT FROM m.session;
+    `);
+    await runSql(`
+      ALTER TABLE menu_item_ratings
+      ALTER COLUMN session SET NOT NULL;
+    `);
+    await runSql(`
+      ALTER TABLE menu_item_ratings
+      DROP CONSTRAINT IF EXISTS menu_item_ratings_pkey;
+    `);
+    const ratingsPkExists = await runSql(`
+      SELECT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conrelid = 'menu_item_ratings'::regclass
+          AND conname = 'menu_item_ratings_pkey'
+      );
+    `);
+    if (ratingsPkExists !== 't') {
+      await runSql(`
+        ALTER TABLE menu_item_ratings
+        ADD CONSTRAINT menu_item_ratings_pkey PRIMARY KEY (menu_item_id, user_id, session);
+      `);
+    }
+    await runSql(`
       CREATE INDEX IF NOT EXISTS idx_menu_item_ratings_item_stars
-      ON menu_item_ratings(menu_item_id, stars);
+      ON menu_item_ratings(menu_item_id, session, stars);
     `);
   }
 
@@ -1164,15 +1222,61 @@ export class CoreService implements OnModuleInit {
       CREATE TABLE IF NOT EXISTS delivery_school_assignments (
         delivery_user_id uuid NOT NULL REFERENCES users(id),
         school_id uuid NOT NULL REFERENCES schools(id),
+        session session_type NOT NULL DEFAULT 'LUNCH',
         is_active boolean NOT NULL DEFAULT true,
         created_at timestamptz NOT NULL DEFAULT now(),
         updated_at timestamptz NOT NULL DEFAULT now(),
-        PRIMARY KEY (delivery_user_id, school_id)
+        PRIMARY KEY (school_id, session)
       );
     `);
     await runSql(`
+      ALTER TABLE delivery_school_assignments
+      ADD COLUMN IF NOT EXISTS session session_type NOT NULL DEFAULT 'LUNCH';
+    `);
+    await runSql(`
+      UPDATE delivery_school_assignments
+      SET session = 'LUNCH'
+      WHERE session IS NULL;
+    `);
+    await runSql(`
+      WITH ranked AS (
+        SELECT ctid,
+               ROW_NUMBER() OVER (
+                 PARTITION BY school_id, session
+                 ORDER BY is_active DESC, updated_at DESC, created_at DESC, delivery_user_id
+               ) AS rn
+        FROM delivery_school_assignments
+      )
+      DELETE FROM delivery_school_assignments dsa
+      USING ranked
+      WHERE dsa.ctid = ranked.ctid
+        AND ranked.rn > 1;
+    `);
+    await runSql(`
+      ALTER TABLE delivery_school_assignments
+      DROP CONSTRAINT IF EXISTS delivery_school_assignments_pkey;
+    `);
+    const assignmentPkExists = await runSql(`
+      SELECT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conrelid = 'delivery_school_assignments'::regclass
+          AND conname = 'delivery_school_assignments_pkey'
+      );
+    `);
+    if (assignmentPkExists !== 't') {
+      await runSql(`
+        ALTER TABLE delivery_school_assignments
+        ADD CONSTRAINT delivery_school_assignments_pkey PRIMARY KEY (school_id, session);
+      `);
+    }
+    await runSql(`
       CREATE INDEX IF NOT EXISTS idx_delivery_school_assignments_school
-      ON delivery_school_assignments(school_id, is_active);
+      ON delivery_school_assignments(school_id, session, is_active);
+    `);
+    await runSql(`
+      CREATE INDEX IF NOT EXISTS idx_delivery_school_assignments_delivery_user
+      ON delivery_school_assignments(delivery_user_id, session, is_active);
     `);
     this.deliverySchoolAssignmentsReady = true;
   }
@@ -2182,7 +2286,8 @@ export class CoreService implements OnModuleInit {
     };
   }
 
-  async getBlackoutDays(query: { fromDate?: string; toDate?: string }) {
+  async getBlackoutDays(query: { fromDate?: string; toDate?: string; session?: string }) {
+    await this.ensureBlackoutDaysSessionColumn();
     const params: string[] = [];
     const conditions: string[] = [];
     if (query.fromDate) {
@@ -2193,6 +2298,10 @@ export class CoreService implements OnModuleInit {
       params.push(this.validateServiceDate(query.toDate));
       conditions.push(`b.blackout_date <= $${params.length}::date`);
     }
+    if (query.session) {
+      params.push(this.normalizeSession(query.session));
+      conditions.push(`(b.session = $${params.length}::session_type OR b.session IS NULL)`);
+    }
     const whereSql = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const out = await runSql(
       `
@@ -2201,13 +2310,17 @@ export class CoreService implements OnModuleInit {
         SELECT b.id,
                b.blackout_date::text AS blackout_date,
                b.type::text AS type,
+               b.session::text AS session,
                b.reason,
                b.created_at::text AS created_at,
                u.username AS created_by_username
         FROM blackout_days b
         JOIN users u ON u.id = b.created_by
         ${whereSql}
-        ORDER BY b.blackout_date DESC, b.created_at DESC
+        ORDER BY b.blackout_date DESC,
+                 CASE WHEN b.session IS NULL THEN 1 ELSE 0 END,
+                 b.session ASC NULLS LAST,
+                 b.created_at DESC
       ) t;
     `,
       params,
@@ -2215,31 +2328,63 @@ export class CoreService implements OnModuleInit {
     return this.parseJsonLines(out);
   }
 
-  async createBlackoutDay(actor: AccessUser, input: { blackoutDate?: string; type?: string; reason?: string }) {
+  async createBlackoutDay(actor: AccessUser, input: { blackoutDate?: string; type?: string; reason?: string; session?: string }) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    await this.ensureBlackoutDaysSessionColumn();
     const blackoutDate = this.validateServiceDate(input.blackoutDate);
     const type = (input.type || '').toUpperCase();
     const reason = (input.reason || '').trim().slice(0, 500);
+    const session = input.session ? this.normalizeSession(input.session) : null;
     if (!['ORDER_BLOCK', 'SERVICE_BLOCK', 'BOTH'].includes(type)) {
       throw new BadRequestException('Invalid blackout type');
     }
 
-    const out = await runSql(
-      `WITH upserted AS (
-         INSERT INTO blackout_days (blackout_date, type, reason, created_by)
-         VALUES ($1::date, $2::blackout_type, $3, $4)
-         ON CONFLICT (blackout_date)
-         DO UPDATE SET type = EXCLUDED.type, reason = EXCLUDED.reason, updated_at = now()
-         RETURNING id, blackout_date::text AS blackout_date, type::text AS type, reason
-       )
-       SELECT row_to_json(upserted)::text
-       FROM upserted;`,
-      [blackoutDate, type, reason || null, actor.uid],
+    const existingOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT id
+        FROM blackout_days
+        WHERE blackout_date = $1::date
+          AND (
+            ($2::session_type IS NULL AND session IS NULL)
+            OR session = $2::session_type
+          )
+        LIMIT 1
+      ) t;
+      `,
+      [blackoutDate, session],
     );
-    const entry = this.parseJsonLine<{ id: string; blackout_date: string; type: string }>(out);
+    const existing = existingOut ? this.parseJsonLine<{ id: string }>(existingOut) : null;
+    const out = await runSql(
+      existing
+        ? `WITH updated AS (
+             UPDATE blackout_days
+             SET type = $2::blackout_type,
+                 session = $3::session_type,
+                 reason = $4,
+                 updated_at = now()
+             WHERE id = $1
+             RETURNING id, blackout_date::text AS blackout_date, type::text AS type, session::text AS session, reason
+           )
+           SELECT row_to_json(updated)::text
+           FROM updated;`
+        : `WITH inserted AS (
+             INSERT INTO blackout_days (blackout_date, type, session, reason, created_by)
+             VALUES ($1::date, $2::blackout_type, $3::session_type, $4, $5)
+             RETURNING id, blackout_date::text AS blackout_date, type::text AS type, session::text AS session, reason
+           )
+           SELECT row_to_json(inserted)::text
+           FROM inserted;`,
+      existing
+        ? [existing.id, type, session, reason || null]
+        : [blackoutDate, type, session, reason || null, actor.uid],
+    );
+    const entry = this.parseJsonLine<{ id: string; blackout_date: string; type: string; session?: SessionType | null }>(out);
     await this.recordAdminAudit(actor, 'BLACKOUT_DAY_UPSERTED', 'blackout-day', entry.id, {
       blackoutDate: entry.blackout_date,
       type: entry.type,
+      session: entry.session || 'ALL',
     });
     return entry;
   }
@@ -2672,7 +2817,9 @@ export class CoreService implements OnModuleInit {
                COALESCE(COUNT(mir.user_id), 0)::int AS total_votes
         FROM menus m
         JOIN menu_items mi ON mi.menu_id = m.id
-        LEFT JOIN menu_item_ratings mir ON mir.menu_item_id = mi.id
+        LEFT JOIN menu_item_ratings mir
+          ON mir.menu_item_id = mi.id
+         AND mir.session = m.session
         WHERE 1=1
           ${dateFilter}
           ${sessionFilter}
@@ -2703,30 +2850,34 @@ export class CoreService implements OnModuleInit {
     }
 
     const activeItem = await runSql(
-      `SELECT mi.id
-       FROM menu_items mi
-       JOIN menus m ON m.id = mi.menu_id
-       WHERE mi.id = $1
-         AND mi.is_available = true
-         AND mi.deleted_at IS NULL
-         AND m.is_published = true
-         AND m.deleted_at IS NULL
-       LIMIT 1;`,
+      `SELECT row_to_json(t)::text
+       FROM (
+         SELECT mi.id, m.session::text AS session
+         FROM menu_items mi
+         JOIN menus m ON m.id = mi.menu_id
+         WHERE mi.id = $1
+           AND mi.is_available = true
+           AND mi.deleted_at IS NULL
+           AND m.is_published = true
+           AND m.deleted_at IS NULL
+         LIMIT 1
+       ) t;`,
       [menuItemId],
     );
     if (!activeItem) throw new NotFoundException('Active dish not found');
+    const item = this.parseJsonLine<{ id: string; session: SessionType }>(activeItem);
 
     await runSql(
-      `INSERT INTO menu_item_ratings (menu_item_id, user_id, user_role, stars)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (menu_item_id, user_id)
+      `INSERT INTO menu_item_ratings (menu_item_id, user_id, session, user_role, stars)
+       VALUES ($1, $2, $3::session_type, $4, $5)
+       ON CONFLICT (menu_item_id, user_id, session)
        DO UPDATE SET stars = EXCLUDED.stars,
                      user_role = EXCLUDED.user_role,
                      updated_at = now();`,
-      [menuItemId, actor.uid, actor.role, stars],
+      [menuItemId, actor.uid, item.session, actor.role, stars],
     );
 
-    return { ok: true, menuItemId, stars };
+    return { ok: true, menuItemId, session: item.session, stars };
   }
 
   async uploadMenuImage(buffer: Buffer, mimetype: string): Promise<{ url: string }> {
@@ -3643,7 +3794,7 @@ export class CoreService implements OnModuleInit {
     const childId = (input.childId || '').trim();
 
     await this.enforceParentYoungsterOrderingWindow(actor, serviceDate);
-    await this.validateOrderDayRules(serviceDate);
+    await this.validateOrderDayRules(serviceDate, session);
     await this.assertSessionActiveForOrdering(session);
 
     if (actor.role === 'YOUNGSTER') {
@@ -3866,7 +4017,7 @@ export class CoreService implements OnModuleInit {
     if (items.length === 0) throw new BadRequestException('Cart is empty');
     if (items.length > 5) throw new BadRequestException('ORDER_ITEM_LIMIT_EXCEEDED');
 
-    await this.validateOrderDayRules(cart.service_date);
+    await this.validateOrderDayRules(cart.service_date, cart.session);
     await this.enforceParentYoungsterOrderingWindow(actor, cart.service_date);
     await this.assertSessionActiveForOrdering(cart.session);
 
@@ -5285,6 +5436,7 @@ export class CoreService implements OnModuleInit {
       FROM (
         SELECT dsa.delivery_user_id,
                dsa.school_id,
+               dsa.session::text AS session,
                dsa.is_active,
                (u.first_name || ' ' || u.last_name) AS delivery_name,
                u.username AS delivery_username,
@@ -5295,17 +5447,18 @@ export class CoreService implements OnModuleInit {
         WHERE u.role = 'DELIVERY'
           AND u.deleted_at IS NULL
           AND s.deleted_at IS NULL
-        ORDER BY s.name ASC, delivery_name ASC
+        ORDER BY s.name ASC, dsa.session ASC, delivery_name ASC
       ) t;
     `);
     return this.parseJsonLines(out);
   }
 
-  async upsertDeliverySchoolAssignment(actor: AccessUser, input: { deliveryUserId?: string; schoolId?: string; isActive?: boolean }) {
+  async upsertDeliverySchoolAssignment(actor: AccessUser, input: { deliveryUserId?: string; schoolId?: string; session?: string; isActive?: boolean }) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     await this.ensureDeliverySchoolAssignmentsTable();
     const deliveryUserId = (input.deliveryUserId || '').trim();
     const schoolId = (input.schoolId || '').trim();
+    const session = this.normalizeSession(input.session);
     const isActive = input.isActive !== false;
 
     const deliveryExists = await runSql(
@@ -5331,54 +5484,45 @@ export class CoreService implements OnModuleInit {
     );
     if (schoolExists !== 't') throw new BadRequestException('School not found');
 
-    if (isActive) {
-      const activeCountOut = await runSql(
-        `SELECT COUNT(*)::int
-         FROM delivery_school_assignments
-         WHERE school_id = $1
-           AND is_active = true
-           AND delivery_user_id <> $2;`,
-        [schoolId, deliveryUserId],
-      );
-      const activeCount = Number(activeCountOut || 0);
-      if (activeCount >= 3) {
-        throw new BadRequestException('One school can only have maximum 3 active delivery personnel');
-      }
-    }
-
     await runSql(
-      `INSERT INTO delivery_school_assignments (delivery_user_id, school_id, is_active, updated_at)
-       VALUES ($1, $2, $3, now())
-       ON CONFLICT (delivery_user_id, school_id)
-       DO UPDATE SET is_active = EXCLUDED.is_active, updated_at = now();`,
-      [deliveryUserId, schoolId, isActive],
+      `INSERT INTO delivery_school_assignments (delivery_user_id, school_id, session, is_active, updated_at)
+       VALUES ($1, $2, $3::session_type, $4, now())
+       ON CONFLICT (school_id, session)
+       DO UPDATE SET delivery_user_id = EXCLUDED.delivery_user_id,
+                     is_active = EXCLUDED.is_active,
+                     updated_at = now();`,
+      [deliveryUserId, schoolId, session, isActive],
     );
-    await this.recordAdminAudit(actor, 'DELIVERY_SCHOOL_ASSIGNMENT_UPSERTED', 'delivery-school-assignment', `${deliveryUserId}:${schoolId}`, {
+    await this.recordAdminAudit(actor, 'DELIVERY_SCHOOL_ASSIGNMENT_UPSERTED', 'delivery-school-assignment', `${schoolId}:${session}`, {
       deliveryUserId,
       schoolId,
+      session,
       isActive,
     });
     await this.autoAssignDeliveriesForDate(this.makassarTodayIsoDate());
     return { ok: true };
   }
 
-  async deleteDeliverySchoolAssignment(actor: AccessUser, deliveryUserId: string, schoolId: string) {
+  async deleteDeliverySchoolAssignment(actor: AccessUser, deliveryUserId: string, schoolId: string, sessionRaw?: string) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     this.assertValidUuid(deliveryUserId, 'deliveryUserId');
     this.assertValidUuid(schoolId, 'schoolId');
     await this.ensureDeliverySchoolAssignmentsTable();
+    const session = this.normalizeSession(sessionRaw);
 
     const out = await runSql(
       `DELETE FROM delivery_school_assignments
        WHERE delivery_user_id = $1
          AND school_id = $2
+         AND session = $3::session_type
        RETURNING delivery_user_id;`,
-      [deliveryUserId, schoolId],
+      [deliveryUserId, schoolId, session],
     );
     if (!out) throw new NotFoundException('Delivery-school assignment not found');
-    await this.recordAdminAudit(actor, 'DELIVERY_SCHOOL_ASSIGNMENT_DELETED', 'delivery-school-assignment', `${deliveryUserId}:${schoolId}`, {
+    await this.recordAdminAudit(actor, 'DELIVERY_SCHOOL_ASSIGNMENT_DELETED', 'delivery-school-assignment', `${schoolId}:${session}`, {
       deliveryUserId,
       schoolId,
+      session,
     });
     await this.autoAssignDeliveriesForDate(this.makassarTodayIsoDate());
     return { ok: true };
@@ -5390,7 +5534,7 @@ export class CoreService implements OnModuleInit {
       `
       SELECT row_to_json(t)::text
       FROM (
-        SELECT o.id AS order_id, c.school_id
+        SELECT o.id AS order_id, c.school_id, o.session::text AS session
         FROM orders o
         JOIN children c ON c.id = o.child_id
         LEFT JOIN delivery_assignments da ON da.order_id = o.id
@@ -5402,7 +5546,7 @@ export class CoreService implements OnModuleInit {
     `,
       [serviceDate],
     );
-    const orders = this.parseJsonLines<{ order_id: string; school_id: string }>(ordersOut);
+    const orders = this.parseJsonLines<{ order_id: string; school_id: string; session: SessionType }>(ordersOut);
     if (orders.length === 0) return { ok: true, serviceDate, assignedCount: 0, skippedOrderIds: [] as string[] };
 
     const loadOut = await runSql(
@@ -5424,7 +5568,7 @@ export class CoreService implements OnModuleInit {
     const mappingOut = await runSql(`
       SELECT row_to_json(t)::text
       FROM (
-        SELECT dsa.school_id, dsa.delivery_user_id
+        SELECT dsa.school_id, dsa.delivery_user_id, dsa.session::text AS session
         FROM delivery_school_assignments dsa
         JOIN users u ON u.id = dsa.delivery_user_id
         WHERE dsa.is_active = true
@@ -5433,18 +5577,19 @@ export class CoreService implements OnModuleInit {
           AND u.deleted_at IS NULL
       ) t;
     `);
-    const mappings = this.parseJsonLines<{ school_id: string; delivery_user_id: string }>(mappingOut);
-    const bySchool = new Map<string, string[]>();
+    const mappings = this.parseJsonLines<{ school_id: string; delivery_user_id: string; session: SessionType }>(mappingOut);
+    const bySchoolSession = new Map<string, string[]>();
     for (const m of mappings) {
-      const list = bySchool.get(m.school_id) || [];
+      const key = `${m.school_id}:${m.session}`;
+      const list = bySchoolSession.get(key) || [];
       list.push(m.delivery_user_id);
-      bySchool.set(m.school_id, list);
+      bySchoolSession.set(key, list);
     }
 
     const skippedOrderIds: string[] = [];
     let assignedCount = 0;
     for (const order of orders) {
-      const candidates = bySchool.get(order.school_id) || [];
+      const candidates = bySchoolSession.get(`${order.school_id}:${order.session}`) || [];
       if (candidates.length === 0) {
         skippedOrderIds.push(order.order_id);
         continue;
@@ -5527,6 +5672,7 @@ export class CoreService implements OnModuleInit {
                     FROM delivery_school_assignments dsa
                     WHERE dsa.delivery_user_id = $${deliveryParamIdx}
                       AND dsa.school_id = c.school_id
+                      AND dsa.session = o.session
                       AND dsa.is_active = true
                   )`;
         })()
@@ -6063,7 +6209,7 @@ export class CoreService implements OnModuleInit {
       }
     }
 
-    await this.validateOrderDayRules(targetServiceDate);
+    await this.validateOrderDayRules(targetServiceDate, targetSession);
     await this.assertSessionActiveForOrdering(targetSession);
 
     const ids = [...new Set(normalized.map((item) => item.menuItemId))];
