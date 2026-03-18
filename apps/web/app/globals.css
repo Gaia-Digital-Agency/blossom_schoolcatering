@@ -464,6 +464,30 @@ button:hover,
   margin: 0.35rem 0 1rem;
 }
 
+.module-guide-card {
+  background: #fffbf4;
+  border: 1px solid #e8d9c0;
+  border-left: 3px solid #c8a96e;
+  border-radius: 0.6rem;
+  padding: 0.6rem 0.85rem;
+  font-size: 0.82rem;
+  color: #6b5a43;
+  margin-bottom: 0.9rem;
+}
+
+.module-guide-card strong {
+  color: #3f2f1c;
+}
+
+.module-guide-card ul {
+  margin: 0.45rem 0 0;
+  padding-left: 1rem;
+}
+
+.module-guide-card li + li {
+  margin-top: 0.2rem;
+}
+
 .field-hint {
   display: block;
   font-size: 0.74rem;

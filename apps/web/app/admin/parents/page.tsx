@@ -194,7 +194,9 @@ export default function AdminParentsPage() {
       <section className="auth-panel">
         <h1>Admin Family</h1>
         <AdminNav />
-        <p className="auth-help">Family records are view-only here. Student edits are managed in Admin Student.</p>
+        <div className="module-guide-card">
+          Review Family records, linked students, teacher or guardian details, and billing counts. Student edits are managed in Admin Student.
+        </div>
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
 

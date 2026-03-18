@@ -102,7 +102,7 @@ export default function StudentOverviewPage() {
           <h1>Student Overview</h1>
           {error ? <p className="auth-error">{error}</p> : null}
           <div className="module-guide-card">
-            Review your order calendar. Days with orders are highlighted.
+            Review your order calendar, weekly nutrition rows, and Clean Plate Club badge progress. Dates with orders are highlighted by session.
           </div>
           <div className="module-section">
             {profile ? (

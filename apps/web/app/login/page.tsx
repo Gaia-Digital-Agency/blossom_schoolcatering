@@ -53,7 +53,9 @@ export default function LoginPage() {
     <main className="page-auth">
       <section className="auth-panel">
         <h1>SINGLE SIGN ON (SSO)</h1>
-        <p className="auth-help">Use this page for Family, Student, Delivery, Kitchen, and Admin login. (For Dev Period Use)</p>
+        <div className="module-guide-card">
+          Use this single sign-on page to access the Family, Student, Delivery, Kitchen, and Admin modules.
+        </div>
         <div className="auth-form" style={{ marginBottom: '0.75rem' }}>
           <small><strong>Admin</strong>: <code>admin</code> / <code>teameditor123</code></small>
           <small><strong>Kitchen</strong>: <code>kitchen</code> / <code>teameditor123</code></small>

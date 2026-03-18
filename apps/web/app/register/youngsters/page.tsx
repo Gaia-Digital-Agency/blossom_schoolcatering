@@ -419,7 +419,9 @@ export default function YoungsterRegisterPage() {
     <main className="page-auth">
       <section className="auth-panel">
         <h1>Registration</h1>
-        <p className="auth-help">One registration flow handles student, family, and Guardian/Teacher registrations.</p>
+        <div className="module-guide-card">
+          Register a student together with the linked Family or Guardian/Teacher record, or review an existing registration in record mode.
+        </div>
         <form onSubmit={onSubmit} className="auth-form">
           {isReadonlyRecord ? (
             <p className="auth-help">

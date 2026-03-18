@@ -215,7 +215,9 @@ export default function AdminPage() {
         {/* ── Card 1: Admin Dashboard ─────────────────────────────── */}
         <div className="auth-form dash-card dash-card--admin">
           <h1 className="dash-card-title">Admin Dashboard</h1>
-          <p className="auth-help" style={{ margin: '0.1rem 0 0.6rem' }}>Overview and key operational metrics.</p>
+          <div className="module-guide-card" style={{ margin: '0.1rem 0 0.6rem' }}>
+            Review key operational metrics, platform activity, and dashboard content controls from one overview screen.
+          </div>
           <AdminNav />
         </div>
 

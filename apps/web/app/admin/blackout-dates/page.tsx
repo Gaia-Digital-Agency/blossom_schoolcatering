@@ -127,10 +127,9 @@ export default function AdminBlackoutDatesPage() {
       <section className="auth-panel">
         <h1>Admin Blackout Dates</h1>
         <AdminNav />
-        <p className="auth-help">Manage blackout dates. Order placement checks these rules immediately.</p>
-        
-        {/* Informational guide for the different blackout types */}
-        <div className="blackout-type-guide">
+        <div className="module-guide-card blackout-type-guide">
+          <strong>Guide Note</strong>
+          <p>Manage blackout rules by date and session. Order placement and service checks apply these rules immediately.</p>
           <strong>Type Guide</strong>
           <ul>
             <li><code>ORDER_BLOCK</code> — Parents cannot place new orders on this date</li>

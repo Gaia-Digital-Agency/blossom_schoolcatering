@@ -88,7 +88,9 @@ export default function AdminKitchenPage() {
       <section className="auth-panel">
         <h1>Admin Kitchen</h1>
         <AdminNav />
-        <p className="auth-help">Read-only real-time Kitchen view for admin monitoring.</p>
+        <div className="module-guide-card">
+          Monitor the live kitchen queue in read-only mode. Review dietary alerts, session totals, and order progress by date and session.
+        </div>
 
         <div className="admin-kitchen-controls">
           <label>

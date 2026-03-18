@@ -72,7 +72,7 @@ export default function FamilyOverviewPage() {
         <section className="auth-panel">
           <h1>Family Overview</h1>
           <div className="module-guide-card">
-            Review your Family Group order calendar. Days with orders are highlighted.
+            Review the Family Group order calendar by student. Dates with orders are highlighted so you can quickly see upcoming and past order activity.
           </div>
           {error ? <p className="auth-error">{error}</p> : null}
           {children.length > 1 ? (
