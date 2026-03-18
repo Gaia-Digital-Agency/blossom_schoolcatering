@@ -388,8 +388,12 @@ export default function DeliveryDashboard({
           </div>
         </section>
         <style jsx>{`
+          .auth-panel > h1 {
+            margin: 0;
+            line-height: 1.05;
+          }
           .module-login-label {
-            margin: -0.55rem 0 0;
+            margin: -0.25rem 0 0.25rem;
             font-size: 1rem;
             font-style: italic;
             font-weight: 800;

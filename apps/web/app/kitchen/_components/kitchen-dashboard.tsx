@@ -409,6 +409,10 @@ export default function KitchenDashboard({
           color: #6b5a43;
           margin-bottom: 0.75rem;
         }
+        .auth-panel > h1 {
+          margin: 0;
+          line-height: 1.05;
+        }
         .kitchen-date-picker-row {
           display: grid;
           grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -418,6 +422,27 @@ export default function KitchenDashboard({
         }
         .kitchen-control {
           margin: 0;
+          border: 1px solid #d8cab1;
+          border-radius: 0.7rem;
+          background: #fffdf8;
+          padding: 0.7rem 0.85rem;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 0.35rem;
+          min-height: 100%;
+        }
+        .kitchen-control :global(select),
+        .kitchen-control :global(input) {
+          border: none;
+          background: transparent;
+          padding: 0;
+          min-height: auto;
+          box-shadow: none;
+        }
+        .kitchen-control :global(select:focus),
+        .kitchen-control :global(input:focus) {
+          outline: none;
         }
         .kitchen-fixed-date-card {
           border: 1px solid #d8cab1;

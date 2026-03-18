@@ -148,13 +148,16 @@ export default function ModuleHub({
         }
         .module-hub-icon {
           width: 100%;
+          min-height: 7rem;
           display: flex;
           align-items: center;
           justify-content: center;
         }
         .module-hub-icon-image {
-          width: min(100%, 7.5rem);
-          height: auto;
+          width: 100%;
+          max-width: 6.8rem;
+          max-height: 6.8rem;
+          height: 100%;
           object-fit: contain;
         }
       `}</style>

@@ -96,13 +96,16 @@ export default function AdminHub() {
         }
         .admin-hub-icon {
           width: 100%;
+          min-height: 6.8rem;
           display: flex;
           align-items: center;
           justify-content: center;
         }
         .admin-hub-icon-image {
-          width: min(100%, 7.5rem);
-          height: auto;
+          width: 100%;
+          max-width: 6.4rem;
+          max-height: 6.4rem;
+          height: 100%;
           object-fit: contain;
         }
       `}</style>
