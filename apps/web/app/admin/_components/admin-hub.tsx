@@ -41,7 +41,7 @@ export default function AdminHub() {
             >
               <span style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-hidden="true">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={item.iconSrc} alt="" style={{ width: '60%', height: 'auto', objectFit: 'contain', display: 'block' }} />
+                <img src={item.iconSrc} alt="" style={{ width: '78%', height: 'auto', objectFit: 'contain', display: 'block' }} />
               </span>
             </button>
           ))}
