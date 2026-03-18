@@ -216,6 +216,7 @@ export default function FamilyOrderPage({
   const menuSectionRef = useRef<HTMLDivElement | null>(null);
   const draftSectionRef = useRef<HTMLDivElement | null>(null);
   const autoOpenHandledRef = useRef(false);
+  const blackoutFirstRenderRef = useRef(true);
 
   const orderingWindow = useMemo(() => getMakassarOrderingWindow(orderingCutoffTime), [nowMs, orderingCutoffTime]);
   const placeCutoffMs = getCutoffTimestamp(serviceDate, orderingCutoffTime) - nowMs;
@@ -258,6 +259,9 @@ export default function FamilyOrderPage({
   }, [activeSessions, session]);
 
   useEffect(() => {
+    // Skip the initial page load — only show the modal when the user
+    // explicitly changes the service date or session after mount.
+    if (blackoutFirstRenderRef.current) { blackoutFirstRenderRef.current = false; return; }
     if (activeBlackout) setShowBlackoutModal(true);
   }, [activeBlackout]);
 

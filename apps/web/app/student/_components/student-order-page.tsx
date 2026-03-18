@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '../../../lib/auth';
 import { formatDishCategoryLabel, formatDishDietaryTags } from '../../../lib/dish-tags';
 import DraftExitGuard from '../../_components/draft-exit-guard';
@@ -197,6 +197,7 @@ export default function StudentOrderPage({
   const [showBlackoutModal, setShowBlackoutModal] = useState(false);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [showDuplicatePopup, setShowDuplicatePopup] = useState(false);
+  const blackoutFirstRenderRef = useRef(true);
 
   const selectedCount = useMemo(
     () => Object.values(itemQty).filter((qty) => qty > 0).length,
@@ -270,8 +271,9 @@ export default function StudentOrderPage({
     return () => window.clearInterval(timer);
   }, []);
 
-  // Auto-show blackout modal when blackout is detected
+  // Auto-show blackout modal when blackout is detected — skip initial page load.
   useEffect(() => {
+    if (blackoutFirstRenderRef.current) { blackoutFirstRenderRef.current = false; return; }
     if (activeBlackout) setShowBlackoutModal(true);
   }, [activeBlackout]);
 
