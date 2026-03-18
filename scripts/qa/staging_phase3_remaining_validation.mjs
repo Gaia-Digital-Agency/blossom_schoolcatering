@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
+
 const BASE = process.env.BASE_URL || 'http://34.124.244.233/schoolcatering/api/v1';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'teameditor123';
 const SEEDED_PASSWORD = process.env.SEEDED_PASSWORD || 'Teameditor@123';
@@ -47,31 +50,69 @@ function nextWeekday(offset = 1) {
   return d.toISOString().slice(0, 10);
 }
 
-function weekdayOffsets(backwardDays = 30, forwardDays = 21) {
-  const values = [];
-  for (let i = 1; i <= forwardDays; i += 1) values.push(i);
-  for (let i = 1; i <= backwardDays; i += 1) values.push(-i);
-  return values;
+function getDbUrl() {
+  const candidates = ['.env', '/var/www/_env/schoolcatering.env'];
+  for (const file of candidates) {
+    if (!fs.existsSync(file)) continue;
+    const line = fs.readFileSync(file, 'utf8').split('\n').find((row) => row.startsWith('DATABASE_URL='));
+    if (line) return line.replace('DATABASE_URL=', '').trim();
+  }
+  throw new Error('DATABASE_URL not found in .env or /var/www/_env/schoolcatering.env');
 }
 
-async function findDateWithMenuAndOrders(token, session, offsets = weekdayOffsets()) {
-  for (const offset of offsets) {
-    const date = nextWeekday(offset);
-    const menu = await req(`/admin/menus?service_date=${date}&session=${session}`, { token, expect: [200] });
-    const orders = await req(`/admin/orders?date=${date}&session=${session}`, { token, expect: [200] });
-    const rows = (orders.outstanding || []).length + (orders.completed || []).length;
-    if ((menu.items || []).length > 0 && rows > 0) return date;
-  }
-  return '';
+const DB_URL = process.env.DATABASE_URL || getDbUrl();
+
+function q(value) {
+  if (value === null || value === undefined) return 'NULL';
+  return `'${String(value).replace(/'/g, "''")}'`;
 }
 
-async function findDateWithMenu(token, session, offsets = weekdayOffsets()) {
-  for (const offset of offsets) {
-    const date = nextWeekday(offset);
-    const menu = await req(`/admin/menus?service_date=${date}&session=${session}`, { token, expect: [200] });
-    if ((menu.items || []).length > 0) return date;
-  }
-  return '';
+function db(sql) {
+  return execFileSync('psql', [DB_URL, '-X', '-q', '-tA', '-F', '|', '-c', sql], { encoding: 'utf8' }).trim();
+}
+
+function latestDateWithMenuAndOrders(session) {
+  return db(`
+    SELECT m.service_date::text
+    FROM menus m
+    WHERE m.session = ${q(session)}::session_type
+      AND m.deleted_at IS NULL
+      AND EXISTS (
+        SELECT 1
+        FROM menu_items mi
+        WHERE mi.menu_id = m.id
+          AND mi.deleted_at IS NULL
+          AND mi.is_available = true
+      )
+      AND EXISTS (
+        SELECT 1
+        FROM orders o
+        WHERE o.service_date = m.service_date
+          AND o.session = m.session
+          AND o.deleted_at IS NULL
+          AND o.status <> 'CANCELLED'
+      )
+    ORDER BY m.service_date DESC
+    LIMIT 1;
+  `);
+}
+
+function latestDateWithMenu(session) {
+  return db(`
+    SELECT m.service_date::text
+    FROM menus m
+    WHERE m.session = ${q(session)}::session_type
+      AND m.deleted_at IS NULL
+      AND EXISTS (
+        SELECT 1
+        FROM menu_items mi
+        WHERE mi.menu_id = m.id
+          AND mi.deleted_at IS NULL
+          AND mi.is_available = true
+      )
+    ORDER BY m.service_date DESC
+    LIMIT 1;
+  `);
 }
 
 function errorMessage(error) {
@@ -122,10 +163,10 @@ async function main() {
   const childId = familyChildren.children?.[0]?.id;
   if (!childId) throw new Error('Family child not found');
 
-  const breakfastDate = await findDateWithMenuAndOrders(adminToken, 'BREAKFAST');
-  const snackDate = await findDateWithMenuAndOrders(adminToken, 'SNACK');
-  const lunchDate = await findDateWithMenuAndOrders(adminToken, 'LUNCH');
-  const fallbackLunchDate = lunchDate || await findDateWithMenu(adminToken, 'LUNCH');
+  const breakfastDate = latestDateWithMenuAndOrders('BREAKFAST');
+  const snackDate = latestDateWithMenuAndOrders('SNACK');
+  const lunchDate = latestDateWithMenuAndOrders('LUNCH');
+  const fallbackLunchDate = lunchDate || latestDateWithMenu('LUNCH');
   if (!breakfastDate || !snackDate || !fallbackLunchDate) {
     throw new Error(`Missing scenario dates breakfast=${breakfastDate} snack=${snackDate} lunch=${fallbackLunchDate}`);
   }
