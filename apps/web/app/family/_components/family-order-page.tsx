@@ -212,6 +212,7 @@ export default function FamilyOrderPage({
   const [showDuplicatePopup, setShowDuplicatePopup] = useState(false);
   const [showQuickReorderPopup, setShowQuickReorderPopup] = useState(false);
   const [showBlackoutModal, setShowBlackoutModal] = useState(false);
+  const [showWeekendModal, setShowWeekendModal] = useState(false);
 
   const menuSectionRef = useRef<HTMLDivElement | null>(null);
   const draftSectionRef = useRef<HTMLDivElement | null>(null);
@@ -619,7 +620,11 @@ export default function FamilyOrderPage({
                 </p>
               ) : null}
             <label>Service Date
-              <input type="date" value={serviceDate} min={orderingWindow.earliestServiceDate} onChange={(e) => setServiceDate(e.target.value)} />
+              <input type="date" value={serviceDate} min={orderingWindow.earliestServiceDate} onChange={(e) => {
+                  const d = new Date(e.target.value + 'T00:00:00Z');
+                  if (d.getUTCDay() === 0 || d.getUTCDay() === 6) { setShowWeekendModal(true); return; }
+                  setServiceDate(e.target.value);
+                }} />
             </label>
             <label>Session
               <select value={session} onChange={(e) => setSession(e.target.value as SessionType)}>
@@ -777,6 +782,22 @@ export default function FamilyOrderPage({
               {activeBlackoutMessage(activeBlackout)}{activeBlackout.reason ? ` — ${activeBlackout.reason}` : ''}
             </p>
             <button className="btn btn-primary popup-close" type="button" onClick={() => setShowBlackoutModal(false)}>OK</button>
+          </div>
+        </div>
+      ) : null}
+
+      {showWeekendModal ? (
+        <div className="popup-overlay" onClick={() => setShowWeekendModal(false)}>
+          <div className="popup-card" onClick={(e) => e.stopPropagation()}>
+            <div className="popup-icon">📅</div>
+            <h3 className="popup-title">Weekdays Only</h3>
+            <p className="popup-body">
+              Only weekday orders are available. For any special requests, please contact{' '}
+              <a href="https://www.blossomsteakhouse.com/" target="_blank" rel="noopener noreferrer">
+                www.blossomsteakhouse.com
+              </a>
+            </p>
+            <button className="btn btn-primary popup-close" type="button" onClick={() => setShowWeekendModal(false)}>OK</button>
           </div>
         </div>
       ) : null}
