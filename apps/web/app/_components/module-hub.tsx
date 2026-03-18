@@ -147,17 +147,18 @@ export default function ModuleHub({
           box-shadow: 0 10px 24px rgba(122, 106, 88, 0.18);
         }
         .module-hub-icon {
+          flex: 1;
           width: 100%;
-          min-height: 5.8rem;
           display: flex;
           align-items: center;
           justify-content: center;
+          overflow: hidden;
         }
         .module-hub-icon-image {
           width: 100%;
-          max-width: 5.4rem;
-          max-height: 5.4rem;
           height: 100%;
+          max-width: 3.5rem;
+          max-height: 3.5rem;
           object-fit: contain;
         }
       `}</style>
