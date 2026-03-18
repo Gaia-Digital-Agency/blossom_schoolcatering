@@ -13,6 +13,8 @@ module.exports = {
       restart_delay: 3000,
       exp_backoff_restart_delay: 1000,
       watch: false,
+      // Auto-restart if the process leaks past 600 MB
+      max_memory_restart: '600M',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       log_type: 'json',
       merge_logs: true,
@@ -31,6 +33,8 @@ module.exports = {
       restart_delay: 3000,
       exp_backoff_restart_delay: 1000,
       watch: false,
+      // Auto-restart if the process leaks past 400 MB
+      max_memory_restart: '400M',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       log_type: 'json',
       merge_logs: true,

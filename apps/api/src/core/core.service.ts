@@ -68,6 +68,12 @@ export class CoreService implements OnModuleInit {
   private schoolShortNameReady = false;
   private adminAuditTrailReady = false;
   private adminVisiblePasswordsReady = false;
+  private menuItemExtendedColumnsReady = false;
+  private menuItemNameUniquenessReady = false;
+  private menuRatingsTableReady = false;
+  private sessionSettingsTableReady = false;
+  private childRegistrationSourceColumnsReady = false;
+  private menuItemTextDefaultsReady = false;
   private readonly publicMenuCacheTtlMs = 60_000;
   private publicMenuCache = new Map<string, {
     data: {
@@ -80,18 +86,21 @@ export class CoreService implements OnModuleInit {
   }>();
 
   async onModuleInit() {
-    await this.ensureBlackoutDaysSessionColumn();
-    await this.ensureMenuItemExtendedColumns();
-    await this.ensureMenuItemNameUniquenessScope();
-    await this.ensureSessionSettingsTable();
-    await this.ensureMenuRatingsTable();
-    await this.ensureDeliverySchoolAssignmentsTable();
-    await this.ensureChildRegistrationSourceColumns();
-    await this.ensureDeliveryDailyNotesTable();
-    await this.ensureBillingReviewColumns();
-    await this.ensureSchoolShortNameColumn();
-    await this.ensureAdminAuditTrailTable();
-    await this.ensureMenuItemTextDefaults();
+    // Run all independent schema-ensure migrations in parallel to cut startup time.
+    await Promise.all([
+      this.ensureBlackoutDaysSessionColumn(),
+      this.ensureMenuItemExtendedColumns(),
+      this.ensureMenuItemNameUniquenessScope(),
+      this.ensureSessionSettingsTable(),
+      this.ensureMenuRatingsTable(),
+      this.ensureDeliverySchoolAssignmentsTable(),
+      this.ensureChildRegistrationSourceColumns(),
+      this.ensureDeliveryDailyNotesTable(),
+      this.ensureBillingReviewColumns(),
+      this.ensureSchoolShortNameColumn(),
+      this.ensureAdminAuditTrailTable(),
+      this.ensureMenuItemTextDefaults(),
+    ]);
   }
 
   private async ensureBlackoutDaysSessionColumn() {
@@ -191,6 +200,7 @@ export class CoreService implements OnModuleInit {
   }
 
   private async ensureMenuItemNameUniquenessScope() {
+    if (this.menuItemNameUniquenessReady) return;
     // Historical schema used a global unique index on lower(name), which blocks
     // valid renames across different menus/dates/sessions.
     // Current behavior expects uniqueness within a menu context only.
@@ -200,6 +210,7 @@ export class CoreService implements OnModuleInit {
       ON menu_items (menu_id, lower(name))
       WHERE deleted_at IS NULL;
     `);
+    this.menuItemNameUniquenessReady = true;
   }
 
   private parseJsonLine<T>(line: string): T {
@@ -1144,6 +1155,7 @@ export class CoreService implements OnModuleInit {
   }
 
   private async ensureMenuItemExtendedColumns() {
+    if (this.menuItemExtendedColumnsReady) return;
     await runSql(`
       ALTER TABLE menu_items
       ADD COLUMN IF NOT EXISTS cutlery_required boolean NOT NULL DEFAULT false;
@@ -1176,9 +1188,11 @@ export class CoreService implements OnModuleInit {
       ALTER TABLE menu_items
       ADD COLUMN IF NOT EXISTS dish_category text NOT NULL DEFAULT 'MAIN';
     `);
+    this.menuItemExtendedColumnsReady = true;
   }
 
   private async ensureMenuRatingsTable() {
+    if (this.menuRatingsTableReady) return;
     await runSql(`
       CREATE TABLE IF NOT EXISTS menu_item_ratings (
         menu_item_id uuid NOT NULL REFERENCES menu_items(id) ON DELETE CASCADE,
@@ -1229,6 +1243,7 @@ export class CoreService implements OnModuleInit {
       CREATE INDEX IF NOT EXISTS idx_menu_item_ratings_item_stars
       ON menu_item_ratings(menu_item_id, session, stars);
     `);
+    this.menuRatingsTableReady = true;
   }
 
   private async ensureDeliverySchoolAssignmentsTable() {
@@ -1335,6 +1350,7 @@ export class CoreService implements OnModuleInit {
   }
 
   private async ensureSessionSettingsTable() {
+    if (this.sessionSettingsTableReady) return;
     await runSql(`
       CREATE TABLE IF NOT EXISTS session_settings (
         session session_type PRIMARY KEY,
@@ -1343,14 +1359,15 @@ export class CoreService implements OnModuleInit {
         updated_at timestamptz NOT NULL DEFAULT now()
       );
     `);
-    for (const session of SESSIONS) {
-      await runSql(
-        `INSERT INTO session_settings (session, is_active)
-         VALUES ($1::session_type, true)
-         ON CONFLICT (session) DO NOTHING;`,
-        [session],
-      );
-    }
+    // Single batch INSERT for all sessions instead of one query per session.
+    await runSql(`
+      INSERT INTO session_settings (session, is_active)
+      VALUES ('LUNCH'::session_type, true),
+             ('SNACK'::session_type, true),
+             ('BREAKFAST'::session_type, true)
+      ON CONFLICT (session) DO NOTHING;
+    `);
+    this.sessionSettingsTableReady = true;
   }
 
   private async isSessionActive(session: SessionType) {
@@ -1739,12 +1756,14 @@ export class CoreService implements OnModuleInit {
   }
 
   private async ensureChildRegistrationSourceColumns() {
+    if (this.childRegistrationSourceColumnsReady) return;
     await runSql(`
       ALTER TABLE children
       ADD COLUMN IF NOT EXISTS registration_actor_type varchar(20) NOT NULL DEFAULT 'PARENT',
       ADD COLUMN IF NOT EXISTS registration_actor_teacher_name varchar(50),
       ADD COLUMN IF NOT EXISTS registration_actor_teacher_phone varchar(30);
     `);
+    this.childRegistrationSourceColumnsReady = true;
   }
 
   private async ensureBillingReviewColumns() {
@@ -1757,6 +1776,7 @@ export class CoreService implements OnModuleInit {
   }
 
   private async ensureMenuItemTextDefaults() {
+    if (this.menuItemTextDefaultsReady) return;
     await runSql(`
       UPDATE menu_items
       SET description = 'TBA',
@@ -1772,6 +1792,7 @@ export class CoreService implements OnModuleInit {
         AND is_available = true
         AND COALESCE(NULLIF(BTRIM(nutrition_facts_text), ''), '') = '';
     `);
+    this.menuItemTextDefaultsReady = true;
   }
 
   private normalizeMenuText(raw?: string | null) {

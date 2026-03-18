@@ -124,6 +124,7 @@ export class AuthService {
   private childRegistrationSourceColumnsReady = false;
   private passwordResetTableReady = false;
   private adminVisiblePasswordsReady = false;
+  private systemUsersReady = false;
 
   private normalizeRole(role: string): Role {
     const normalized = role?.toUpperCase() as Role;
@@ -312,6 +313,7 @@ export class AuthService {
   }
 
   private async ensureSystemUsers() {
+    if (this.systemUsersReady) return;
     const specs = [
       {
         role: 'ADMIN',
@@ -394,6 +396,7 @@ export class AuthService {
     `);
 
     await this.ensureSeededFamiliesAndStudents();
+    this.systemUsersReady = true;
   }
 
   private buildSeedAliasEmail(baseEmail: string, tag: string) {
