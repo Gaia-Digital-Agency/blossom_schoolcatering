@@ -147,19 +147,6 @@ export default function StudentOverviewPage() {
                     <small>Total Dishes: {insights.week.totalDishes ?? '-'}</small>
                   </label>
                 </div>
-                <div className="auth-form student-overview-week-rows">
-                  <strong>Week Session Nutrition Rows</strong>
-                  {insights.week.days.length === 0 ? (
-                    <small>No session nutrition rows yet this week.</small>
-                  ) : insights.week.days.map((day) => (
-                    <label key={`${day.service_date}-${day.session}`}>
-                      <strong>{day.service_date}</strong>
-                      <small>Session: {getSessionLabel(day.session)}</small>
-                      <small>Calories: {day.calories_display}</small>
-                      <small>TBA dishes: {day.tba_items}</small>
-                    </label>
-                  ))}
-                </div>
               </div>
             ) : <p className="auth-help">Insights loading...</p>}
           </div>
@@ -198,11 +185,6 @@ export default function StudentOverviewPage() {
           grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 1rem;
         }
-
-        .student-overview-week-rows {
-          grid-column: 1 / -1;
-        }
-
         @media (max-width: 720px) {
           .student-overview-insights {
             grid-template-columns: 1fr;
