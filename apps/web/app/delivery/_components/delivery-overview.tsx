@@ -28,7 +28,7 @@ export default function DeliveryOverview() {
             >
               <span style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-hidden="true">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={item.iconSrc} alt="" style={{ width: '95%', height: 'auto', objectFit: 'contain', display: 'block' }} />
+                <img src={item.iconSrc} alt="" style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }} />
               </span>
             </button>
           ))}
@@ -62,7 +62,7 @@ export default function DeliveryOverview() {
         }
         .module-hub-card {
           aspect-ratio: 1;
-          border: 1.5px solid #d8cab1;
+          border: none;
           border-radius: 1.1rem;
           background: radial-gradient(circle at 30% 20%, rgba(255, 251, 240, 0.98), rgba(255, 240, 210, 0.94));
           display: flex;
@@ -72,16 +72,14 @@ export default function DeliveryOverview() {
           gap: 0.45rem;
           padding: 0.6rem 0.4rem 0.65rem;
           cursor: pointer;
-          transition: transform 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
+          transition: transform 0.14s ease, box-shadow 0.14s ease;
           box-shadow: 0 4px 14px rgba(122, 106, 88, 0.12);
         }
         .module-hub-card:hover {
           transform: translateY(-3px);
-          border-color: #b8860b;
           box-shadow: 0 10px 24px rgba(122, 106, 88, 0.18);
         }
         .module-hub-card-active {
-          border-color: #b8860b;
           background: radial-gradient(circle at 30% 20%, rgba(255, 248, 225, 0.98), rgba(255, 230, 180, 0.96));
         }
       `}</style>

@@ -41,7 +41,7 @@ export default function AdminHub() {
             >
               <span style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-hidden="true">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={item.iconSrc} alt="" style={{ width: '95%', height: 'auto', objectFit: 'contain', display: 'block' }} />
+                <img src={item.iconSrc} alt="" style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }} />
               </span>
             </button>
           ))}
@@ -76,7 +76,7 @@ export default function AdminHub() {
         }
         .admin-hub-card {
           aspect-ratio: 1;
-          border: 1.5px solid #d8cab1;
+          border: none;
           border-radius: 1.1rem;
           background: radial-gradient(circle at 30% 20%, rgba(255, 251, 240, 0.98), rgba(255, 240, 210, 0.94));
           display: flex;
@@ -91,7 +91,6 @@ export default function AdminHub() {
         }
         .admin-hub-card:hover {
           transform: translateY(-3px);
-          border-color: #b8860b;
           box-shadow: 0 10px 24px rgba(122, 106, 88, 0.18);
         }
       `}</style>
