@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import { getAppBase } from '../../../lib/auth';
 import LogoutButton from '../../_components/logout-button';
 
@@ -27,8 +26,9 @@ export default function DeliveryOverview() {
               }}
               aria-label={item.label}
             >
-              <span className="module-hub-icon" aria-hidden="true">
-                <Image src={item.iconSrc} alt="" width={160} height={160} className="module-hub-icon-image" />
+              <span style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-hidden="true">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={item.iconSrc} alt="" style={{ width: '78%', height: 'auto', objectFit: 'contain', display: 'block' }} />
               </span>
             </button>
           ))}
@@ -83,17 +83,6 @@ export default function DeliveryOverview() {
         .module-hub-card-active {
           border-color: #b8860b;
           background: radial-gradient(circle at 30% 20%, rgba(255, 248, 225, 0.98), rgba(255, 230, 180, 0.96));
-        }
-        .module-hub-icon {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .module-hub-icon-image {
-          width: 82%;
-          height: auto;
-          object-fit: contain;
         }
       `}</style>
     </main>
