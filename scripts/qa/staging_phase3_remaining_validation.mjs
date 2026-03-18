@@ -47,9 +47,16 @@ function nextWeekday(offset = 1) {
   return d.toISOString().slice(0, 10);
 }
 
-async function findDateWithMenuAndOrders(token, session, maxDays = 21) {
-  for (let i = 1; i <= maxDays; i += 1) {
-    const date = nextWeekday(i);
+function weekdayOffsets(backwardDays = 30, forwardDays = 21) {
+  const values = [];
+  for (let i = 1; i <= forwardDays; i += 1) values.push(i);
+  for (let i = 1; i <= backwardDays; i += 1) values.push(-i);
+  return values;
+}
+
+async function findDateWithMenuAndOrders(token, session, offsets = weekdayOffsets()) {
+  for (const offset of offsets) {
+    const date = nextWeekday(offset);
     const menu = await req(`/admin/menus?service_date=${date}&session=${session}`, { token, expect: [200] });
     const orders = await req(`/admin/orders?date=${date}&session=${session}`, { token, expect: [200] });
     const rows = (orders.outstanding || []).length + (orders.completed || []).length;
@@ -58,9 +65,9 @@ async function findDateWithMenuAndOrders(token, session, maxDays = 21) {
   return '';
 }
 
-async function findDateWithMenu(token, session, maxDays = 21) {
-  for (let i = 1; i <= maxDays; i += 1) {
-    const date = nextWeekday(i);
+async function findDateWithMenu(token, session, offsets = weekdayOffsets()) {
+  for (const offset of offsets) {
+    const date = nextWeekday(offset);
     const menu = await req(`/admin/menus?service_date=${date}&session=${session}`, { token, expect: [200] });
     if ((menu.items || []).length > 0) return date;
   }
