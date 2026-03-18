@@ -1,13 +1,14 @@
 'use client';
 
+import Image from 'next/image';
 import { getAppBase } from '../../../lib/auth';
 import LogoutButton from '../../_components/logout-button';
 
 const KITCHEN_ITEMS = [
-  { label: 'Yesterday', icon: '⬅️', href: '/kitchen/yesterday' },
-  { label: 'Today', icon: '📅', href: '/kitchen/today', active: true },
-  { label: 'Tomorrow', icon: '➡️', href: '/kitchen/tomorrow' },
-  { label: 'Select Date', icon: '🗓️', href: '/kitchen/select-date' },
+  { label: 'Yesterday', iconSrc: '/schoolcatering/assets/icons/yesterday.jpeg', href: '/kitchen/yesterday' },
+  { label: 'Today', iconSrc: '/schoolcatering/assets/icons/today.jpeg', href: '/kitchen/today', active: true },
+  { label: 'Tomorrow', iconSrc: '/schoolcatering/assets/icons/tomorrow.jpeg', href: '/kitchen/tomorrow' },
+  { label: 'Select Date', iconSrc: '/schoolcatering/assets/icons/date.jpeg', href: '/kitchen/select-date' },
 ];
 
 export default function KitchenOverview() {
@@ -26,8 +27,9 @@ export default function KitchenOverview() {
               }}
               aria-label={item.label}
             >
-              <span className="module-hub-icon" aria-hidden="true">{item.icon}</span>
-              <span className="module-hub-label">{item.label}</span>
+              <span className="module-hub-icon" aria-hidden="true">
+                <Image src={item.iconSrc} alt="" width={160} height={160} className="module-hub-icon-image" />
+              </span>
             </button>
           ))}
         </div>
@@ -83,17 +85,15 @@ export default function KitchenOverview() {
           background: radial-gradient(circle at 30% 20%, rgba(255, 248, 225, 0.98), rgba(255, 230, 180, 0.96));
         }
         .module-hub-icon {
-          font-size: clamp(2rem, 10vw, 2.8rem);
-          line-height: 1;
-        }
-        .module-hub-label {
           width: 100%;
-          font-size: clamp(0.76rem, 3vw, 0.95rem);
-          font-weight: 700;
-          color: #5d4e3a;
-          text-align: center;
-          line-height: 1.15;
-          white-space: nowrap;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .module-hub-icon-image {
+          width: min(100%, 7.5rem);
+          height: auto;
+          object-fit: contain;
         }
       `}</style>
     </main>

@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { apiFetch, getAppBase } from '../../lib/auth';
 import LogoutButton from './logout-button';
@@ -12,22 +13,22 @@ type StudentProfile = {
   school_short_name?: string;
 };
 
-const HUB_ITEMS: Record<ModuleType, Array<{ label: string; icon: string; href?: string }>> = {
+const HUB_ITEMS: Record<ModuleType, Array<{ label: string; iconSrc: string; href?: string }>> = {
   family: [
-    { label: 'Overview', icon: '📅', href: '/family/overview' },
-    { label: 'Order', icon: '🛒', href: '/family/order' },
-    { label: 'Record', icon: '🧾', href: '/family/consolorder' },
-    { label: 'Billing', icon: '💳', href: '/family/billing' },
-    { label: 'Rating', icon: '⭐', href: '/rating' },
-    { label: 'Menu', icon: '🍽️', href: '/menu' },
+    { label: 'Overview', iconSrc: '/schoolcatering/assets/icons/overview.jpeg', href: '/family/overview' },
+    { label: 'Order', iconSrc: '/schoolcatering/assets/icons/order.jpeg', href: '/family/order' },
+    { label: 'Record', iconSrc: '/schoolcatering/assets/icons/report.jpeg', href: '/family/consolorder' },
+    { label: 'Billing', iconSrc: '/schoolcatering/assets/icons/billing.jpeg', href: '/family/billing' },
+    { label: 'Rating', iconSrc: '/schoolcatering/assets/icons/rating.jpeg', href: '/rating' },
+    { label: 'Menu', iconSrc: '/schoolcatering/assets/icons/menu.jpeg', href: '/menu' },
   ],
   student: [
-    { label: 'Overview', icon: '📅', href: '/student/overview' },
-    { label: 'Order', icon: '🛒', href: '/student/order' },
-    { label: 'Record', icon: '🧾', href: '/student/consolorder' },
-    { label: 'Billing', icon: '💳', href: '/student/billing' },
-    { label: 'Rating', icon: '⭐', href: '/rating' },
-    { label: 'Menu', icon: '🍽️', href: '/menu' },
+    { label: 'Overview', iconSrc: '/schoolcatering/assets/icons/overview.jpeg', href: '/student/overview' },
+    { label: 'Order', iconSrc: '/schoolcatering/assets/icons/order.jpeg', href: '/student/order' },
+    { label: 'Record', iconSrc: '/schoolcatering/assets/icons/report.jpeg', href: '/student/consolorder' },
+    { label: 'Billing', iconSrc: '/schoolcatering/assets/icons/billing.jpeg', href: '/student/billing' },
+    { label: 'Rating', iconSrc: '/schoolcatering/assets/icons/rating.jpeg', href: '/rating' },
+    { label: 'Menu', iconSrc: '/schoolcatering/assets/icons/menu.jpeg', href: '/menu' },
   ],
 };
 
@@ -86,8 +87,9 @@ export default function ModuleHub({
               }}
               aria-label={item.label}
             >
-              <span className="module-hub-icon" aria-hidden="true">{item.icon}</span>
-              <span className="module-hub-label">{item.label}</span>
+              <span className="module-hub-icon" aria-hidden="true">
+                <Image src={item.iconSrc} alt="" width={160} height={160} className="module-hub-icon-image" />
+              </span>
             </button>
           ))}
         </div>
@@ -145,17 +147,15 @@ export default function ModuleHub({
           box-shadow: 0 10px 24px rgba(122, 106, 88, 0.18);
         }
         .module-hub-icon {
-          font-size: clamp(2rem, 9vw, 2.6rem);
-          line-height: 1;
-        }
-        .module-hub-label {
           width: 100%;
-          font-size: clamp(0.78rem, 3vw, 0.95rem);
-          font-weight: 700;
-          color: #5d4e3a;
-          text-align: center;
-          line-height: 1.15;
-          text-wrap: balance;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .module-hub-icon-image {
+          width: min(100%, 7.5rem);
+          height: auto;
+          object-fit: contain;
         }
       `}</style>
     </main>

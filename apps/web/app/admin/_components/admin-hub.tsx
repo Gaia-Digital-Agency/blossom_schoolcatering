@@ -1,21 +1,22 @@
 'use client';
 
+import Image from 'next/image';
 import { getAppBase } from '../../../lib/auth';
 import LogoutButton from '../../_components/logout-button';
 
 const HUB_ITEMS = [
-  { label: 'Dashboard', icon: '📊', href: '/admin/dashboard' },
-  { label: 'Family', icon: '👨‍👩‍👧', href: '/admin/family' },
-  { label: 'Student', icon: '🎓', href: '/admin/student' },
-  { label: 'Schools', icon: '🏫', href: '/admin/schools' },
-  { label: 'Delivery', icon: '🚚', href: '/admin/delivery' },
-  { label: 'Menu', icon: '🍽️', href: '/admin/menu' },
-  { label: 'Orders', icon: '📦', href: '/admin/orders' },
-  { label: 'Billing', icon: '💳', href: '/admin/billing' },
-  { label: 'Blackout', icon: '📅', href: '/admin/blackout-dates' },
-  { label: 'Kitchen', icon: '👩‍🍳', href: '/admin/kitchen' },
-  { label: 'Rating', icon: '⭐', href: '/admin/rating' },
-  { label: 'Reports', icon: '📈', href: '/admin/reports' },
+  { label: 'Dashboard', iconSrc: '/schoolcatering/assets/icons/dashboard.jpeg', href: '/admin/dashboard' },
+  { label: 'Family', iconSrc: '/schoolcatering/assets/icons/family.jpeg', href: '/admin/family' },
+  { label: 'Student', iconSrc: '/schoolcatering/assets/icons/student.jpeg', href: '/admin/student' },
+  { label: 'Schools', iconSrc: '/schoolcatering/assets/icons/schools.jpeg', href: '/admin/schools' },
+  { label: 'Delivery', iconSrc: '/schoolcatering/assets/icons/delivery.jpeg', href: '/admin/delivery' },
+  { label: 'Menu', iconSrc: '/schoolcatering/assets/icons/menu.jpeg', href: '/admin/menu' },
+  { label: 'Orders', iconSrc: '/schoolcatering/assets/icons/order.jpeg', href: '/admin/orders' },
+  { label: 'Billing', iconSrc: '/schoolcatering/assets/icons/billing.jpeg', href: '/admin/billing' },
+  { label: 'Blackout', iconSrc: '/schoolcatering/assets/icons/blackout.jpeg', href: '/admin/blackout-dates' },
+  { label: 'Kitchen', iconSrc: '/schoolcatering/assets/icons/kitchen.jpeg', href: '/admin/kitchen' },
+  { label: 'Rating', iconSrc: '/schoolcatering/assets/icons/rating.jpeg', href: '/admin/rating' },
+  { label: 'Reports', iconSrc: '/schoolcatering/assets/icons/report.jpeg', href: '/admin/reports' },
 ];
 
 export default function AdminHub() {
@@ -39,8 +40,9 @@ export default function AdminHub() {
               }}
               aria-label={item.label}
             >
-              <span className="admin-hub-icon" aria-hidden="true">{item.icon}</span>
-              <span className="admin-hub-label">{item.label}</span>
+              <span className="admin-hub-icon" aria-hidden="true">
+                <Image src={item.iconSrc} alt="" width={160} height={160} className="admin-hub-icon-image" />
+              </span>
             </button>
           ))}
         </div>
@@ -93,17 +95,15 @@ export default function AdminHub() {
           box-shadow: 0 10px 24px rgba(122, 106, 88, 0.18);
         }
         .admin-hub-icon {
-          font-size: clamp(2rem, 11vw, 2.8rem);
-          line-height: 1;
-        }
-        .admin-hub-label {
           width: 100%;
-          text-align: center;
-          font-size: clamp(0.86rem, 3vw, 1rem);
-          font-weight: 700;
-          color: #5d4e3a;
-          line-height: 1.15;
-          text-wrap: balance;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .admin-hub-icon-image {
+          width: min(100%, 7.5rem);
+          height: auto;
+          object-fit: contain;
         }
       `}</style>
     </main>
