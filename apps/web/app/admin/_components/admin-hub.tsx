@@ -95,18 +95,13 @@ export default function AdminHub() {
           box-shadow: 0 10px 24px rgba(122, 106, 88, 0.18);
         }
         .admin-hub-icon {
-          flex: 1;
-          width: 100%;
           display: flex;
           align-items: center;
           justify-content: center;
-          overflow: hidden;
         }
         .admin-hub-icon-image {
-          width: 100%;
-          height: 100%;
-          max-width: 3.5rem;
-          max-height: 3.5rem;
+          width: 55%;
+          height: auto;
           object-fit: contain;
         }
       `}</style>
