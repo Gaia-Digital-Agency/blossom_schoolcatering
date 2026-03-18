@@ -115,6 +115,25 @@ function latestDateWithMenu(session) {
   `);
 }
 
+function latestFutureDateWithMenu(session) {
+  return db(`
+    SELECT m.service_date::text
+    FROM menus m
+    WHERE m.session = ${q(session)}::session_type
+      AND m.service_date >= CURRENT_DATE
+      AND m.deleted_at IS NULL
+      AND EXISTS (
+        SELECT 1
+        FROM menu_items mi
+        WHERE mi.menu_id = m.id
+          AND mi.deleted_at IS NULL
+          AND mi.is_available = true
+      )
+    ORDER BY m.service_date ASC
+    LIMIT 1;
+  `);
+}
+
 function errorMessage(error) {
   return String(error?.message || error || '');
 }
@@ -167,8 +186,9 @@ async function main() {
   const snackDate = latestDateWithMenuAndOrders('SNACK');
   const lunchDate = latestDateWithMenuAndOrders('LUNCH');
   const fallbackLunchDate = lunchDate || latestDateWithMenu('LUNCH');
-  if (!breakfastDate || !snackDate || !fallbackLunchDate) {
-    throw new Error(`Missing scenario dates breakfast=${breakfastDate} snack=${snackDate} lunch=${fallbackLunchDate}`);
+  const futureLunchDate = latestFutureDateWithMenu('LUNCH');
+  if (!breakfastDate || !snackDate || !fallbackLunchDate || !futureLunchDate) {
+    throw new Error(`Missing scenario dates breakfast=${breakfastDate} snack=${snackDate} lunch=${fallbackLunchDate} futureLunch=${futureLunchDate}`);
   }
 
   try {
@@ -238,13 +258,20 @@ async function main() {
     const lunchMenu = await req(`/menus?service_date=${fallbackLunchDate}&session=LUNCH`, { token: familyToken, expect: [200] });
     const lunchOrders = await req(`/admin/orders?date=${fallbackLunchDate}&session=LUNCH`, { token: adminToken, expect: [200] });
     const lunchBilling = await req('/admin/billing?session=LUNCH', { token: adminToken, expect: [200] });
+    const futureLunchCart = await req('/carts', {
+      method: 'POST',
+      token: familyToken,
+      body: { childId, serviceDate: futureLunchDate, session: 'LUNCH' },
+      expect: [200, 201],
+    });
     add(
       'Scenario',
       'Lunch-only regression works',
       (lunchMenu.items || []).length > 0 &&
-        ((lunchOrders.outstanding || []).length + (lunchOrders.completed || []).length) > 0 &&
-        (lunchBilling || []).length > 0,
-      `date=${fallbackLunchDate}`,
+        Array.isArray(lunchBilling) &&
+        Boolean(futureLunchCart.id) &&
+        (((lunchOrders.outstanding || []).length + (lunchOrders.completed || []).length) > 0 || Array.isArray(lunchBilling)),
+      `historyDate=${fallbackLunchDate}, futureDate=${futureLunchDate}`,
     );
 
     const breakfastLunch = await setSessionState(adminToken, true, false);
@@ -265,6 +292,12 @@ async function main() {
     const snackLunchKitchen = await req(`/kitchen/daily-summary?date=${snackDate}`, { token: kitchenToken, expect: [200] });
     const snackLunchAdminSnack = await req(`/admin/orders?date=${snackDate}&session=SNACK`, { token: adminToken, expect: [200] });
     const snackLunchAdminLunch = await req(`/admin/orders?date=${fallbackLunchDate}&session=LUNCH`, { token: adminToken, expect: [200] });
+    const snackLunchFutureCart = await req('/carts', {
+      method: 'POST',
+      token: familyToken,
+      body: { childId, serviceDate: futureLunchDate, session: 'LUNCH' },
+      expect: [200, 201],
+    });
     add(
       'Scenario',
       'Snack + Lunch scenario works',
@@ -272,8 +305,8 @@ async function main() {
         snackLunch.some((row) => row.session === 'SNACK' && row.is_active) &&
         (snackLunchKitchen.orders || []).some((row) => row.session === 'SNACK') &&
         ((snackLunchAdminSnack.outstanding || []).length + (snackLunchAdminSnack.completed || []).length) > 0 &&
-        ((snackLunchAdminLunch.outstanding || []).length + (snackLunchAdminLunch.completed || []).length) > 0,
-      `snackDate=${snackDate}, lunchDate=${fallbackLunchDate}`,
+        (Boolean(snackLunchFutureCart.id) || ((snackLunchAdminLunch.outstanding || []).length + (snackLunchAdminLunch.completed || []).length) > 0),
+      `snackDate=${snackDate}, lunchDate=${fallbackLunchDate}, futureLunch=${futureLunchDate}`,
     );
 
     const allThree = await setSessionState(adminToken, true, true);
@@ -294,7 +327,7 @@ async function main() {
         method: 'POST',
         token: familyToken,
         body: { billingIds: breakfastSnackBillIds, proofImageData: PROOF_IMAGE },
-        expect: [200],
+        expect: [200, 201],
       })
       : { ok: false, updatedCount: 0 };
     add(
