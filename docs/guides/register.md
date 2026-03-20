@@ -1,36 +1,45 @@
-# Registration Guide (Youngster + Parent)
+# Registration Guide
 
-Last updated: 2026-02-28
+Last updated: 2026-03-20
 
-URL: `/schoolcatering/register/youngsters`
+## Active Registration Route
+- `/schoolcatering/register/youngsters`
 
-This is the active youngster onboarding flow. It can create or link parent data in the same submission.
+## What Registration Does
+- Creates one family account.
+- Creates one or more linked student accounts in the same registration.
+- Supports `1` to `5` students in one family registration.
+- Supports registration by `Parent`, `Student`, or `Guardian/Teacher`.
 
-## Required Inputs
-- Registrant type (`Youngster`, `Parent`, `Teacher`)
-- Youngster first name, last name, gender, date of birth
-- Youngster school and grade
-- Youngster phone
-- Youngster allergies
-- Parent first name, last name, mobile, email
+## Required Family Details
+- Family Group Name
+- Parent First Name
+- Parent Phone Number
+- Parent Email
+- Parent Password and Confirm Password
 
-## Conditional Inputs
-- `Teacher Name` is required only when registrant type is `Teacher`.
+## Required Student Details
+- Student First Name
+- Date of Birth
+- Grade at Registration Date
+- School
+- Phone Number
+- Email
+- Allergies choice
 
-## Optional Inputs
-- Youngster email
-- Parent address
+## Registration Rules
+- Parent and student contact details are compulsory.
+- Parent and student emails must be unique.
+- Parent and student phone numbers must be unique.
+- Student email cannot be the same as parent email.
+- Student phone number cannot be the same as parent phone number.
 
-## Behavior Notes
-- School list is loaded from active admin-managed schools.
-- Parent account can be reused if parent email already exists.
-- Successful registration links parent and youngster records.
-- Record mode (`?mode=record`) is read-only for authenticated parent/youngster users.
+## Username and Password
+- Parent username is auto-created as `familyName_parentName`.
+- Student username is auto-created as `familyName_studentName`.
+- Parent sets the family password during registration.
+- Each student gets an auto-generated password.
 
-## Data Linking
-Successful flow writes/updates:
-- `users`
-- `parents`
-- `children`
-- `parent_children`
-- registration metadata fields on `children`
+## Important
+- Keep the Registration Successful card information safely.
+- Admin should handle later family or student corrections instead of re-registration.

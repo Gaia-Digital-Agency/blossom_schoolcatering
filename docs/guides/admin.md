@@ -1,37 +1,32 @@
 # Admin User Guide
 
-Last updated: 2026-03-09
+Last updated: 2026-03-20
 
 ## Access
 - Login: `/schoolcatering/admin/login`
 - Main dashboard: `/schoolcatering/admin`
 
-## Main Navigation
-- `Dashboard`
-- `Menu`
-- `Parents`
-- `Youngsters`
-- `Schools`
-- `Blackout Dates`
-- `Billing`
-- `Delivery`
-- `Reports`
-- `Kitchen`
+## Main Responsibilities
+- Manage family and student records.
+- Manage schools and student-school links.
+- Manage menu items, ingredients, and availability.
+- Review billing proof and verify or reject payments.
+- Manage delivery users and school-delivery assignments.
+- Manage blackout dates and ordering controls.
+- Review revenue and operational reports.
 
-## Operational Responsibilities
-- Parents: list and reset password.
-- Youngsters: create, edit, delete, reset password.
-- Schools: create, activate/deactivate, delete.
-- Sessions: toggle snack/breakfast (`LUNCH` is system-enforced ON).
-- Blackout dates: create/list/delete blocked dates.
-- Menu: create/update/delete/toggle dishes, manage ingredients, seed menus, upload images.
-- Billing: view payment proof (authenticated stream), verify/reject payment proof, generate receipts.
-- Delivery: manage users, school mappings, and auto-assignment.
-- Reports: revenue analytics with filters.
-- Kitchen monitor: read live summary from admin view.
+## Family and Student Management
+- `Admin Family` shows existing family groups, usernames, linked students, and password tools.
+- `Admin Student` allows Admin to add, edit, reassign, and delete students under a family.
+- Admin can view and reset parent and student passwords.
+- Admin can change which school a student is linked to.
 
-## Practical Tips
-- Confirm active schools and sessions before checking parent ordering issues.
-- Use blackout page for date-level ordering/service controls.
-- For registration data edits, use `Youngsters` and `Parents` admin screens rather than public registration routes.
-- Youngster password reset action now runs via youngster-scoped endpoint (`/admin/youngsters/:youngsterId/reset-password`) instead of generic user route.
+## Dashboard Controls
+- Update the homepage hero image and chef message.
+- Update the assistance message shown to family and student users.
+- Monitor counts for family, student, delivery, billing, menu, and kitchen operations.
+
+## Good Practice
+- Use Admin Student for student corrections instead of asking users to re-register.
+- Check school links before investigating delivery issues.
+- Check blackout dates and cutoff settings before investigating ordering complaints.

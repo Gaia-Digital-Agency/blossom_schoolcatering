@@ -1,31 +1,19 @@
-# Menu User Guide
+# Menu Guide
 
-Last updated: 2026-02-28
+Last updated: 2026-03-20
 
-## Admin Menu Management
+## What Users See
+- Available dishes for the active date and session.
+- Dish name, category, description, and price.
+- Dish types include `Main`, `Dessert`, and `Drinks`.
+
+## Ordering Notes
+- Users can add dishes to draft before placing an order.
+- One unique dish entry per meal line is allowed.
+- Maximum 5 dishes per meal order.
+- Menu availability can change by date, session, and Admin settings.
+
+## Admin Side
 - Route: `/schoolcatering/admin/menu`
-- Set context by service date and session.
-- Actions:
-  - create dish
-  - update dish
-  - delete dish
-  - activate/deactivate dish
-  - seed sample menus
-
-## Dish Data Fields
-- Name and description.
-- Nutrition facts text and calories.
-- Price.
-- Ingredient links.
-- Display order.
-- Cutlery required flag.
-- Packing requirement flag.
-- Image URL/upload.
-
-## Ingredient and Image Workflow
-- Missing ingredients can be created directly from menu workflow.
-- Uploaded images are processed before save and stored for runtime access.
-
-## Ordering Impact
-- Parent/youngster menus consume active dishes from this module.
-- Session availability and service date validity are still enforced server-side.
+- Create, edit, activate, deactivate, and delete dishes.
+- Manage ingredients and uploaded dish images.

@@ -1,30 +1,17 @@
 # Delivery User Guide
 
-Last updated: 2026-02-28
+Last updated: 2026-03-20
 
 ## Access
 - Login: `/schoolcatering/delivery/login`
 - Main page: `/schoolcatering/delivery`
 
-## Assignment Workflow
-- Pick date manually or use quick controls:
-  - `Past`
-  - `Today`
-  - `Future`
-- Use `Refresh Assignments` to reload latest assignment state.
-- Assignments are grouped by school.
+## Core Workflow
+- Select service date.
+- Review assigned orders grouped by school.
+- Check student name, school, and delivery details.
+- Mark delivery complete when the meal has been delivered.
 
-## Assignment Details
-- Service date and session.
-- Order ID.
-- Youngster name and mobile.
-- Parent name.
-- Delivery status and confirmation timestamp.
-
-## Completion Actions
-- Optional confirmation note can be entered.
-- `Mark Complete` sets assignment to completed state.
-- `Completed (Click to Undo)` toggles it back.
-
-## Dependency
-- Admin must create active school-delivery mappings in `/schoolcatering/admin/delivery`.
+## Notes
+- Delivery assignment depends on school-delivery mapping set by Admin.
+- Delivery users work from the student-school link maintained by Admin.

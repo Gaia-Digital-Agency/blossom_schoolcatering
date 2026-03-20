@@ -39,6 +39,11 @@ export class AppController {
       VALUES ('ordering_cutoff_time', '08:00')
       ON CONFLICT (setting_key) DO NOTHING;
     `);
+    await runSql(`
+      INSERT INTO site_settings (setting_key, setting_value)
+      VALUES ('assistance_message', 'For Assistance Please Whatsapp +6285211710217')
+      ON CONFLICT (setting_key) DO NOTHING;
+    `);
   }
 
   /**
@@ -56,17 +61,19 @@ export class AppController {
           COALESCE(MAX(CASE WHEN setting_key = 'chef_message' THEN setting_value END), '') AS chef_message,
           COALESCE(MAX(CASE WHEN setting_key = 'hero_image_url' THEN setting_value END), '/schoolcatering/assets/hero-meal.jpg') AS hero_image_url,
           COALESCE(MAX(CASE WHEN setting_key = 'hero_image_caption' THEN setting_value END), 'Enchanting Nourished Zesty Original Meals') AS hero_image_caption,
-          COALESCE(MAX(CASE WHEN setting_key = 'ordering_cutoff_time' THEN setting_value END), '08:00') AS ordering_cutoff_time
+          COALESCE(MAX(CASE WHEN setting_key = 'ordering_cutoff_time' THEN setting_value END), '08:00') AS ordering_cutoff_time,
+          COALESCE(MAX(CASE WHEN setting_key = 'assistance_message' THEN setting_value END), 'For Assistance Please Whatsapp +6285211710217') AS assistance_message
         FROM site_settings
       ) t;
     `);
     const line = out.split('\n').map((x: string) => x.trim()).find(Boolean);
-    const data = line ? (JSON.parse(line) as { chef_message?: string; hero_image_url?: string; hero_image_caption?: string; ordering_cutoff_time?: string }) : {};
+    const data = line ? (JSON.parse(line) as { chef_message?: string; hero_image_url?: string; hero_image_caption?: string; ordering_cutoff_time?: string; assistance_message?: string }) : {};
     return {
       chef_message: data.chef_message ?? '',
       hero_image_url: data.hero_image_url ?? '/schoolcatering/assets/hero-meal.jpg',
       hero_image_caption: data.hero_image_caption ?? 'Enchanting Nourished Zesty Original Meals',
       ordering_cutoff_time: data.ordering_cutoff_time ?? '08:00',
+      assistance_message: data.assistance_message ?? 'For Assistance Please Whatsapp +6285211710217',
     };
   }
 

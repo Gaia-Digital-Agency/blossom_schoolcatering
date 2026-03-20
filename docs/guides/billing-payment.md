@@ -1,31 +1,30 @@
-# Billing & Payment User Guide
+# Billing and Payment Guide
 
-Last updated: 2026-03-09
+Last updated: 2026-03-20
 
-## Parent Side
-- Route: `/schoolcatering/parents/billing`
-- View consolidated billing by youngster.
-- Select unpaid bills and upload one proof image for batch processing.
-- `View Proof Image` now uses authenticated in-app endpoint to support private storage objects.
-- Status lifecycle:
-  - `UNPAID`
-  - `PENDING_VERIFICATION`
-  - `VERIFIED`
-  - `REJECTED`
-- Open receipt once generated and available.
+## Family and Student Side
+- Billing is available from the Family and Student modules.
+- Users can review unpaid and paid billing items.
+- Payment proof can be uploaded for unpaid bills.
+- Uploaded proof stays in review until Admin verifies or rejects it.
+
+## Billing Status Flow
+1. `UNPAID`
+2. `PENDING_VERIFICATION`
+3. `VERIFIED` or `REJECTED`
+
+## What Users Should Do
+- Review the billing rows carefully before payment.
+- Upload a clear payment proof image.
+- Wait for Admin verification.
+- Open the receipt when the bill is verified and the receipt is available.
 
 ## Admin Side
 - Route: `/schoolcatering/admin/billing`
-- Review billing rows and proof status.
-- `View Proof` uses authenticated proof stream endpoint.
-- Use actions:
-  - `Verify`
-  - `Reject`
-  - `Generate Receipt`
-  - `Regenerate Receipt`
-- Billing status and delivery status are shown together for operational checks.
+- View proof
+- Verify payment
+- Reject payment
+- Generate or regenerate receipt
 
-## Guidance
-- If proof upload appears successful but receipt is missing, verify billing is `VERIFIED` and receipt has been generated.
-- Receipt/PDF generation depends on storage credential setup in runtime environment.
-- Action errors and rejected/unallowed operations are shown inline in bold red for visibility.
+## Useful Note
+- If proof upload succeeds but receipt is missing, the bill usually still needs verification or receipt generation.

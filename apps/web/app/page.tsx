@@ -132,6 +132,7 @@ export default function HomePage() {
             <div className="auth-grid">
               <Link className="btn btn-primary" href="/login">Log In</Link>
               <Link className="btn btn-outline" href="/register">Register</Link>
+              <Link className="btn btn-outline" href="/userguide">User Guide</Link>
             </div>
           </section>
         </main>

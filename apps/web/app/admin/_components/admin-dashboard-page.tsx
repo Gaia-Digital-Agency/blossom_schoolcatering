@@ -109,6 +109,7 @@ export default function AdminPage() {
   const [heroImageFile, setHeroImageFile] = useState<File | null>(null);
   const [chefMessageSaving, setChefMessageSaving] = useState(false);
   const [chefMessageStatus, setChefMessageStatus] = useState<'idle' | 'saved' | 'error'>('idle');
+  const [assistanceMessage, setAssistanceMessage] = useState('For Assistance Please Whatsapp +6285211710217');
 
   /**
    * Fetches the main dashboard data from the API.
@@ -135,10 +136,12 @@ export default function AdminPage() {
         chef_message: string;
         hero_image_url?: string;
         hero_image_caption?: string;
+        assistance_message?: string;
       };
       setChefMessage(result.chef_message ?? '');
       setHeroImageUrl(result.hero_image_url ?? '/schoolcatering/assets/hero-meal.jpg');
       setHeroImageCaption(result.hero_image_caption ?? 'Enchanting Nourished Zesty Original Meals');
+      setAssistanceMessage(result.assistance_message ?? 'For Assistance Please Whatsapp +6285211710217');
       setHeroImageFileName('');
       setHeroImageFile(null);
       setHeroImagePreviewUrl('');
@@ -181,6 +184,7 @@ export default function AdminPage() {
           chef_message: chefMessage,
           hero_image_url: nextHeroImageUrl,
           hero_image_caption: heroImageCaption,
+          assistance_message: assistanceMessage,
         }),
       });
       setHeroImageUrl(nextHeroImageUrl);
@@ -264,6 +268,15 @@ export default function AdminPage() {
                 value={chefMessage}
                 onChange={(e) => { setChefMessage(e.target.value); setChefMessageStatus('idle'); }}
                 placeholder="Write the chef's personal message shown on the homepage…"
+              />
+            </label>
+            <label>
+              Assistance Message
+              <input
+                maxLength={200}
+                value={assistanceMessage}
+                onChange={(e) => { setAssistanceMessage(e.target.value); setChefMessageStatus('idle'); }}
+                placeholder="Edit the assistance message shown to family and student users…"
               />
             </label>
             <div className="chef-message-footer">

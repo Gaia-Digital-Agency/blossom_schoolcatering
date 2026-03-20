@@ -39,6 +39,7 @@ export default function ModuleHub({
   title: string;
 }) {
   const [subtitle, setSubtitle] = useState('');
+  const [assistanceMessage, setAssistanceMessage] = useState('For Assistance Please Whatsapp +6285211710217');
 
   useEffect(() => {
     let active = true;
@@ -70,6 +71,20 @@ export default function ModuleHub({
     };
   }, [module]);
 
+  useEffect(() => {
+    let active = true;
+    fetch('/schoolcatering/api/v1/public/site-settings', { credentials: 'include' })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data: { assistance_message?: string } | null) => {
+        if (!active) return;
+        if (data?.assistance_message?.trim()) setAssistanceMessage(data.assistance_message.trim());
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <main className="page-auth page-auth-mobile">
       <section className="auth-panel">
@@ -93,6 +108,7 @@ export default function ModuleHub({
             </button>
           ))}
         </div>
+        <div className="module-guide-card module-assistance-card">{assistanceMessage}</div>
         <LogoutButton showRecord={false} sticky={false} />
       </section>
       <style jsx>{`
@@ -124,6 +140,11 @@ export default function ModuleHub({
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 0.75rem;
+        }
+        .module-assistance-card {
+          margin-top: 0.25rem;
+          text-align: center;
+          font-weight: 700;
         }
         .module-hub-card {
           aspect-ratio: 1;

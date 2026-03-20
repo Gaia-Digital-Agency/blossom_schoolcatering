@@ -8449,6 +8449,11 @@ export class CoreService implements OnModuleInit {
       VALUES ('ordering_cutoff_time', '08:00')
       ON CONFLICT (setting_key) DO NOTHING;
     `);
+    await runSql(`
+      INSERT INTO site_settings (setting_key, setting_value)
+      VALUES ('assistance_message', 'For Assistance Please Whatsapp +6285211710217')
+      ON CONFLICT (setting_key) DO NOTHING;
+    `);
   }
 
   async getSiteSettings() {
@@ -8460,31 +8465,37 @@ export class CoreService implements OnModuleInit {
           COALESCE(MAX(CASE WHEN setting_key = 'chef_message' THEN setting_value END), '') AS chef_message,
           COALESCE(MAX(CASE WHEN setting_key = 'hero_image_url' THEN setting_value END), '/schoolcatering/assets/hero-meal.jpg') AS hero_image_url,
           COALESCE(MAX(CASE WHEN setting_key = 'hero_image_caption' THEN setting_value END), 'Enchanting Nourished Zesty Original Meals') AS hero_image_caption,
-          COALESCE(MAX(CASE WHEN setting_key = 'ordering_cutoff_time' THEN setting_value END), '08:00') AS ordering_cutoff_time
+          COALESCE(MAX(CASE WHEN setting_key = 'ordering_cutoff_time' THEN setting_value END), '08:00') AS ordering_cutoff_time,
+          COALESCE(MAX(CASE WHEN setting_key = 'assistance_message' THEN setting_value END), 'For Assistance Please Whatsapp +6285211710217') AS assistance_message
         FROM site_settings
       ) t;
     `);
     const lines = out.split('\n').map((x: string) => x.trim()).filter(Boolean);
     const data = lines[0]
-      ? (JSON.parse(lines[0]) as { chef_message?: string; hero_image_url?: string; hero_image_caption?: string; ordering_cutoff_time?: string })
+      ? (JSON.parse(lines[0]) as { chef_message?: string; hero_image_url?: string; hero_image_caption?: string; ordering_cutoff_time?: string; assistance_message?: string })
       : {};
     return {
       chef_message: data.chef_message ?? '',
       hero_image_url: data.hero_image_url ?? '/schoolcatering/assets/hero-meal.jpg',
       hero_image_caption: data.hero_image_caption ?? 'Enchanting Nourished Zesty Original Meals',
       ordering_cutoff_time: this.normalizeOrderingCutoffTime(data.ordering_cutoff_time ?? '08:00'),
+      assistance_message: data.assistance_message ?? 'For Assistance Please Whatsapp +6285211710217',
     };
   }
 
-  async updateSiteSettings(actor: AccessUser, input: { chef_message?: string; hero_image_url?: string; hero_image_caption?: string; ordering_cutoff_time?: string }) {
+  async updateSiteSettings(actor: AccessUser, input: { chef_message?: string; hero_image_url?: string; hero_image_caption?: string; ordering_cutoff_time?: string; assistance_message?: string }) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     const chefMessage = typeof input.chef_message === 'string' ? input.chef_message.trim() : '';
     const heroImageUrl = typeof input.hero_image_url === 'string' ? input.hero_image_url.trim() : '/schoolcatering/assets/hero-meal.jpg';
     const heroImageCaption = typeof input.hero_image_caption === 'string' ? input.hero_image_caption.trim() : 'Enchanting Nourished Zesty Original Meals';
     const orderingCutoffTime = this.normalizeOrderingCutoffTime(input.ordering_cutoff_time ?? '08:00');
+    const assistanceMessage = typeof input.assistance_message === 'string'
+      ? input.assistance_message.trim()
+      : 'For Assistance Please Whatsapp +6285211710217';
     if (chefMessage.length > 500) throw new BadRequestException('chef_message must be 500 characters or fewer');
     if (heroImageCaption.length > 200) throw new BadRequestException('hero_image_caption must be 200 characters or fewer');
     if (heroImageUrl.length > 2000) throw new BadRequestException('hero_image_url must be 2000 characters or fewer');
+    if (assistanceMessage.length > 200) throw new BadRequestException('assistance_message must be 200 characters or fewer');
     await this.ensureSiteSettingsTable();
     await runSql(
       `INSERT INTO site_settings (setting_key, setting_value, updated_at)
@@ -8492,16 +8503,18 @@ export class CoreService implements OnModuleInit {
          ('chef_message', $1, now()),
          ('hero_image_url', $2, now()),
          ('hero_image_caption', $3, now()),
-         ('ordering_cutoff_time', $4, now())
+         ('ordering_cutoff_time', $4, now()),
+         ('assistance_message', $5, now())
        ON CONFLICT (setting_key)
        DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = now();`,
-      [chefMessage, heroImageUrl || '/schoolcatering/assets/hero-meal.jpg', heroImageCaption, orderingCutoffTime],
+      [chefMessage, heroImageUrl || '/schoolcatering/assets/hero-meal.jpg', heroImageCaption, orderingCutoffTime, assistanceMessage],
     );
     return {
       chef_message: chefMessage,
       hero_image_url: heroImageUrl || '/schoolcatering/assets/hero-meal.jpg',
       hero_image_caption: heroImageCaption,
       ordering_cutoff_time: orderingCutoffTime,
+      assistance_message: assistanceMessage,
     };
   }
 
