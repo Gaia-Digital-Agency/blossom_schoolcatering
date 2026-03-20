@@ -82,6 +82,8 @@ export function middleware(request: NextRequest) {
     normalizedPath.startsWith('/menu/') ||
     normalizedPath === '/guide' ||
     normalizedPath.startsWith('/guide/') ||
+    normalizedPath === '/userguide' ||
+    normalizedPath.startsWith('/userguide/') ||
     normalizedPath === '/login' ||
     normalizedPath === '/register' ||
     normalizedPath.startsWith('/register/');

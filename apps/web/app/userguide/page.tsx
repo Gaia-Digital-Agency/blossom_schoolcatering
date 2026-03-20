@@ -36,8 +36,9 @@ export default async function UserGuidePage() {
             billing, rating, and support.
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.55rem', marginTop: '0.85rem' }}>
-            <Link href="/guide" className="btn btn-outline">All Guides</Link>
             <Link href="/login" className="btn btn-primary">Log In</Link>
+            <Link href="/register" className="btn btn-outline">Register</Link>
+            <Link href="/guide" className="btn btn-outline">All Guide</Link>
           </div>
         </div>
 

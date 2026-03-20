@@ -172,6 +172,10 @@ h1 {
   gap: 0.35rem;
 }
 
+.home-auth-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .google-oauth-wrap {
   display: flex;
   justify-content: center;
@@ -190,6 +194,7 @@ h1 {
   align-items: center;
   justify-content: center;
   min-height: 2.2rem;
+  padding: 0.6rem 1rem;
   border-radius: 0.65rem;
   text-decoration: none;
   font-weight: 600;
@@ -1160,6 +1165,10 @@ button:disabled,
   .auth-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.55rem;
+  }
+
+  .home-auth-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .page-auth-desktop .auth-form {

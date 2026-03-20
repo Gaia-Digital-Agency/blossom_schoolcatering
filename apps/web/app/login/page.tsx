@@ -60,8 +60,8 @@ export default function LoginPage() {
           <small><strong>Admin</strong>: <code>admin</code> / <code>teameditor123</code></small>
           <small><strong>Kitchen</strong>: <code>kitchen</code> / <code>teameditor123</code></small>
           <small><strong>Delivery</strong>: <code>delivery_username</code> / <code>teameditor123</code></small>
-          <small><strong>Family</strong>: <code>familyName_parenttName</code> / <code>Teameditor@123</code></small>
-          <small><strong>Student</strong>: <code>familyName_studentName</code> / <code>Teameditor@123</code></small>
+          <small><strong>Family</strong>: <code>familyname_parentname</code> / <code>Teameditor@123</code></small>
+          <small><strong>Student</strong>: <code>familyname_studentname</code> / <code>Teameditor@123</code></small>
         </div>
         <form onSubmit={onSubmit} className="auth-form" autoComplete="off">
           <label>

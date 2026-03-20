@@ -129,10 +129,10 @@ export default function HomePage() {
             <p className="lead">
               Meals For Students, Up To Five Dishes Per Meal, Register or Log In.
             </p>
-            <div className="auth-grid">
+            <div className="auth-grid home-auth-grid">
               <Link className="btn btn-primary" href="/login">Log In</Link>
               <Link className="btn btn-outline" href="/register">Register</Link>
-              <Link className="btn btn-outline" href="/userguide">User Guide</Link>
+              <Link className="btn btn-outline" href="/userguide">Guide</Link>
             </div>
           </section>
         </main>
