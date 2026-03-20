@@ -1,4 +1,31 @@
-import { IsIn, IsOptional, IsString, Matches, MaxLength, ValidateIf } from 'class-validator';
+import { Type } from 'class-transformer';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsOptional, IsString, IsUUID, Matches, MaxLength, ValidateIf, ValidateNested } from 'class-validator';
+
+export class RegisterFamilyStudentDto {
+  @IsString()
+  youngsterFirstName!: string;
+
+  @IsString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  youngsterDateOfBirth!: string;
+
+  @IsString()
+  @IsUUID('4')
+  youngsterSchoolId!: string;
+
+  @IsString()
+  youngsterGrade!: string;
+
+  @IsString()
+  youngsterPhone!: string;
+
+  @IsString()
+  youngsterEmail!: string;
+
+  @IsString()
+  @MaxLength(50)
+  youngsterAllergies!: string;
+}
 
 export class RegisterYoungsterWithParentDto {
   @IsString()
@@ -14,30 +41,12 @@ export class RegisterYoungsterWithParentDto {
   @IsString()
   teacherPhone?: string;
 
-  @IsString()
-  youngsterFirstName!: string;
-
-  @IsString()
-  @Matches(/^\d{4}-\d{2}-\d{2}$/)
-  youngsterDateOfBirth!: string;
-
-  @IsString()
-  youngsterSchoolId!: string;
-
-  @IsString()
-  youngsterGrade!: string;
-
-  @ValidateIf((o: RegisterYoungsterWithParentDto) => o.registrantType === 'YOUNGSTER' || o.registrantType === 'TEACHER')
-  @IsString()
-  youngsterPhone?: string;
-
-  @IsOptional()
-  @IsString()
-  youngsterEmail?: string;
-
-  @IsString()
-  @MaxLength(50)
-  youngsterAllergies!: string;
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(5)
+  @ValidateNested({ each: true })
+  @Type(() => RegisterFamilyStudentDto)
+  students!: RegisterFamilyStudentDto[];
 
   @IsString()
   parentFirstName!: string;

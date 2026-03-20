@@ -356,6 +356,59 @@ export class CoreService implements OnModuleInit {
     return `${digits}123456`.slice(0, 6);
   }
 
+  private normalizePhone(raw?: string | null) {
+    return String(raw || '').trim();
+  }
+
+  private phoneCompareKey(raw?: string | null) {
+    const digits = String(raw || '').replace(/\D/g, '');
+    return digits || String(raw || '').trim().toLowerCase();
+  }
+
+  private async findActiveUserByEmail(email?: string | null, excludeUserId?: string) {
+    const normalized = String(email || '').trim().toLowerCase();
+    if (!normalized) return null;
+    const params: unknown[] = [normalized];
+    const exclusion = excludeUserId ? ` AND id <> $2` : '';
+    if (excludeUserId) params.push(excludeUserId);
+    const out = await runSql(
+      `SELECT row_to_json(t)::text
+       FROM (
+         SELECT id, role::text AS role, username
+         FROM users
+         WHERE is_active = true
+           AND deleted_at IS NULL
+           AND lower(email) = $1
+           ${exclusion}
+         LIMIT 1
+       ) t;`,
+      params,
+    );
+    return out ? this.parseJsonLine<{ id: string; role: string; username: string }>(out) : null;
+  }
+
+  private async findActiveUserByPhone(phoneNumber?: string | null, excludeUserId?: string) {
+    const normalized = this.phoneCompareKey(phoneNumber);
+    if (!normalized) return null;
+    const params: unknown[] = [normalized];
+    const exclusion = excludeUserId ? ` AND id <> $2` : '';
+    if (excludeUserId) params.push(excludeUserId);
+    const out = await runSql(
+      `SELECT row_to_json(t)::text
+       FROM (
+         SELECT id, role::text AS role, username
+         FROM users
+         WHERE is_active = true
+           AND deleted_at IS NULL
+           AND regexp_replace(COALESCE(phone_number, ''), '[^0-9]', '', 'g') = $1
+           ${exclusion}
+         LIMIT 1
+       ) t;`,
+      params,
+    );
+    return out ? this.parseJsonLine<{ id: string; role: string; username: string }>(out) : null;
+  }
+
   private buildTwoColumnDeliveryPdfLines(input: {
     title: string;
     serviceDate: string;
@@ -1589,12 +1642,15 @@ export class CoreService implements OnModuleInit {
 
     const firstName = (input.firstName || '').trim();
     const lastName = (input.lastName || '').trim();
-    const phoneNumber = (input.phoneNumber || '').trim();
+    const phoneNumber = this.normalizePhone(input.phoneNumber);
     const email = (input.email || '').trim().toLowerCase();
     const dateOfBirth = (input.dateOfBirth || '').trim();
     const gender = (input.gender || '').trim().toUpperCase();
     const schoolId = (input.schoolId || '').trim();
     const schoolGrade = (input.schoolGrade || '').trim();
+    if (!phoneNumber) throw new BadRequestException('Student phone number is required');
+    if (!email) throw new BadRequestException('Student email is required');
+    if (!email.includes('@')) throw new BadRequestException('Student email must be valid');
     if (actor.role === 'PARENT' && !String(input.allergies || '').trim()) {
       throw new BadRequestException('Allergies is required');
     }
@@ -1631,7 +1687,38 @@ export class CoreService implements OnModuleInit {
       parentId = input.parentId;
     }
 
-    const usernameBase = this.sanitizeUsernamePart(`${lastName}_${firstName}`);
+    let parentLastNameForUsername = lastName;
+    if (parentId) {
+      const parentOut = await runSql(
+        `SELECT row_to_json(t)::text
+         FROM (
+           SELECT p.id, u.last_name, u.phone_number, u.email
+           FROM parents p
+           JOIN users u ON u.id = p.user_id
+           WHERE p.id = $1
+             AND p.deleted_at IS NULL
+             AND u.deleted_at IS NULL
+             AND u.is_active = true
+           LIMIT 1
+         ) t;`,
+        [parentId],
+      );
+      const parent = parentOut
+        ? this.parseJsonLine<{ id: string; last_name: string; phone_number?: string | null; email?: string | null }>(parentOut)
+        : null;
+      if (!parent) throw new BadRequestException('Parent profile not found');
+      parentLastNameForUsername = String(parent.last_name || '').trim() || lastName;
+      if (email === String(parent.email || '').trim().toLowerCase()) {
+        throw new BadRequestException('Student email cannot be the same as parent email');
+      }
+      if (this.phoneCompareKey(phoneNumber) === this.phoneCompareKey(parent.phone_number)) {
+        throw new BadRequestException('Student phone number cannot be the same as parent phone number');
+      }
+    }
+    if (await this.findActiveUserByEmail(email)) throw new ConflictException('That email is already taken');
+    if (await this.findActiveUserByPhone(phoneNumber)) throw new ConflictException('That phone number is already taken');
+
+    const usernameBase = this.sanitizeUsernamePart(`${parentLastNameForUsername}_${firstName}`);
     const username = await runSql(`SELECT generate_unique_username($1);`, [usernameBase]);
     const passwordSeed = phoneNumber.replace(/\D/g, '') || randomUUID().slice(0, 10);
     const passwordHash = this.hashPassword(passwordSeed);
@@ -7273,8 +7360,24 @@ export class CoreService implements OnModuleInit {
     const params: unknown[] = [];
     if (input.firstName) { params.push(input.firstName.trim()); updates.push(`first_name = $${params.length}`); }
     if (input.lastName) { params.push(input.lastName.trim()); updates.push(`last_name = $${params.length}`); }
-    if (input.phoneNumber) { params.push(input.phoneNumber.trim()); updates.push(`phone_number = $${params.length}`); }
-    if (input.email) { params.push(input.email.trim().toLowerCase()); updates.push(`email = $${params.length}`); }
+    if (input.phoneNumber !== undefined) {
+      const phoneNumber = this.normalizePhone(input.phoneNumber);
+      if (!phoneNumber) throw new BadRequestException('phoneNumber cannot be empty');
+      if (await this.findActiveUserByPhone(phoneNumber, parent.user_id)) {
+        throw new ConflictException('That phone number is already taken');
+      }
+      params.push(phoneNumber);
+      updates.push(`phone_number = $${params.length}`);
+    }
+    if (input.email !== undefined) {
+      const email = input.email.trim().toLowerCase();
+      if (!email) throw new BadRequestException('email cannot be empty');
+      if (await this.findActiveUserByEmail(email, parent.user_id)) {
+        throw new ConflictException('That email is already taken');
+      }
+      params.push(email);
+      updates.push(`email = $${params.length}`);
+    }
     if (updates.length > 0) {
       updates.push('updated_at = now()');
       params.push(parent.user_id);
@@ -7601,8 +7704,38 @@ export class CoreService implements OnModuleInit {
     const userParams: unknown[] = [];
     if (input.firstName) { userParams.push(input.firstName.trim()); userUpdates.push(`first_name = $${userParams.length}`); }
     if (input.lastName) { userParams.push(input.lastName.trim()); userUpdates.push(`last_name = $${userParams.length}`); }
-    if (input.phoneNumber) { userParams.push(input.phoneNumber.trim()); userUpdates.push(`phone_number = $${userParams.length}`); }
-    if (input.email !== undefined) { userParams.push(input.email.trim().toLowerCase() || null); userUpdates.push(`email = $${userParams.length}`); }
+    const currentUserOut = await runSql(
+      `SELECT row_to_json(t)::text FROM (
+         SELECT phone_number, email
+         FROM users
+         WHERE id = $1
+         LIMIT 1
+       ) t;`,
+      [child.user_id],
+    );
+    const currentUser = currentUserOut
+      ? this.parseJsonLine<{ phone_number?: string | null; email?: string | null }>(currentUserOut)
+      : { phone_number: null, email: null };
+    let nextPhone = String(currentUser.phone_number || '');
+    let nextEmail = String(currentUser.email || '').trim().toLowerCase();
+    if (input.phoneNumber !== undefined) {
+      nextPhone = this.normalizePhone(input.phoneNumber);
+      if (!nextPhone) throw new BadRequestException('phoneNumber cannot be empty');
+      if (await this.findActiveUserByPhone(nextPhone, child.user_id)) {
+        throw new ConflictException('That phone number is already taken');
+      }
+      userParams.push(nextPhone);
+      userUpdates.push(`phone_number = $${userParams.length}`);
+    }
+    if (input.email !== undefined) {
+      nextEmail = input.email.trim().toLowerCase();
+      if (!nextEmail) throw new BadRequestException('email cannot be empty');
+      if (await this.findActiveUserByEmail(nextEmail, child.user_id)) {
+        throw new ConflictException('That email is already taken');
+      }
+      userParams.push(nextEmail);
+      userUpdates.push(`email = $${userParams.length}`);
+    }
     if (userUpdates.length > 0) {
       userUpdates.push('updated_at = now()');
       userParams.push(child.user_id);
@@ -7621,6 +7754,30 @@ export class CoreService implements OnModuleInit {
     }
     if (input.parentId) {
       this.assertValidUuid(input.parentId, 'parentId');
+      const parentOut = await runSql(
+        `SELECT row_to_json(t)::text FROM (
+           SELECT u.phone_number, u.email
+           FROM parents p
+           JOIN users u ON u.id = p.user_id
+           WHERE p.id = $1
+             AND p.deleted_at IS NULL
+             AND u.deleted_at IS NULL
+             AND u.is_active = true
+           LIMIT 1
+         ) t;`,
+        [input.parentId],
+      );
+      const parent = parentOut
+        ? this.parseJsonLine<{ phone_number?: string | null; email?: string | null }>(parentOut)
+        : null;
+      if (!parent) throw new BadRequestException('Parent not found');
+      if (nextEmail && nextEmail === String(parent.email || '').trim().toLowerCase()) {
+        throw new BadRequestException('Student email cannot be the same as parent email');
+      }
+      if (this.phoneCompareKey(nextPhone) === this.phoneCompareKey(parent.phone_number)) {
+        throw new BadRequestException('Student phone number cannot be the same as parent phone number');
+      }
+      await runSql(`DELETE FROM parent_children WHERE child_id = $1;`, [youngsterId]);
       await runSql(
         `INSERT INTO parent_children (parent_id, child_id)
          VALUES ($1, $2)

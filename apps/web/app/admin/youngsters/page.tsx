@@ -215,6 +215,29 @@ export default function AdminYoungstersPage() {
       setError('Parent link is compulsory.');
       return;
     }
+    if (!phoneNumber.trim()) {
+      setError('Student phone number is compulsory.');
+      return;
+    }
+    if (!email.trim()) {
+      setError('Student email is compulsory.');
+      return;
+    }
+    if (!email.includes('@')) {
+      setError('Student email must be valid.');
+      return;
+    }
+    const selectedParent = parentById.get(selectedParentId);
+    const studentPhoneKey = phoneNumber.replace(/\D/g, '') || phoneNumber.trim();
+    const parentPhoneKey = (selectedParent?.phone_number || '').replace(/\D/g, '') || String(selectedParent?.phone_number || '').trim();
+    if (selectedParent && email.trim().toLowerCase() === String(selectedParent.email || '').trim().toLowerCase()) {
+      setError('Student email cannot be the same as the linked parent email.');
+      return;
+    }
+    if (selectedParent && studentPhoneKey && studentPhoneKey === parentPhoneKey) {
+      setError('Student phone number cannot be the same as the linked parent phone number.');
+      return;
+    }
     setBusy(true);
     try {
       if (editingYoungsterId) {
@@ -498,12 +521,12 @@ export default function AdminYoungstersPage() {
             </select>
           </label>
           <label>
-            Youngster Phone
+            Youngster Phone Number
             <input value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} required />
           </label>
           <label>
-            Youngster Email (Optional)
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            Youngster Email
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </label>
           <label>
             Youngster Allergies (Optional)
