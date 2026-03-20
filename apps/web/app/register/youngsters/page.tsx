@@ -309,15 +309,12 @@ export default function YoungsterRegisterPage() {
         setError(`Student ${number} Phone Number is required.`);
         return;
       }
-      if (!student.youngsterEmail.trim()) {
-        setError(`Student ${number} Email is required.`);
-        return;
-      }
-      if (!student.youngsterEmail.includes('@')) {
+      const studentEmail = student.youngsterEmail.trim().toLowerCase();
+      if (studentEmail && !studentEmail.includes('@')) {
         setError(`Student ${number} Email must be valid.`);
         return;
       }
-      if (student.youngsterEmail.trim().toLowerCase() === parentEmail.trim().toLowerCase()) {
+      if (studentEmail && studentEmail === parentEmail.trim().toLowerCase()) {
         setError(`Student ${number} Email cannot be the same as Parent Email.`);
         return;
       }
@@ -327,7 +324,7 @@ export default function YoungsterRegisterPage() {
         setError(`Student ${number} Phone Number cannot be the same as Parent Phone Number.`);
         return;
       }
-      if (seenEmails.has(student.youngsterEmail.trim().toLowerCase())) {
+      if (studentEmail && seenEmails.has(studentEmail)) {
         setError(`Student ${number} Email must be unique.`);
         return;
       }
@@ -335,7 +332,7 @@ export default function YoungsterRegisterPage() {
         setError(`Student ${number} Phone Number must be unique.`);
         return;
       }
-      seenEmails.add(student.youngsterEmail.trim().toLowerCase());
+      if (studentEmail) seenEmails.add(studentEmail);
       seenPhones.add(phoneKey);
       if (student.youngsterAllergySelection === 'HAS_ALLERGIES' && !normalizedAllergies) {
         setError(`Please enter Student ${number} allergies.`);
@@ -600,7 +597,7 @@ export default function YoungsterRegisterPage() {
                 </label>
                 <label>
                   Student Email
-                  <input type="email" value={student.youngsterEmail} onChange={(e) => setStudentField(index, 'youngsterEmail', e.target.value)} required />
+                  <input type="email" value={student.youngsterEmail} onChange={(e) => setStudentField(index, 'youngsterEmail', e.target.value)} />
                 </label>
                 <fieldset className="allergy-fieldset">
                   <div className="allergy-title">Student Allergies (Required)</div>

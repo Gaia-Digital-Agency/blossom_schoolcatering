@@ -67,7 +67,7 @@ type RegisterYoungsterWithParentInput = {
     youngsterSchoolId: string;
     youngsterGrade: string;
     youngsterPhone: string;
-    youngsterEmail: string;
+    youngsterEmail?: string;
     youngsterAllergies: string;
   }>;
   parentFirstName: string;
@@ -1203,29 +1203,31 @@ export class AuthService {
       const youngsterGrade = String(student?.youngsterGrade || '').trim();
       const youngsterPhone = this.normalizePhone(student?.youngsterPhone);
       const youngsterEmail = String(student?.youngsterEmail || '').trim().toLowerCase();
-      if (!youngsterFirstName || !youngsterDateOfBirth || !youngsterSchoolId || !youngsterGrade || !youngsterPhone || !youngsterEmail) {
+      if (!youngsterFirstName || !youngsterDateOfBirth || !youngsterSchoolId || !youngsterGrade || !youngsterPhone) {
         throw new BadRequestException(`Student ${index + 1} is missing required information.`);
       }
       if (!/^\d{4}-\d{2}-\d{2}$/.test(youngsterDateOfBirth)) {
         throw new BadRequestException(`Student ${index + 1} date of birth must be YYYY-MM-DD.`);
       }
-      if (!youngsterEmail.includes('@')) {
-        throw new BadRequestException(`Student ${index + 1} email must be valid.`);
-      }
-      if (youngsterEmail === parentEmail) {
-        throw new BadRequestException(`Student ${index + 1} email cannot be the same as parent email.`);
+      if (youngsterEmail) {
+        if (!youngsterEmail.includes('@')) {
+          throw new BadRequestException(`Student ${index + 1} email must be valid.`);
+        }
+        if (youngsterEmail === parentEmail) {
+          throw new BadRequestException(`Student ${index + 1} email cannot be the same as parent email.`);
+        }
       }
       const youngsterPhoneKey = this.phoneCompareKey(youngsterPhone);
       if (youngsterPhoneKey === this.phoneCompareKey(parentMobileNumber)) {
         throw new BadRequestException(`Student ${index + 1} phone number cannot be the same as parent phone number.`);
       }
-      if (seenEmails.has(youngsterEmail)) {
+      if (youngsterEmail && seenEmails.has(youngsterEmail)) {
         throw new BadRequestException(`Student ${index + 1} email must be unique.`);
       }
       if (seenPhones.has(youngsterPhoneKey)) {
         throw new BadRequestException(`Student ${index + 1} phone number must be unique.`);
       }
-      seenEmails.add(youngsterEmail);
+      if (youngsterEmail) seenEmails.add(youngsterEmail);
       seenPhones.add(youngsterPhoneKey);
 
       const youngsterAllergies = this.normalizeAllergies(student?.youngsterAllergies);
@@ -1273,7 +1275,7 @@ export class AuthService {
         throw new BadRequestException(`Student ${index + 1} is already registered for this family. Please contact Admin.`);
       }
 
-      if (await this.findUserByEmail(youngsterEmail)) {
+      if (youngsterEmail && await this.findUserByEmail(youngsterEmail)) {
         throw new BadRequestException(`Student ${index + 1} email already exists.`);
       }
       if (await this.findUserByPhone(youngsterPhone)) {

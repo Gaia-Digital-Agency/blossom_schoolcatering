@@ -19,8 +19,9 @@ export class RegisterFamilyStudentDto {
   @IsString()
   youngsterPhone!: string;
 
+  @IsOptional()
   @IsString()
-  youngsterEmail!: string;
+  youngsterEmail?: string;
 
   @IsString()
   @MaxLength(50)
