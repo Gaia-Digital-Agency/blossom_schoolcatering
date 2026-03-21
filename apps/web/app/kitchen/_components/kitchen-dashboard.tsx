@@ -18,6 +18,7 @@ type KitchenOrder = {
   status: string;
   delivery_status: string;
   school_name?: string;
+  school_grade?: string;
   child_name: string;
   youngster_mobile?: string | null;
   parent_name: string;
@@ -158,6 +159,7 @@ export default function KitchenDashboard({
       <article class=\"order-card\">
         <div><strong>Session:</strong> ${escapeHtml(getSessionLabel(o.session))}</div>
         <div><strong>Student:</strong> ${escapeHtml(o.child_name)}</div>
+        <div><strong>Grade:</strong> ${escapeHtml(o.school_grade || '-')}</div>
         <div><strong>School:</strong> ${escapeHtml(o.school_name || '-')}</div>
         <div><strong>Phone Number:</strong> ${escapeHtml(o.youngster_mobile || '-')}</div>
         <div><strong>Dietary Allergies:</strong> ${escapeHtml(o.allergen_items || '-')}</div>
@@ -333,6 +335,7 @@ export default function KitchenDashboard({
                   {filteredAlerts.map((o) => (
                     <article className="kitchen-alert-card" key={o.id}>
                       <strong>{getSessionLabel(o.session)} - {o.child_name}</strong>
+                      <small>Grade: {o.school_grade || '-'}</small>
                       <small>Family: {o.parent_name}</small>
                       <small>Dietary Allergies: {o.allergen_items || '-'}</small>
                       <small>Dishes: {o.dish_count}</small>
@@ -354,6 +357,7 @@ export default function KitchenDashboard({
                           <button className="kitchen-order-card" key={o.id} type="button" onClick={() => onMarkKitchenComplete(o.id)}>
                             <small>Session: {getSessionLabel(o.session)}</small>
                             <small>Student: {o.child_name}</small>
+                            <small>Grade: {o.school_grade || '-'}</small>
                             <small>School: {o.school_name || '-'}</small>
                             <small>Phone Number: {o.youngster_mobile || '-'}</small>
                             <small>Dietary Allergies: {o.allergen_items || '-'}</small>
@@ -377,6 +381,7 @@ export default function KitchenDashboard({
                           <button className="kitchen-order-card kitchen-order-card-complete" key={o.id} type="button" onClick={() => onMarkKitchenComplete(o.id)}>
                             <small>Session: {getSessionLabel(o.session)}</small>
                             <small>Student: {o.child_name}</small>
+                            <small>Grade: {o.school_grade || '-'}</small>
                             <small>School: {o.school_name || '-'}</small>
                             <small>Phone Number: {o.youngster_mobile || '-'}</small>
                             <small>Dietary Allergies: {o.allergen_items || '-'}</small>

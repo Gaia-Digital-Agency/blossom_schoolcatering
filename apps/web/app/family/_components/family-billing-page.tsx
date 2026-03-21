@@ -228,7 +228,7 @@ export default function FamilyBillingPage() {
               </select>
             </label>
           ) : children.length === 1 ? (
-            <p className="auth-help">Viewing billing for: <strong>{children[0].first_name} {children[0].last_name}</strong></p>
+            <p className="auth-help">Viewing billing for: <strong>{children[0].first_name} {children[0].last_name}</strong> ({children[0].school_grade})</p>
           ) : null}
         </div>
 

@@ -40,6 +40,7 @@ type Assignment = {
   session: string;
   status: string;
   school_name: string;
+  school_grade?: string;
   child_name: string;
   youngster_mobile?: string | null;
   allergen_items?: string | null;
@@ -726,7 +727,7 @@ export default function AdminDeliveryPage() {
                     <div className="auto-order-list">
                       {row.orders.map((order) => (
                         <div key={order.id}>
-                          {order.school_name} | {order.service_date} {getSessionLabel(order.session)} | {order.child_name} / {order.parent_name} | {order.delivery_status} | {order.order_id}
+                          {order.school_name} | {order.school_grade || '-'} | {order.service_date} {getSessionLabel(order.session)} | {order.child_name} / {order.parent_name} | {order.delivery_status} | {order.order_id}
                         </div>
                       ))}
                     </div>

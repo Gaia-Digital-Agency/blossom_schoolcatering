@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '../../../lib/auth';
+import { GRADE_OPTIONS } from '../../../lib/grades';
 import AdminNav from '../_components/admin-nav';
 import AdminReturnButton from '../_components/admin-return-button';
 
@@ -29,6 +30,8 @@ type ChildRow = {
   school_id: string;
   school_name: string;
   school_grade: string;
+  registration_grade?: string;
+  current_school_grade?: string | null;
   dietary_allergies?: string;
   registration_actor_teacher_name?: string | null;
   registration_actor_teacher_phone?: string | null;
@@ -41,6 +44,8 @@ type CreateResult = {
   linkedParentId: string | null;
   schoolId: string;
   lastName: string;
+  registrationGrade: string;
+  currentGrade: string | null;
 };
 
 type ShowPassInfo = {
@@ -49,6 +54,7 @@ type ShowPassInfo = {
   youngsterUsername: string;
   youngsterPassword: string;
   schoolName: string;
+  schoolGrade: string;
   parentLabel: string;
 };
 
@@ -59,7 +65,7 @@ type ShowIdInfo = {
   youngsterPassword: string;
 };
 
-const GRADES = Array.from({ length: 12 }, (_v, i) => String(i + 1));
+const GRADES: string[] = [...GRADE_OPTIONS];
 
 export default function AdminYoungstersPage() {
   const [schools, setSchools] = useState<School[]>([]);
@@ -83,6 +89,7 @@ export default function AdminYoungstersPage() {
   const [gender, setGender] = useState('UNDISCLOSED');
   const [schoolId, setSchoolId] = useState('');
   const [schoolGrade, setSchoolGrade] = useState(GRADES[0]);
+  const [currentGrade, setCurrentGrade] = useState('');
   const [allergies, setAllergies] = useState('');
   const [registrationNote, setRegistrationNote] = useState('');
 
@@ -156,6 +163,7 @@ export default function AdminYoungstersPage() {
     setDateOfBirth('');
     setGender('UNDISCLOSED');
     setSchoolGrade(GRADES[0]);
+    setCurrentGrade('');
     setAllergies('');
     setRegistrationNote('');
     setPFirstName('');
@@ -179,7 +187,8 @@ export default function AdminYoungstersPage() {
     setDateOfBirth((child.date_of_birth || '').slice(0, 10));
     setGender(child.gender || 'UNDISCLOSED');
     setSchoolId(child.school_id || '');
-    setSchoolGrade(child.school_grade || GRADES[0]);
+    setSchoolGrade(child.registration_grade || child.school_grade || GRADES[0]);
+    setCurrentGrade(child.current_school_grade || '');
     setAllergies(child.dietary_allergies || '');
     setRegistrationNote(
       child.registration_actor_teacher_name
@@ -252,6 +261,7 @@ export default function AdminYoungstersPage() {
             gender,
             schoolId,
             schoolGrade,
+            currentGrade,
             parentId: selectedParentId,
             allergies,
           }),
@@ -284,6 +294,7 @@ export default function AdminYoungstersPage() {
             gender,
             schoolId,
             schoolGrade,
+            currentGrade: currentGrade || undefined,
             allergies: allergies || undefined,
             parentId: selectedParentId,
           }),
@@ -294,6 +305,8 @@ export default function AdminYoungstersPage() {
           linkedParentId: created.linkedParentId,
           schoolId,
           lastName,
+          registrationGrade: schoolGrade,
+          currentGrade: currentGrade || null,
         });
         resetForm();
         await load();
@@ -325,6 +338,7 @@ export default function AdminYoungstersPage() {
         youngsterUsername: res.username,
         youngsterPassword: res.password,
         schoolName: child.school_name,
+        schoolGrade: child.school_grade || child.registration_grade || '',
         parentLabel,
       });
     } catch (e) {
@@ -354,6 +368,7 @@ export default function AdminYoungstersPage() {
         youngsterUsername: res.username,
         youngsterPassword: res.newPassword,
         schoolName: child.school_name,
+        schoolGrade: child.school_grade || child.registration_grade || '',
         parentLabel,
       });
       setMessage(`New password set for ${child.first_name} ${child.last_name}.`);
@@ -422,6 +437,10 @@ export default function AdminYoungstersPage() {
             <div className="crc-grid">
               <span className="crc-label">School</span>
               <span className="crc-value">{createSchoolLabel || '—'}</span>
+              <span className="crc-label">Registration Grade</span>
+              <span className="crc-value">{createResult.registrationGrade}</span>
+              <span className="crc-label">Current Grade</span>
+              <span className="crc-value">{createResult.currentGrade || 'Automatic fallback'}</span>
               <span className="crc-label">Youngster Last Name</span>
               <span className="crc-value">{createResult.lastName}</span>
               <span className="crc-label">Youngster Username</span>
@@ -521,6 +540,17 @@ export default function AdminYoungstersPage() {
             </select>
           </label>
           <label>
+            Current Grade
+            <select value={currentGrade} onChange={(e) => setCurrentGrade(e.target.value)}>
+              <option value="">Use automatic yearly fallback</option>
+              {GRADES.map((grade) => (
+                <option key={grade} value={grade}>
+                  {grade}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
             Youngster Phone Number
             <input value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} required />
           </label>
@@ -600,7 +630,8 @@ export default function AdminYoungstersPage() {
                 <th>First Name</th>
                 <th>User Name</th>
                 <th>School</th>
-                <th>Grade</th>
+                <th>Current Grade</th>
+                <th>Registration Grade</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -611,7 +642,8 @@ export default function AdminYoungstersPage() {
                   <td>{c.first_name}</td>
                   <td>{c.username}</td>
                   <td>{c.school_name}</td>
-                  <td>{String(c.school_grade || '').replace(/^[Gg]rade\s*/, '')}</td>
+                  <td>{c.school_grade || '-'}</td>
+                  <td>{c.registration_grade || c.school_grade || '-'}</td>
                   <td>
                     <div className="action-row">
                       <button className="btn btn-outline" type="button" onClick={() => onShowId(c)}>
@@ -635,7 +667,7 @@ export default function AdminYoungstersPage() {
               ))}
               {children.length === 0 ? (
                 <tr>
-                  <td colSpan={6}>No youngsters found.</td>
+                  <td colSpan={7}>No youngsters found.</td>
                 </tr>
               ) : null}
             </tbody>
@@ -703,6 +735,10 @@ export default function AdminYoungstersPage() {
               <div className="reg-info-row">
                 <span className="reg-info-label">School</span>
                 <span className="reg-info-val">{showPassInfo.schoolName}</span>
+              </div>
+              <div className="reg-info-row">
+                <span className="reg-info-label">Grade</span>
+                <span className="reg-info-val">{showPassInfo.schoolGrade || '-'}</span>
               </div>
               <div className="reg-info-row">
                 <span className="reg-info-label">Linked Family</span>

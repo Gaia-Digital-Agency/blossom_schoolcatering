@@ -237,6 +237,10 @@ export default function FamilyOrderPage({
     () => [...visibleOrders].sort((a, b) => String(a.service_date).localeCompare(String(b.service_date))),
     [visibleOrders],
   );
+  const selectedChild = useMemo(
+    () => children.find((child) => child.id === selectedChildId) || null,
+    [children, selectedChildId],
+  );
   const selectedDayOrder = useMemo(
     () => visibleOrders.find((o) => o.service_date === serviceDate && o.session === session && o.status === 'PLACED') || null,
     [visibleOrders, serviceDate, session],
@@ -605,6 +609,7 @@ export default function FamilyOrderPage({
             </label>
           </div>
         )}
+        {selectedChild ? <p className="auth-help">Selected student: {selectedChild.first_name} {selectedChild.last_name} ({selectedChild.school_grade})</p> : null}
 
         {mode === 'order' ? (
           <div className="module-section" ref={menuSectionRef}>

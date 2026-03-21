@@ -61,6 +61,10 @@ export default function FamilyOverviewPage() {
     const child = children.find((entry) => entry.id === selectedChildId);
     return child ? `${child.first_name} ${child.last_name}`.trim() : '';
   }, [children, selectedChildId]);
+  const selectedChildGrade = useMemo(() => {
+    const child = children.find((entry) => entry.id === selectedChildId);
+    return child?.school_grade || '';
+  }, [children, selectedChildId]);
 
   if (loading) {
     return <main className="page-auth page-auth-mobile"><section className="auth-panel"><h1>Family Module</h1><p>Loading...</p></section></main>;
@@ -90,7 +94,7 @@ export default function FamilyOverviewPage() {
           ) : null}
           <div className="module-section">
             <h2>Overview</h2>
-            {selectedChildName ? <p className="auth-help">Showing calendar for {selectedChildName}.</p> : null}
+            {selectedChildName ? <p className="auth-help">Showing calendar for {selectedChildName}{selectedChildGrade ? ` (${selectedChildGrade})` : ''}.</p> : null}
             <ModuleOverviewCalendar
               highlightedDates={highlightedDates}
               emptyLabel="No orders found for the selected Family Group view."

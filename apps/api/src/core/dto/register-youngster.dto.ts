@@ -32,6 +32,10 @@ export class RegisterYoungsterDto {
   schoolGrade!: string;
 
   @IsOptional()
+  @IsString()
+  currentGrade?: string;
+
+  @IsOptional()
   @IsUUID('4')
   parentId?: string;
 

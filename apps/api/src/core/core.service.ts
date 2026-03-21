@@ -12,6 +12,7 @@ import { createSign, randomUUID, scryptSync } from 'crypto';
 import { runSql } from '../auth/db.util';
 import { validatePasswordPolicy } from '../auth/password-policy';
 import { AccessUser, CartItemInput, SessionType } from './core.types';
+import { normalizeGradeLabel, resolveEffectiveGrade } from '../shared/grade.util';
 
 type DbUserRow = {
   id: string;
@@ -30,6 +31,9 @@ type ChildRow = {
   school_name: string;
   school_short_name?: string;
   school_grade: string;
+  registration_grade?: string;
+  current_school_grade?: string | null;
+  registration_date?: string;
   date_of_birth: string;
   gender: string;
   dietary_allergies?: string;
@@ -73,6 +77,7 @@ export class CoreService implements OnModuleInit {
   private menuRatingsTableReady = false;
   private sessionSettingsTableReady = false;
   private childRegistrationSourceColumnsReady = false;
+  private childCurrentGradeColumnReady = false;
   private menuItemTextDefaultsReady = false;
   private readonly publicMenuCacheTtlMs = 60_000;
   private publicMenuCache = new Map<string, {
@@ -86,7 +91,8 @@ export class CoreService implements OnModuleInit {
   }>();
 
   async onModuleInit() {
-    // Cold-start safety matters more than startup speed here.
+    // Startup schema guards are run sequentially because the production DB helper is not
+    // safe under parallel initialization and can tear down the shared pool mid-boot.
     await this.ensureBlackoutDaysSessionColumn();
     await this.ensureMenuItemExtendedColumns();
     await this.ensureMenuItemNameUniquenessScope();
@@ -94,6 +100,7 @@ export class CoreService implements OnModuleInit {
     await this.ensureMenuRatingsTable();
     await this.ensureDeliverySchoolAssignmentsTable();
     await this.ensureChildRegistrationSourceColumns();
+    await this.ensureChildCurrentGradeColumn();
     await this.ensureDeliveryDailyNotesTable();
     await this.ensureBillingReviewColumns();
     await this.ensureSchoolShortNameColumn();
@@ -1630,6 +1637,7 @@ export class CoreService implements OnModuleInit {
       gender?: string;
       schoolId?: string;
       schoolGrade?: string;
+      currentGrade?: string;
       parentId?: string;
       allergies?: string;
     },
@@ -1645,7 +1653,8 @@ export class CoreService implements OnModuleInit {
     const dateOfBirth = (input.dateOfBirth || '').trim();
     const gender = (input.gender || '').trim().toUpperCase();
     const schoolId = (input.schoolId || '').trim();
-    const schoolGrade = (input.schoolGrade || '').trim();
+    const schoolGrade = normalizeGradeLabel(input.schoolGrade);
+    const currentGrade = normalizeGradeLabel(input.currentGrade);
     if (!phoneNumber) throw new BadRequestException('Student phone number is required');
     if (!email) throw new BadRequestException('Student email is required');
     if (!email.includes('@')) throw new BadRequestException('Student email must be valid');
@@ -1715,6 +1724,7 @@ export class CoreService implements OnModuleInit {
     }
     if (await this.findActiveUserByEmail(email)) throw new ConflictException('That email is already taken');
     if (await this.findActiveUserByPhone(phoneNumber)) throw new ConflictException('That phone number is already taken');
+    await this.ensureChildCurrentGradeColumn();
 
     const usernameBase = this.sanitizeUsernamePart(`${parentLastNameForUsername}_${firstName}`);
     const username = await runSql(`SELECT generate_unique_username($1);`, [usernameBase]);
@@ -1742,13 +1752,13 @@ export class CoreService implements OnModuleInit {
 
     const childOut = await runSql(
       `WITH inserted AS (
-         INSERT INTO children (user_id, school_id, date_of_birth, gender, school_grade, photo_url)
-         VALUES ($1, $2, $3::date, $4::gender_type, $5, NULL)
+         INSERT INTO children (user_id, school_id, date_of_birth, gender, school_grade, current_school_grade, photo_url)
+         VALUES ($1, $2, $3::date, $4::gender_type, $5, $6, NULL)
          RETURNING id, user_id
        )
        SELECT row_to_json(inserted)::text
        FROM inserted;`,
-      [created.id, schoolId, dateOfBirth, gender, schoolGrade],
+      [created.id, schoolId, dateOfBirth, gender, schoolGrade, currentGrade || null],
     );
     const child = this.parseJsonLine<{ id: string; user_id: string }>(childOut);
 
@@ -1851,6 +1861,36 @@ export class CoreService implements OnModuleInit {
     this.childRegistrationSourceColumnsReady = true;
   }
 
+  private async ensureChildCurrentGradeColumn() {
+    if (this.childCurrentGradeColumnReady) return;
+    await runSql(`
+      ALTER TABLE children
+      ADD COLUMN IF NOT EXISTS current_school_grade varchar(30);
+    `);
+    this.childCurrentGradeColumnReady = true;
+  }
+
+  private withEffectiveGrade<T extends Record<string, unknown>>(row: T) {
+    const registrationGrade = normalizeGradeLabel(
+      (row.registration_grade as string | undefined) ?? (row.school_grade as string | undefined),
+    );
+    const currentSchoolGrade = normalizeGradeLabel(row.current_school_grade as string | null | undefined);
+    const registrationDate = (row.registration_date as string | null | undefined)
+      ?? (row.created_at as string | null | undefined)
+      ?? null;
+    return {
+      ...row,
+      school_grade: resolveEffectiveGrade({
+        registrationGrade,
+        currentGrade: currentSchoolGrade,
+        registrationDate,
+      }),
+      registration_grade: registrationGrade,
+      current_school_grade: currentSchoolGrade || null,
+      registration_date: registrationDate || undefined,
+    };
+  }
+
   private async ensureBillingReviewColumns() {
     if (this.billingReviewColumnsReady) return;
     await runSql(`
@@ -1919,7 +1959,9 @@ export class CoreService implements OnModuleInit {
                c.date_of_birth::text AS date_of_birth,
                c.gender::text AS gender,
                c.school_id,
-               c.school_grade,
+               c.school_grade AS registration_grade,
+               c.current_school_grade,
+               c.created_at::text AS registration_date,
                s.name AS school_name,
                COALESCE((
                  SELECT cdr.restriction_details
@@ -1941,11 +1983,11 @@ export class CoreService implements OnModuleInit {
         WHERE c.is_active = true
           AND c.deleted_at IS NULL
           AND u.is_active = true
-        GROUP BY c.id, c.user_id, u.username, u.first_name, u.last_name, u.phone_number, u.email, c.date_of_birth, c.gender, c.school_id, c.school_grade, s.name, c.registration_actor_teacher_name, c.registration_actor_teacher_phone
+        GROUP BY c.id, c.user_id, u.username, u.first_name, u.last_name, u.phone_number, u.email, c.date_of_birth, c.gender, c.school_id, c.school_grade, c.current_school_grade, c.created_at, s.name, c.registration_actor_teacher_name, c.registration_actor_teacher_phone
         ORDER BY u.first_name, u.last_name
       ) t;
     `);
-    return this.parseJsonLines(out);
+    return this.parseJsonLines<Record<string, unknown>>(out).map((row) => this.withEffectiveGrade(row));
   }
 
   async getAdminDashboard(dateRaw?: string) {
@@ -2329,6 +2371,9 @@ export class CoreService implements OnModuleInit {
                c.id AS child_id,
                s.id AS school_id,
                s.name AS school_name,
+               c.school_grade AS registration_grade,
+               c.current_school_grade,
+               c.created_at::text AS registration_date,
                (uc.first_name || ' ' || uc.last_name) AS child_name,
                COALESCE((up.first_name || ' ' || up.last_name), '-') AS account_name,
                da.delivery_user_id::text AS delivery_user_id,
@@ -2392,7 +2437,7 @@ export class CoreService implements OnModuleInit {
 
     const rows = this.parseJsonLines<Record<string, unknown> & { total_price?: string | number; delivery_status?: string }>(rowsOut)
       .map((row) => ({
-        ...row,
+        ...this.withEffectiveGrade(row),
         total_price: Number(row.total_price || 0),
         is_completed: String(row.delivery_status || '').toUpperCase() === 'DELIVERED',
       }));
@@ -2521,7 +2566,10 @@ export class CoreService implements OnModuleInit {
       SELECT row_to_json(t)::text
       FROM (
         SELECT c.id, c.user_id, u.first_name, u.last_name, c.school_id, s.name AS school_name,
-               c.school_grade, c.date_of_birth::text AS date_of_birth, c.gender::text AS gender,
+               c.school_grade AS registration_grade,
+               c.current_school_grade,
+               c.created_at::text AS registration_date,
+               c.date_of_birth::text AS date_of_birth, c.gender::text AS gender,
                COALESCE((
                  SELECT cdr.restriction_details
                  FROM child_dietary_restrictions cdr
@@ -2547,7 +2595,7 @@ export class CoreService implements OnModuleInit {
 
     return {
       parentId,
-      children: this.parseJsonLines<ChildRow>(out),
+      children: this.parseJsonLines<ChildRow>(out).map((row) => this.withEffectiveGrade(row)),
     };
   }
 
@@ -3867,7 +3915,10 @@ export class CoreService implements OnModuleInit {
       SELECT row_to_json(t)::text
       FROM (
         SELECT c.id, c.user_id, u.first_name, u.last_name, c.school_id, s.name AS school_name, s.short_name AS school_short_name,
-               c.school_grade, c.date_of_birth::text AS date_of_birth, c.gender::text AS gender,
+               c.school_grade AS registration_grade,
+               c.current_school_grade,
+               c.created_at::text AS registration_date,
+               c.date_of_birth::text AS date_of_birth, c.gender::text AS gender,
                COALESCE((
                  SELECT cdr.restriction_details
                  FROM child_dietary_restrictions cdr
@@ -3890,7 +3941,7 @@ export class CoreService implements OnModuleInit {
       [actor.uid],
     );
     if (!out) throw new NotFoundException('Youngster profile not found');
-    return this.parseJsonLine<ChildRow>(out);
+    return this.withEffectiveGrade(this.parseJsonLine<ChildRow>(out));
   }
 
   async createCart(actor: AccessUser, input: { childId?: string; serviceDate?: string; session?: string }) {
@@ -5816,6 +5867,9 @@ export class CoreService implements OnModuleInit {
                o.delivery_status::text AS delivery_status,
                o.total_price,
                s.name AS school_name,
+               c.school_grade AS registration_grade,
+               c.current_school_grade,
+               c.created_at::text AS registration_date,
                (uc.first_name || ' ' || uc.last_name) AS child_name,
                (up.first_name || ' ' || up.last_name) AS parent_name,
                COALESCE(NULLIF(TRIM(uc.phone_number), ''), NULLIF(TRIM(up.phone_number), '')) AS youngster_mobile,
@@ -5854,7 +5908,7 @@ export class CoreService implements OnModuleInit {
     `,
       params,
     );
-    return this.parseJsonLines(out);
+    return this.parseJsonLines<Record<string, unknown>>(out).map((row) => this.withEffectiveGrade(row));
   }
 
   async getDeliveryDailyNote(actor: AccessUser, dateRaw?: string) {
@@ -5935,6 +5989,9 @@ export class CoreService implements OnModuleInit {
                o.status::text AS status,
                o.delivery_status::text AS delivery_status,
                s.name AS school_name,
+               c.school_grade AS registration_grade,
+               c.current_school_grade,
+               c.created_at::text AS registration_date,
                (uc.first_name || ' ' || uc.last_name) AS child_name,
                COALESCE(NULLIF(TRIM(uc.phone_number), ''), NULLIF(TRIM(up.phone_number), '')) AS youngster_mobile,
                CASE
@@ -7173,7 +7230,7 @@ export class CoreService implements OnModuleInit {
       allergen_items: string;
       registration_allergen_items: string;
       dishes: Array<{ menu_item_id: string; item_name: string; quantity: number }>;
-    }>(ordersOut);
+    }>(ordersOut).map((row) => this.withEffectiveGrade(row));
 
     const dishSummaryOut = await runSql(
       `
@@ -7681,6 +7738,7 @@ export class CoreService implements OnModuleInit {
       email?: string;
       dateOfBirth?: string;
       schoolGrade?: string;
+      currentGrade?: string;
       schoolId?: string;
       gender?: string;
       parentId?: string;
@@ -7739,9 +7797,20 @@ export class CoreService implements OnModuleInit {
       userParams.push(child.user_id);
       await runSql(`UPDATE users SET ${userUpdates.join(', ')} WHERE id = $${userParams.length};`, userParams);
     }
+    await this.ensureChildCurrentGradeColumn();
     const childUpdates: string[] = [];
     const childParams: unknown[] = [];
-    if (input.schoolGrade) { childParams.push(input.schoolGrade.trim()); childUpdates.push(`school_grade = $${childParams.length}`); }
+    if (input.schoolGrade !== undefined) {
+      const registrationGrade = normalizeGradeLabel(input.schoolGrade);
+      if (!registrationGrade) throw new BadRequestException('schoolGrade cannot be empty');
+      childParams.push(registrationGrade);
+      childUpdates.push(`school_grade = $${childParams.length}`);
+    }
+    if (input.currentGrade !== undefined) {
+      const currentGrade = normalizeGradeLabel(input.currentGrade);
+      childParams.push(currentGrade || null);
+      childUpdates.push(`current_school_grade = $${childParams.length}`);
+    }
     if (input.schoolId) { this.assertValidUuid(input.schoolId, 'schoolId'); childParams.push(input.schoolId); childUpdates.push(`school_id = $${childParams.length}`); }
     if (input.gender) { childParams.push(input.gender.toUpperCase()); childUpdates.push(`gender = $${childParams.length}::gender_type`); }
     if (input.dateOfBirth) { childParams.push(this.validateServiceDate(input.dateOfBirth)); childUpdates.push(`date_of_birth = $${childParams.length}::date`); }

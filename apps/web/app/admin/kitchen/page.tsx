@@ -18,6 +18,8 @@ type KitchenOrder = {
   session: string;
   status: string;
   delivery_status: string;
+  school_name?: string;
+  school_grade?: string;
   child_name: string;
   parent_name: string;
   dish_count: number;
@@ -170,6 +172,8 @@ export default function AdminKitchenPage() {
                   {allergenAlerts.map((o) => (
                     <article className="kitchen-alert-card" key={o.id}>
                       <strong>{getSessionLabel(o.session)} - {o.child_name}</strong>
+                      <small>Grade: {o.school_grade || '-'}</small>
+                      <small>School: {o.school_name || '-'}</small>
                       <small>Parent: {o.parent_name}</small>
                       <small>Dietary Allergies: {o.allergen_items || '-'}</small>
                       <small>Dishes: {o.dish_count}</small>
@@ -186,6 +190,8 @@ export default function AdminKitchenPage() {
                   {orders.map((o) => (
                     <article className="kitchen-order-card" key={o.id}>
                       <strong>{getSessionLabel(o.session)} - {o.child_name}</strong>
+                      <small>Grade: {o.school_grade || '-'}</small>
+                      <small>School: {o.school_name || '-'}</small>
                       <small>Parent: {o.parent_name}</small>
                       <small>Dietary Allergies: {o.allergen_items || '-'}</small>
                       <small>Status: {o.status} | Delivery: {o.delivery_status}</small>

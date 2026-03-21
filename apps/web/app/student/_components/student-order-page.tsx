@@ -460,6 +460,11 @@ export default function StudentOrderPage({
         <div className="module-guide-card">
           Select dishes, manage drafts, and confirm student meals.
         </div>
+        {youngster ? (
+          <p className="auth-help">
+            {youngster.first_name} {youngster.last_name} | {youngster.school_name} | {youngster.school_grade}
+          </p>
+        ) : null}
         {error ? <p className="auth-error">{error}</p> : null}
 
         {mode === 'record' ? (

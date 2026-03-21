@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch, clearBrowserSession, fetchWithTimeout, getApiBase, ROLE_KEY, type Role } from '../../../lib/auth';
+import { GRADE_OPTIONS } from '../../../lib/grades';
 
 type School = {
   id: string;
@@ -46,7 +47,7 @@ type RecordChild = {
   dietary_allergies?: string;
 };
 
-const GRADES = Array.from({ length: 12 }, (_v, i) => `Grade ${i + 1}`);
+const GRADES: string[] = [...GRADE_OPTIONS];
 const NO_ALLERGIES_LABEL = 'No Allergies';
 
 function buildEmptyStudent(defaultSchoolId = ''): StudentForm {

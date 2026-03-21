@@ -3,6 +3,7 @@ import { createHash, createHmac, randomBytes, randomUUID, scryptSync, timingSafe
 import { AuthUser, ROLES, Role } from './auth.types';
 import { runSql } from './db.util';
 import { validatePasswordPolicy } from './password-policy';
+import { normalizeGradeLabel } from '../shared/grade.util';
 
 type RefreshPayload = {
   sub: string;
@@ -122,6 +123,7 @@ const REFRESH_TTL = '7d';
 export class AuthService {
   private parentDietaryRestrictionsReady = false;
   private childRegistrationSourceColumnsReady = false;
+  private childCurrentGradeColumnReady = false;
   private passwordResetTableReady = false;
   private adminVisiblePasswordsReady = false;
   private systemUsersReady = false;
@@ -320,6 +322,15 @@ export class AuthService {
       ADD COLUMN IF NOT EXISTS registration_actor_teacher_phone varchar(30);
     `);
     this.childRegistrationSourceColumnsReady = true;
+  }
+
+  private async ensureChildCurrentGradeColumn() {
+    if (this.childCurrentGradeColumnReady) return;
+    await runSql(`
+      ALTER TABLE children
+      ADD COLUMN IF NOT EXISTS current_school_grade varchar(30);
+    `);
+    this.childCurrentGradeColumnReady = true;
   }
 
   private async upsertParentAllergies(parentId: string, allergies: string) {
@@ -805,7 +816,7 @@ export class AuthService {
             studentUserId,
             schoolId,
             student.dateOfBirth,
-            student.grade,
+            normalizeGradeLabel(student.grade),
             student.registrantType,
             student.registrantType === 'TEACHER' ? (student.teacherName || 'teacher') : null,
             student.registrantType === 'TEACHER' ? (student.teacherPhone || teacherPhone) : null,
@@ -1193,6 +1204,7 @@ export class AuthService {
 
     const parentLastName = parentLastNameInput;
     await this.ensureChildRegistrationSourceColumns();
+    await this.ensureChildCurrentGradeColumn();
     const seenEmails = new Set<string>([parentEmail]);
     const seenPhones = new Set<string>([this.phoneCompareKey(parentMobileNumber)]);
     for (let index = 0; index < students.length; index += 1) {
@@ -1200,7 +1212,7 @@ export class AuthService {
       const youngsterFirstName = String(student?.youngsterFirstName || '').trim();
       const youngsterDateOfBirth = String(student?.youngsterDateOfBirth || '').trim();
       const youngsterSchoolId = String(student?.youngsterSchoolId || '').trim();
-      const youngsterGrade = String(student?.youngsterGrade || '').trim();
+      const youngsterGrade = normalizeGradeLabel(student?.youngsterGrade);
       const youngsterPhone = this.normalizePhone(student?.youngsterPhone);
       const youngsterEmail = String(student?.youngsterEmail || '').trim().toLowerCase();
       if (!youngsterFirstName || !youngsterDateOfBirth || !youngsterSchoolId || !youngsterGrade || !youngsterPhone) {
@@ -1424,7 +1436,7 @@ export class AuthService {
           youngsterSchoolId,
           youngsterDateOfBirth,
           youngsterGender,
-          youngsterGrade,
+          normalizeGradeLabel(youngsterGrade),
           registrantType,
           registrantType === 'TEACHER' ? teacherName : null,
           registrantType === 'TEACHER' ? teacherPhone : null,

@@ -26,6 +26,10 @@ export class UpdateYoungsterDto {
   schoolGrade?: string;
 
   @IsOptional()
+  @IsString()
+  currentGrade?: string;
+
+  @IsOptional()
   @IsUUID('4')
   schoolId?: string;
 
