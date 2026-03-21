@@ -1,6 +1,5 @@
 export const GRADE_OPTIONS = [
   'Pre K',
-  'Kinder',
   'KP',
   'G1',
   'G1a',

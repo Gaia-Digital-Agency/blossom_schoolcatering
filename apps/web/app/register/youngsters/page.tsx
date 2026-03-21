@@ -50,6 +50,10 @@ type RecordChild = {
 const GRADES: string[] = [...GRADE_OPTIONS];
 const NO_ALLERGIES_LABEL = 'No Allergies';
 
+function normalizeNameKey(value: string) {
+  return value.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
 function buildEmptyStudent(defaultSchoolId = ''): StudentForm {
   return {
     youngsterFirstName: '',
@@ -282,8 +286,11 @@ export default function YoungsterRegisterPage() {
       return;
     }
 
+    const normalizedFamilyName = normalizeNameKey(parentLastName);
+    const parentPhoneKey = parentMobileNumber.replace(/\D/g, '') || parentMobileNumber.trim();
     const seenEmails = new Set<string>([parentEmail.trim().toLowerCase()]);
-    const seenPhones = new Set<string>([parentMobileNumber.replace(/\D/g, '') || parentMobileNumber.trim()]);
+    const seenPhones = new Set<string>();
+    const seenStudentNames = new Set<string>();
     for (let index = 0; index < students.length; index += 1) {
       const student = students[index];
       const number = index + 1;
@@ -294,6 +301,7 @@ export default function YoungsterRegisterPage() {
         setError(`Student ${number} First Name is required.`);
         return;
       }
+      const studentNameKey = `${normalizeNameKey(student.youngsterFirstName)}|${normalizedFamilyName}`;
       if (!student.youngsterDateOfBirth) {
         setError(`Student ${number} Date Of Birth is required.`);
         return;
@@ -306,11 +314,8 @@ export default function YoungsterRegisterPage() {
         setError(`Student ${number} School is required.`);
         return;
       }
-      if (!student.youngsterPhone.trim()) {
-        setError(`Student ${number} Phone Number is required.`);
-        return;
-      }
       const studentEmail = student.youngsterEmail.trim().toLowerCase();
+      const hasExplicitStudentPhone = student.youngsterPhone.trim().length > 0;
       if (studentEmail && !studentEmail.includes('@')) {
         setError(`Student ${number} Email must be valid.`);
         return;
@@ -320,21 +325,23 @@ export default function YoungsterRegisterPage() {
         return;
       }
       const phoneKey = student.youngsterPhone.replace(/\D/g, '') || student.youngsterPhone.trim();
-      const parentPhoneKey = parentMobileNumber.replace(/\D/g, '') || parentMobileNumber.trim();
-      if (phoneKey === parentPhoneKey) {
-        setError(`Student ${number} Phone Number cannot be the same as Parent Phone Number.`);
-        return;
-      }
       if (studentEmail && seenEmails.has(studentEmail)) {
         setError(`Student ${number} Email must be unique.`);
         return;
       }
-      if (seenPhones.has(phoneKey)) {
+      if (hasExplicitStudentPhone && phoneKey !== parentPhoneKey && seenPhones.has(phoneKey)) {
         setError(`Student ${number} Phone Number must be unique.`);
         return;
       }
+      if (seenStudentNames.has(studentNameKey)) {
+        setError(`Student ${number} name is duplicated in this family.`);
+        return;
+      }
       if (studentEmail) seenEmails.add(studentEmail);
-      seenPhones.add(phoneKey);
+      if (hasExplicitStudentPhone && phoneKey !== parentPhoneKey) {
+        seenPhones.add(phoneKey);
+      }
+      seenStudentNames.add(studentNameKey);
       if (student.youngsterAllergySelection === 'HAS_ALLERGIES' && !normalizedAllergies) {
         setError(`Please enter Student ${number} allergies.`);
         return;

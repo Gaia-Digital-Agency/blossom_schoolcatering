@@ -51,13 +51,11 @@ function nextWeekday(offset = 1) {
 }
 
 function getDbUrl() {
-  const candidates = ['.env', '/var/www/_env/schoolcatering.env'];
-  for (const file of candidates) {
-    if (!fs.existsSync(file)) continue;
-    const line = fs.readFileSync(file, 'utf8').split('\n').find((row) => row.startsWith('DATABASE_URL='));
-    if (line) return line.replace('DATABASE_URL=', '').trim();
-  }
-  throw new Error('DATABASE_URL not found in .env or /var/www/_env/schoolcatering.env');
+  const file = '.env';
+  if (!fs.existsSync(file)) throw new Error('DATABASE_URL not found. Set DATABASE_URL or create .env in the repo root.');
+  const line = fs.readFileSync(file, 'utf8').split('\n').find((row) => row.startsWith('DATABASE_URL='));
+  if (line) return line.replace('DATABASE_URL=', '').trim();
+  throw new Error('DATABASE_URL not found. Set DATABASE_URL or add it to .env in the repo root.');
 }
 
 const DB_URL = process.env.DATABASE_URL || getDbUrl();

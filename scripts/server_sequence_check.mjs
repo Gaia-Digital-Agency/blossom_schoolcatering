@@ -11,9 +11,11 @@ function logResult(step, ok, details) {
 }
 
 function getDbUrl() {
-  const raw = fs.readFileSync('/var/www/_env/schoolcatering.env', 'utf8');
+  const file = '.env';
+  if (!fs.existsSync(file)) throw new Error('DATABASE_URL not found. Set DATABASE_URL or create .env in the repo root.');
+  const raw = fs.readFileSync(file, 'utf8');
   const line = raw.split('\n').find((l) => l.startsWith('DATABASE_URL='));
-  if (!line) throw new Error('DATABASE_URL not found');
+  if (!line) throw new Error('DATABASE_URL not found. Set DATABASE_URL or add it to .env in the repo root.');
   return line.replace('DATABASE_URL=', '').trim();
 }
 

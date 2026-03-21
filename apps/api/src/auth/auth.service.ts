@@ -250,6 +250,10 @@ export class AuthService {
     return digits || String(raw || '').trim().toLowerCase();
   }
 
+  private nameCompareKey(raw?: string | null) {
+    return String(raw || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  }
+
   private buildGeneratedPassword(phoneLike: string) {
     const raw = (phoneLike || '').trim();
     if (raw.length >= 6) return raw;
@@ -1205,16 +1209,36 @@ export class AuthService {
     const parentLastName = parentLastNameInput;
     await this.ensureChildRegistrationSourceColumns();
     await this.ensureChildCurrentGradeColumn();
+    const familyNameExists = await runSql(
+      `
+      SELECT EXISTS (
+        SELECT 1
+        FROM users u
+        JOIN parents p ON p.user_id = u.id
+        WHERE u.deleted_at IS NULL
+          AND p.deleted_at IS NULL
+          AND LOWER(TRIM(u.last_name)) = LOWER(TRIM($1))
+      );
+      `,
+      [parentLastName],
+    );
+    if (familyNameExists === 't') {
+      throw new BadRequestException('Family Group Name already exists. Please contact Admin.');
+    }
+    const parentPhoneKey = this.phoneCompareKey(parentMobileNumber);
     const seenEmails = new Set<string>([parentEmail]);
-    const seenPhones = new Set<string>([this.phoneCompareKey(parentMobileNumber)]);
+    const seenPhones = new Set<string>();
+    const seenStudentNames = new Set<string>();
     for (let index = 0; index < students.length; index += 1) {
       const student = students[index];
       const youngsterFirstName = String(student?.youngsterFirstName || '').trim();
       const youngsterDateOfBirth = String(student?.youngsterDateOfBirth || '').trim();
       const youngsterSchoolId = String(student?.youngsterSchoolId || '').trim();
       const youngsterGrade = normalizeGradeLabel(student?.youngsterGrade);
-      const youngsterPhone = this.normalizePhone(student?.youngsterPhone);
+      const youngsterPhoneInput = this.normalizePhone(student?.youngsterPhone);
+      const youngsterPhone = youngsterPhoneInput || parentMobileNumber;
       const youngsterEmail = String(student?.youngsterEmail || '').trim().toLowerCase();
+      const youngsterNameKey = `${this.nameCompareKey(youngsterFirstName)}|${this.nameCompareKey(parentLastName)}`;
       if (!youngsterFirstName || !youngsterDateOfBirth || !youngsterSchoolId || !youngsterGrade || !youngsterPhone) {
         throw new BadRequestException(`Student ${index + 1} is missing required information.`);
       }
@@ -1230,17 +1254,21 @@ export class AuthService {
         }
       }
       const youngsterPhoneKey = this.phoneCompareKey(youngsterPhone);
-      if (youngsterPhoneKey === this.phoneCompareKey(parentMobileNumber)) {
-        throw new BadRequestException(`Student ${index + 1} phone number cannot be the same as parent phone number.`);
-      }
+      const hasExplicitStudentPhone = Boolean(youngsterPhoneInput);
       if (youngsterEmail && seenEmails.has(youngsterEmail)) {
         throw new BadRequestException(`Student ${index + 1} email must be unique.`);
       }
-      if (seenPhones.has(youngsterPhoneKey)) {
+      if (hasExplicitStudentPhone && youngsterPhoneKey !== parentPhoneKey && seenPhones.has(youngsterPhoneKey)) {
         throw new BadRequestException(`Student ${index + 1} phone number must be unique.`);
       }
+      if (seenStudentNames.has(youngsterNameKey)) {
+        throw new BadRequestException(`Student ${index + 1} name is duplicated in this family.`);
+      }
       if (youngsterEmail) seenEmails.add(youngsterEmail);
-      seenPhones.add(youngsterPhoneKey);
+      if (hasExplicitStudentPhone && youngsterPhoneKey !== parentPhoneKey) {
+        seenPhones.add(youngsterPhoneKey);
+      }
+      seenStudentNames.add(youngsterNameKey);
 
       const youngsterAllergies = this.normalizeAllergies(student?.youngsterAllergies);
       if (!youngsterAllergies) {
@@ -1290,7 +1318,7 @@ export class AuthService {
       if (youngsterEmail && await this.findUserByEmail(youngsterEmail)) {
         throw new BadRequestException(`Student ${index + 1} email already exists.`);
       }
-      if (await this.findUserByPhone(youngsterPhone)) {
+      if (youngsterPhoneKey !== parentPhoneKey && await this.findUserByPhone(youngsterPhone)) {
         throw new BadRequestException(`Student ${index + 1} phone number already exists.`);
       }
     }
@@ -1373,7 +1401,7 @@ export class AuthService {
       const youngsterDateOfBirth = String(student.youngsterDateOfBirth || '').trim();
       const youngsterSchoolId = String(student.youngsterSchoolId || '').trim();
       const youngsterGrade = String(student.youngsterGrade || '').trim();
-      const youngsterPhone = this.normalizePhone(student.youngsterPhone);
+      const youngsterPhone = this.normalizePhone(student.youngsterPhone) || parentMobileNumber;
       const youngsterEmail = String(student.youngsterEmail || '').trim().toLowerCase();
       const youngsterAllergies = this.normalizeAllergies(student.youngsterAllergies);
       const youngsterLastName = parentLastName;
