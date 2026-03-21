@@ -6,7 +6,7 @@ module.exports = {
       args: '--prefix /var/www/schoolcatering/apps/api run start:prod',
       cwd: '/var/www/schoolcatering',
       env: {
-        PORT: 3006,
+        PORT: 3000,
         NODE_ENV: 'production',
       },
       max_restarts: 10,

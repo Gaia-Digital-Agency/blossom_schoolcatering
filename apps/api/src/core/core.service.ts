@@ -86,21 +86,19 @@ export class CoreService implements OnModuleInit {
   }>();
 
   async onModuleInit() {
-    // Run all independent schema-ensure migrations in parallel to cut startup time.
-    await Promise.all([
-      this.ensureBlackoutDaysSessionColumn(),
-      this.ensureMenuItemExtendedColumns(),
-      this.ensureMenuItemNameUniquenessScope(),
-      this.ensureSessionSettingsTable(),
-      this.ensureMenuRatingsTable(),
-      this.ensureDeliverySchoolAssignmentsTable(),
-      this.ensureChildRegistrationSourceColumns(),
-      this.ensureDeliveryDailyNotesTable(),
-      this.ensureBillingReviewColumns(),
-      this.ensureSchoolShortNameColumn(),
-      this.ensureAdminAuditTrailTable(),
-      this.ensureMenuItemTextDefaults(),
-    ]);
+    // Cold-start safety matters more than startup speed here.
+    await this.ensureBlackoutDaysSessionColumn();
+    await this.ensureMenuItemExtendedColumns();
+    await this.ensureMenuItemNameUniquenessScope();
+    await this.ensureSessionSettingsTable();
+    await this.ensureMenuRatingsTable();
+    await this.ensureDeliverySchoolAssignmentsTable();
+    await this.ensureChildRegistrationSourceColumns();
+    await this.ensureDeliveryDailyNotesTable();
+    await this.ensureBillingReviewColumns();
+    await this.ensureSchoolShortNameColumn();
+    await this.ensureAdminAuditTrailTable();
+    await this.ensureMenuItemTextDefaults();
   }
 
   private async ensureBlackoutDaysSessionColumn() {
