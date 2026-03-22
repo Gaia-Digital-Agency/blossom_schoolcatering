@@ -92,6 +92,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(`${BASE_PATH}/login`, request.url));
   }
 
+  if (normalizedPath === '/dashboard' || normalizedPath.startsWith('/dashboard/')) {
+    const destination = role ? roleHomePath(role) : '/login';
+    return NextResponse.redirect(new URL(`${BASE_PATH}${destination}`, request.url));
+  }
+
   // Special handling for rating paths.
   if (isRatingPath) {
     if (!hasToken) {
@@ -141,8 +146,10 @@ export function middleware(request: NextRequest) {
 
   // If a logged-in user tries to access the main login page, redirect them to their dashboard.
   if (hasToken && normalizedPath === '/login') {
-    const destination = role ? roleHomePath(role) : '/dashboard';
-    return NextResponse.redirect(new URL(`${BASE_PATH}${destination}`, request.url));
+    if (role) {
+      return NextResponse.redirect(new URL(`${BASE_PATH}${roleHomePath(role)}`, request.url));
+    }
+    return NextResponse.next();
   }
 
   // If none of the above conditions are met, allow the request to proceed.
