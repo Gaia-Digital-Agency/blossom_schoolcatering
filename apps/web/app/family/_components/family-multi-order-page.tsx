@@ -278,11 +278,11 @@ export default function FamilyMultiOrderPage() {
   };
 
   const startEdit = async (groupId: string) => {
-    await loadGroupDetail(groupId);
     const detail = await apiFetch(`/multi-orders/${groupId}`) as MultiOrderDetail;
     const days = parseRepeatDays(detail.repeat_days_json);
     const dishes = parseDishSelection(detail.dish_selection_json);
     setEditingGroupId(groupId);
+    setSelectedGroup(null);
     setSelectedChildId(detail.child_id);
     setSession(detail.session);
     setStartDate(detail.start_date);
