@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { fetchWithTimeout, getApiBase, setAuthState } from '../../../lib/auth';
+import { fetchWithTimeout, getApiBase, roleHomePath, setAuthState } from '../../../lib/auth';
 import PasswordInput from '../../_components/password-input';
 
 type RegisterRole = 'PARENT' | 'YOUNGSTER' | 'DELIVERY';
@@ -58,7 +58,7 @@ export default function RegisterForm({ role, allowedRoles, title, subtitle }: Re
       }
       const data = await res.json();
       setAuthState(data.accessToken, data.user.role);
-      router.push('/dashboard');
+      router.push(roleHomePath(data?.user?.role));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
     } finally {

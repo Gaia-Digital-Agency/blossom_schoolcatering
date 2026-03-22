@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { fetchWithTimeout, getApiBase, setAuthState } from '../../lib/auth';
+import { fetchWithTimeout, getApiBase, roleHomePath, setAuthState } from '../../lib/auth';
 import PasswordInput from '../_components/password-input';
 
 export default function LoginPage() {
@@ -28,20 +28,7 @@ export default function LoginPage() {
       }
       const data = await res.json();
       setAuthState(data.accessToken, data.user.role);
-      const role = String(data?.user?.role || '').toUpperCase();
-      if (role === 'PARENT') {
-        router.push('/family');
-      } else if (role === 'YOUNGSTER') {
-        router.push('/student');
-      } else if (role === 'DELIVERY') {
-        router.push('/delivery');
-      } else if (role === 'KITCHEN') {
-        router.push('/kitchen');
-      } else if (role === 'ADMIN') {
-        router.push('/admin');
-      } else {
-        router.push('/dashboard');
-      }
+      router.push(roleHomePath(data?.user?.role));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {

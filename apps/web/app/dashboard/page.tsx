@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { clearAuthState, fetchWithTimeout, getApiBase, refreshAccessToken } from '../../lib/auth';
+import { clearAuthState, fetchWithTimeout, getApiBase, refreshAccessToken, roleHomePath } from '../../lib/auth';
 
 type Profile = {
   username: string;
@@ -36,7 +36,7 @@ export default function DashboardPage() {
       }
       if (!res.ok) throw new Error('Failed to load profile');
       const data = await res.json();
-      setProfile(data);
+      router.replace(roleHomePath(data?.role));
     };
     loadProfile().catch((err) => setError(err instanceof Error ? err.message : 'Failed to load profile'));
   }, [router]);

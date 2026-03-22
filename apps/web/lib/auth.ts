@@ -18,6 +18,23 @@ export function getAppBase() {
   return getApiBase().replace('/api/v1', '');
 }
 
+export function roleHomePath(role?: string | null) {
+  switch (String(role || '').trim().toUpperCase()) {
+    case 'PARENT':
+      return '/family';
+    case 'YOUNGSTER':
+      return '/student';
+    case 'DELIVERY':
+      return '/delivery';
+    case 'KITCHEN':
+      return '/kitchen';
+    case 'ADMIN':
+      return '/admin';
+    default:
+      return '/login';
+  }
+}
+
 function getCookiePath() {
   return getAppBase() || '/';
 }
