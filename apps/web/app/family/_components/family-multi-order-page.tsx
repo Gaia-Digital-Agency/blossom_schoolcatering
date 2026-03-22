@@ -73,7 +73,7 @@ export default function FamilyMultiOrderPage() {
   const [session, setSession] = useState<SessionType>('LUNCH');
   const [startDate, setStartDate] = useState(plusDays(todayIsoLocal(), 1));
   const [endDate, setEndDate] = useState(plusDays(todayIsoLocal(), 14));
-  const [repeatDays, setRepeatDays] = useState<number[]>([1, 3, 5]);
+  const [repeatDays, setRepeatDays] = useState<number[]>([]);
   const [itemQty, setItemQty] = useState<Record<string, number>>({});
   const [requestType, setRequestType] = useState<'CHANGE' | 'DELETE'>('CHANGE');
   const [requestReason, setRequestReason] = useState('');
@@ -155,7 +155,7 @@ export default function FamilyMultiOrderPage() {
     setStep(1);
     setStartDate(plusDays(todayIsoLocal(), 1));
     setEndDate(plusDays(todayIsoLocal(), 14));
-    setRepeatDays([1, 3, 5]);
+    setRepeatDays([]);
     setItemQty({});
     setRequestType('CHANGE');
     setRequestReason('');
@@ -171,7 +171,7 @@ export default function FamilyMultiOrderPage() {
     setSession(detail.session);
     setStartDate(detail.start_date);
     setEndDate(detail.end_date);
-    setRepeatDays(days.length ? days : [1, 3, 5]);
+    setRepeatDays(days);
     setItemQty(Object.fromEntries(dishes.map((item) => [item.menuItemId, item.quantity && Number(item.quantity) > 0 ? 1 : 0])));
     setStep(1);
   };
@@ -189,6 +189,7 @@ export default function FamilyMultiOrderPage() {
 
   const submitBuilder = async () => {
     if (!selectedChildId) { setError('Select a student first.'); return; }
+    if (repeatDays.length === 0) { setError('Select at least one repeat day.'); return; }
     if (selectedItems.length === 0) { setError('Select at least one dish.'); return; }
     setSubmitting(true);
     setError('');
@@ -375,7 +376,7 @@ export default function FamilyMultiOrderPage() {
             <div className="auth-form">
               <p><strong>Session:</strong> {getSessionLabel(session)}</p>
               <p><strong>Date Range:</strong> {startDate} to {endDate}</p>
-              <p><strong>Repeat:</strong> {repeatDays.map(repeatDayLabel).join(', ')}</p>
+              <p><strong>Repeat:</strong> {repeatDays.length ? repeatDays.map(repeatDayLabel).join(', ') : '-'}</p>
               <p><strong>Dishes:</strong> {selectedItems.length}</p>
               <div className="date-chip-grid">
                 {reviewDates.map((date) => <span key={date} className="date-chip">{date}</span>)}
@@ -409,31 +410,52 @@ export default function FamilyMultiOrderPage() {
         </div>
 
         {selectedGroup ? (
-          <div className="module-section">
-            <h2>Selected Group</h2>
-            <p><strong>{selectedGroup.child_name}</strong> · {getSessionLabel(selectedGroup.session)} · {selectedGroup.status}</p>
-            <p>Repeat: {parseRepeatDays(selectedGroup.repeat_days_json).map(repeatDayLabel).join(', ') || '-'}</p>
-            <div className="date-chip-grid">
-              {selectedGroup.occurrences.map((occurrence) => (
-                <span key={occurrence.id} className="date-chip">{occurrence.service_date} · {occurrence.status}</span>
-              ))}
-            </div>
-            {selectedGroup.can_request_change ? (
-              <div className="auth-form">
-                <label>
-                  Request Type
-                  <select value={requestType} onChange={(e) => setRequestType(e.target.value as 'CHANGE' | 'DELETE')}>
-                    <option value="CHANGE">Change Future Plan</option>
-                    <option value="DELETE">Delete Future Plan</option>
-                  </select>
-                </label>
-                <label>
-                  Reason
-                  <textarea value={requestReason} onChange={(e) => setRequestReason(e.target.value)} rows={3} />
-                </label>
-                <button className="btn btn-primary" type="button" onClick={submitRequest} disabled={submitting}>Submit Admin Request</button>
+          <div className="multiorder-modal-backdrop" role="presentation" onClick={() => setSelectedGroup(null)}>
+            <div className="multiorder-modal" role="dialog" aria-modal="true" aria-labelledby="multiorder-modal-title" onClick={(e) => e.stopPropagation()}>
+              <div className="multiorder-modal-header">
+                <h2 id="multiorder-modal-title">Multi Order Details</h2>
+                <button className="btn btn-outline" type="button" onClick={() => setSelectedGroup(null)}>Close</button>
               </div>
-            ) : null}
+              <p><strong>{selectedGroup.child_name}</strong> · {getSessionLabel(selectedGroup.session)} · {selectedGroup.status}</p>
+              <p><strong>Date Range:</strong> {selectedGroup.start_date} to {selectedGroup.end_date}</p>
+              <p><strong>Repeat:</strong> {parseRepeatDays(selectedGroup.repeat_days_json).map(repeatDayLabel).join(', ') || '-'}</p>
+              <p><strong>Amount:</strong> Rp {Number(selectedGroup.current_total_amount || 0).toLocaleString('id-ID')}</p>
+              <div>
+                <strong>Dishes</strong>
+                <div className="modal-list">
+                  {parseDishSelection(selectedGroup.dish_selection_json).map((dish) => (
+                    <div key={dish.menuItemId} className="modal-list-item">
+                      <span>{dish.itemNameSnapshot || dish.menuItemId}</span>
+                      <span>Qty {Number(dish.quantity || 1)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <strong>Occurrences</strong>
+                <div className="date-chip-grid">
+                  {selectedGroup.occurrences.map((occurrence) => (
+                    <span key={occurrence.id} className="date-chip">{occurrence.service_date} · {occurrence.status}</span>
+                  ))}
+                </div>
+              </div>
+              {selectedGroup.can_request_change ? (
+                <div className="auth-form">
+                  <label>
+                    Request Type
+                    <select value={requestType} onChange={(e) => setRequestType(e.target.value as 'CHANGE' | 'DELETE')}>
+                      <option value="CHANGE">Change Future Plan</option>
+                      <option value="DELETE">Delete Future Plan</option>
+                    </select>
+                  </label>
+                  <label>
+                    Reason
+                    <textarea value={requestReason} onChange={(e) => setRequestReason(e.target.value)} rows={3} />
+                  </label>
+                  <button className="btn btn-primary" type="button" onClick={submitRequest} disabled={submitting}>Submit Admin Request</button>
+                </div>
+              ) : null}
+            </div>
           </div>
         ) : null}
 
@@ -500,6 +522,49 @@ export default function FamilyMultiOrderPage() {
           display: grid;
           gap: 0.6rem;
           background: #fffdf9;
+        }
+        .multiorder-modal-backdrop {
+          position: fixed;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 1rem;
+          background: rgba(35, 28, 22, 0.45);
+          z-index: 40;
+        }
+        .multiorder-modal {
+          width: min(680px, 100%);
+          max-height: min(88vh, 920px);
+          overflow: auto;
+          display: grid;
+          gap: 0.85rem;
+          padding: 1rem;
+          border-radius: 1rem;
+          border: 1px solid #eadcc9;
+          background: #fffdf9;
+          box-shadow: 0 24px 60px rgba(35, 28, 22, 0.18);
+        }
+        .multiorder-modal-header,
+        .modal-list-item {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 0.75rem;
+        }
+        .multiorder-modal-header h2 {
+          margin: 0;
+        }
+        .modal-list {
+          display: grid;
+          gap: 0.5rem;
+          margin-top: 0.5rem;
+        }
+        .modal-list-item {
+          padding: 0.75rem 0.9rem;
+          border: 1px solid #eadcc9;
+          border-radius: 0.85rem;
+          background: #fffaf2;
         }
       `}</style>
     </main>
