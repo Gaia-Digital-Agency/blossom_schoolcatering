@@ -62,7 +62,7 @@ export default function FamilyMultiOrderPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<0 | 1 | 2 | 3>(1);
   const [children, setChildren] = useState<Child[]>([]);
   const [groups, setGroups] = useState<MultiOrderGroup[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<MultiOrderDetail | null>(null);
@@ -87,7 +87,7 @@ export default function FamilyMultiOrderPage() {
   const selectedItems = useMemo(
     () => Object.entries(itemQty)
       .filter(([, quantity]) => quantity > 0)
-      .map(([menuItemId, quantity]) => ({ menuItemId, quantity })),
+      .map(([menuItemId]) => ({ menuItemId, quantity: 1 })),
     [itemQty],
   );
 
@@ -172,7 +172,7 @@ export default function FamilyMultiOrderPage() {
     setStartDate(detail.start_date);
     setEndDate(detail.end_date);
     setRepeatDays(days.length ? days : [1, 3, 5]);
-    setItemQty(Object.fromEntries(dishes.map((item) => [item.menuItemId, Number(item.quantity || 0)])));
+    setItemQty(Object.fromEntries(dishes.map((item) => [item.menuItemId, item.quantity && Number(item.quantity) > 0 ? 1 : 0])));
     setStep(1);
   };
 
@@ -180,10 +180,10 @@ export default function FamilyMultiOrderPage() {
     setRepeatDays((current) => current.includes(day) ? current.filter((value) => value !== day) : [...current, day].sort((a, b) => a - b));
   };
 
-  const setMenuQty = (menuItemId: string, quantity: number) => {
+  const toggleMenuItem = (menuItemId: string) => {
     setItemQty((current) => ({
       ...current,
-      [menuItemId]: Math.max(0, Math.min(5, quantity)),
+      [menuItemId]: current[menuItemId] ? 0 : 1,
     }));
   };
 
@@ -287,12 +287,28 @@ export default function FamilyMultiOrderPage() {
 
         <div className="module-section">
           <div className="step-row">
+            <button type="button" className={step === 0 ? 'step-pill active' : 'step-pill'} onClick={() => setStep(0)}>
+              Guide
+            </button>
             {[1, 2, 3].map((value) => (
               <button key={value} type="button" className={step === value ? 'step-pill active' : 'step-pill'} onClick={() => setStep(value as 1 | 2 | 3)}>
                 Step {value}
               </button>
             ))}
           </div>
+
+          {step === 0 ? (
+            <div className="guide-card">
+              <h2>Multi Order Guide</h2>
+              <p>Multi Order lets one student create repeated meal orders in one setup instead of ordering each date manually.</p>
+              <p><strong>Step 1:</strong> Choose the student, session, start date, end date, and repeat weekdays.</p>
+              <p><strong>Step 2:</strong> Choose the dishes. Each dish can only be selected once, so no quantity dropdown is needed.</p>
+              <p><strong>Step 3:</strong> Review the repeated dates and submit the grouped order.</p>
+              <p><strong>Repeat by days:</strong> Turn on the weekdays you want, such as Monday, Wednesday, and Friday.</p>
+              <p><strong>Repeat by week:</strong> Keep the same weekday pattern across multiple weeks by setting a longer end date.</p>
+              <p><strong>Repeat by month:</strong> Extend the date range into the next month to continue the same pattern, up to the allowed booking limit.</p>
+            </div>
+          ) : null}
 
           {step === 1 ? (
             <div className="auth-form">
@@ -341,18 +357,16 @@ export default function FamilyMultiOrderPage() {
           ) : null}
 
           {step === 2 ? (
-            <div className="auth-form">
+            <div className="menu-pick-grid">
               {menuItems.map((item) => (
-                <label key={item.id}>
-                  <span>{item.name}</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={5}
-                    value={itemQty[item.id] || 0}
-                    onChange={(e) => setMenuQty(item.id, Number(e.target.value || 0))}
-                  />
-                </label>
+                <button
+                  key={item.id}
+                  type="button"
+                  className={itemQty[item.id] ? 'dish-pill active' : 'dish-pill'}
+                  onClick={() => toggleMenuItem(item.id)}
+                >
+                  {item.name}
+                </button>
               ))}
             </div>
           ) : null}
@@ -439,8 +453,41 @@ export default function FamilyMultiOrderPage() {
           background: #fffaf2;
         }
         .step-pill.active {
-          background: #e8f4ea;
-          border-color: #7ca486;
+          background: #2f7a43;
+          border-color: #2f7a43;
+          color: #ffffff;
+          box-shadow: 0 10px 24px rgba(47, 122, 67, 0.22);
+        }
+        .guide-card {
+          display: grid;
+          gap: 0.65rem;
+          padding: 1rem;
+          border: 1px solid #d7c8b5;
+          border-radius: 1rem;
+          background: #fffdf9;
+        }
+        .guide-card h2,
+        .guide-card p {
+          margin: 0;
+        }
+        .menu-pick-grid {
+          display: grid;
+          gap: 0.65rem;
+        }
+        .dish-pill {
+          width: 100%;
+          text-align: left;
+          border: 1px solid #d7c8b5;
+          border-radius: 0.9rem;
+          padding: 0.85rem 1rem;
+          background: #fffaf2;
+          color: #3f3226;
+        }
+        .dish-pill.active {
+          background: #2f7a43;
+          border-color: #2f7a43;
+          color: #ffffff;
+          box-shadow: 0 10px 24px rgba(47, 122, 67, 0.18);
         }
         .multiorder-list {
           display: grid;
