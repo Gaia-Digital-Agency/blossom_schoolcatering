@@ -21,6 +21,8 @@ type MultiOrderGroup = {
   session: SessionType;
   start_date: string;
   end_date: string;
+  created_at?: string;
+  updated_at?: string;
   repeat_days_json?: number[];
   status: string;
   current_total_amount: number;
@@ -114,11 +116,25 @@ function toTitleCase(value?: string) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+function formatTimestampDate(value?: string) {
+  const raw = String(value || '').trim();
+  if (!raw) return '-';
+  return raw.slice(0, 10);
+}
+
 function buildCardNarrative(group: MultiOrderGroup) {
   const honorific = getStudentHonorific(group.child_gender);
   const firstName = getFirstName(group.child_first_name, group.child_name);
   const summary = buildAiSummary(group).replace(/^AI Generated Summary:\s*/, '');
-  return `${honorific} ${firstName} have an ${toTitleCase(group.status)} multi order ${getSessionLabel(group.session)} from ${group.start_date} to ${group.end_date}. The order is for ${summary}.`;
+  const createdAt = String(group.created_at || '').trim();
+  const updatedAt = String(group.updated_at || '').trim();
+  const hasChanged = Boolean(createdAt && updatedAt && createdAt !== updatedAt);
+  const actionLabel = hasChanged ? 'last updated on' : 'placed on';
+  const actionDate = formatTimestampDate(hasChanged ? updatedAt : createdAt);
+  const sessionLabel = getSessionLabel(group.session).toLowerCase();
+  const statusLabel = String(group.status || '').trim().toLowerCase() || 'active';
+  const amountLabel = Number(group.current_total_amount || 0).toLocaleString('id-ID');
+  return `${honorific} ${firstName} has an ${statusLabel} multi order ${sessionLabel} from ${group.start_date} to ${group.end_date}, this order was ${actionLabel} ${actionDate} for ${summary} amounting to Rp ${amountLabel}.`;
 }
 
 export default function FamilyMultiOrderPage() {
@@ -460,10 +476,7 @@ export default function FamilyMultiOrderPage() {
             {groups.map((group) => (
               <article key={group.id} className="multiorder-card">
                 <div>
-                  <strong>{group.child_name}</strong>
                   <p>{buildCardNarrative(group)}</p>
-                  <p>AI Generated Summary: {buildAiSummary(group).replace(/^AI Generated Summary:\s*/, '')}</p>
-                  <p>Amount: Rp {Number(group.current_total_amount || 0).toLocaleString('id-ID')}</p>
                 </div>
                 <div className="card-actions">
                   <button className="btn btn-outline" type="button" onClick={() => loadGroupDetail(group.id)}>View</button>
