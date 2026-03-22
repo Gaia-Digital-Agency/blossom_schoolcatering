@@ -17,6 +17,7 @@ type MultiOrderGroup = {
   child_name: string;
   child_first_name?: string;
   child_gender?: string;
+  school_short_name?: string;
   parent_name?: string;
   session: SessionType;
   start_date: string;
@@ -165,10 +166,12 @@ function buildCardNarrative(group: MultiOrderGroup, isStudentView: boolean) {
   const sessionLabel = getSessionLabel(group.session).toLowerCase();
   const statusLabel = String(group.status || '').trim().toLowerCase() || 'active';
   const amountLabel = Number(group.current_total_amount || 0).toLocaleString('id-ID');
+  const schoolShortName = String(group.school_short_name || '').trim();
+  const schoolPhrase = schoolShortName ? ` in ${schoolShortName}` : '';
   if (isStudentView) {
-    return `You have an ${statusLabel} multi order ${sessionLabel} from ${group.start_date} to ${group.end_date}, this order was ${actionLabel} ${actionDate} for ${summary} amounting to Rp ${amountLabel}.`;
+    return `You${schoolPhrase} have an ${statusLabel} multi order ${sessionLabel} from ${group.start_date} to ${group.end_date}, this order was ${actionLabel} ${actionDate} for ${summary} amounting to Rp ${amountLabel}.`;
   }
-  return `${honorific} ${firstName} has an ${statusLabel} multi order ${sessionLabel} from ${group.start_date} to ${group.end_date}, this order was ${actionLabel} ${actionDate} for ${summary} amounting to Rp ${amountLabel}.`;
+  return `${honorific} ${firstName}${schoolPhrase} has an ${statusLabel} multi order ${sessionLabel} from ${group.start_date} to ${group.end_date}, this order was ${actionLabel} ${actionDate} for ${summary} amounting to Rp ${amountLabel}.`;
 }
 
 export default function FamilyMultiOrderPage() {

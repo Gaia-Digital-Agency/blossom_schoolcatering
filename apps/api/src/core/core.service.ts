@@ -9104,6 +9104,7 @@ export class CoreService implements OnModuleInit {
                mog.current_total_amount,
                cu.first_name AS child_first_name,
                c.gender::text AS child_gender,
+               NULLIF(TRIM(COALESCE(s.short_name, '')), '') AS school_short_name,
                cu.first_name || ' ' || cu.last_name AS child_name,
                COALESCE(pu.first_name || ' ' || pu.last_name, '') AS parent_name,
                mob.status AS billing_status,
@@ -9117,6 +9118,7 @@ export class CoreService implements OnModuleInit {
                ) AS has_open_request
         FROM multi_order_groups mog
         JOIN children c ON c.id = mog.child_id
+        JOIN schools s ON s.id = c.school_id
         JOIN users cu ON cu.id = c.user_id
         LEFT JOIN parents p ON p.id = mog.parent_id
         LEFT JOIN users pu ON pu.id = p.user_id
