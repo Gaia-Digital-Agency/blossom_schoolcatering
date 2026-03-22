@@ -15,6 +15,8 @@ type MultiOrderGroup = {
   id: string;
   child_id: string;
   child_name: string;
+  child_first_name?: string;
+  child_gender?: string;
   parent_name?: string;
   session: SessionType;
   start_date: string;
@@ -90,6 +92,33 @@ function buildAiSummary(group: Pick<MultiOrderGroup, 'start_date' | 'end_date' |
     return `AI Generated Summary: Repeating order every ${repeatDayLabel(repeatDays[0])}, ${repeatDayLabel(repeatDays[1])}, and ${repeatDayLabel(repeatDays[2])} for ${duration}`;
   }
   return `AI Generated Summary: Custom weekly repeat on ${repeatDays.map(repeatDayLabel).join(', ')} for ${duration}`;
+}
+
+function getStudentHonorific(genderRaw?: string) {
+  const gender = String(genderRaw || '').trim().toUpperCase();
+  if (gender === 'MALE') return 'Master';
+  if (gender === 'FEMALE') return 'Miss';
+  return 'Student';
+}
+
+function getFirstName(name?: string, fallback?: string) {
+  const fromField = String(name || '').trim();
+  if (fromField) return fromField;
+  const parts = String(fallback || '').trim().split(/\s+/).filter(Boolean);
+  return parts[0] || 'Student';
+}
+
+function toTitleCase(value?: string) {
+  const text = String(value || '').trim().toLowerCase();
+  if (!text) return '-';
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function buildCardNarrative(group: MultiOrderGroup) {
+  const honorific = getStudentHonorific(group.child_gender);
+  const firstName = getFirstName(group.child_first_name, group.child_name);
+  const summary = buildAiSummary(group).replace(/^AI Generated Summary:\s*/, '');
+  return `${honorific} ${firstName} have an ${toTitleCase(group.status)} multi order ${getSessionLabel(group.session)} from ${group.start_date} to ${group.end_date}. The order is for ${summary}.`;
 }
 
 export default function FamilyMultiOrderPage() {
@@ -432,9 +461,9 @@ export default function FamilyMultiOrderPage() {
               <article key={group.id} className="multiorder-card">
                 <div>
                   <strong>{group.child_name}</strong>
-                  <p>{getSessionLabel(group.session)} · {group.start_date} to {group.end_date}</p>
-                  <p>{buildAiSummary(group)}</p>
-                  <p>Status: {group.status} · Amount: Rp {Number(group.current_total_amount || 0).toLocaleString('id-ID')}</p>
+                  <p>{buildCardNarrative(group)}</p>
+                  <p>AI Generated Summary: {buildAiSummary(group).replace(/^AI Generated Summary:\s*/, '')}</p>
+                  <p>Amount: Rp {Number(group.current_total_amount || 0).toLocaleString('id-ID')}</p>
                 </div>
                 <div className="card-actions">
                   <button className="btn btn-outline" type="button" onClick={() => loadGroupDetail(group.id)}>View</button>

@@ -9093,6 +9093,8 @@ export class CoreService implements OnModuleInit {
                mog.status,
                mog.original_total_amount,
                mog.current_total_amount,
+               cu.first_name AS child_first_name,
+               c.gender::text AS child_gender,
                cu.first_name || ' ' || cu.last_name AS child_name,
                COALESCE(pu.first_name || ' ' || pu.last_name, '') AS parent_name,
                mob.status AS billing_status,
