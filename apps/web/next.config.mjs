@@ -9,8 +9,8 @@ const nextConfig = {
   // Allow Next.js Image component to serve optimised WebP/AVIF from the API
   images: {
     remotePatterns: [
-      { protocol: 'http',  hostname: '34.124.244.233' },
-      { protocol: 'https', hostname: '34.124.244.233' },
+      { protocol: 'http',  hostname: '34.158.47.112' },
+      { protocol: 'https', hostname: '34.158.47.112' },
       { protocol: 'http',  hostname: 'localhost' },
     ],
     // Cache optimised images for 7 days on the client

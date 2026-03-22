@@ -1,7 +1,7 @@
 # Access Information
 
 Last updated: 2026-02-26
-Base URL: `http://34.124.244.233/schoolcatering`
+Base URL: `http://34.158.47.112/schoolcatering`
 
 ## Role Login Pages
 - Admin login: `/admin/login`

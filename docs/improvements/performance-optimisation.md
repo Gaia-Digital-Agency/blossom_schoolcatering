@@ -159,7 +159,7 @@ CREATE INDEX IF NOT EXISTS billing_records_status_idx
 
 **Run on server:**
 ```bash
-ssh -i ~/.ssh/google_compute_engine rogerwoolie@34.124.244.233 \
+ssh -i ~/.ssh/google_compute_engine rogerwoolie@34.158.47.112 \
   "sudo -u postgres psql -d schoolcatering_db \
    -f /var/www/schoolcatering/docs/db/002_perf_indexes.sql"
 ```

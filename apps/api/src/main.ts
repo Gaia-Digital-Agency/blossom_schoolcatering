@@ -73,7 +73,7 @@ async function bootstrap() {
   const corsOrigins = [
     'http://localhost:5173',
     'http://127.0.0.1:5173',
-    'http://34.124.244.233',
+    'http://34.158.47.112',
     process.env.CORS_ORIGIN,
   ].filter(Boolean) as string[];
 

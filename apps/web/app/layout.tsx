@@ -3,7 +3,7 @@ import './globals.css';
 import NetworkActivityIndicator from './_components/network-activity-indicator';
 import BackToTopGlobal from './_components/back-to-top-global';
 
-const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'http://34.124.244.233').replace(/\/+$/, '');
+const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'http://34.158.47.112').replace(/\/+$/, '');
 
 /**
  * Metadata for the website.

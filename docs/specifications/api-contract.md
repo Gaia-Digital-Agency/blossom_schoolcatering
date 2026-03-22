@@ -3,7 +3,7 @@
 ## API Style
 - Primary: REST JSON
 - Auth: JWT Bearer token
-- Base URL (staging): `http://34.124.244.233/schoolcatering/api/v1`
+- Base URL (staging): `http://34.158.47.112/schoolcatering/api/v1`
 
 ## Global Standards
 - Timezone for cutoff/service checks: `Asia/Makassar` (UTC+8)

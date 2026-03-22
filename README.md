@@ -13,7 +13,7 @@ Blossom School Catering is a role-based school meal ordering platform for Bali o
 - Runtime stack: Next.js + NestJS + PostgreSQL + PM2 + Nginx + GCS
 
 ## Current Runtime
-- Staging URL: `http://34.124.244.233/schoolcatering`
+- Staging URL: `http://34.158.47.112/schoolcatering`
 - Frontend process: `schoolcatering-web`
 - API process: `schoolcatering-api`
 - API base: `/schoolcatering/api/v1`
@@ -40,7 +40,7 @@ Local URLs:
 
 ## Typical Server Deploy
 ```bash
-ssh -i ~/.ssh/gda-ce01 azlan@34.124.244.233
+ssh -i ~/.ssh/gda-ce01 azlan@34.158.47.112
 cd /var/www/schoolcatering
 git pull origin codex/phase1-stack-upgrade
 npm run build:api

@@ -14,7 +14,7 @@ Target go-live: 2026-04-01
 
 ## 1) Create Basline & Plan
 - [x] VM staging path prepared at `/var/www/schoolcatering`
-- [x] Nginx route serving app at `http://34.124.244.233/schoolcatering/`
+- [x] Nginx route serving app at `http://34.158.47.112/schoolcatering/`
 - [x] PostgreSQL database created and migrations applied on VM
 - [x] Shared `.env` symlinked into app, including GCS bucket/folder values
 - [x] Base homepage deployed (mobile-first, hero image, logo, favicon)

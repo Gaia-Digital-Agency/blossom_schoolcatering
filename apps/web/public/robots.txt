@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: http://34.124.244.233/schoolcatering/sitemap.xml
+Sitemap: http://34.158.47.112/schoolcatering/sitemap.xml

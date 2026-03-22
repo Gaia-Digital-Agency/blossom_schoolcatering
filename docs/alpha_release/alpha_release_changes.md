@@ -1,6 +1,6 @@
 # Alpha Release Changes
 
-http://34.124.244.233/schoolcatering\
+http://34.158.47.112/schoolcatering\
 Alpha release discussion on 3:00pm 16th March 2026.\
 Updated: 3:00pm, 17th March 2026.\
 Target change completion: 19th March 2026.\

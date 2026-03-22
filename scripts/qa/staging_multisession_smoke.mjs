@@ -1,4 +1,4 @@
-const base = process.env.BASE_URL || 'http://34.124.244.233/schoolcatering/api/v1';
+const base = process.env.BASE_URL || 'http://34.158.47.112/schoolcatering/api/v1';
 const seededPassword = process.env.SEEDED_PASSWORD || 'teameditor123';
 const familyUsername = process.env.FAMILY_USERNAME || 'family01_parent01';
 const studentUsername = process.env.STUDENT_USERNAME || 'family01_student01a';

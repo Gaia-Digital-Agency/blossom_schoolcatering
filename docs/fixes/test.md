@@ -1,7 +1,7 @@
 # Staging Test Sweep
 
 Date: 2026-02-26  
-Target: `http://34.124.244.233/schoolcatering`  
+Target: `http://34.158.47.112/schoolcatering`  
 Runner: API/scripted validation on staging
 
 ## Scope

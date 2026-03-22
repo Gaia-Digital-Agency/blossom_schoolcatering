@@ -1,5 +1,5 @@
 # Blossom School Catering 
-http://34.124.244.233/schoolcatering
+http://34.158.47.112/schoolcatering
 
 ## 1) Product Story
 Blossom School Catering is a school meal operations platform where Admin, Parent, Youngster, Kitchen, and Delivery each complete part of one connected daily service cycle.

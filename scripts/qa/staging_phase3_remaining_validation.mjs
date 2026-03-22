@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
-const BASE = process.env.BASE_URL || 'http://34.124.244.233/schoolcatering/api/v1';
+const BASE = process.env.BASE_URL || 'http://34.158.47.112/schoolcatering/api/v1';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'teameditor123';
 const SEEDED_PASSWORD = process.env.SEEDED_PASSWORD || 'Teameditor@123';
 const FAMILY_USERNAME = process.env.FAMILY_USERNAME || 'family01_parent01';

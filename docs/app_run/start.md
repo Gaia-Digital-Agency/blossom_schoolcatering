@@ -74,11 +74,11 @@ npm --prefix apps/api run start:prod
 ## 2) Alter (Update) App on Staging Server
 
 Server details:
-- Host: `34.124.244.233`
+- Host: `34.158.47.112`
 - User: `azlan`
 - SSH key: `~/.ssh/gda-ce01`
 - Server app path: `/var/www/schoolcatering`
-- Staging URL: `http://34.124.244.233/schoolcatering`
+- Staging URL: `http://34.158.47.112/schoolcatering`
 
 ### A. Build locally first
 ```bash
@@ -89,7 +89,7 @@ npm run build:api
 
 ### B. Update on server (git workflow)
 ```bash
-ssh -i ~/.ssh/gda-ce01 azlan@34.124.244.233
+ssh -i ~/.ssh/gda-ce01 azlan@34.158.47.112
 cd /var/www/schoolcatering
 git pull origin main
 npm run build:api
@@ -107,7 +107,7 @@ curl -fsS http://127.0.0.1:3006/ready
 ```
 
 ### D. Open staging site
-- `http://34.124.244.233/schoolcatering`
+- `http://34.158.47.112/schoolcatering`
 
 
 ## 3) Quick Update Cycle
@@ -122,7 +122,7 @@ git push origin main
 ```
 3. Pull and rebuild on server:
 ```bash
-ssh -i ~/.ssh/gda-ce01 azlan@34.124.244.233
+ssh -i ~/.ssh/gda-ce01 azlan@34.158.47.112
 cd /var/www/schoolcatering
 git pull origin main
 npm run build:api
@@ -137,7 +137,7 @@ pm2 restart schoolcatering-web
 
 Default deployment mode is git checkout + PM2 restart:
 ```bash
-ssh -i ~/.ssh/gda-ce01 azlan@34.124.244.233
+ssh -i ~/.ssh/gda-ce01 azlan@34.158.47.112
 cd /var/www/schoolcatering
 git pull origin main
 npm run build:api

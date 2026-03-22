@@ -443,10 +443,10 @@
 ## Infrastructure and Environments
 - Staging VM (GCP): `gda-s01`
 - Server path: `/var/www/schoolcatering`
-- Staging URL: `http://34.124.244.233/schoolcatering`
+- Staging URL: `http://34.158.47.112/schoolcatering`
 - Storage bucket: `gda-ce01`
 - Bucket folder: `blossom_schoolcatering`
-- SSH access command: `ssh -i ~/.ssh/gda-ce01 azlan@34.124.244.233`
+- SSH access command: `ssh -i ~/.ssh/gda-ce01 azlan@34.158.47.112`
 
 ## Repository Details
 - Git remote: `git@github.com-net1io:Gaia-Digital-Agency/blossom_schoolcatering.git`

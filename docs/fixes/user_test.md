@@ -2,7 +2,7 @@
 
 Last updated: 2026-02-27
 System under test: Blossom School Catering (`/schoolcatering`)
-Environment: `http://34.124.244.233/schoolcatering`
+Environment: `http://34.158.47.112/schoolcatering`
 Seed sources:
 - `docs/db/006_runtime_manual_test_seed.sql`
 - `docs/db/007_runtime_manual_data_seed.sql`
@@ -389,7 +389,7 @@ This section merges the requested "Flow Test For The Life Of A Single Order" int
 
 Execution date: 2026-02-28
 Runner: `docs/testting/test_script.mjs`
-Base URL: `http://34.124.244.233/schoolcatering/api/v1`
+Base URL: `http://34.158.47.112/schoolcatering/api/v1`
 Evidence report: `/tmp/sequence-test-report-619316.json`
 
 Summary:
