@@ -8529,6 +8529,11 @@ export class CoreService implements OnModuleInit {
 
   async getSiteSettings() {
     await this.ensureSiteSettingsTable();
+    await runSql(`
+      INSERT INTO site_settings (setting_key, setting_value)
+      VALUES ('multiorder_future_enabled', 'false')
+      ON CONFLICT (setting_key) DO NOTHING;
+    `);
     const out = await runSql(`
       SELECT row_to_json(t)::text
       FROM (
@@ -8537,13 +8542,21 @@ export class CoreService implements OnModuleInit {
           COALESCE(MAX(CASE WHEN setting_key = 'hero_image_url' THEN setting_value END), '/schoolcatering/assets/hero-meal.jpg') AS hero_image_url,
           COALESCE(MAX(CASE WHEN setting_key = 'hero_image_caption' THEN setting_value END), 'Enchanting Nourished Zesty Original Meals') AS hero_image_caption,
           COALESCE(MAX(CASE WHEN setting_key = 'ordering_cutoff_time' THEN setting_value END), '08:00') AS ordering_cutoff_time,
-          COALESCE(MAX(CASE WHEN setting_key = 'assistance_message' THEN setting_value END), 'For Assistance Please Whatsapp +6285211710217') AS assistance_message
+          COALESCE(MAX(CASE WHEN setting_key = 'assistance_message' THEN setting_value END), 'For Assistance Please Whatsapp +6285211710217') AS assistance_message,
+          COALESCE(MAX(CASE WHEN setting_key = 'multiorder_future_enabled' THEN setting_value END), 'false') AS multiorder_future_enabled
         FROM site_settings
       ) t;
     `);
     const lines = out.split('\n').map((x: string) => x.trim()).filter(Boolean);
     const data = lines[0]
-      ? (JSON.parse(lines[0]) as { chef_message?: string; hero_image_url?: string; hero_image_caption?: string; ordering_cutoff_time?: string; assistance_message?: string })
+      ? (JSON.parse(lines[0]) as {
+          chef_message?: string;
+          hero_image_url?: string;
+          hero_image_caption?: string;
+          ordering_cutoff_time?: string;
+          assistance_message?: string;
+          multiorder_future_enabled?: string;
+        })
       : {};
     return {
       chef_message: data.chef_message ?? '',
@@ -8551,18 +8564,30 @@ export class CoreService implements OnModuleInit {
       hero_image_caption: data.hero_image_caption ?? 'Enchanting Nourished Zesty Original Meals',
       ordering_cutoff_time: this.normalizeOrderingCutoffTime(data.ordering_cutoff_time ?? '08:00'),
       assistance_message: data.assistance_message ?? 'For Assistance Please Whatsapp +6285211710217',
+      multiorder_future_enabled: String(data.multiorder_future_enabled || 'false').trim().toLowerCase() === 'true',
     };
   }
 
-  async updateSiteSettings(actor: AccessUser, input: { chef_message?: string; hero_image_url?: string; hero_image_caption?: string; ordering_cutoff_time?: string; assistance_message?: string }) {
+  async updateSiteSettings(actor: AccessUser, input: {
+    chef_message?: string;
+    hero_image_url?: string;
+    hero_image_caption?: string;
+    ordering_cutoff_time?: string;
+    assistance_message?: string;
+    multiorder_future_enabled?: boolean;
+  }) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
-    const chefMessage = typeof input.chef_message === 'string' ? input.chef_message.trim() : '';
-    const heroImageUrl = typeof input.hero_image_url === 'string' ? input.hero_image_url.trim() : '/schoolcatering/assets/hero-meal.jpg';
-    const heroImageCaption = typeof input.hero_image_caption === 'string' ? input.hero_image_caption.trim() : 'Enchanting Nourished Zesty Original Meals';
-    const orderingCutoffTime = this.normalizeOrderingCutoffTime(input.ordering_cutoff_time ?? '08:00');
+    const current = await this.getSiteSettings();
+    const chefMessage = typeof input.chef_message === 'string' ? input.chef_message.trim() : current.chef_message;
+    const heroImageUrl = typeof input.hero_image_url === 'string' ? input.hero_image_url.trim() : current.hero_image_url;
+    const heroImageCaption = typeof input.hero_image_caption === 'string' ? input.hero_image_caption.trim() : current.hero_image_caption;
+    const orderingCutoffTime = this.normalizeOrderingCutoffTime(input.ordering_cutoff_time ?? current.ordering_cutoff_time);
     const assistanceMessage = typeof input.assistance_message === 'string'
       ? input.assistance_message.trim()
-      : 'For Assistance Please Whatsapp +6285211710217';
+      : current.assistance_message;
+    const multiorderFutureEnabled = typeof input.multiorder_future_enabled === 'boolean'
+      ? input.multiorder_future_enabled
+      : Boolean(current.multiorder_future_enabled);
     if (chefMessage.length > 500) throw new BadRequestException('chef_message must be 500 characters or fewer');
     if (heroImageCaption.length > 200) throw new BadRequestException('hero_image_caption must be 200 characters or fewer');
     if (heroImageUrl.length > 2000) throw new BadRequestException('hero_image_url must be 2000 characters or fewer');
@@ -8575,10 +8600,11 @@ export class CoreService implements OnModuleInit {
          ('hero_image_url', $2, now()),
          ('hero_image_caption', $3, now()),
          ('ordering_cutoff_time', $4, now()),
-         ('assistance_message', $5, now())
+         ('assistance_message', $5, now()),
+         ('multiorder_future_enabled', $6, now())
        ON CONFLICT (setting_key)
        DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = now();`,
-      [chefMessage, heroImageUrl || '/schoolcatering/assets/hero-meal.jpg', heroImageCaption, orderingCutoffTime, assistanceMessage],
+      [chefMessage, heroImageUrl || '/schoolcatering/assets/hero-meal.jpg', heroImageCaption, orderingCutoffTime, assistanceMessage, multiorderFutureEnabled ? 'true' : 'false'],
     );
     return {
       chef_message: chefMessage,
@@ -8586,6 +8612,7 @@ export class CoreService implements OnModuleInit {
       hero_image_caption: heroImageCaption,
       ordering_cutoff_time: orderingCutoffTime,
       assistance_message: assistanceMessage,
+      multiorder_future_enabled: multiorderFutureEnabled,
     };
   }
 
@@ -9166,7 +9193,7 @@ export class CoreService implements OnModuleInit {
       repeatDays,
       items: input.items || [],
     });
-    if (plan.dates.length === 0) throw new BadRequestException('No eligible dates for multi order');
+    if (plan.dates.length < 2) throw new BadRequestException('Multiorder requires at least 2 eligible dates');
     const groupOut = await runSql(
       `WITH inserted AS (
          INSERT INTO multi_order_groups (
@@ -9294,7 +9321,7 @@ export class CoreService implements OnModuleInit {
       repeatDays,
       items: input.items || [],
     });
-    if (plan.dates.length === 0) throw new BadRequestException('No eligible dates for multi order');
+    if (plan.dates.length < 2) throw new BadRequestException('Multiorder requires at least 2 eligible dates');
     await runSql(
       `UPDATE multi_order_groups
        SET start_date = $2::date,

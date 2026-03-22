@@ -8,8 +8,10 @@ import LogoutButton from '../../_components/logout-button';
 import { getSessionLabel } from '../../../lib/session-theme';
 
 type SessionType = 'BREAKFAST' | 'SNACK' | 'LUNCH';
+type MultiOrderViewStep = 'guide' | 'summary' | 'step1' | 'step2' | 'step3' | 'future';
 type Child = { id: string; first_name: string; last_name: string; school_grade?: string };
 type SessionSetting = { session: SessionType; is_active: boolean };
+type SiteSettings = { multiorder_future_enabled?: boolean };
 type MenuItem = { id: string; name: string; dish_category?: string };
 type MultiOrderItem = { menuItemId: string; quantity: number; itemNameSnapshot?: string; priceSnapshot?: number };
 type MultiOrderGroup = {
@@ -113,20 +115,20 @@ function formatDurationLabel(totalDays: number) {
 function buildAiSummary(group: Pick<MultiOrderGroup, 'start_date' | 'end_date' | 'repeat_days_json'>) {
   const repeatDays = parseRepeatDays(group.repeat_days_json);
   const duration = formatDurationLabel(daysBetweenInclusive(group.start_date, group.end_date));
-  if (repeatDays.length === 0) return `AI Generated Summary: custom repeat order for ${duration}`;
+  if (repeatDays.length === 0) return `Multiorder Summary: custom repeat order for ${duration}`;
   if (repeatDays.length === 1) {
-    return `AI Generated Summary: weekly order every ${repeatDayNarrativeLabel(repeatDays[0])} for ${duration}`;
+    return `Multiorder Summary: weekly order every ${repeatDayNarrativeLabel(repeatDays[0])} for ${duration}`;
   }
   if (repeatDays.length >= 5 && repeatDays.slice(0, 5).join(',') === '1,2,3,4,5') {
-    return `AI Generated Summary: daily repeat order for ${duration}`;
+    return `Multiorder Summary: daily repeat order for ${duration}`;
   }
   if (repeatDays.length === 2) {
-    return `AI Generated Summary: weekly order every ${repeatDayNarrativeLabel(repeatDays[0])} and ${repeatDayNarrativeLabel(repeatDays[1])} for ${duration}`;
+    return `Multiorder Summary: weekly order every ${repeatDayNarrativeLabel(repeatDays[0])} and ${repeatDayNarrativeLabel(repeatDays[1])} for ${duration}`;
   }
   if (repeatDays.length === 3) {
-    return `AI Generated Summary: repeating order every ${repeatDayNarrativeLabel(repeatDays[0])}, ${repeatDayNarrativeLabel(repeatDays[1])}, and ${repeatDayNarrativeLabel(repeatDays[2])} for ${duration}`;
+    return `Multiorder Summary: repeating order every ${repeatDayNarrativeLabel(repeatDays[0])}, ${repeatDayNarrativeLabel(repeatDays[1])}, and ${repeatDayNarrativeLabel(repeatDays[2])} for ${duration}`;
   }
-  return `AI Generated Summary: custom weekly repeat on ${repeatDays.map(repeatDayNarrativeLabel).join(', ')} for ${duration}`;
+  return `Multiorder Summary: custom weekly repeat on ${repeatDays.map(repeatDayNarrativeLabel).join(', ')} for ${duration}`;
 }
 
 function getStudentHonorific(genderRaw?: string) {
@@ -158,7 +160,7 @@ function formatTimestampDate(value?: string) {
 function buildCardNarrative(group: MultiOrderGroup, isStudentView: boolean) {
   const honorific = getStudentHonorific(group.child_gender);
   const firstName = getFirstName(group.child_first_name, group.child_name);
-  const summary = buildAiSummary(group).replace(/^AI Generated Summary:\s*/, '');
+  const summary = buildAiSummary(group).replace(/^Multiorder Summary:\s*/, '');
   const createdAt = String(group.created_at || '').trim();
   const updatedAt = String(group.updated_at || '').trim();
   const hasChanged = Boolean(createdAt && updatedAt && createdAt !== updatedAt);
@@ -181,7 +183,7 @@ export default function FamilyMultiOrderPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  const [step, setStep] = useState<0 | 1 | 2 | 3>(1);
+  const [step, setStep] = useState<MultiOrderViewStep>('step1');
   const [children, setChildren] = useState<Child[]>([]);
   const [groups, setGroups] = useState<MultiOrderGroup[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<MultiOrderDetail | null>(null);
@@ -198,6 +200,7 @@ export default function FamilyMultiOrderPage() {
   const [requestType, setRequestType] = useState<'CHANGE' | 'DELETE'>('CHANGE');
   const [requestReason, setRequestReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [futureEnabled, setFutureEnabled] = useState(false);
 
   const activeSessions = useMemo(
     () => (sessionSettings.length ? sessionSettings.filter((row) => row.is_active).map((row) => row.session) : ['LUNCH', 'SNACK', 'BREAKFAST']) as SessionType[],
@@ -237,7 +240,8 @@ export default function FamilyMultiOrderPage() {
   const hasValidDateRange = Boolean(startDate && endDate && endDate >= startDate);
   const step1Complete = Boolean(selectedChildId && session && startDate && endDate && hasValidDateRange && repeatDays.length > 0);
   const step2Complete = selectedItems.length > 0 && selectedItems.length <= 5;
-  const canSubmitBuilder = step1Complete && step2Complete && !submitting;
+  const meetsMultiOrderMinimum = reviewDates.length >= 2;
+  const canSubmitBuilder = step1Complete && step2Complete && meetsMultiOrderMinimum && !submitting;
 
   const loadGroups = async () => {
     const data = await apiFetch('/multi-orders') as MultiOrderGroup[];
@@ -245,12 +249,16 @@ export default function FamilyMultiOrderPage() {
   };
 
   const loadBase = async () => {
-    const [settings, groupsData] = await Promise.all([
+    const [settings, groupsData, siteSettings] = await Promise.all([
       apiFetch('/session-settings') as Promise<SessionSetting[]>,
       apiFetch('/multi-orders') as Promise<MultiOrderGroup[]>,
+      fetch('/schoolcatering/api/v1/public/site-settings', { credentials: 'include', cache: 'no-cache' })
+        .then(async (res) => (res.ok ? res.json() : null))
+        .catch(() => null) as Promise<SiteSettings | null>,
     ]);
     setSessionSettings(settings || []);
     setGroups(groupsData || []);
+    setFutureEnabled(Boolean(siteSettings?.multiorder_future_enabled));
     if (isStudentView) {
       const me = await apiFetch('/children/me') as Child;
       setChildren(me ? [me] : []);
@@ -288,7 +296,7 @@ export default function FamilyMultiOrderPage() {
 
   const resetBuilder = () => {
     setEditingGroupId('');
-    setStep(1);
+    setStep('step1');
     setStartDate(plusDays(todayIsoLocal(), 1));
     setEndDate(plusDays(todayIsoLocal(), 14));
     setRepeatDays([]);
@@ -309,7 +317,7 @@ export default function FamilyMultiOrderPage() {
     setEndDate(detail.end_date);
     setRepeatDays(days);
     setItemQty(Object.fromEntries(dishes.map((item) => [item.menuItemId, item.quantity && Number(item.quantity) > 0 ? 1 : 0])));
-    setStep(1);
+    setStep('step1');
   };
 
   const openEditConfirmation = (groupId: string) => {
@@ -345,6 +353,7 @@ export default function FamilyMultiOrderPage() {
     if (!startDate || !endDate) { setError('Select both start and end dates.'); return; }
     if (!hasValidDateRange) { setError('End date must be on or after start date.'); return; }
     if (repeatDays.length === 0) { setError('Select at least one repeat day.'); return; }
+    if (!meetsMultiOrderMinimum) { setError('Multiorder requires at least 2 order dates.'); return; }
     if (selectedItems.length === 0) { setError('Select at least one dish.'); return; }
     if (selectedItems.length > 5) { setError('Maximum 5 dishes per multi order.'); return; }
     setSubmitting(true);
@@ -444,37 +453,51 @@ export default function FamilyMultiOrderPage() {
 
         <div className="module-section">
           <div className="step-row">
-            <button type="button" className={step === 0 ? 'step-pill active' : 'step-pill'} onClick={() => setStep(0)}>
+            <button type="button" className={step === 'guide' ? 'step-pill active' : 'step-pill'} onClick={() => setStep('guide')}>
+              Guide
+            </button>
+            <button type="button" className={step === 'summary' ? 'step-pill active' : 'step-pill'} onClick={() => setStep('summary')}>
               Summary
             </button>
-            <button type="button" className={step === 1 ? 'step-pill active' : 'step-pill'} onClick={() => setStep(1)}>
+            <button type="button" className={step === 'step1' ? 'step-pill active' : 'step-pill'} onClick={() => setStep('step1')}>
               Step 1
             </button>
             <button
               type="button"
-              className={step === 2 ? 'step-pill active' : 'step-pill'}
-              onClick={() => setStep(2)}
+              className={step === 'step2' ? 'step-pill active' : 'step-pill'}
+              onClick={() => setStep('step2')}
               disabled={!step1Complete}
             >
               Step 2
             </button>
             <button
               type="button"
-              className={step === 3 ? 'step-pill active' : 'step-pill'}
-              onClick={() => setStep(3)}
+              className={step === 'step3' ? 'step-pill active' : 'step-pill'}
+              onClick={() => setStep('step3')}
               disabled={!step1Complete || !step2Complete}
             >
               Step 3
             </button>
+            <button
+              type="button"
+              className={step === 'future' ? 'step-pill active' : 'step-pill'}
+              onClick={() => setStep('future')}
+              disabled={!futureEnabled}
+              title={futureEnabled ? 'Future feature' : 'Activate FUTURE in Admin > Schools first'}
+            >
+              Future
+            </button>
           </div>
 
-          {step === 0 ? (
+          {step === 'guide' ? (
             <div className="guide-card">
               <h2>Multi Order Guide</h2>
               <p>Multi Order allows creation of repeated meal orders in one setup instead of ordering each date individually.</p>
+              <p><strong>Summary:</strong> Review all existing multiorders and open any detail modal from one page.</p>
               <p><strong>Step 1:</strong> Choose the student, session, start date, end date, and repeat weekdays.</p>
               <p><strong>Step 2:</strong> Choose the dishes. Each dish can only be selected once, up to 5 dish max per meal per session.</p>
-              <p><strong>Step 3:</strong> Review the repeated dates and submit the grouped order.</p>
+              <p><strong>Step 3:</strong> Review the repeated dates and submit the grouped order. Multiorder requires at least 2 order dates.</p>
+              <p><strong>Future:</strong> Placeholder page for the future feature, available only when activated by Admin.</p>
               <p><strong>Options are:</strong></p>
               <p><strong>Repeat by days:</strong> Choose the weekdays, such as Monday, Wednesday, and Friday.</p>
               <p><strong>Repeat by week:</strong> Keep the same weekday pattern across multiple weeks by setting a longer end date.</p>
@@ -482,7 +505,7 @@ export default function FamilyMultiOrderPage() {
             </div>
           ) : null}
 
-          {step === 1 ? (
+          {step === 'step1' ? (
             <div className="auth-form">
               {!isStudentView && children.length > 0 ? (
                 <label>
@@ -529,7 +552,7 @@ export default function FamilyMultiOrderPage() {
             </div>
           ) : null}
 
-          {step === 2 ? (
+          {step === 'step2' ? (
             <div className="menu-pick-columns">
               <div className="menu-pick-column">
                 <h3>Main</h3>
@@ -567,27 +590,36 @@ export default function FamilyMultiOrderPage() {
             </div>
           ) : null}
 
-          {step === 3 ? (
+          {step === 'step3' ? (
             <div className="auth-form">
               <p><strong>Session:</strong> {getSessionLabel(session)}</p>
               <p><strong>Date Range:</strong> {startDate} to {endDate}</p>
               <p><strong>Repeat:</strong> {repeatDays.length ? repeatDays.map(repeatDayLabel).join(', ') : '-'}</p>
               <p><strong>Dishes:</strong> {selectedItems.length}</p>
+              <p><strong>Eligible Order Dates:</strong> {reviewDates.length}</p>
+              {!meetsMultiOrderMinimum ? <p className="auth-error">Multiorder requires at least 2 order dates.</p> : null}
               <div className="date-chip-grid">
                 {reviewDates.map((date) => <span key={date} className="date-chip">{date}</span>)}
               </div>
               <button className="btn btn-primary" type="button" onClick={submitBuilder} disabled={!canSubmitBuilder}>
                 {editingGroupId ? 'Update Multi Order' : 'Create Multi Order'}
               </button>
-              {!canSubmitBuilder ? <p className="auth-help">Complete Step 1 and Step 2 before creating the multi order.</p> : null}
+              {!canSubmitBuilder ? <p className="auth-help">Complete Step 1 and Step 2, then keep at least 2 order dates before creating the multiorder.</p> : null}
               {editingGroupId ? <button className="btn btn-outline" type="button" onClick={resetBuilder}>Cancel Edit</button> : null}
+            </div>
+          ) : null}
+
+          {step === 'future' ? (
+            <div className="guide-card">
+              <h2>{isStudentView ? 'Student Multi Order' : 'Family Multi Order'}</h2>
+              <p>Future Feature</p>
             </div>
           ) : null}
         </div>
 
-        {step === 0 ? (
+        {step === 'summary' ? (
           <div className="module-section">
-            <h2>AI Gemerated Summary</h2>
+            <h2>Multiorder Summary</h2>
             <div className="multiorder-list">
               {groups.map((group) => (
                 <article key={group.id} className="multiorder-card">

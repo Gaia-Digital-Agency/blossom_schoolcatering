@@ -9,4 +9,9 @@ export class PublicController {
   getPublicMenu(@Query('service_date') serviceDate?: string, @Query('session') session?: string) {
     return this.coreService.getPublicActiveMenu({ serviceDate, session });
   }
+
+  @Get('site-settings')
+  getPublicSiteSettings() {
+    return this.coreService.getSiteSettings();
+  }
 }

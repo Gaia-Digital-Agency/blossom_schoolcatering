@@ -15,7 +15,14 @@ type School = {
   is_active?: boolean;
 };
 type SessionSetting = { session: 'LUNCH' | 'SNACK' | 'BREAKFAST'; is_active: boolean };
-type SiteSettings = { ordering_cutoff_time?: string };
+type SiteSettings = {
+  chef_message?: string;
+  hero_image_url?: string;
+  hero_image_caption?: string;
+  ordering_cutoff_time?: string;
+  assistance_message?: string;
+  multiorder_future_enabled?: boolean;
+};
 
 export default function AdminSchoolsPage() {
   const [schools, setSchools] = useState<School[]>([]);
@@ -39,6 +46,7 @@ export default function AdminSchoolsPage() {
   const [editAddress, setEditAddress] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [orderingCutoffTime, setOrderingCutoffTime] = useState('08:00');
+  const [siteSettings, setSiteSettings] = useState<SiteSettings>({});
   const activeSchools = schools.filter((school) => school.is_active !== false);
   const inactiveSchools = schools.filter((school) => school.is_active === false);
 
@@ -52,6 +60,7 @@ export default function AdminSchoolsPage() {
     ]);
     setSchools([...(activeSchools || []), ...(inactiveSchools || [])]);
     setSessions(sessionSettings || []);
+    setSiteSettings(siteSettings || {});
     setOrderingCutoffTime(siteSettings?.ordering_cutoff_time || '08:00');
   };
 
@@ -192,7 +201,10 @@ export default function AdminSchoolsPage() {
     try {
       await apiFetch('/admin/site-settings', {
         method: 'PATCH',
-        body: JSON.stringify({ ordering_cutoff_time: orderingCutoffTime }),
+        body: JSON.stringify({
+          ...siteSettings,
+          ordering_cutoff_time: orderingCutoffTime,
+        }),
       }, { skipAutoReload: true });
       setMessage(`Cut off time updated: ${orderingCutoffTime}`);
       await load();
@@ -200,6 +212,27 @@ export default function AdminSchoolsPage() {
       setError(e instanceof Error ? e.message : 'Failed');
     } finally {
       setSavingCutoff(false);
+    }
+  };
+
+  const onToggleFutureFeature = async (isActive: boolean) => {
+    setSavingSession('FUTURE');
+    setMessage('');
+    setError('');
+    try {
+      await apiFetch('/admin/site-settings', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          ...siteSettings,
+          multiorder_future_enabled: isActive,
+        }),
+      }, { skipAutoReload: true });
+      setMessage(`Future feature ${isActive ? 'activated' : 'deactivated'}.`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed');
+    } finally {
+      setSavingSession('');
     }
   };
 
@@ -329,6 +362,29 @@ export default function AdminSchoolsPage() {
               )}
             </div>
           ))}
+          <div className="session-card">
+            <span className="session-name">FUTURE</span>
+            <span className="session-status">{siteSettings.multiorder_future_enabled ? 'Active' : 'Inactive'}</span>
+            {siteSettings.multiorder_future_enabled ? (
+              <button
+                className="btn btn-outline btn-sm"
+                type="button"
+                onClick={() => onToggleFutureFeature(false)}
+                disabled={savingSession === 'FUTURE'}
+              >
+                Deactivate
+              </button>
+            ) : (
+              <button
+                className="btn btn-outline btn-sm"
+                type="button"
+                onClick={() => onToggleFutureFeature(true)}
+                disabled={savingSession === 'FUTURE'}
+              >
+                Activate
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="school-section-card">
