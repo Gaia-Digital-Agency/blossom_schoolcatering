@@ -53,6 +53,10 @@ function repeatDayLabel(day: number) {
   return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][day - 1] || String(day);
 }
 
+function repeatDayNarrativeLabel(day: number) {
+  return ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'][day - 1] || String(day).toLowerCase();
+}
+
 function parseRepeatDays(raw?: unknown) {
   return Array.isArray(raw) ? raw.map((value) => Number(value || 0)).filter((value) => value > 0) : [];
 }
@@ -67,40 +71,67 @@ function daysBetweenInclusive(startDate: string, endDate: string) {
   return Math.max(1, Math.floor((end - start) / 86400000) + 1);
 }
 
+function numberToWord(value: number) {
+  return [
+    'zero',
+    'one',
+    'two',
+    'three',
+    'four',
+    'five',
+    'six',
+    'seven',
+    'eight',
+    'nine',
+    'ten',
+    'eleven',
+    'twelve',
+    'thirteen',
+    'fourteen',
+    'fifteen',
+    'sixteen',
+    'seventeen',
+    'eighteen',
+    'nineteen',
+    'twenty',
+  ][value] || String(value);
+}
+
 function formatDurationLabel(totalDays: number) {
-  if (totalDays <= 7) return '1 week';
-  if (totalDays <= 14) return '2 weeks';
-  if (totalDays <= 21) return '3 weeks';
-  if (totalDays <= 31) return '1 month';
-  if (totalDays <= 62) return '2 months';
-  if (totalDays <= 92) return '3 months';
-  return `${Math.ceil(totalDays / 7)} weeks`;
+  if (totalDays <= 7) return 'one week';
+  if (totalDays <= 14) return 'two weeks';
+  if (totalDays <= 21) return 'three weeks';
+  if (totalDays <= 31) return 'one month';
+  if (totalDays <= 62) return 'two months';
+  if (totalDays <= 92) return 'three months';
+  const totalWeeks = Math.ceil(totalDays / 7);
+  return `${numberToWord(totalWeeks)} weeks`;
 }
 
 function buildAiSummary(group: Pick<MultiOrderGroup, 'start_date' | 'end_date' | 'repeat_days_json'>) {
   const repeatDays = parseRepeatDays(group.repeat_days_json);
   const duration = formatDurationLabel(daysBetweenInclusive(group.start_date, group.end_date));
-  if (repeatDays.length === 0) return `AI Generated Summary: Custom repeat order for ${duration}`;
+  if (repeatDays.length === 0) return `AI Generated Summary: custom repeat order for ${duration}`;
   if (repeatDays.length === 1) {
-    return `AI Generated Summary: Weekly order every ${repeatDayLabel(repeatDays[0])} for ${duration}`;
+    return `AI Generated Summary: weekly order every ${repeatDayNarrativeLabel(repeatDays[0])} for ${duration}`;
   }
   if (repeatDays.length >= 5 && repeatDays.slice(0, 5).join(',') === '1,2,3,4,5') {
-    return `AI Generated Summary: Daily repeat order for ${duration}`;
+    return `AI Generated Summary: daily repeat order for ${duration}`;
   }
   if (repeatDays.length === 2) {
-    return `AI Generated Summary: Weekly order every ${repeatDayLabel(repeatDays[0])} and ${repeatDayLabel(repeatDays[1])} for ${duration}`;
+    return `AI Generated Summary: weekly order every ${repeatDayNarrativeLabel(repeatDays[0])} and ${repeatDayNarrativeLabel(repeatDays[1])} for ${duration}`;
   }
   if (repeatDays.length === 3) {
-    return `AI Generated Summary: Repeating order every ${repeatDayLabel(repeatDays[0])}, ${repeatDayLabel(repeatDays[1])}, and ${repeatDayLabel(repeatDays[2])} for ${duration}`;
+    return `AI Generated Summary: repeating order every ${repeatDayNarrativeLabel(repeatDays[0])}, ${repeatDayNarrativeLabel(repeatDays[1])}, and ${repeatDayNarrativeLabel(repeatDays[2])} for ${duration}`;
   }
-  return `AI Generated Summary: Custom weekly repeat on ${repeatDays.map(repeatDayLabel).join(', ')} for ${duration}`;
+  return `AI Generated Summary: custom weekly repeat on ${repeatDays.map(repeatDayNarrativeLabel).join(', ')} for ${duration}`;
 }
 
 function getStudentHonorific(genderRaw?: string) {
   const gender = String(genderRaw || '').trim().toUpperCase();
   if (gender === 'MALE') return 'Master';
   if (gender === 'FEMALE') return 'Miss';
-  return 'Student';
+  return 'Master';
 }
 
 function getFirstName(name?: string, fallback?: string) {
