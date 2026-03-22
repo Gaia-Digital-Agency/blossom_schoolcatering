@@ -19,6 +19,7 @@ type MultiOrderGroup = {
   session: SessionType;
   start_date: string;
   end_date: string;
+  repeat_days_json?: number[];
   status: string;
   current_total_amount: number;
   occurrence_count: number;
@@ -54,6 +55,41 @@ function parseRepeatDays(raw?: unknown) {
 
 function parseDishSelection(raw?: unknown) {
   return Array.isArray(raw) ? raw as MultiOrderItem[] : [];
+}
+
+function daysBetweenInclusive(startDate: string, endDate: string) {
+  const start = new Date(`${startDate}T00:00:00Z`).getTime();
+  const end = new Date(`${endDate}T00:00:00Z`).getTime();
+  return Math.max(1, Math.floor((end - start) / 86400000) + 1);
+}
+
+function formatDurationLabel(totalDays: number) {
+  if (totalDays <= 7) return '1 week';
+  if (totalDays <= 14) return '2 weeks';
+  if (totalDays <= 21) return '3 weeks';
+  if (totalDays <= 31) return '1 month';
+  if (totalDays <= 62) return '2 months';
+  if (totalDays <= 92) return '3 months';
+  return `${Math.ceil(totalDays / 7)} weeks`;
+}
+
+function buildAiSummary(group: Pick<MultiOrderGroup, 'start_date' | 'end_date' | 'repeat_days_json'>) {
+  const repeatDays = parseRepeatDays(group.repeat_days_json);
+  const duration = formatDurationLabel(daysBetweenInclusive(group.start_date, group.end_date));
+  if (repeatDays.length === 0) return `AI Generated Summary: Custom repeat order for ${duration}`;
+  if (repeatDays.length === 1) {
+    return `AI Generated Summary: Weekly order every ${repeatDayLabel(repeatDays[0])} for ${duration}`;
+  }
+  if (repeatDays.length >= 5 && repeatDays.slice(0, 5).join(',') === '1,2,3,4,5') {
+    return `AI Generated Summary: Daily repeat order for ${duration}`;
+  }
+  if (repeatDays.length === 2) {
+    return `AI Generated Summary: Weekly order every ${repeatDayLabel(repeatDays[0])} and ${repeatDayLabel(repeatDays[1])} for ${duration}`;
+  }
+  if (repeatDays.length === 3) {
+    return `AI Generated Summary: Repeating order every ${repeatDayLabel(repeatDays[0])}, ${repeatDayLabel(repeatDays[1])}, and ${repeatDayLabel(repeatDays[2])} for ${duration}`;
+  }
+  return `AI Generated Summary: Custom weekly repeat on ${repeatDays.map(repeatDayLabel).join(', ')} for ${duration}`;
 }
 
 export default function FamilyMultiOrderPage() {
@@ -397,6 +433,7 @@ export default function FamilyMultiOrderPage() {
                 <div>
                   <strong>{group.child_name}</strong>
                   <p>{getSessionLabel(group.session)} · {group.start_date} to {group.end_date}</p>
+                  <p>{buildAiSummary(group)}</p>
                   <p>Status: {group.status} · Amount: Rp {Number(group.current_total_amount || 0).toLocaleString('id-ID')}</p>
                 </div>
                 <div className="card-actions">

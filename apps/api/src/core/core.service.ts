@@ -9089,6 +9089,7 @@ export class CoreService implements OnModuleInit {
                mog.session::text AS session,
                mog.start_date::text AS start_date,
                mog.end_date::text AS end_date,
+               mog.repeat_days_json,
                mog.status,
                mog.original_total_amount,
                mog.current_total_amount,
