@@ -234,6 +234,11 @@ export default function FamilyMultiOrderPage() {
     return { mains, others };
   }, [menuItems]);
 
+  const hasValidDateRange = Boolean(startDate && endDate && endDate >= startDate);
+  const step1Complete = Boolean(selectedChildId && session && startDate && endDate && hasValidDateRange && repeatDays.length > 0);
+  const step2Complete = selectedItems.length > 0 && selectedItems.length <= 5;
+  const canSubmitBuilder = step1Complete && step2Complete && !submitting;
+
   const loadGroups = async () => {
     const data = await apiFetch('/multi-orders') as MultiOrderGroup[];
     setGroups(data || []);
@@ -324,6 +329,11 @@ export default function FamilyMultiOrderPage() {
   };
 
   const toggleMenuItem = (menuItemId: string) => {
+    if (!itemQty[menuItemId] && selectedItems.length >= 5) {
+      setError('Maximum 5 dishes per multi order.');
+      return;
+    }
+    setError('');
     setItemQty((current) => ({
       ...current,
       [menuItemId]: current[menuItemId] ? 0 : 1,
@@ -332,8 +342,11 @@ export default function FamilyMultiOrderPage() {
 
   const submitBuilder = async () => {
     if (!selectedChildId) { setError('Select a student first.'); return; }
+    if (!startDate || !endDate) { setError('Select both start and end dates.'); return; }
+    if (!hasValidDateRange) { setError('End date must be on or after start date.'); return; }
     if (repeatDays.length === 0) { setError('Select at least one repeat day.'); return; }
     if (selectedItems.length === 0) { setError('Select at least one dish.'); return; }
+    if (selectedItems.length > 5) { setError('Maximum 5 dishes per multi order.'); return; }
     setSubmitting(true);
     setError('');
     setMessage('');
@@ -434,11 +447,25 @@ export default function FamilyMultiOrderPage() {
             <button type="button" className={step === 0 ? 'step-pill active' : 'step-pill'} onClick={() => setStep(0)}>
               Summary
             </button>
-            {[1, 2, 3].map((value) => (
-              <button key={value} type="button" className={step === value ? 'step-pill active' : 'step-pill'} onClick={() => setStep(value as 1 | 2 | 3)}>
-                Step {value}
-              </button>
-            ))}
+            <button type="button" className={step === 1 ? 'step-pill active' : 'step-pill'} onClick={() => setStep(1)}>
+              Step 1
+            </button>
+            <button
+              type="button"
+              className={step === 2 ? 'step-pill active' : 'step-pill'}
+              onClick={() => setStep(2)}
+              disabled={!step1Complete}
+            >
+              Step 2
+            </button>
+            <button
+              type="button"
+              className={step === 3 ? 'step-pill active' : 'step-pill'}
+              onClick={() => setStep(3)}
+              disabled={!step1Complete || !step2Complete}
+            >
+              Step 3
+            </button>
           </div>
 
           {step === 0 ? (
@@ -483,6 +510,7 @@ export default function FamilyMultiOrderPage() {
                 End Date
                 <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
               </label>
+              {!hasValidDateRange ? <p className="auth-error">End date must be on or after start date.</p> : null}
               <div>
                 <strong>Repeat Days</strong>
                 <div className="repeat-grid">
@@ -535,6 +563,7 @@ export default function FamilyMultiOrderPage() {
                   ))}
                 </div>
               </div>
+              <div className="auth-help">Selected dishes: {selectedItems.length} / 5</div>
             </div>
           ) : null}
 
@@ -547,9 +576,10 @@ export default function FamilyMultiOrderPage() {
               <div className="date-chip-grid">
                 {reviewDates.map((date) => <span key={date} className="date-chip">{date}</span>)}
               </div>
-              <button className="btn btn-primary" type="button" onClick={submitBuilder} disabled={submitting}>
+              <button className="btn btn-primary" type="button" onClick={submitBuilder} disabled={!canSubmitBuilder}>
                 {editingGroupId ? 'Update Multi Order' : 'Create Multi Order'}
               </button>
+              {!canSubmitBuilder ? <p className="auth-help">Complete Step 1 and Step 2 before creating the multi order.</p> : null}
               {editingGroupId ? <button className="btn btn-outline" type="button" onClick={resetBuilder}>Cancel Edit</button> : null}
             </div>
           ) : null}
