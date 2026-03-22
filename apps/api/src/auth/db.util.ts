@@ -62,18 +62,10 @@ function renderSqlWithParams(sql: string, params?: unknown[]) {
 export async function runSql(sql: string, params?: unknown[]): Promise<string> {
   const clientPool = getPgPool();
   if (clientPool) {
-    const res = await clientPool.query(sql, params);
+    const rawRes = await clientPool.query(sql, params);
+    const res = Array.isArray(rawRes) ? rawRes[rawRes.length - 1] : rawRes;
     if (!res || !Array.isArray(res.rows)) {
-      // Fallback to psql path if pool client returns an unexpected shape.
-      // This prevents startup crashes and preserves query execution.
-      try {
-        if (typeof clientPool.end === 'function') await clientPool.end();
-      } catch {
-        // ignore pool shutdown errors
-      }
-      pool = null;
-      pgUnavailable = true;
-      return runSql(sql, params);
+      return '';
     }
     if (!res.rows.length) return '';
     return res.rows

@@ -121,4 +121,30 @@ describe('CoreService rules, pricing, and badge logic', () => {
   it('rejects invalid UUID values for guarded paths', () => {
     expect(() => (service as any).assertValidUuid('not-a-uuid', 'billingId')).toThrow(BadRequestException);
   });
+
+  it('normalizes multi-order repeat days from mixed labels', () => {
+    expect((service as any).normalizeMultiOrderRepeatDays(['mon', 'WEDNESDAY', '5', 'mon'])).toEqual([1, 3, 5]);
+  });
+
+  it('classifies immutable multi-order statuses', () => {
+    expect((service as any).isImmutableMultiOrderStatus('DELIVERED')).toBe(true);
+    expect((service as any).isImmutableMultiOrderStatus('IN_DELIVERY')).toBe(true);
+    expect((service as any).isImmutableMultiOrderStatus('PLACED')).toBe(false);
+  });
+
+  it('rejects multi-order plans beyond the 3 month horizon', async () => {
+    await expect(
+      service.createMultiOrder(
+        { uid: 'admin-1', role: 'ADMIN', sub: 'admin_user' },
+        {
+          childId: '11111111-1111-1111-1111-111111111111',
+          session: 'LUNCH',
+          startDate: '2026-03-01',
+          endDate: '2026-07-15',
+          repeatDays: ['MONDAY'],
+          items: [{ menuItemId: '22222222-2222-2222-2222-222222222222', quantity: 1 }],
+        },
+      ),
+    ).rejects.toThrow('MULTI_ORDER_RANGE_EXCEEDED');
+  });
 });

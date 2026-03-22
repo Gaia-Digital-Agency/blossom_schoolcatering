@@ -11,6 +11,7 @@ const HUB_ITEMS = [
   { label: 'Delivery', iconSrc: '/schoolcatering/assets/icons/delivery.jpeg', href: '/admin/delivery' },
   { label: 'Menu', iconSrc: '/schoolcatering/assets/icons/menu.jpeg', href: '/admin/menu' },
   { label: 'Orders', iconSrc: '/schoolcatering/assets/icons/order.jpeg', href: '/admin/orders' },
+  { label: 'Multi Orders', iconSrc: '/schoolcatering/assets/icons/calendar.jpeg', href: '/admin/multiorders' },
   { label: 'Billing', iconSrc: '/schoolcatering/assets/icons/billing.jpeg', href: '/admin/billing' },
   { label: 'Blackout', iconSrc: '/schoolcatering/assets/icons/blackout.jpeg', href: '/admin/blackout-dates' },
   { label: 'Kitchen', iconSrc: '/schoolcatering/assets/icons/kitchen.jpeg', href: '/admin/kitchen' },

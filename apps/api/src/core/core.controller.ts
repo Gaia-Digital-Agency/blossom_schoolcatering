@@ -31,15 +31,20 @@ import {
   CreateIngredientDto,
   CreateMenuItemDto,
   CreateMenuRatingDto,
+  CreateMultiOrderDto,
+  CreateMultiOrderReplacementDto,
+  CreateMultiOrderRequestDto,
   CreateSchoolDto,
   MealPlanWizardDto,
   NoteDto,
   QuickReorderDto,
   RegisterYoungsterDto,
   ReplaceCartItemsDto,
+  ResolveMultiOrderRequestDto,
   ResetPasswordDto,
   SeedMenuDto,
   SeedOrdersDto,
+  UpdateMultiOrderDto,
   UpdateDeliveryUserDto,
   UpdateIngredientDto,
   UpdateMenuItemDto,
@@ -50,6 +55,7 @@ import {
   UpdateYoungsterDto,
   UploadBillingProofDto,
   UploadBillingProofBatchDto,
+  UploadMultiOrderBillingProofDto,
   UpsertDeliveryAssignmentDto,
   VerifyBillingDto,
 } from './dto';
@@ -867,6 +873,101 @@ export class CoreController {
     return this.coreService.getParentConsolidatedOrders(req.user);
   }
 
+  @Get('multi-orders')
+  @Roles('PARENT', 'YOUNGSTER', 'ADMIN')
+  getMultiOrders(@Req() req: AuthRequest) {
+    return this.coreService.getMultiOrders(req.user);
+  }
+
+  @Get('multi-orders/:groupId')
+  @Roles('PARENT', 'YOUNGSTER', 'ADMIN')
+  getMultiOrderById(@Req() req: AuthRequest, @Param('groupId', ParseUUIDPipe) groupId: string) {
+    return this.coreService.getMultiOrderDetail(req.user, groupId);
+  }
+
+  @Post('multi-orders')
+  @Roles('PARENT', 'YOUNGSTER', 'ADMIN')
+  createMultiOrder(@Req() req: AuthRequest, @Body() body: CreateMultiOrderDto) {
+    return this.coreService.createMultiOrder(req.user, body);
+  }
+
+  @Patch('multi-orders/:groupId')
+  @Roles('PARENT', 'YOUNGSTER', 'ADMIN')
+  updateMultiOrder(@Req() req: AuthRequest, @Param('groupId', ParseUUIDPipe) groupId: string, @Body() body: UpdateMultiOrderDto) {
+    return this.coreService.updateMultiOrder(req.user, groupId, body);
+  }
+
+  @Delete('multi-orders/:groupId')
+  @Roles('PARENT', 'YOUNGSTER', 'ADMIN')
+  deleteMultiOrder(@Req() req: AuthRequest, @Param('groupId', ParseUUIDPipe) groupId: string) {
+    return this.coreService.deleteMultiOrder(req.user, groupId);
+  }
+
+  @Post('multi-orders/:groupId/requests')
+  @Roles('PARENT', 'YOUNGSTER')
+  createMultiOrderRequest(
+    @Req() req: AuthRequest,
+    @Param('groupId', ParseUUIDPipe) groupId: string,
+    @Body() body: CreateMultiOrderRequestDto,
+  ) {
+    return this.coreService.createMultiOrderRequest(req.user, groupId, body);
+  }
+
+  @Get('multi-orders/:groupId/billing')
+  @Roles('PARENT', 'YOUNGSTER', 'ADMIN')
+  getMultiOrderBilling(@Req() req: AuthRequest, @Param('groupId', ParseUUIDPipe) groupId: string) {
+    return this.coreService.getMultiOrderBilling(req.user, groupId);
+  }
+
+  @Post('multi-orders/:groupId/billing/proof-upload')
+  @Roles('PARENT', 'YOUNGSTER')
+  uploadMultiOrderBillingProof(
+    @Req() req: AuthRequest,
+    @Param('groupId', ParseUUIDPipe) groupId: string,
+    @Body() body: UploadMultiOrderBillingProofDto,
+  ) {
+    return this.coreService.uploadMultiOrderBillingProof(req.user, groupId, body.proofImageData);
+  }
+
+  @Post('multi-orders/:groupId/billing/revert-proof')
+  @Roles('PARENT', 'YOUNGSTER')
+  revertMultiOrderBillingProof(@Req() req: AuthRequest, @Param('groupId', ParseUUIDPipe) groupId: string) {
+    return this.coreService.revertMultiOrderBillingProof(req.user, groupId);
+  }
+
+  @Get('multi-orders/:groupId/billing/proof-image')
+  @Roles('PARENT', 'YOUNGSTER', 'ADMIN')
+  async getMultiOrderBillingProofImage(
+    @Req() req: AuthRequest,
+    @Param('groupId', ParseUUIDPipe) groupId: string,
+    @Res() res: Response,
+  ) {
+    const out = await this.coreService.getMultiOrderProofImage(req.user, groupId);
+    res.setHeader('Content-Type', out.contentType);
+    res.setHeader('Cache-Control', 'private, max-age=60');
+    res.send(out.data);
+  }
+
+  @Get('multi-orders/:groupId/receipt')
+  @Roles('PARENT', 'YOUNGSTER', 'ADMIN')
+  getMultiOrderReceipt(@Req() req: AuthRequest, @Param('groupId', ParseUUIDPipe) groupId: string) {
+    return this.coreService.getMultiOrderReceipt(req.user, groupId);
+  }
+
+  @Get('multi-orders/:groupId/receipt-file')
+  @Roles('PARENT', 'YOUNGSTER', 'ADMIN')
+  async getMultiOrderReceiptFile(
+    @Req() req: AuthRequest,
+    @Param('groupId', ParseUUIDPipe) groupId: string,
+    @Res() res: Response,
+  ) {
+    const out = await this.coreService.getMultiOrderReceiptFile(req.user, groupId);
+    res.setHeader('Content-Type', out.contentType);
+    res.setHeader('Content-Disposition', `inline; filename="${out.fileName}"`);
+    res.setHeader('Cache-Control', 'private, max-age=60');
+    res.send(out.data);
+  }
+
   @Get('parent/me/orders/consolidated')
   @Roles('PARENT')
   getParentConsolidatedOrdersSingular(@Req() req: AuthRequest) {
@@ -917,6 +1018,126 @@ export class CoreController {
   @Roles('KITCHEN', 'ADMIN')
   getKitchenDailySummary(@Req() req: AuthRequest, @Query('date') date?: string) {
     return this.coreService.getKitchenDailySummary(req.user, date);
+  }
+
+  @Get('admin/multi-orders')
+  @Roles('ADMIN')
+  getAdminMultiOrders(
+    @Req() req: AuthRequest,
+    @Query('student') student?: string,
+    @Query('parent') parent?: string,
+    @Query('session') session?: string,
+    @Query('status') status?: string,
+    @Query('request_status') requestStatus?: string,
+    @Query('from_date') fromDate?: string,
+    @Query('to_date') toDate?: string,
+  ) {
+    return this.coreService.getAdminMultiOrders(req.user, {
+      student,
+      parent,
+      session,
+      status,
+      requestStatus,
+      fromDate,
+      toDate,
+    });
+  }
+
+  @Get('admin/multi-orders/:groupId')
+  @Roles('ADMIN')
+  getAdminMultiOrderById(@Req() req: AuthRequest, @Param('groupId', ParseUUIDPipe) groupId: string) {
+    return this.coreService.getMultiOrderDetail(req.user, groupId);
+  }
+
+  @Post('admin/multi-orders/:groupId/resolve-request')
+  @Roles('ADMIN')
+  resolveMultiOrderRequest(
+    @Req() req: AuthRequest,
+    @Param('groupId', ParseUUIDPipe) groupId: string,
+    @Body() body: ResolveMultiOrderRequestDto,
+  ) {
+    return this.coreService.resolveMultiOrderRequest(req.user, groupId, body);
+  }
+
+  @Patch('admin/multi-orders/:groupId/future-trim')
+  @Roles('ADMIN')
+  trimMultiOrderFuture(@Req() req: AuthRequest, @Param('groupId', ParseUUIDPipe) groupId: string) {
+    return this.coreService.trimMultiOrderFuture(req.user, groupId);
+  }
+
+  @Post('admin/multi-orders/:groupId/replacement')
+  @Roles('ADMIN')
+  createMultiOrderReplacement(
+    @Req() req: AuthRequest,
+    @Param('groupId', ParseUUIDPipe) groupId: string,
+    @Body() body: CreateMultiOrderReplacementDto,
+  ) {
+    return this.coreService.createMultiOrderReplacement(req.user, groupId, body);
+  }
+
+  @Delete('admin/multi-orders/:groupId/future-occurrences/:occurrenceId')
+  @Roles('ADMIN')
+  deleteMultiOrderOccurrence(
+    @Req() req: AuthRequest,
+    @Param('groupId', ParseUUIDPipe) groupId: string,
+    @Param('occurrenceId', ParseUUIDPipe) occurrenceId: string,
+  ) {
+    return this.coreService.deleteMultiOrderOccurrence(req.user, groupId, occurrenceId);
+  }
+
+  @Get('admin/multi-orders/:groupId/billing')
+  @Roles('ADMIN')
+  getAdminMultiOrderBilling(@Req() req: AuthRequest, @Param('groupId', ParseUUIDPipe) groupId: string) {
+    return this.coreService.getMultiOrderBilling(req.user, groupId);
+  }
+
+  @Get('admin/multi-orders/:groupId/billing/proof-image')
+  @Roles('ADMIN')
+  async getAdminMultiOrderBillingProofImage(
+    @Req() req: AuthRequest,
+    @Param('groupId', ParseUUIDPipe) groupId: string,
+    @Res() res: Response,
+  ) {
+    const out = await this.coreService.getMultiOrderProofImage(req.user, groupId);
+    res.setHeader('Content-Type', out.contentType);
+    res.setHeader('Cache-Control', 'private, max-age=60');
+    res.send(out.data);
+  }
+
+  @Post('admin/multi-orders/:groupId/billing/verify')
+  @Roles('ADMIN')
+  verifyAdminMultiOrderBilling(
+    @Req() req: AuthRequest,
+    @Param('groupId', ParseUUIDPipe) groupId: string,
+    @Body() body: VerifyBillingDto,
+  ) {
+    return this.coreService.verifyMultiOrderBilling(req.user, groupId, body.decision || 'VERIFIED', body.note);
+  }
+
+  @Post('admin/multi-orders/:groupId/receipt')
+  @Roles('ADMIN')
+  generateAdminMultiOrderReceipt(@Req() req: AuthRequest, @Param('groupId', ParseUUIDPipe) groupId: string) {
+    return this.coreService.generateMultiOrderReceipt(req.user, groupId);
+  }
+
+  @Get('admin/multi-orders/:groupId/receipt')
+  @Roles('ADMIN')
+  getAdminMultiOrderReceipt(@Req() req: AuthRequest, @Param('groupId', ParseUUIDPipe) groupId: string) {
+    return this.coreService.getMultiOrderReceipt(req.user, groupId);
+  }
+
+  @Get('admin/multi-orders/:groupId/receipt-file')
+  @Roles('ADMIN')
+  async getAdminMultiOrderReceiptFile(
+    @Req() req: AuthRequest,
+    @Param('groupId', ParseUUIDPipe) groupId: string,
+    @Res() res: Response,
+  ) {
+    const out = await this.coreService.getMultiOrderReceiptFile(req.user, groupId);
+    res.setHeader('Content-Type', out.contentType);
+    res.setHeader('Content-Disposition', `inline; filename="${out.fileName}"`);
+    res.setHeader('Cache-Control', 'private, max-age=60');
+    res.send(out.data);
   }
 
   @Post('kitchen/orders/:orderId/complete')

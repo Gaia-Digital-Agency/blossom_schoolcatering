@@ -78,10 +78,10 @@ If future occurrences are removed after billing has already been generated, the 
 - generates a new corrected receipt automatically
 
 This ensures the client has reliable financial records and avoids mismatch between active billing and old paperwork.
-
+P
 ## Scope
 
-Changes in schema, API, family/student UI, admin UI, billing/receipt, rules, concurrency, histprical immutability, billing adjustments, algorithm adjustment (to exsiting single order), regression and testing. Estimated build time 6 days. Working on Git Feature Branch, so current single order mode which is operational is not disturbed.
+Changes in schema, API, family/student UI, admin UI, billing/receipt, rules, concurrency, histprical immutability, billing adjustments, algorithm adjustment (to exsiting single order), regression and testing. Estimated build time 6 days. Working on Forked Project Mode, so current single order mode which is operational is not disturbed, will port over after forked site is fully functional.
 
 ## Documentation For Build And Plan ning
 

@@ -11,12 +11,14 @@ import AdminReturnButton from '../_components/admin-return-button';
  */
 type BillingRow = {
   id: string;
-  order_id: string;
+  order_id?: string | null;
+  group_id?: string | null;
   status: 'UNPAID' | 'PENDING_VERIFICATION' | 'VERIFIED' | 'REJECTED';
   delivery_status: string;
   service_date: string;
   session: string;
   total_price: number;
+  source_type?: 'SINGLE' | 'MULTI';
   parent_name: string;
   child_name?: string | null;
   school_name?: string | null;
@@ -94,7 +96,7 @@ export default function AdminBillingPage() {
   // State for the payment proof image preview modal.
   const [proofPreviewUrl, setProofPreviewUrl] = useState('');
   // State for the receipt generation/information modal.
-  const [receiptInfo, setReceiptInfo] = useState<{ billingId: string; receiptNumber: string } | null>(null);
+  const [receiptInfo, setReceiptInfo] = useState<{ billingId: string; groupId?: string | null; sourceType: 'SINGLE' | 'MULTI'; receiptNumber: string } | null>(null);
 
   /**
    * Fetches all billing data from the API.
@@ -144,11 +146,14 @@ export default function AdminBillingPage() {
   /**
    * Handles the decision to verify or reject a payment.
    */
-  const onDecision = async (billingId: string, decision: 'VERIFIED' | 'REJECTED', note?: string) => {
+  const onDecision = async (row: BillingRow, decision: 'VERIFIED' | 'REJECTED', note?: string) => {
     setError('');
     setMessage('');
     try {
-      await apiFetch(`/admin/billing/${billingId}/verify`, {
+      const path = row.source_type === 'MULTI'
+        ? `/admin/multi-orders/${row.group_id}/billing/verify`
+        : `/admin/billing/${row.id}/verify`;
+      await apiFetch(path, {
         method: 'POST',
         body: JSON.stringify({ decision, note }),
       });
@@ -171,11 +176,19 @@ export default function AdminBillingPage() {
       return;
     }
     try {
-      const res = await apiFetchResponse(`/admin/billing/${row.id}/proof-image`);
-      const blob = await res.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
-      if (proofPreviewUrl) window.URL.revokeObjectURL(proofPreviewUrl);
-      setProofPreviewUrl(blobUrl);
+      if (row.source_type === 'MULTI') {
+        const res = await apiFetchResponse(`/admin/multi-orders/${row.group_id}/billing/proof-image`);
+        const blob = await res.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        if (proofPreviewUrl) window.URL.revokeObjectURL(proofPreviewUrl);
+        setProofPreviewUrl(blobUrl);
+      } else {
+        const res = await apiFetchResponse(`/admin/billing/${row.id}/proof-image`);
+        const blob = await res.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        if (proofPreviewUrl) window.URL.revokeObjectURL(proofPreviewUrl);
+        setProofPreviewUrl(blobUrl);
+      }
     } catch (err) {
       setProofPreviewUrl(proof);
       const msg = err instanceof Error ? err.message : 'Failed loading proof image';
@@ -196,7 +209,7 @@ export default function AdminBillingPage() {
       setError('Reject note is required.');
       return;
     }
-    await onDecision(row.id, 'REJECTED', note.trim());
+    await onDecision(row, 'REJECTED', note.trim());
   };
 
   /**
@@ -208,19 +221,23 @@ export default function AdminBillingPage() {
       return;
     }
     if (!window.confirm(`Approve payment for ${row.parent_name} - ${row.service_date} ${getSessionLabel(row.session)}?`)) return;
-    await onDecision(row.id, 'VERIFIED');
+    await onDecision(row, 'VERIFIED');
   };
 
   /**
    * Generates a receipt for a specific billing entry.
    */
-  const onGenerateReceipt = async (billingId: string) => {
+  const onGenerateReceipt = async (row: BillingRow) => {
     setError('');
     setMessage('');
     try {
-      const out = await apiFetch(`/admin/billing/${billingId}/receipt`, { method: 'POST' }) as { receiptNumber: string };
+      const out = row.source_type === 'MULTI'
+        ? await apiFetch(`/admin/multi-orders/${row.group_id}/receipt`, { method: 'POST' }) as { receiptNumber: string }
+        : await apiFetch(`/admin/billing/${row.id}/receipt`, { method: 'POST' }) as { receiptNumber: string };
       setReceiptInfo({
-        billingId,
+        billingId: row.id,
+        groupId: row.group_id,
+        sourceType: row.source_type || 'SINGLE',
         receiptNumber: out.receiptNumber,
       });
       setMessage(`Receipt generated: ${out.receiptNumber}`);
@@ -238,7 +255,11 @@ export default function AdminBillingPage() {
     setError('');
     setMessage('');
     try {
-      await apiFetch(`/admin/billing/${row.id}`, { method: 'DELETE' }, { skipAutoReload: true });
+      if (row.source_type === 'MULTI') {
+        await apiFetch(`/admin/multi-orders/${row.group_id}/future-trim`, { method: 'PATCH' }, { skipAutoReload: true });
+      } else {
+        await apiFetch(`/admin/billing/${row.id}`, { method: 'DELETE' }, { skipAutoReload: true });
+      }
       setMessage(`Billing deleted: ${row.id}`);
       await load();
     } catch (e) {
@@ -264,16 +285,24 @@ export default function AdminBillingPage() {
       setError('Receipt PDF is not available yet.');
       return;
     }
-    setReceiptInfo({
-      billingId: row.id,
-      receiptNumber: String(row.receipt_number || '').trim() || 'Receipt',
-    });
+      setReceiptInfo({
+        billingId: row.id,
+        groupId: row.group_id,
+        sourceType: row.source_type || 'SINGLE',
+        receiptNumber: String(row.receipt_number || '').trim() || 'Receipt',
+      });
   };
 
   /**
    * Fetches the receipt PDF as a blob.
    */
   const fetchReceiptBlob = async (billingId: string) => {
+    if (receiptInfo?.sourceType === 'MULTI' && receiptInfo.groupId) {
+      const res = await apiFetchResponse(`/admin/multi-orders/${receiptInfo.groupId}/receipt-file`, {
+        headers: { Accept: 'application/pdf' },
+      });
+      return res.blob();
+    }
     const res = await apiFetchResponse(`/admin/billing/${billingId}/receipt-file`, {
       headers: { Accept: 'application/pdf' },
     });
@@ -330,7 +359,9 @@ export default function AdminBillingPage() {
    */
   const renderRef = (row: BillingRow) => (
     <div className="ref-cell">
-      <code title={row.order_id}>{shortRef(row.order_id)}</code>
+      <code title={row.source_type === 'MULTI' ? row.group_id || '' : row.order_id || ''}>
+        {row.source_type === 'MULTI' ? shortRef(row.group_id) : shortRef(row.order_id)}
+      </code>
       <code title={row.id}>{shortRef(row.id)}</code>
     </div>
   );
@@ -355,7 +386,7 @@ export default function AdminBillingPage() {
           </button>
         ) : null}
         {row.status === 'PENDING_VERIFICATION' ? (
-          <button className="btn btn-outline btn-sm" type="button" onClick={() => onGenerateReceipt(row.id)}>
+          <button className="btn btn-outline btn-sm" type="button" onClick={() => onGenerateReceipt(row)}>
             Receipt
           </button>
         ) : null}
@@ -378,7 +409,7 @@ export default function AdminBillingPage() {
           Open Receipt
         </button>
       ) : (
-        <button className="btn btn-outline btn-sm" type="button" onClick={() => onGenerateReceipt(row.id)}>
+        <button className="btn btn-outline btn-sm" type="button" onClick={() => onGenerateReceipt(row)}>
           Gen Receipt
         </button>
       )}

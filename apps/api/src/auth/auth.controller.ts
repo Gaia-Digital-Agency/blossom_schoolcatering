@@ -44,23 +44,36 @@ export class AuthController {
     return '';
   }
 
+  private getRefreshCookiePath() {
+    const apiBase = process.env.NEXT_PUBLIC_API_BASE ?? '/schoolcatering/api/v1';
+    return apiBase.replace('/api/v1', '') || '/';
+  }
+
+  private clearLegacyRefreshCookies(req: Request, res: Response) {
+    const paths = new Set(['/', this.getRefreshCookiePath(), '/schoolcatering', '/cateringschool']);
+    for (const path of paths) {
+      res.clearCookie(this.refreshCookieName, {
+        httpOnly: true,
+        secure: this.isSecureCookie(req),
+        sameSite: 'strict',
+        path,
+      });
+    }
+  }
+
   private setRefreshCookie(req: Request, res: Response, refreshToken: string) {
+    this.clearLegacyRefreshCookies(req, res);
     res.cookie(this.refreshCookieName, refreshToken, {
       httpOnly: true,
       secure: this.isSecureCookie(req),
       sameSite: 'strict',
-      path: '/',
+      path: this.getRefreshCookiePath(),
       maxAge: this.refreshTtlMs,
     });
   }
 
   private clearRefreshCookie(req: Request, res: Response) {
-    res.clearCookie(this.refreshCookieName, {
-      httpOnly: true,
-      secure: this.isSecureCookie(req),
-      sameSite: 'strict',
-      path: '/',
-    });
+    this.clearLegacyRefreshCookies(req, res);
   }
 
   @Post('login')

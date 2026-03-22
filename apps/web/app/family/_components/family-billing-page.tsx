@@ -17,13 +17,15 @@ type Child = {
 };
 type BillingRow = {
   id: string;
-  order_id: string;
+  order_id?: string | null;
+  group_id?: string | null;
   child_id: string;
   status: 'UNPAID' | 'PENDING_VERIFICATION' | 'VERIFIED' | 'REJECTED';
   delivery_status: string;
   service_date: string;
   session: string;
   total_price: number;
+  source_type?: 'SINGLE' | 'MULTI';
   admin_note?: string | null;
   proof_image_url?: string | null;
   receipt_number?: string | null;
@@ -143,12 +145,16 @@ export default function FamilyBillingPage() {
   };
   const onUploadBatchProof = async () => {
     if (!batchProofData.trim()) { setError('Upload/select a proof image first.'); return; }
-    if (selectedBillingIds.length === 0) { setError('Select at least one unpaid bill.'); return; }
+    const singleBillingIds = selectedBillingIds.filter((billingId) => {
+      const row = billings.find((item) => item.id === billingId);
+      return (row?.source_type || 'SINGLE') === 'SINGLE';
+    });
+    if (singleBillingIds.length === 0) { setError('Select at least one unpaid single bill.'); return; }
     setError(''); setMessage('');
     try {
       const out = await apiFetch('/billing/proof-upload-batch', {
         method: 'POST',
-        body: JSON.stringify({ billingIds: selectedBillingIds, proofImageData: batchProofData }),
+        body: JSON.stringify({ billingIds: singleBillingIds, proofImageData: batchProofData }),
       }) as { updatedCount: number };
       setMessage(`Proof uploaded for ${out.updatedCount} billing record(s). Moved to Paid Bills with pending admin verification.`);
       setSelectedBillingIds([]);
@@ -157,9 +163,19 @@ export default function FamilyBillingPage() {
       setError(err instanceof Error ? err.message : 'Proof upload failed');
     }
   };
-  const onOpenReceipt = async (billingId: string) => {
+  const onOpenReceipt = async (billingId: string, sourceType: 'SINGLE' | 'MULTI' = 'SINGLE', groupId?: string | null) => {
     setError(''); setMessage('');
     try {
+      if (sourceType === 'MULTI') {
+        const res = await apiFetchResponse(`/multi-orders/${groupId}/receipt-file`, {
+          headers: { Accept: 'application/pdf' },
+        });
+        const blob = await res.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        window.open(blobUrl, '_blank', 'noopener,noreferrer');
+        window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60_000);
+        return;
+      }
       const receipt = await apiFetch(`/billing/${billingId}/receipt`) as { pdf_url?: string };
       if (!receipt.pdf_url) { setError('Receipt is not generated yet.'); return; }
       window.open(receipt.pdf_url, '_blank');
@@ -167,10 +183,18 @@ export default function FamilyBillingPage() {
       setError(err instanceof Error ? err.message : 'Failed opening receipt');
     }
   };
-  const onViewProof = async (billingId: string, fallbackProofUrl?: string | null) => {
+  const onViewProof = async (billingId: string, fallbackProofUrl?: string | null, sourceType: 'SINGLE' | 'MULTI' = 'SINGLE', groupId?: string | null) => {
     setError('');
     setMessage('');
     try {
+      if (sourceType === 'MULTI') {
+        const res = await apiFetchResponse(`/multi-orders/${groupId}/billing/proof-image`);
+        const blob = await res.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        window.open(blobUrl, '_blank', 'noopener,noreferrer');
+        window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60_000);
+        return;
+      }
       const res = await apiFetchResponse(`/billing/${billingId}/proof-image`);
       const blob = await res.blob();
       const blobUrl = window.URL.createObjectURL(blob);
@@ -185,11 +209,15 @@ export default function FamilyBillingPage() {
       setError(err instanceof Error ? err.message : 'Failed opening proof image');
     }
   };
-  const onRevertProof = async (billingId: string) => {
+  const onRevertProof = async (billingId: string, sourceType: 'SINGLE' | 'MULTI' = 'SINGLE', groupId?: string | null) => {
     if (!window.confirm('Move this bill back to Unpaid and delete the uploaded proof image?')) return;
     setError(''); setMessage('');
     try {
-      await apiFetch(`/billing/${billingId}/revert-proof`, { method: 'POST' });
+      if (sourceType === 'MULTI') {
+        await apiFetch(`/multi-orders/${groupId}/billing/revert-proof`, { method: 'POST' });
+      } else {
+        await apiFetch(`/billing/${billingId}/revert-proof`, { method: 'POST' });
+      }
       setMessage('Bill moved back to Unpaid Bills. Proof image removed.');
       await loadBilling();
     } catch (err) {
@@ -267,19 +295,41 @@ export default function FamilyBillingPage() {
                   <label key={b.id} style={getSessionCardStyle(b.session)}>
                     <SessionBadge session={b.session} />
                     <strong>{b.service_date}</strong>
-                    <small>Order: {b.order_id}</small>
+                    <small>{b.source_type === 'MULTI' ? `Multi Order Group: ${b.group_id || '-'}` : `Order: ${b.order_id}`}</small>
                     <small>Status: {b.status} | Delivery: {b.delivery_status}</small>
                     <small>Total: Rp {Number(b.total_price).toLocaleString('id-ID')}</small>
                     <small>Proof: {b.proof_image_url ? 'Uploaded' : 'Not uploaded'}</small>
                     {b.admin_note ? <small>Admin Note: {b.admin_note}</small> : null}
-                    <label className="checkbox-inline">
-                      <input
-                        type="checkbox"
-                        checked={selectedBillingIds.includes(b.id)}
-                        onChange={(e) => onToggleBillingSelect(b.id, e.target.checked)}
-                      />
-                      <span>Select for batch proof upload</span>
-                    </label>
+                    {b.source_type !== 'MULTI' ? (
+                      <label className="checkbox-inline">
+                        <input
+                          type="checkbox"
+                          checked={selectedBillingIds.includes(b.id)}
+                          onChange={(e) => onToggleBillingSelect(b.id, e.target.checked)}
+                        />
+                        <span>Select for batch proof upload</span>
+                      </label>
+                    ) : (
+                      <button
+                        className="btn btn-outline"
+                        type="button"
+                        onClick={async () => {
+                          if (!batchProofData.trim()) { setError('Upload/select a proof image first.'); return; }
+                          try {
+                            await apiFetch(`/multi-orders/${b.group_id}/billing/proof-upload`, {
+                              method: 'POST',
+                              body: JSON.stringify({ proofImageData: batchProofData }),
+                            }, { skipAutoReload: true });
+                            setMessage('Grouped proof uploaded.');
+                            await loadBilling();
+                          } catch (err) {
+                            setError(err instanceof Error ? err.message : 'Grouped proof upload failed');
+                          }
+                        }}
+                      >
+                        Upload Grouped Proof
+                      </button>
+                    )}
                   </label>
                 ))}
               </div>
@@ -295,7 +345,7 @@ export default function FamilyBillingPage() {
                   <label key={b.id} style={getSessionCardStyle(b.session)}>
                     <SessionBadge session={b.session} />
                     <strong>{b.service_date}</strong>
-                    <small>Order: {b.order_id}</small>
+                    <small>{b.source_type === 'MULTI' ? `Multi Order Group: ${b.group_id || '-'}` : `Order: ${b.order_id}`}</small>
                     <small>Status: {b.status} | Delivery: {b.delivery_status}</small>
                     <small>Total: Rp {Number(b.total_price).toLocaleString('id-ID')}</small>
                     <small>Receipt: {b.receipt_number || '-'}</small>
@@ -303,15 +353,15 @@ export default function FamilyBillingPage() {
                     {b.admin_note ? <small>Admin Note: {b.admin_note}</small> : null}
                     <div className="billing-action-row">
                       {b.proof_image_url ? (
-                        <button className="btn btn-outline" type="button" onClick={() => onViewProof(b.id, b.proof_image_url)}>
+                        <button className="btn btn-outline" type="button" onClick={() => onViewProof(b.id, b.proof_image_url, b.source_type || 'SINGLE', b.group_id)}>
                           View Proof Image
                         </button>
                       ) : null}
                       {b.receipt_number ? (
-                        <button className="btn btn-outline" type="button" onClick={() => onOpenReceipt(b.id)}>Open Receipt</button>
+                        <button className="btn btn-outline" type="button" onClick={() => onOpenReceipt(b.id, b.source_type || 'SINGLE', b.group_id)}>Open Receipt</button>
                       ) : null}
                       {b.status === 'PENDING_VERIFICATION' ? (
-                        <button className="btn btn-outline" type="button" onClick={() => onRevertProof(b.id)}>Redo (Move to Unpaid)</button>
+                        <button className="btn btn-outline" type="button" onClick={() => onRevertProof(b.id, b.source_type || 'SINGLE', b.group_id)}>Redo (Move to Unpaid)</button>
                       ) : null}
                     </div>
                   </label>

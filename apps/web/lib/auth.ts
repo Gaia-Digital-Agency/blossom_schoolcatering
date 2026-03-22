@@ -18,24 +18,39 @@ export function getAppBase() {
   return getApiBase().replace('/api/v1', '');
 }
 
+function getCookiePath() {
+  return getAppBase() || '/';
+}
+
+function expireCookie(name: string, path: string) {
+  document.cookie = `${name}=; path=${path}; max-age=0; SameSite=Lax`;
+  document.cookie = `${name}=; path=${path}; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
+}
+
+function clearLegacyAuthCookies() {
+  const paths = new Set(['/', getCookiePath(), '/schoolcatering', '/cateringschool']);
+  for (const path of paths) {
+    expireCookie(AUTH_COOKIE, path);
+    expireCookie(ROLE_COOKIE, path);
+  }
+}
+
+function setCookie(name: string, value: string) {
+  document.cookie = `${name}=${value}; path=${getCookiePath()}; max-age=86400; SameSite=Lax`;
+}
+
 export function setAuthState(accessToken: string, role: Role) {
   localStorage.setItem(ACCESS_KEY, accessToken);
   localStorage.setItem(ROLE_KEY, role);
-  document.cookie = `${AUTH_COOKIE}=${accessToken}; path=/; max-age=86400; SameSite=Lax`;
-  document.cookie = `${ROLE_COOKIE}=${role}; path=/; max-age=86400; SameSite=Lax`;
+  clearLegacyAuthCookies();
+  setCookie(AUTH_COOKIE, accessToken);
+  setCookie(ROLE_COOKIE, role);
 }
 
 export function clearAuthState() {
   localStorage.removeItem(ACCESS_KEY);
   localStorage.removeItem(ROLE_KEY);
-  const expireCookie = (name: string, path: string) => {
-    document.cookie = `${name}=; path=${path}; max-age=0; SameSite=Lax`;
-    document.cookie = `${name}=; path=${path}; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
-  };
-  expireCookie(AUTH_COOKIE, '/');
-  expireCookie(ROLE_COOKIE, '/');
-  expireCookie(AUTH_COOKIE, '/schoolcatering');
-  expireCookie(ROLE_COOKIE, '/schoolcatering');
+  clearLegacyAuthCookies();
 }
 
 function publishNetworkState() {
@@ -84,7 +99,8 @@ export async function refreshAccessToken() {
     if (!res.ok) return null;
     const data = await res.json();
     localStorage.setItem(ACCESS_KEY, data.accessToken);
-    document.cookie = `${AUTH_COOKIE}=${data.accessToken}; path=/; max-age=86400; SameSite=Lax`;
+    clearLegacyAuthCookies();
+    setCookie(AUTH_COOKIE, data.accessToken);
     return data.accessToken as string;
   })().finally(() => {
     _refreshPromise = null;
