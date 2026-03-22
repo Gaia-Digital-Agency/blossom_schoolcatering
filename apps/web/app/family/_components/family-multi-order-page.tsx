@@ -573,7 +573,12 @@ export default function FamilyMultiOrderPage() {
           </div>
         ) : null}
 
-        <LogoutButton showRecord={false} sticky={false} />
+        <LogoutButton
+          returnHref={isStudentView ? '/student' : '/family'}
+          showRecord={false}
+          showLogout={false}
+          sticky={false}
+        />
       </section>
       <style jsx>{`
         .multiorder-panel { width: min(760px, 100%); gap: 1rem; }
