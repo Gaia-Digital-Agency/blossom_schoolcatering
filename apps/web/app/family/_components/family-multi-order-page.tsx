@@ -414,7 +414,11 @@ export default function FamilyMultiOrderPage() {
             <div className="multiorder-modal" role="dialog" aria-modal="true" aria-labelledby="multiorder-modal-title" onClick={(e) => e.stopPropagation()}>
               <div className="multiorder-modal-header">
                 <h2 id="multiorder-modal-title">Multi Order Details</h2>
-                <button className="btn btn-outline" type="button" onClick={() => setSelectedGroup(null)}>Close</button>
+                <div className="multiorder-modal-actions">
+                  {selectedGroup.can_edit ? <button className="btn btn-outline" type="button" onClick={() => startEdit(selectedGroup.id)}>Edit</button> : null}
+                  {selectedGroup.can_edit ? <button className="btn btn-outline" type="button" onClick={() => deleteGroup(selectedGroup.id)}>Delete</button> : null}
+                  <button className="btn btn-outline" type="button" onClick={() => setSelectedGroup(null)}>Close</button>
+                </div>
               </div>
               <p><strong>{selectedGroup.child_name}</strong> · {getSessionLabel(selectedGroup.session)} · {selectedGroup.status}</p>
               <p><strong>Date Range:</strong> {selectedGroup.start_date} to {selectedGroup.end_date}</p>
@@ -546,11 +550,18 @@ export default function FamilyMultiOrderPage() {
           box-shadow: 0 24px 60px rgba(35, 28, 22, 0.18);
         }
         .multiorder-modal-header,
+        .multiorder-modal-actions,
         .modal-list-item {
           display: flex;
           align-items: center;
-          justify-content: space-between;
           gap: 0.75rem;
+        }
+        .multiorder-modal-header {
+          justify-content: space-between;
+        }
+        .multiorder-modal-actions {
+          justify-content: flex-end;
+          flex-wrap: wrap;
         }
         .multiorder-modal-header h2 {
           margin: 0;
