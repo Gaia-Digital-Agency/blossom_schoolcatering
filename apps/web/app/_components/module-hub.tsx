@@ -107,7 +107,6 @@ export default function ModuleHub({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={item.iconSrc} alt="" style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }} />
               </span>
-              <span className="module-hub-label">{item.label}</span>
             </button>
           ))}
         </div>
@@ -164,14 +163,6 @@ export default function ModuleHub({
           cursor: pointer;
           transition: transform 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
           box-shadow: 0 4px 14px rgba(122, 106, 88, 0.12);
-        }
-        .module-hub-label {
-          flex: 0 0 auto;
-          text-align: center;
-          font-size: 0.92rem;
-          font-weight: 800;
-          line-height: 1.15;
-          color: #5d4e3a;
         }
         .module-hub-card:hover {
           transform: translateY(-3px);
