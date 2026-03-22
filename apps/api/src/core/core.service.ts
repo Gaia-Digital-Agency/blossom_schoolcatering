@@ -8936,10 +8936,17 @@ export class CoreService implements OnModuleInit {
       `,
       [groupId],
     );
-    return this.parseJsonLines<Record<string, unknown> & { price_snapshot_total?: string | number }>(out).map((row) => ({
+    return this.parseJsonLines<Record<string, unknown> & { service_date?: string; price_snapshot_total?: string | number }>(out).map((row) => ({
       ...row,
       price_snapshot_total: Number(row.price_snapshot_total || 0),
     }));
+  }
+
+  private async canOwnerEditMultiOrder(group: Record<string, unknown> & { id?: string | null; start_date?: string | null }) {
+    const occurrences = await this.getMultiOrderOccurrences(String(group.id || ''));
+    const firstServiceDate = String(occurrences[0]?.service_date || group.start_date || '').trim();
+    if (!firstServiceDate) return false;
+    return !(await this.isAfterOrAtMakassarCutoff(firstServiceDate));
   }
 
   private async upsertMultiOrderBilling(groupId: string, parentId: string | null) {
@@ -9224,6 +9231,7 @@ export class CoreService implements OnModuleInit {
   async getMultiOrderDetail(actor: AccessUser, groupId: string) {
     const group = await this.getMultiOrderGroupOwned(actor, groupId);
     const occurrences = await this.getMultiOrderOccurrences(groupId);
+    const canEdit = await this.canOwnerEditMultiOrder(group);
     const requestsOut = await runSql(
       `
       SELECT row_to_json(t)::text
@@ -9249,8 +9257,8 @@ export class CoreService implements OnModuleInit {
       current_total_amount: Number(group.current_total_amount || 0),
       occurrences,
       requests: this.parseJsonLines(requestsOut),
-      can_edit: String(group.start_date || '') > this.makassarTodayIsoDate(),
-      can_request_change: String(group.start_date || '') <= this.makassarTodayIsoDate(),
+      can_edit: canEdit,
+      can_request_change: !canEdit,
     };
   }
 
@@ -9262,8 +9270,8 @@ export class CoreService implements OnModuleInit {
   }) {
     const group = await this.getMultiOrderGroupOwned(actor, groupId);
     if (actor.role === 'ADMIN') throw new ForbiddenException('Owner update only');
-    if (String(group.start_date || '') <= this.makassarTodayIsoDate()) {
-      throw new BadRequestException('MULTI_ORDER_ALREADY_STARTED');
+    if (!(await this.canOwnerEditMultiOrder(group))) {
+      throw new BadRequestException('MULTI_ORDER_CUTOFF_EXCEEDED');
     }
     const orderIds = (await this.getMultiOrderOccurrences(groupId) as Array<{ order_id?: string | null }>)
       .map((row) => String(row.order_id || '').trim())
@@ -9320,8 +9328,8 @@ export class CoreService implements OnModuleInit {
   async deleteMultiOrder(actor: AccessUser, groupId: string) {
     const group = await this.getMultiOrderGroupOwned(actor, groupId);
     if (actor.role === 'ADMIN') throw new ForbiddenException('Owner delete only');
-    if (String(group.start_date || '') <= this.makassarTodayIsoDate()) {
-      throw new BadRequestException('MULTI_ORDER_ALREADY_STARTED');
+    if (!(await this.canOwnerEditMultiOrder(group))) {
+      throw new BadRequestException('MULTI_ORDER_CUTOFF_EXCEEDED');
     }
     const orderIds = (await this.getMultiOrderOccurrences(groupId) as Array<{ order_id?: string | null }>)
       .map((row) => String(row.order_id || '').trim())
@@ -9343,7 +9351,7 @@ export class CoreService implements OnModuleInit {
   }) {
     const group = await this.getMultiOrderGroupOwned(actor, groupId);
     if (!['PARENT', 'YOUNGSTER'].includes(actor.role)) throw new ForbiddenException('Role not allowed');
-    if (String(group.start_date || '') > this.makassarTodayIsoDate()) {
+    if (await this.canOwnerEditMultiOrder(group)) {
       throw new BadRequestException('MULTI_ORDER_OWNER_CAN_EDIT_DIRECTLY');
     }
     const requestType = String(input.requestType || '').trim().toUpperCase();

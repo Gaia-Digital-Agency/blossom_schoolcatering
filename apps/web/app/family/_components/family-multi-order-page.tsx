@@ -181,6 +181,7 @@ export default function FamilyMultiOrderPage() {
   const [children, setChildren] = useState<Child[]>([]);
   const [groups, setGroups] = useState<MultiOrderGroup[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<MultiOrderDetail | null>(null);
+  const [editConfirmGroupId, setEditConfirmGroupId] = useState('');
   const [editingGroupId, setEditingGroupId] = useState('');
   const [sessionSettings, setSessionSettings] = useState<SessionSetting[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -289,6 +290,18 @@ export default function FamilyMultiOrderPage() {
     setRepeatDays(days);
     setItemQty(Object.fromEntries(dishes.map((item) => [item.menuItemId, item.quantity && Number(item.quantity) > 0 ? 1 : 0])));
     setStep(1);
+  };
+
+  const openEditConfirmation = (groupId: string) => {
+    setEditConfirmGroupId(groupId);
+  };
+
+  const proceedEdit = async () => {
+    if (!editConfirmGroupId) return;
+    const groupId = editConfirmGroupId;
+    setEditConfirmGroupId('');
+    setSelectedGroup(null);
+    await startEdit(groupId);
   };
 
   const toggleRepeatDay = (day: number) => {
@@ -514,7 +527,7 @@ export default function FamilyMultiOrderPage() {
                 </div>
                 <div className="card-actions">
                   <button className="btn btn-outline" type="button" onClick={() => loadGroupDetail(group.id)}>View</button>
-                  {selectedGroup?.id === group.id && selectedGroup.can_edit ? <button className="btn btn-outline" type="button" onClick={() => startEdit(group.id)}>Edit</button> : null}
+                  {selectedGroup?.id === group.id && selectedGroup.can_edit ? <button className="btn btn-outline" type="button" onClick={() => openEditConfirmation(group.id)}>Edit</button> : null}
                   {selectedGroup?.id === group.id && selectedGroup.can_edit ? <button className="btn btn-outline" type="button" onClick={() => deleteGroup(group.id)}>Delete</button> : null}
                 </div>
               </article>
@@ -528,7 +541,7 @@ export default function FamilyMultiOrderPage() {
               <div className="multiorder-modal-header">
                 <h2 id="multiorder-modal-title">Multi Order Details</h2>
                 <div className="multiorder-modal-actions">
-                  {selectedGroup.can_edit ? <button className="btn btn-outline" type="button" onClick={() => startEdit(selectedGroup.id)}>Edit</button> : null}
+                  {selectedGroup.can_edit ? <button className="btn btn-outline" type="button" onClick={() => openEditConfirmation(selectedGroup.id)}>Edit</button> : null}
                   {selectedGroup.can_edit ? <button className="btn btn-outline" type="button" onClick={() => deleteGroup(selectedGroup.id)}>Delete</button> : null}
                   <button className="btn btn-outline" type="button" onClick={() => setSelectedGroup(null)}>Close</button>
                 </div>
@@ -537,6 +550,7 @@ export default function FamilyMultiOrderPage() {
               <p><strong>Date Range:</strong> {selectedGroup.start_date} to {selectedGroup.end_date}</p>
               <p><strong>Repeat:</strong> {parseRepeatDays(selectedGroup.repeat_days_json).map(repeatDayLabel).join(', ') || '-'}</p>
               <p><strong>Amount:</strong> Rp {Number(selectedGroup.current_total_amount || 0).toLocaleString('id-ID')}</p>
+              {!selectedGroup.can_edit ? <p className="muted-note">Cutoff passed. This multi order can no longer be edited or deleted directly.</p> : null}
               <div>
                 <strong>Dishes</strong>
                 <div className="modal-list">
@@ -572,6 +586,23 @@ export default function FamilyMultiOrderPage() {
                   <button className="btn btn-primary" type="button" onClick={submitRequest} disabled={submitting}>Submit Admin Request</button>
                 </div>
               ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        {editConfirmGroupId ? (
+          <div className="multiorder-modal-backdrop" role="presentation" onClick={() => setEditConfirmGroupId('')}>
+            <div className="multiorder-modal multiorder-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="multiorder-edit-confirm-title" onClick={(e) => e.stopPropagation()}>
+              <div className="multiorder-modal-header">
+                <h2 id="multiorder-edit-confirm-title">Editing Existing Multi Order</h2>
+                <div className="multiorder-modal-actions">
+                  <button className="btn btn-outline" type="button" onClick={() => setEditConfirmGroupId('')}>Close</button>
+                </div>
+              </div>
+              <p>You are editing existing multi order.</p>
+              <div className="card-actions">
+                <button className="btn btn-primary" type="button" onClick={proceedEdit}>Proceed</button>
+              </div>
             </div>
           </div>
         ) : null}
@@ -666,6 +697,9 @@ export default function FamilyMultiOrderPage() {
           border: 1px solid #eadcc9;
           background: #fffdf9;
           box-shadow: 0 24px 60px rgba(35, 28, 22, 0.18);
+        }
+        .multiorder-confirm-modal {
+          width: min(520px, 100%);
         }
         .multiorder-modal-header,
         .multiorder-modal-actions,
