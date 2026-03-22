@@ -16,7 +16,7 @@ const HUB_ITEMS: Record<ModuleType, Array<{ label: string; iconSrc: string; href
   family: [
     { label: 'Overview', iconSrc: '/schoolcatering/assets/icons/overview.jpeg', href: '/family/overview' },
     { label: 'Order', iconSrc: '/schoolcatering/assets/icons/order.jpeg', href: '/family/order' },
-    { label: 'Multi Order', iconSrc: '/schoolcatering/assets/icons/calendar.jpeg', href: '/family/multiorder' },
+    { label: 'Multi Order', iconSrc: '/schoolcatering/assets/icons/multiorder.jpeg', href: '/family/multiorder' },
     { label: 'Billing', iconSrc: '/schoolcatering/assets/icons/billing.jpeg', href: '/family/billing' },
     { label: 'Record', iconSrc: '/schoolcatering/assets/icons/report.jpeg', href: '/family/consolorder' },
     { label: 'Rating', iconSrc: '/schoolcatering/assets/icons/rating.jpeg', href: '/rating' },
@@ -25,7 +25,7 @@ const HUB_ITEMS: Record<ModuleType, Array<{ label: string; iconSrc: string; href
   student: [
     { label: 'Overview', iconSrc: '/schoolcatering/assets/icons/overview.jpeg', href: '/student/overview' },
     { label: 'Order', iconSrc: '/schoolcatering/assets/icons/order.jpeg', href: '/student/order' },
-    { label: 'Multi Order', iconSrc: '/schoolcatering/assets/icons/calendar.jpeg', href: '/student/multiorder' },
+    { label: 'Multi Order', iconSrc: '/schoolcatering/assets/icons/multiorder.jpeg', href: '/student/multiorder' },
     { label: 'Billing', iconSrc: '/schoolcatering/assets/icons/billing.jpeg', href: '/student/billing' },
     { label: 'Record', iconSrc: '/schoolcatering/assets/icons/report.jpeg', href: '/student/consolorder' },
     { label: 'Rating', iconSrc: '/schoolcatering/assets/icons/rating.jpeg', href: '/rating' },
