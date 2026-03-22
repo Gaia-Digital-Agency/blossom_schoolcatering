@@ -587,7 +587,7 @@ export default function FamilyMultiOrderPage() {
 
         {step === 0 ? (
           <div className="module-section">
-            <h2>AI Generated Multi Order Summary</h2>
+            <h2>AI Gemerated Summary</h2>
             <div className="multiorder-list">
               {groups.map((group) => (
                 <article key={group.id} className="multiorder-card">
@@ -609,17 +609,19 @@ export default function FamilyMultiOrderPage() {
           <div className="multiorder-modal-backdrop" role="presentation" onClick={() => setSelectedGroup(null)}>
             <div className="multiorder-modal" role="dialog" aria-modal="true" aria-labelledby="multiorder-modal-title" onClick={(e) => e.stopPropagation()}>
               <div className="multiorder-modal-header">
-                <h2 id="multiorder-modal-title">Multi Order Details</h2>
+                <h2 id="multiorder-modal-title">Order Details</h2>
                 <div className="multiorder-modal-actions">
                   {selectedGroup.can_edit ? <button className="btn btn-outline" type="button" onClick={() => openEditConfirmation(selectedGroup.id)}>Edit</button> : null}
                   {selectedGroup.can_edit ? <button className="btn btn-outline" type="button" onClick={() => deleteGroup(selectedGroup.id)}>Delete</button> : null}
                   <button className="btn btn-outline" type="button" onClick={() => setSelectedGroup(null)}>Close</button>
                 </div>
               </div>
-              <p><strong>{selectedGroup.child_name}</strong> · {getSessionLabel(selectedGroup.session)} · {selectedGroup.status}</p>
-              <p><strong>Date Range:</strong> {selectedGroup.start_date} to {selectedGroup.end_date}</p>
-              <p><strong>Repeat:</strong> {parseRepeatDays(selectedGroup.repeat_days_json).map(repeatDayLabel).join(', ') || '-'}</p>
-              <p><strong>Amount:</strong> Rp {Number(selectedGroup.current_total_amount || 0).toLocaleString('id-ID')}</p>
+              <div className="order-detail-meta">
+                <p><strong>{selectedGroup.child_name}</strong> · {getSessionLabel(selectedGroup.session)} · {selectedGroup.status}</p>
+                <p><strong>Date Range:</strong> {selectedGroup.start_date} to {selectedGroup.end_date}</p>
+                <p><strong>Repeat:</strong> {parseRepeatDays(selectedGroup.repeat_days_json).map(repeatDayLabel).join(', ') || '-'}</p>
+                <p><strong>Amount:</strong> Rp {Number(selectedGroup.current_total_amount || 0).toLocaleString('id-ID')}</p>
+              </div>
               {!selectedGroup.can_edit ? <p className="muted-note">Cutoff passed. This multi order can no longer be edited or deleted directly.</p> : null}
               <div>
                 <strong>Dishes</strong>
@@ -808,6 +810,13 @@ export default function FamilyMultiOrderPage() {
         .multiorder-modal-header h2 {
           margin: 0;
         }
+        .order-detail-meta {
+          display: grid;
+          gap: 0.2rem;
+        }
+        .order-detail-meta p {
+          margin: 0;
+        }
         .modal-list {
           display: grid;
           gap: 0.5rem;
@@ -822,6 +831,14 @@ export default function FamilyMultiOrderPage() {
         @media (max-width: 720px) {
           .menu-pick-columns {
             grid-template-columns: minmax(0, 1fr);
+          }
+          .multiorder-modal-header {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+          .multiorder-modal-actions {
+            width: 100%;
+            justify-content: flex-start;
           }
         }
       `}</style>
