@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { clearAuthState, fetchWithTimeout, getApiBase, getAppBase, ROLE_KEY, type Role } from '../../lib/auth';
+import { clearAuthState, fetchWithTimeout, getApiBase, ROLE_KEY, type Role } from '../../lib/auth';
 
 /**
  * A component that provides a logout button and, for certain user roles,
@@ -29,16 +29,6 @@ export default function LogoutButton({
 
   // Determines if the "Record" button should be visible based on the user's role.
   const canOpenRecord = showRecord && (role === 'PARENT' || role === 'YOUNGSTER');
-
-  const resolveAppHref = (href?: string) => {
-    const raw = String(href || '').trim();
-    if (!raw) return '';
-    if (/^https?:\/\//i.test(raw)) return raw;
-    const base = getAppBase().replace(/\/+$/, '');
-    const normalized = raw.startsWith('/') ? raw : `/${raw}`;
-    if (base && (normalized === base || normalized.startsWith(`${base}/`))) return normalized;
-    return `${base}${normalized}`;
-  };
 
   /**
    * On component mount, this effect retrieves the user's role from local storage
@@ -88,16 +78,15 @@ export default function LogoutButton({
             type="button"
             className="record-btn"
             onClick={() => {
-              const destination = resolveAppHref(returnHref);
               if (typeof window !== 'undefined') {
                 const exitIntent = new CustomEvent('blossom:draft-exit-intent', {
                   cancelable: true,
-                  detail: { href: destination },
+                  detail: { href: returnHref },
                 });
                 window.dispatchEvent(exitIntent);
                 if (exitIntent.defaultPrevented) return;
               }
-              if (destination) router.push(destination);
+              router.push(returnHref);
             }}
             aria-label="Return to module"
           >
