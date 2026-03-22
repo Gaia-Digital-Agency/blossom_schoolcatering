@@ -455,7 +455,7 @@ export default function FamilyMultiOrderPage() {
         </div>
 
         <div className="module-section">
-          <h2>Existing Multi Orders</h2>
+          <h2>AI Generated Multi Order Summary</h2>
           <div className="multiorder-list">
             {groups.map((group) => (
               <article key={group.id} className="multiorder-card">
