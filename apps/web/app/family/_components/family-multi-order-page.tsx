@@ -555,23 +555,25 @@ export default function FamilyMultiOrderPage() {
           ) : null}
         </div>
 
-        <div className="module-section">
-          <h2>AI Generated Multi Order Summary</h2>
-          <div className="multiorder-list">
-            {groups.map((group) => (
-              <article key={group.id} className="multiorder-card">
-                <div>
-                  <p>{buildCardNarrative(group, isStudentView)}</p>
-                </div>
-                <div className="card-actions">
-                  <button className="btn btn-outline" type="button" onClick={() => loadGroupDetail(group.id)}>View</button>
-                  {selectedGroup?.id === group.id && selectedGroup.can_edit ? <button className="btn btn-outline" type="button" onClick={() => openEditConfirmation(group.id)}>Edit</button> : null}
-                  {selectedGroup?.id === group.id && selectedGroup.can_edit ? <button className="btn btn-outline" type="button" onClick={() => deleteGroup(group.id)}>Delete</button> : null}
-                </div>
-              </article>
-            ))}
+        {step === 0 ? (
+          <div className="module-section">
+            <h2>AI Generated Multi Order Summary</h2>
+            <div className="multiorder-list">
+              {groups.map((group) => (
+                <article key={group.id} className="multiorder-card">
+                  <div>
+                    <p>{buildCardNarrative(group, isStudentView)}</p>
+                  </div>
+                  <div className="card-actions">
+                    <button className="btn btn-outline" type="button" onClick={() => loadGroupDetail(group.id)}>View</button>
+                    {selectedGroup?.id === group.id && selectedGroup.can_edit ? <button className="btn btn-outline" type="button" onClick={() => openEditConfirmation(group.id)}>Edit</button> : null}
+                    {selectedGroup?.id === group.id && selectedGroup.can_edit ? <button className="btn btn-outline" type="button" onClick={() => deleteGroup(group.id)}>Delete</button> : null}
+                  </div>
+                </article>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : null}
 
         {selectedGroup ? (
           <div className="multiorder-modal-backdrop" role="presentation" onClick={() => setSelectedGroup(null)}>
