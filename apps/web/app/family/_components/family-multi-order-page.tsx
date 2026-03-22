@@ -153,7 +153,7 @@ function formatTimestampDate(value?: string) {
   return raw.slice(0, 10);
 }
 
-function buildCardNarrative(group: MultiOrderGroup) {
+function buildCardNarrative(group: MultiOrderGroup, isStudentView: boolean) {
   const honorific = getStudentHonorific(group.child_gender);
   const firstName = getFirstName(group.child_first_name, group.child_name);
   const summary = buildAiSummary(group).replace(/^AI Generated Summary:\s*/, '');
@@ -165,6 +165,9 @@ function buildCardNarrative(group: MultiOrderGroup) {
   const sessionLabel = getSessionLabel(group.session).toLowerCase();
   const statusLabel = String(group.status || '').trim().toLowerCase() || 'active';
   const amountLabel = Number(group.current_total_amount || 0).toLocaleString('id-ID');
+  if (isStudentView) {
+    return `You have an ${statusLabel} multi order ${sessionLabel} from ${group.start_date} to ${group.end_date}, this order was ${actionLabel} ${actionDate} for ${summary} amounting to Rp ${amountLabel}.`;
+  }
   return `${honorific} ${firstName} has an ${statusLabel} multi order ${sessionLabel} from ${group.start_date} to ${group.end_date}, this order was ${actionLabel} ${actionDate} for ${summary} amounting to Rp ${amountLabel}.`;
 }
 
@@ -507,7 +510,7 @@ export default function FamilyMultiOrderPage() {
             {groups.map((group) => (
               <article key={group.id} className="multiorder-card">
                 <div>
-                  <p>{buildCardNarrative(group)}</p>
+                  <p>{buildCardNarrative(group, isStudentView)}</p>
                 </div>
                 <div className="card-actions">
                   <button className="btn btn-outline" type="button" onClick={() => loadGroupDetail(group.id)}>View</button>
