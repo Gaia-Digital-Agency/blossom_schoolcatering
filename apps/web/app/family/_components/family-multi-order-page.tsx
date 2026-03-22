@@ -3,13 +3,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { apiFetch } from '../../../lib/auth';
+import { formatDishCategoryLabel } from '../../../lib/dish-tags';
 import LogoutButton from '../../_components/logout-button';
 import { getSessionLabel } from '../../../lib/session-theme';
 
 type SessionType = 'BREAKFAST' | 'SNACK' | 'LUNCH';
 type Child = { id: string; first_name: string; last_name: string; school_grade?: string };
 type SessionSetting = { session: SessionType; is_active: boolean };
-type MenuItem = { id: string; name: string };
+type MenuItem = { id: string; name: string; dish_category?: string };
 type MultiOrderItem = { menuItemId: string; quantity: number; itemNameSnapshot?: string; priceSnapshot?: number };
 type MultiOrderGroup = {
   id: string;
@@ -222,6 +223,17 @@ export default function FamilyMultiOrderPage() {
     return out;
   }, [endDate, repeatDays, startDate]);
 
+  const categorizedMenuItems = useMemo(() => {
+    const mains: MenuItem[] = [];
+    const others: MenuItem[] = [];
+    for (const item of menuItems) {
+      const category = String(item.dish_category || 'MAIN').trim().toUpperCase();
+      if (category === 'MAIN') mains.push(item);
+      else others.push(item);
+    }
+    return { mains, others };
+  }, [menuItems]);
+
   const loadGroups = async () => {
     const data = await apiFetch('/multi-orders') as MultiOrderGroup[];
     setGroups(data || []);
@@ -247,7 +259,7 @@ export default function FamilyMultiOrderPage() {
 
   const loadMenu = async (targetSession: SessionType) => {
     const out = await apiFetch(`/menus?session=${targetSession}`) as { items: MenuItem[] };
-    setMenuItems((out.items || []).map((item) => ({ id: item.id, name: item.name })));
+    setMenuItems((out.items || []).map((item) => ({ id: item.id, name: item.name, dish_category: item.dish_category })));
   };
 
   const loadGroupDetail = async (groupId: string) => {
@@ -490,17 +502,39 @@ export default function FamilyMultiOrderPage() {
           ) : null}
 
           {step === 2 ? (
-            <div className="menu-pick-grid">
-              {menuItems.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={itemQty[item.id] ? 'dish-pill active' : 'dish-pill'}
-                  onClick={() => toggleMenuItem(item.id)}
-                >
-                  {item.name}
-                </button>
-              ))}
+            <div className="menu-pick-columns">
+              <div className="menu-pick-column">
+                <h3>Main</h3>
+                <div className="menu-pick-grid">
+                  {categorizedMenuItems.mains.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={itemQty[item.id] ? 'dish-pill active' : 'dish-pill'}
+                      onClick={() => toggleMenuItem(item.id)}
+                    >
+                      <strong>{item.name}</strong>
+                      <small>{formatDishCategoryLabel(item.dish_category)}</small>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="menu-pick-column">
+                <h3>Dessert, Drinks, Other</h3>
+                <div className="menu-pick-grid">
+                  {categorizedMenuItems.others.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={itemQty[item.id] ? 'dish-pill active' : 'dish-pill'}
+                      onClick={() => toggleMenuItem(item.id)}
+                    >
+                      <strong>{item.name}</strong>
+                      <small>{formatDishCategoryLabel(item.dish_category)}</small>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           ) : null}
 
@@ -649,6 +683,20 @@ export default function FamilyMultiOrderPage() {
         .guide-card p {
           margin: 0;
         }
+        .menu-pick-columns {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 0.9rem;
+        }
+        .menu-pick-column {
+          display: grid;
+          gap: 0.6rem;
+          align-content: start;
+        }
+        .menu-pick-column h3 {
+          margin: 0;
+          font-size: 0.98rem;
+        }
         .menu-pick-grid {
           display: grid;
           gap: 0.65rem;
@@ -656,11 +704,17 @@ export default function FamilyMultiOrderPage() {
         .dish-pill {
           width: 100%;
           text-align: left;
+          display: grid;
+          gap: 0.18rem;
           border: 1px solid #d7c8b5;
           border-radius: 0.9rem;
           padding: 0.85rem 1rem;
           background: #fffaf2;
           color: #3f3226;
+        }
+        .dish-pill small {
+          color: inherit;
+          opacity: 0.82;
         }
         .dish-pill.active {
           background: #2f7a43;
@@ -732,6 +786,11 @@ export default function FamilyMultiOrderPage() {
           border: 1px solid #eadcc9;
           border-radius: 0.85rem;
           background: #fffaf2;
+        }
+        @media (max-width: 720px) {
+          .menu-pick-columns {
+            grid-template-columns: minmax(0, 1fr);
+          }
         }
       `}</style>
     </main>
