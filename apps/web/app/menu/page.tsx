@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { fetchWithTimeout, getApiBase, ROLE_KEY, type Role } from '../../lib/auth';
+import { fetchWithTimeout, getApiBase, getAppBase, ROLE_KEY, type Role } from '../../lib/auth';
 import SessionBadge from '../_components/session-badge';
 import { getSessionCardStyle } from '../../lib/session-theme';
 
@@ -68,6 +68,16 @@ export default function MenuPage() {
   const [error, setError] = useState('');
   const [returnHref, setReturnHref] = useState('/login');
   const [selectedSession, setSelectedSession] = useState<SessionOption>('LUNCH');
+
+  const resolvedReturnHref = useMemo(() => {
+    const raw = String(returnHref || '').trim();
+    if (!raw) return `${getAppBase()}/login`;
+    if (/^https?:\/\//i.test(raw)) return raw;
+    const base = getAppBase().replace(/\/+$/, '');
+    const normalized = raw.startsWith('/') ? raw : `/${raw}`;
+    if (base && (normalized === base || normalized.startsWith(`${base}/`))) return normalized;
+    return `${base}${normalized}`;
+  }, [returnHref]);
 
   useEffect(() => {
     const load = async () => {
@@ -227,7 +237,7 @@ export default function MenuPage() {
         )}
 
         <div className="dev-links">
-          <Link href={returnHref}>Return</Link>
+          <Link href={resolvedReturnHref}>Return</Link>
           <Link href="/rating">Rating</Link>
         </div>
       </section>
