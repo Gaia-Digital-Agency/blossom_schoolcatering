@@ -420,7 +420,7 @@ export default function FamilyMultiOrderPage() {
         <div className="module-section">
           <div className="step-row">
             <button type="button" className={step === 0 ? 'step-pill active' : 'step-pill'} onClick={() => setStep(0)}>
-              Guide
+              Summary
             </button>
             {[1, 2, 3].map((value) => (
               <button key={value} type="button" className={step === value ? 'step-pill active' : 'step-pill'} onClick={() => setStep(value as 1 | 2 | 3)}>
@@ -432,13 +432,14 @@ export default function FamilyMultiOrderPage() {
           {step === 0 ? (
             <div className="guide-card">
               <h2>Multi Order Guide</h2>
-              <p>Multi Order lets one student create repeated meal orders in one setup instead of ordering each date manually.</p>
+              <p>Multi Order allows creation of repeated meal orders in one setup instead of ordering each date individually.</p>
               <p><strong>Step 1:</strong> Choose the student, session, start date, end date, and repeat weekdays.</p>
-              <p><strong>Step 2:</strong> Choose the dishes. Each dish can only be selected once, so no quantity dropdown is needed.</p>
+              <p><strong>Step 2:</strong> Choose the dishes. Each dish can only be selected once, up to 5 dish max per meal per session.</p>
               <p><strong>Step 3:</strong> Review the repeated dates and submit the grouped order.</p>
-              <p><strong>Repeat by days:</strong> Turn on the weekdays you want, such as Monday, Wednesday, and Friday.</p>
+              <p><strong>Options are:</strong></p>
+              <p><strong>Repeat by days:</strong> Choose the weekdays, such as Monday, Wednesday, and Friday.</p>
               <p><strong>Repeat by week:</strong> Keep the same weekday pattern across multiple weeks by setting a longer end date.</p>
-              <p><strong>Repeat by month:</strong> Extend the date range into the next month to continue the same pattern, up to the allowed booking limit.</p>
+              <p><strong>Repeat by month:</strong> Extend the date range into the next month to continue the same pattern.</p>
             </div>
           ) : null}
 
