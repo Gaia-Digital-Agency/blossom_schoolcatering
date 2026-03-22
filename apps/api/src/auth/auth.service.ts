@@ -64,6 +64,7 @@ type RegisterYoungsterWithParentInput = {
   teacherPhone?: string;
   students: Array<{
     youngsterFirstName: string;
+    youngsterGender: 'MALE' | 'FEMALE';
     youngsterDateOfBirth: string;
     youngsterSchoolId: string;
     youngsterGrade: string;
@@ -89,6 +90,7 @@ type RegistrationSchoolRow = {
 type SeedStudentSpec = {
   username: string;
   firstName: string;
+  gender: 'MALE' | 'FEMALE';
   familyGroup: string;
   schoolIndex: number;
   dateOfBirth: string;
@@ -598,6 +600,7 @@ export class AuthService {
           {
             username: 'family01_student01a',
             firstName: 'student01a',
+            gender: 'MALE',
             familyGroup: 'family01',
             schoolIndex: 0,
             dateOfBirth: '2016-02-14',
@@ -617,6 +620,7 @@ export class AuthService {
           {
             username: 'family02_student02a',
             firstName: 'student02a',
+            gender: 'MALE',
             familyGroup: 'family02',
             schoolIndex: 1,
             dateOfBirth: '2015-04-09',
@@ -627,6 +631,7 @@ export class AuthService {
           {
             username: 'family02_student02b',
             firstName: 'student02b',
+            gender: 'FEMALE',
             familyGroup: 'family02',
             schoolIndex: 2,
             dateOfBirth: '2014-06-21',
@@ -646,6 +651,7 @@ export class AuthService {
           {
             username: 'family03_student03a',
             firstName: 'student03a',
+            gender: 'MALE',
             familyGroup: 'family03',
             schoolIndex: 3,
             dateOfBirth: '2013-08-11',
@@ -665,6 +671,7 @@ export class AuthService {
           {
             username: 'family04_student04a',
             firstName: 'student04a',
+            gender: 'FEMALE',
             familyGroup: 'family04',
             schoolIndex: 4,
             dateOfBirth: '2012-10-03',
@@ -686,6 +693,7 @@ export class AuthService {
           {
             username: 'family05_student05a',
             firstName: 'student05a',
+            gender: 'MALE',
             familyGroup: 'family05',
             schoolIndex: 5,
             dateOfBirth: '2011-12-18',
@@ -696,6 +704,7 @@ export class AuthService {
           {
             username: 'family05_student05b',
             firstName: 'student05b',
+            gender: 'FEMALE',
             familyGroup: 'family05',
             schoolIndex: 6,
             dateOfBirth: '2014-01-26',
@@ -814,12 +823,13 @@ export class AuthService {
              is_active,
              deleted_at
            )
-           VALUES ($1, $2, $3::date, 'UNDISCLOSED'::gender_type, $4, NULL, $5, $6, $7, true, NULL)
+           VALUES ($1, $2, $3::date, $4::gender_type, $5, NULL, $6, $7, $8, true, NULL)
            RETURNING id;`,
           [
             studentUserId,
             schoolId,
             student.dateOfBirth,
+            student.gender,
             normalizeGradeLabel(student.grade),
             student.registrantType,
             student.registrantType === 'TEACHER' ? (student.teacherName || 'teacher') : null,
@@ -1232,6 +1242,7 @@ export class AuthService {
     for (let index = 0; index < students.length; index += 1) {
       const student = students[index];
       const youngsterFirstName = String(student?.youngsterFirstName || '').trim();
+      const youngsterGender = String(student?.youngsterGender || '').trim().toUpperCase();
       const youngsterDateOfBirth = String(student?.youngsterDateOfBirth || '').trim();
       const youngsterSchoolId = String(student?.youngsterSchoolId || '').trim();
       const youngsterGrade = normalizeGradeLabel(student?.youngsterGrade);
@@ -1239,8 +1250,11 @@ export class AuthService {
       const youngsterPhone = youngsterPhoneInput || parentMobileNumber;
       const youngsterEmail = String(student?.youngsterEmail || '').trim().toLowerCase();
       const youngsterNameKey = `${this.nameCompareKey(youngsterFirstName)}|${this.nameCompareKey(parentLastName)}`;
-      if (!youngsterFirstName || !youngsterDateOfBirth || !youngsterSchoolId || !youngsterGrade || !youngsterPhone) {
+      if (!youngsterFirstName || !youngsterGender || !youngsterDateOfBirth || !youngsterSchoolId || !youngsterGrade || !youngsterPhone) {
         throw new BadRequestException(`Student ${index + 1} is missing required information.`);
+      }
+      if (!['MALE', 'FEMALE'].includes(youngsterGender)) {
+        throw new BadRequestException(`Student ${index + 1} gender must be Male or Female.`);
       }
       if (!/^\d{4}-\d{2}-\d{2}$/.test(youngsterDateOfBirth)) {
         throw new BadRequestException(`Student ${index + 1} date of birth must be YYYY-MM-DD.`);
@@ -1395,15 +1409,18 @@ export class AuthService {
       email: string | null;
       schoolId: string;
     }> = [];
-    const youngsterGender = 'UNDISCLOSED';
     for (const student of students) {
       const youngsterFirstName = String(student.youngsterFirstName || '').trim();
+      const youngsterGender = String(student.youngsterGender || '').trim().toUpperCase();
       const youngsterDateOfBirth = String(student.youngsterDateOfBirth || '').trim();
       const youngsterSchoolId = String(student.youngsterSchoolId || '').trim();
       const youngsterGrade = String(student.youngsterGrade || '').trim();
       const youngsterPhone = this.normalizePhone(student.youngsterPhone) || parentMobileNumber;
       const youngsterEmail = String(student.youngsterEmail || '').trim().toLowerCase();
       const youngsterAllergies = this.normalizeAllergies(student.youngsterAllergies);
+      if (!['MALE', 'FEMALE'].includes(youngsterGender)) {
+        throw new BadRequestException(`Student gender must be Male or Female for ${youngsterFirstName || 'this student'}.`);
+      }
       const youngsterLastName = parentLastName;
       const youngsterUsernameBase = this.sanitizeUsernamePart(`${youngsterLastName}_${youngsterFirstName}`);
       const youngsterUsername = await runSql(`SELECT generate_unique_username($1);`, [youngsterUsernameBase]);

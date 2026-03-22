@@ -6,6 +6,10 @@ export class RegisterFamilyStudentDto {
   youngsterFirstName!: string;
 
   @IsString()
+  @IsIn(['MALE', 'FEMALE'])
+  youngsterGender!: 'MALE' | 'FEMALE';
+
+  @IsString()
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
   youngsterDateOfBirth!: string;
 

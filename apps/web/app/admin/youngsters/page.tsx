@@ -38,6 +38,11 @@ type ChildRow = {
   parent_ids: string[];
 };
 
+function normalizeBinaryGender(value?: string) {
+  const gender = String(value || '').trim().toUpperCase();
+  return gender === 'MALE' || gender === 'FEMALE' ? gender : '';
+}
+
 type CreateResult = {
   username: string;
   generatedPassword: string;
@@ -86,7 +91,7 @@ export default function AdminYoungstersPage() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [email, setEmail] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
-  const [gender, setGender] = useState('UNDISCLOSED');
+  const [gender, setGender] = useState('');
   const [schoolId, setSchoolId] = useState('');
   const [schoolGrade, setSchoolGrade] = useState(GRADES[0]);
   const [currentGrade, setCurrentGrade] = useState('');
@@ -161,7 +166,7 @@ export default function AdminYoungstersPage() {
     setPhoneNumber('');
     setEmail('');
     setDateOfBirth('');
-    setGender('UNDISCLOSED');
+    setGender('');
     setSchoolGrade(GRADES[0]);
     setCurrentGrade('');
     setAllergies('');
@@ -185,7 +190,7 @@ export default function AdminYoungstersPage() {
     setPhoneNumber(child.phone_number || '');
     setEmail(child.email || '');
     setDateOfBirth((child.date_of_birth || '').slice(0, 10));
-    setGender(child.gender || 'UNDISCLOSED');
+    setGender(normalizeBinaryGender(child.gender));
     setSchoolId(child.school_id || '');
     setSchoolGrade(child.registration_grade || child.school_grade || GRADES[0]);
     setCurrentGrade(child.current_school_grade || '');
@@ -502,10 +507,9 @@ export default function AdminYoungstersPage() {
           <label>
             Youngster Gender
             <select value={gender} onChange={(e) => setGender(e.target.value)} required>
+              <option value="">Select...</option>
               <option value="MALE">Male</option>
               <option value="FEMALE">Female</option>
-              <option value="OTHER">Other</option>
-              <option value="UNDISCLOSED">Undisclosed</option>
             </select>
           </label>
           <label>

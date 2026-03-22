@@ -21,8 +21,8 @@ export class RegisterYoungsterDto {
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
   dateOfBirth!: string;
 
-  @IsIn(['MALE', 'FEMALE', 'OTHER', 'UNDISCLOSED'])
-  gender!: string;
+  @IsIn(['MALE', 'FEMALE'])
+  gender!: 'MALE' | 'FEMALE';
 
   @IsUUID('4')
   schoolId!: string;

@@ -139,6 +139,7 @@ export class AuthController {
       teacherPhone: body.teacherPhone || '',
       students: (body.students || []).map((student) => ({
         youngsterFirstName: student.youngsterFirstName,
+        youngsterGender: student.youngsterGender,
         youngsterDateOfBirth: student.youngsterDateOfBirth,
         youngsterSchoolId: student.youngsterSchoolId,
         youngsterGrade: student.youngsterGrade,

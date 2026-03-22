@@ -13,6 +13,7 @@ type School = {
 
 type StudentForm = {
   youngsterFirstName: string;
+  youngsterGender: '' | 'MALE' | 'FEMALE';
   youngsterDateOfBirth: string;
   youngsterSchoolId: string;
   youngsterGrade: string;
@@ -57,6 +58,7 @@ function normalizeNameKey(value: string) {
 function buildEmptyStudent(defaultSchoolId = ''): StudentForm {
   return {
     youngsterFirstName: '',
+    youngsterGender: '',
     youngsterDateOfBirth: '',
     youngsterSchoolId: defaultSchoolId,
     youngsterGrade: GRADES[0],
@@ -173,6 +175,7 @@ export default function YoungsterRegisterPage() {
           const hasAllergies = allergies.length > 0 && allergies.toLowerCase() !== NO_ALLERGIES_LABEL.toLowerCase();
           return {
             youngsterFirstName: child.first_name || '',
+            youngsterGender: '',
             youngsterDateOfBirth: child.date_of_birth || '',
             youngsterSchoolId: child.school_id || defaultSchoolId,
             youngsterGrade: child.school_grade || GRADES[0],
@@ -301,6 +304,10 @@ export default function YoungsterRegisterPage() {
         setError(`Student ${number} First Name is required.`);
         return;
       }
+      if (!student.youngsterGender) {
+        setError(`Student ${number} Gender is required.`);
+        return;
+      }
       const studentNameKey = `${normalizeNameKey(student.youngsterFirstName)}|${normalizedFamilyName}`;
       if (!student.youngsterDateOfBirth) {
         setError(`Student ${number} Date Of Birth is required.`);
@@ -370,6 +377,7 @@ export default function YoungsterRegisterPage() {
           password,
           students: students.map((student) => ({
             youngsterFirstName: student.youngsterFirstName,
+            youngsterGender: student.youngsterGender,
             youngsterDateOfBirth: student.youngsterDateOfBirth,
             youngsterSchoolId: student.youngsterSchoolId,
             youngsterGrade: student.youngsterGrade,
@@ -570,6 +578,14 @@ export default function YoungsterRegisterPage() {
                 <label>
                   Student First Name
                   <input value={student.youngsterFirstName} onChange={(e) => setStudentField(index, 'youngsterFirstName', e.target.value)} required />
+                </label>
+                <label>
+                  Gender
+                  <select value={student.youngsterGender} onChange={(e) => setStudentField(index, 'youngsterGender', e.target.value as '' | 'MALE' | 'FEMALE')} required>
+                    <option value="">Select...</option>
+                    <option value="MALE">Male</option>
+                    <option value="FEMALE">Female</option>
+                  </select>
                 </label>
                 <label>
                   Date Of Birth

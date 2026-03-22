@@ -34,8 +34,8 @@ export class UpdateYoungsterDto {
   schoolId?: string;
 
   @IsOptional()
-  @IsIn(['MALE', 'FEMALE', 'OTHER', 'UNDISCLOSED'])
-  gender?: string;
+  @IsIn(['MALE', 'FEMALE'])
+  gender?: 'MALE' | 'FEMALE';
 
   @IsOptional()
   @IsUUID('4')

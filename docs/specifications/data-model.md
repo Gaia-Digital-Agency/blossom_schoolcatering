@@ -26,7 +26,7 @@ Data model for `blossom-schoolcatering` using PostgreSQL, aligned to:
 - `role_type`: `PARENT`, `CHILD`, `ADMIN`, `KITCHEN`, `DELIVERY`
 - `auth_provider_type`: `LOCAL`, `GOOGLE`
 - `session_type`: `LUNCH`, `SNACK`, `BREAKFAST`
-- `gender_type`: `MALE`, `FEMALE`, `OTHER`, `UNDISCLOSED`
+- `gender_type`: `MALE`, `FEMALE`
 - `payment_status`: `UNPAID`, `PENDING_VERIFICATION`, `VERIFIED`, `REJECTED`
 - `order_status`: `PLACED`, `CANCELLED`, `LOCKED`
 - `blackout_type`: `ORDER_BLOCK`, `SERVICE_BLOCK`, `BOTH`
