@@ -1542,7 +1542,7 @@ export class CoreService implements OnModuleInit {
            JOIN menus m ON m.id = mi.menu_id
            WHERE m.service_date = $1::date
              AND m.session = $2::session_type
-             AND mi.is_active = true
+             AND mi.is_available = true
              AND mi.deleted_at IS NULL
              AND lower(mi.name) ILIKE $3
            LIMIT 1
