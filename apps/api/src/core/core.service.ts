@@ -1563,6 +1563,17 @@ export class CoreService implements OnModuleInit {
       throw new BadRequestException(`Dishes not found for session ${session}: ${notFound.join(', ')}`);
     }
 
+    // Fetch student name for confirmation response
+    const nameOut = await runSql(
+      `SELECT (u.first_name || ' ' || u.last_name) AS full_name
+       FROM children c
+       JOIN users u ON u.id = c.user_id
+       WHERE c.id = $1
+       LIMIT 1;`,
+      [childId],
+    );
+    const studentName = (nameOut || '').trim() || childUsername;
+
     // Create cart (reuses existing open cart if present)
     const cart = await this.createCart(actor, { childId, serviceDate, session });
 
@@ -1572,15 +1583,19 @@ export class CoreService implements OnModuleInit {
     // Submit
     const order = await this.submitCart(actor, cart.id);
 
+    const rawPrice = Number(order.total_price || 0);
     return {
       ok: true,
       orderId: order.id,
-      orderNumber: order.order_number,
-      childId,
+      ref: String(order.id || '').slice(0, 8).toUpperCase(),
+      studentName,
+      studentUsername: childUsername,
       serviceDate,
       session,
       items: resolvedItems.map((i) => i.name),
-      totalPrice: order.total_price,
+      itemCount: resolvedItems.length,
+      totalPrice: rawPrice,
+      totalPriceFormatted: `Rp ${rawPrice.toLocaleString('id-ID')}`,
     };
   }
 
