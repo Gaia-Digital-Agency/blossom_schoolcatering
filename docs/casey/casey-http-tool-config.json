@@ -1,0 +1,64 @@
+{
+  "_comment": "OpenClaw HTTP tool definitions for Casey — Place Order flow",
+  "tools": [
+    {
+      "name": "blossom_login",
+      "description": "Login to Blossom school catering system and get an access token. Call this before placing an order, or when a 401 is received.",
+      "type": "http",
+      "method": "POST",
+      "url": "http://34.158.47.112/schoolcatering/api/v1/auth/login",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body_schema": {
+        "username": {
+          "type": "string",
+          "description": "The parent or student username"
+        },
+        "password": {
+          "type": "string",
+          "description": "The account password"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["PARENT", "YOUNGSTER"],
+          "description": "User role. Use PARENT for family accounts."
+        }
+      },
+      "response_extract": {
+        "access_token": "$.accessToken"
+      }
+    },
+    {
+      "name": "blossom_quick_order",
+      "description": "Place a meal order on Blossom by providing the child username, date, session and dish names. No UUIDs needed — dish names are matched by partial name. Requires a valid access token from blossom_login.",
+      "type": "http",
+      "method": "POST",
+      "url": "http://34.158.47.112/schoolcatering/api/v1/order/quick",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {{access_token}}"
+      },
+      "body_schema": {
+        "childUsername": {
+          "type": "string",
+          "description": "The student's login username, e.g. family_studentname"
+        },
+        "date": {
+          "type": "string",
+          "description": "Service date in YYYY-MM-DD format"
+        },
+        "session": {
+          "type": "string",
+          "enum": ["LUNCH", "BREAKFAST", "SNACK"],
+          "description": "Meal session"
+        },
+        "dishes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of dish names (max 5). Partial names are fine, e.g. 'Beef Rice' matches 'Beef Rice Bowl'."
+        }
+      }
+    }
+  ]
+}

@@ -14,6 +14,7 @@ export * from './create-multi-order-request.dto';
 export * from './create-school.dto';
 export * from './meal-plan-wizard.dto';
 export * from './note.dto';
+export * from './quick-order.dto';
 export * from './quick-reorder.dto';
 export * from './register-youngster.dto';
 export * from './replace-cart-items.dto';

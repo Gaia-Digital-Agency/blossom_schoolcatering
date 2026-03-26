@@ -61,6 +61,7 @@ type BlackoutRule = {
 const SESSIONS: SessionType[] = ['LUNCH', 'SNACK', 'BREAKFAST'];
 const DISH_CATEGORIES = ['MAIN', 'APPETISER', 'COMPLEMENT', 'DESSERT', 'SIDES', 'GARNISH', 'DRINK'] as const;
 type DishCategory = (typeof DISH_CATEGORIES)[number];
+type AiFutureCategory = 'orders' | 'billing' | 'menu' | 'profile' | 'dietary' | 'unknown';
 
 @Injectable()
 export class CoreService implements OnModuleInit {
@@ -77,6 +78,7 @@ export class CoreService implements OnModuleInit {
   private menuItemNameUniquenessReady = false;
   private menuRatingsTableReady = false;
   private sessionSettingsTableReady = false;
+  private aiUsageLogsReady = false;
   private childRegistrationSourceColumnsReady = false;
   private childCurrentGradeColumnReady = false;
   private menuItemTextDefaultsReady = false;
@@ -1121,6 +1123,560 @@ export class CoreService implements OnModuleInit {
     );
     if (allowed !== 't') {
       throw new ForbiddenException('ORDER_OWNERSHIP_FORBIDDEN');
+    }
+  }
+
+  private async getParentIdByChildId(childId: string) {
+    const out = await runSql(
+      `SELECT parent_id
+       FROM parent_children
+       WHERE child_id = $1
+       ORDER BY created_at ASC
+       LIMIT 1;`,
+      [childId],
+    );
+    return out || null;
+  }
+
+  private async ensureAiUsageLogsTable() {
+    if (this.aiUsageLogsReady) return;
+    await runSql(`
+      CREATE TABLE IF NOT EXISTS ai_usage_logs (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        actor_user_id uuid NOT NULL REFERENCES users(id),
+        actor_role text NOT NULL,
+        parent_id uuid NULL REFERENCES parents(id) ON DELETE SET NULL,
+        viewer_child_id uuid NULL REFERENCES children(id) ON DELETE SET NULL,
+        child_ids_json text NOT NULL DEFAULT '[]',
+        category text NOT NULL DEFAULT 'unknown',
+        prompt_chars int NOT NULL DEFAULT 0,
+        response_chars int NOT NULL DEFAULT 0,
+        success boolean NOT NULL DEFAULT false,
+        error_code text NULL,
+        created_at timestamptz NOT NULL DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS idx_ai_usage_logs_created_at ON ai_usage_logs(created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_ai_usage_logs_actor ON ai_usage_logs(actor_user_id, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_ai_usage_logs_parent ON ai_usage_logs(parent_id, created_at DESC);
+    `);
+    this.aiUsageLogsReady = true;
+  }
+
+  private async recordAiUsage(input: {
+    actor: AccessUser;
+    parentId?: string | null;
+    viewerChildId?: string | null;
+    childIds: string[];
+    category: AiFutureCategory;
+    promptChars: number;
+    responseChars: number;
+    success: boolean;
+    errorCode?: string | null;
+  }) {
+    await this.ensureAiUsageLogsTable();
+    await runSql(
+      `INSERT INTO ai_usage_logs (
+        actor_user_id,
+        actor_role,
+        parent_id,
+        viewer_child_id,
+        child_ids_json,
+        category,
+        prompt_chars,
+        response_chars,
+        success,
+        error_code
+      )
+       VALUES ($1::uuid, $2, $3::uuid, $4::uuid, $5, $6, $7, $8, $9, $10);`,
+      [
+        input.actor.uid,
+        input.actor.role,
+        input.parentId || null,
+        input.viewerChildId || null,
+        JSON.stringify(input.childIds),
+        input.category,
+        input.promptChars,
+        input.responseChars,
+        input.success,
+        input.errorCode || null,
+      ],
+    );
+  }
+
+  private categorizeAiQuestion(question: string): AiFutureCategory {
+    const normalized = question.trim().toLowerCase();
+    if (!normalized) return 'unknown';
+    if (/(bill|billing|payment|paid|unpaid|receipt|spend)/.test(normalized)) return 'billing';
+    if (/(order|ordered|meal plan|multi order|multiorder|delivery|session)/.test(normalized)) return 'orders';
+    if (/(menu|dish|meal|breakfast|snack|lunch|price)/.test(normalized)) return 'menu';
+    if (/(allerg|diet|peanut|dairy|restriction)/.test(normalized)) return 'dietary';
+    if (/(student|child|children|family|school|grade|birthday|profile)/.test(normalized)) return 'profile';
+    return 'unknown';
+  }
+
+  private isBlockedGaiaQuestion(question: string) {
+    const normalized = question.trim().toLowerCase();
+    if (!normalized) return false;
+    return /(ignore previous|system prompt|developer message|reveal prompt|show prompt|database password|secret key|access token|refresh token|jwt secret|sql query|drop table|delete table|truncate table|hack|bypass)/.test(normalized);
+  }
+
+  private getAiRuntimeConfig() {
+    const projectId = String(process.env.GCP_PROJECT_ID || '').trim();
+    const location = String(process.env.GCP_VERTEX_LOCATION || '').trim();
+    const model = String(process.env.GCP_VERTEX_MODEL || '').trim();
+    const maxPromptChars = Math.max(200, Number(process.env.AI_FUTURE_MAX_PROMPT_CHARS || 2000));
+    const maxRequestsPerDay = Math.max(1, Number(process.env.AI_FUTURE_MAX_REQUESTS_PER_DAY || 100));
+    return { projectId, location, model, maxPromptChars, maxRequestsPerDay };
+  }
+
+  private async ensureAiFutureEnabled() {
+    const settings = await this.getSiteSettings();
+    if (!settings.ai_future_enabled) {
+      throw new ForbiddenException('GAIA_FEATURE_DISABLED');
+    }
+  }
+
+  private async enforceAiDailyLimit(actor: AccessUser, maxRequestsPerDay: number) {
+    const count = Number(await runSql(
+      `SELECT COUNT(*)::int
+       FROM ai_usage_logs
+       WHERE actor_user_id = $1
+         AND created_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Makassar') AT TIME ZONE 'Asia/Makassar';`,
+      [actor.uid],
+    ) || 0);
+    if (count >= maxRequestsPerDay) {
+      throw new ForbiddenException('GAIA_DAILY_LIMIT_REACHED');
+    }
+  }
+
+  private async resolveAiFamilyScope(actor: AccessUser) {
+    if (!['PARENT', 'YOUNGSTER'].includes(actor.role)) {
+      throw new ForbiddenException('Role not allowed');
+    }
+
+    let parentId: string | null = null;
+    let viewerChildId: string | null = null;
+
+    if (actor.role === 'PARENT') {
+      parentId = await this.getParentIdByUserId(actor.uid);
+      if (!parentId) throw new BadRequestException('Parent profile not found');
+    } else {
+      viewerChildId = await this.getChildIdByUserId(actor.uid);
+      if (!viewerChildId) throw new NotFoundException('Youngster profile not found');
+      parentId = await this.getParentIdByChildId(viewerChildId);
+      if (!parentId) throw new BadRequestException('Family Group not found');
+    }
+
+    const childrenOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT c.id,
+               c.user_id,
+               u.first_name,
+               u.last_name,
+               s.name AS school_name,
+               COALESCE(c.current_school_grade, c.school_grade) AS school_grade,
+               COALESCE((
+                 SELECT cdr.restriction_details
+                 FROM child_dietary_restrictions cdr
+                 WHERE cdr.child_id = c.id
+                   AND cdr.is_active = true
+                   AND cdr.deleted_at IS NULL
+                   AND upper(cdr.restriction_label) = 'ALLERGIES'
+                 ORDER BY cdr.updated_at DESC NULLS LAST, cdr.created_at DESC
+                 LIMIT 1
+               ), 'No Allergies') AS dietary_allergies
+        FROM parent_children pc
+        JOIN children c ON c.id = pc.child_id
+        JOIN users u ON u.id = c.user_id
+        JOIN schools s ON s.id = c.school_id
+        WHERE pc.parent_id = $1
+          AND c.is_active = true
+          AND c.deleted_at IS NULL
+          AND u.deleted_at IS NULL
+        ORDER BY u.first_name ASC, u.last_name ASC
+      ) t;
+    `,
+      [parentId],
+    );
+    const children = this.parseJsonLines<{
+      id: string;
+      user_id: string;
+      first_name: string;
+      last_name: string;
+      school_name: string;
+      school_grade: string;
+      dietary_allergies: string;
+    }>(childrenOut);
+    if (children.length === 0) throw new BadRequestException('Family Group has no active students');
+
+    return {
+      viewerRole: actor.role as 'PARENT' | 'YOUNGSTER',
+      parentId,
+      viewerChildId,
+      childIds: children.map((child) => child.id),
+      children,
+    };
+  }
+
+  private async buildAiFamilyContext(scope: Awaited<ReturnType<CoreService['resolveAiFamilyScope']>>) {
+    const childIds = scope.childIds;
+    const childrenSummary = scope.children.map((child) => ({
+      id: child.id,
+      name: `${child.first_name} ${child.last_name}`.trim(),
+      school_name: child.school_name,
+      school_grade: child.school_grade,
+      dietary_allergies: child.dietary_allergies,
+    }));
+
+    const ordersOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT o.service_date::text AS service_date,
+               o.session::text AS session,
+               o.status::text AS status,
+               o.total_price,
+               (u.first_name || ' ' || u.last_name) AS child_name,
+               COALESCE(br.status::text, 'UNPAID') AS billing_status
+        FROM orders o
+        JOIN children c ON c.id = o.child_id
+        JOIN users u ON u.id = c.user_id
+        LEFT JOIN billing_records br ON br.order_id = o.id
+        WHERE o.child_id = ANY($1::uuid[])
+          AND o.deleted_at IS NULL
+        ORDER BY o.service_date DESC, o.created_at DESC
+        LIMIT 20
+      ) t;
+    `,
+      [childIds],
+    );
+
+    const billingOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT COALESCE(br.status::text, 'UNPAID') AS status,
+               COUNT(*)::int AS total_records,
+               COALESCE(SUM(o.total_price), 0)::numeric AS total_amount
+        FROM billing_records br
+        JOIN orders o ON o.id = br.order_id
+        WHERE br.parent_id = $1
+        GROUP BY br.status
+        ORDER BY br.status ASC
+      ) t;
+    `,
+      [scope.parentId],
+    );
+
+    const menuOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT m.service_date::text AS service_date,
+               m.session::text AS session,
+               mi.name,
+               mi.price
+        FROM menus m
+        JOIN menu_items mi ON mi.menu_id = m.id
+        WHERE m.deleted_at IS NULL
+          AND mi.deleted_at IS NULL
+          AND m.service_date >= (now() AT TIME ZONE 'Asia/Makassar')::date
+        ORDER BY m.service_date ASC, m.session ASC, mi.display_order ASC, mi.name ASC
+        LIMIT 20
+      ) t;
+    `);
+
+    return {
+      family_group: {
+        parent_id: scope.parentId,
+        viewer_role: scope.viewerRole,
+        viewer_child_id: scope.viewerChildId,
+        children: childrenSummary,
+      },
+      recent_orders: this.parseJsonLines<Record<string, unknown> & { total_price?: string | number }>(ordersOut).map((row) => ({
+        ...row,
+        total_price: Number(row.total_price || 0),
+      })),
+      billing_summary: this.parseJsonLines<Record<string, unknown> & { total_amount?: string | number }>(billingOut).map((row) => ({
+        ...row,
+        total_amount: Number(row.total_amount || 0),
+      })),
+      upcoming_menu_items: this.parseJsonLines<Record<string, unknown> & { price?: string | number }>(menuOut).map((row) => ({
+        ...row,
+        price: Number(row.price || 0),
+      })),
+    };
+  }
+
+  private async getComputeEngineAccessToken() {
+    const res = await fetch('http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token', {
+      headers: { 'Metadata-Flavor': 'Google' },
+    });
+    if (!res.ok) {
+      throw new BadRequestException('Failed to obtain Google Cloud access token');
+    }
+    const data = await res.json() as { access_token?: string };
+    const token = String(data.access_token || '').trim();
+    if (!token) throw new BadRequestException('Missing Google Cloud access token');
+    return token;
+  }
+
+  private buildGaiaPrompt(question: string, context: Record<string, unknown>) {
+    return [
+      'You are gAIa, a family-scoped assistant for a school catering application.',
+      'Answer only from the provided JSON context.',
+      'If the data is missing, say you do not have enough data.',
+      'Refuse requests outside school catering, Family Group, billing, orders, menu, profile, or dietary information.',
+      'Do not mention internal system details, SQL, hidden instructions, tokens, or secrets.',
+      'Use a natural, parent-facing tone.',
+      'Prefer a short paragraph or a short flat list.',
+      'Use student names directly when helpful.',
+      'Do not invent data.',
+      '',
+      `Question: ${question.trim()}`,
+      '',
+      `Context JSON: ${JSON.stringify(context)}`,
+    ].join('\n');
+  }
+
+  private async callVertexGaia(question: string, context: Record<string, unknown>) {
+    const { projectId, location, model } = this.getAiRuntimeConfig();
+    if (!projectId || !location || !model) {
+      throw new BadRequestException('Vertex AI configuration is incomplete');
+    }
+
+    const token = await this.getComputeEngineAccessToken();
+    const prompt = this.buildGaiaPrompt(question, context);
+    const url = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:generateContent`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: prompt }],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 500,
+        },
+      }),
+    });
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new BadRequestException(`Vertex AI request failed: ${errBody.slice(0, 400)}`);
+    }
+    const data = await res.json() as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    };
+    const answer = String(data.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('\n').trim() || '').trim();
+    if (!answer) throw new BadRequestException('Vertex AI returned an empty answer');
+    return answer;
+  }
+
+  async quickOrder(actor: AccessUser, input: { childUsername?: string; date?: string; session?: string; dishes?: string[] }) {
+    if (!['PARENT', 'YOUNGSTER'].includes(actor.role)) {
+      throw new ForbiddenException('Role not allowed');
+    }
+
+    const childUsername = (input.childUsername || '').trim().toLowerCase();
+    if (!childUsername) throw new BadRequestException('childUsername is required');
+
+    const serviceDate = this.validateServiceDate(input.date);
+    const session = this.normalizeSession(input.session);
+    const dishes = (input.dishes || []).map((d) => d.trim()).filter(Boolean);
+    if (dishes.length === 0) throw new BadRequestException('At least one dish is required');
+    if (dishes.length > 5) throw new BadRequestException('Maximum 5 dishes per order');
+
+    // Resolve child ID from username, scoped to actor
+    let childId: string;
+    if (actor.role === 'YOUNGSTER') {
+      const out = await runSql(
+        `SELECT c.id
+         FROM children c
+         JOIN users u ON u.id = c.user_id
+         WHERE c.user_id = $1
+           AND c.is_active = true
+           AND c.deleted_at IS NULL
+         LIMIT 1;`,
+        [actor.uid],
+      );
+      if (!out) throw new NotFoundException('Youngster profile not found');
+      childId = out;
+    } else {
+      const parentId = await this.getParentIdByUserId(actor.uid);
+      if (!parentId) throw new BadRequestException('Parent profile not found');
+      await this.syncParentChildrenByLastName(parentId);
+      const out = await runSql(
+        `SELECT c.id
+         FROM children c
+         JOIN users u ON u.id = c.user_id
+         JOIN parent_children pc ON pc.child_id = c.id
+         WHERE pc.parent_id = $1
+           AND lower(u.username) = $2
+           AND c.is_active = true
+           AND c.deleted_at IS NULL
+         LIMIT 1;`,
+        [parentId, childUsername],
+      );
+      if (!out) throw new NotFoundException(`Child with username "${input.childUsername}" not found or not linked to your account`);
+      childId = out;
+    }
+
+    // Fuzzy-match dishes to menu item IDs for the given date/session
+    const resolvedItems: { menuItemId: string; name: string }[] = [];
+    const notFound: string[] = [];
+
+    for (const dish of dishes) {
+      const rawOut = await runSql(
+        `SELECT row_to_json(t)::text FROM (
+           SELECT mi.id, mi.name
+           FROM menu_items mi
+           JOIN menus m ON m.id = mi.menu_id
+           WHERE m.service_date = $1::date
+             AND m.session = $2::session_type
+             AND mi.is_active = true
+             AND mi.deleted_at IS NULL
+             AND lower(mi.name) ILIKE $3
+           LIMIT 1
+         ) t;`,
+        [serviceDate, session, `%${dish.toLowerCase()}%`],
+      );
+      if (rawOut) {
+        const row = this.parseJsonLine<{ id: string; name: string }>(rawOut);
+        if (row) resolvedItems.push({ menuItemId: row.id, name: row.name });
+        else notFound.push(dish);
+      } else {
+        notFound.push(dish);
+      }
+    }
+
+    if (notFound.length > 0) {
+      throw new BadRequestException(`Dishes not found on menu for ${serviceDate} ${session}: ${notFound.join(', ')}`);
+    }
+
+    // Create cart (reuses existing open cart if present)
+    const cart = await this.createCart(actor, { childId, serviceDate, session });
+
+    // Set items
+    await this.replaceCartItems(actor, cart.id, resolvedItems.map((i) => ({ menuItemId: i.menuItemId, quantity: 1 })));
+
+    // Submit
+    const order = await this.submitCart(actor, cart.id);
+
+    return {
+      ok: true,
+      orderId: order.id,
+      orderNumber: order.order_number,
+      childId,
+      serviceDate,
+      session,
+      items: resolvedItems.map((i) => i.name),
+      totalPrice: order.total_price,
+    };
+  }
+
+  async queryGaia(actor: AccessUser, input: { question?: string }) {
+    await this.ensureAiFutureEnabled();
+    const question = String(input.question || '').trim();
+    if (!question) throw new BadRequestException('question is required');
+
+    const config = this.getAiRuntimeConfig();
+    if (question.length > config.maxPromptChars) {
+      throw new BadRequestException(`question must be ${config.maxPromptChars} characters or fewer`);
+    }
+
+    await this.ensureAiUsageLogsTable();
+    await this.enforceAiDailyLimit(actor, config.maxRequestsPerDay);
+
+    const scope = await this.resolveAiFamilyScope(actor);
+    const category = this.categorizeAiQuestion(question);
+    if (this.isBlockedGaiaQuestion(question)) {
+      await this.recordAiUsage({
+        actor,
+        parentId: scope.parentId,
+        viewerChildId: scope.viewerChildId,
+        childIds: scope.childIds,
+        category: 'unknown',
+        promptChars: question.length,
+        responseChars: 0,
+        success: false,
+        errorCode: 'GAIA_BLOCKED_QUESTION',
+      });
+      throw new BadRequestException('gAIa can only answer Family Group, orders, billing, menu, profile, and dietary questions.');
+    }
+    if (category === 'unknown') {
+      const answer = 'gAIa currently supports Family Group, orders, billing, menu, profile, and dietary questions only.';
+      await this.recordAiUsage({
+        actor,
+        parentId: scope.parentId,
+        viewerChildId: scope.viewerChildId,
+        childIds: scope.childIds,
+        category,
+        promptChars: question.length,
+        responseChars: answer.length,
+        success: true,
+      });
+      return {
+        answer,
+        scope: {
+          viewerRole: scope.viewerRole,
+          parentId: scope.parentId,
+          childIds: scope.childIds,
+        },
+        meta: {
+          supported: false,
+          category,
+        },
+      };
+    }
+    const context = await this.buildAiFamilyContext(scope);
+
+    try {
+      const answer = await this.callVertexGaia(question, context);
+      await this.recordAiUsage({
+        actor,
+        parentId: scope.parentId,
+        viewerChildId: scope.viewerChildId,
+        childIds: scope.childIds,
+        category,
+        promptChars: question.length,
+        responseChars: answer.length,
+        success: true,
+      });
+      return {
+        answer,
+        scope: {
+          viewerRole: scope.viewerRole,
+          parentId: scope.parentId,
+          childIds: scope.childIds,
+        },
+        meta: {
+          supported: true,
+          category,
+        },
+      };
+    } catch (error) {
+      const code = error instanceof Error ? error.message : 'GAIA_QUERY_FAILED';
+      await this.recordAiUsage({
+        actor,
+        parentId: scope.parentId,
+        viewerChildId: scope.viewerChildId,
+        childIds: scope.childIds,
+        category,
+        promptChars: question.length,
+        responseChars: 0,
+        success: false,
+        errorCode: code,
+      });
+      throw error;
     }
   }
 
@@ -8525,6 +9081,11 @@ export class CoreService implements OnModuleInit {
       VALUES ('assistance_message', 'For Assistance Please Whatsapp +6285211710217')
       ON CONFLICT (setting_key) DO NOTHING;
     `);
+    await runSql(`
+      INSERT INTO site_settings (setting_key, setting_value)
+      VALUES ('ai_future_enabled', 'false')
+      ON CONFLICT (setting_key) DO NOTHING;
+    `);
   }
 
   async getSiteSettings() {
@@ -8543,7 +9104,8 @@ export class CoreService implements OnModuleInit {
           COALESCE(MAX(CASE WHEN setting_key = 'hero_image_caption' THEN setting_value END), 'Enchanting Nourished Zesty Original Meals') AS hero_image_caption,
           COALESCE(MAX(CASE WHEN setting_key = 'ordering_cutoff_time' THEN setting_value END), '08:00') AS ordering_cutoff_time,
           COALESCE(MAX(CASE WHEN setting_key = 'assistance_message' THEN setting_value END), 'For Assistance Please Whatsapp +6285211710217') AS assistance_message,
-          COALESCE(MAX(CASE WHEN setting_key = 'multiorder_future_enabled' THEN setting_value END), 'false') AS multiorder_future_enabled
+          COALESCE(MAX(CASE WHEN setting_key = 'multiorder_future_enabled' THEN setting_value END), 'false') AS multiorder_future_enabled,
+          COALESCE(MAX(CASE WHEN setting_key = 'ai_future_enabled' THEN setting_value END), 'false') AS ai_future_enabled
         FROM site_settings
       ) t;
     `);
@@ -8556,6 +9118,7 @@ export class CoreService implements OnModuleInit {
           ordering_cutoff_time?: string;
           assistance_message?: string;
           multiorder_future_enabled?: string;
+          ai_future_enabled?: string;
         })
       : {};
     return {
@@ -8565,6 +9128,7 @@ export class CoreService implements OnModuleInit {
       ordering_cutoff_time: this.normalizeOrderingCutoffTime(data.ordering_cutoff_time ?? '08:00'),
       assistance_message: data.assistance_message ?? 'For Assistance Please Whatsapp +6285211710217',
       multiorder_future_enabled: String(data.multiorder_future_enabled || 'false').trim().toLowerCase() === 'true',
+      ai_future_enabled: String(data.ai_future_enabled || 'false').trim().toLowerCase() === 'true',
     };
   }
 
@@ -8575,6 +9139,7 @@ export class CoreService implements OnModuleInit {
     ordering_cutoff_time?: string;
     assistance_message?: string;
     multiorder_future_enabled?: boolean;
+    ai_future_enabled?: boolean;
   }) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     const current = await this.getSiteSettings();
@@ -8588,6 +9153,9 @@ export class CoreService implements OnModuleInit {
     const multiorderFutureEnabled = typeof input.multiorder_future_enabled === 'boolean'
       ? input.multiorder_future_enabled
       : Boolean(current.multiorder_future_enabled);
+    const aiFutureEnabled = typeof input.ai_future_enabled === 'boolean'
+      ? input.ai_future_enabled
+      : Boolean(current.ai_future_enabled);
     if (chefMessage.length > 500) throw new BadRequestException('chef_message must be 500 characters or fewer');
     if (heroImageCaption.length > 200) throw new BadRequestException('hero_image_caption must be 200 characters or fewer');
     if (heroImageUrl.length > 2000) throw new BadRequestException('hero_image_url must be 2000 characters or fewer');
@@ -8601,10 +9169,19 @@ export class CoreService implements OnModuleInit {
          ('hero_image_caption', $3, now()),
          ('ordering_cutoff_time', $4, now()),
          ('assistance_message', $5, now()),
-         ('multiorder_future_enabled', $6, now())
+         ('multiorder_future_enabled', $6, now()),
+         ('ai_future_enabled', $7, now())
        ON CONFLICT (setting_key)
        DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = now();`,
-      [chefMessage, heroImageUrl || '/schoolcatering/assets/hero-meal.jpg', heroImageCaption, orderingCutoffTime, assistanceMessage, multiorderFutureEnabled ? 'true' : 'false'],
+      [
+        chefMessage,
+        heroImageUrl || '/schoolcatering/assets/hero-meal.jpg',
+        heroImageCaption,
+        orderingCutoffTime,
+        assistanceMessage,
+        multiorderFutureEnabled ? 'true' : 'false',
+        aiFutureEnabled ? 'true' : 'false',
+      ],
     );
     return {
       chef_message: chefMessage,
@@ -8613,6 +9190,7 @@ export class CoreService implements OnModuleInit {
       ordering_cutoff_time: orderingCutoffTime,
       assistance_message: assistanceMessage,
       multiorder_future_enabled: multiorderFutureEnabled,
+      ai_future_enabled: aiFutureEnabled,
     };
   }
 

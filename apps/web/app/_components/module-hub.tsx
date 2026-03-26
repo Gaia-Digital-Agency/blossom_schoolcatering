@@ -12,7 +12,22 @@ type StudentProfile = {
   school_short_name?: string;
 };
 
-const HUB_ITEMS: Record<ModuleType, Array<{ label: string; iconSrc: string; href?: string }>> = {
+type SiteSettings = {
+  assistance_message?: string;
+  ai_future_enabled?: boolean;
+};
+
+type HubItem = {
+  label: string;
+  href?: string;
+  iconSrc?: string;
+  variant?: 'image' | 'text';
+  textValue?: string;
+  featureFlag?: 'ai_future_enabled';
+  disabledMessage?: string;
+};
+
+const HUB_ITEMS: Record<ModuleType, HubItem[]> = {
   family: [
     { label: 'Overview', iconSrc: '/schoolcatering/assets/icons/overview.jpeg', href: '/family/overview' },
     { label: 'Order', iconSrc: '/schoolcatering/assets/icons/order.jpeg', href: '/family/order' },
@@ -21,6 +36,7 @@ const HUB_ITEMS: Record<ModuleType, Array<{ label: string; iconSrc: string; href
     { label: 'Record', iconSrc: '/schoolcatering/assets/icons/report.jpeg', href: '/family/consolorder' },
     { label: 'Rating', iconSrc: '/schoolcatering/assets/icons/rating.jpeg', href: '/rating' },
     { label: 'Menu', iconSrc: '/schoolcatering/assets/icons/menu.jpeg', href: '/menu' },
+    { label: 'gAIa', href: '/family/gaia', variant: 'text', textValue: 'gAIa', featureFlag: 'ai_future_enabled', disabledMessage: 'Furure Function' },
   ],
   student: [
     { label: 'Overview', iconSrc: '/schoolcatering/assets/icons/overview.jpeg', href: '/student/overview' },
@@ -30,6 +46,7 @@ const HUB_ITEMS: Record<ModuleType, Array<{ label: string; iconSrc: string; href
     { label: 'Record', iconSrc: '/schoolcatering/assets/icons/report.jpeg', href: '/student/consolorder' },
     { label: 'Rating', iconSrc: '/schoolcatering/assets/icons/rating.jpeg', href: '/rating' },
     { label: 'Menu', iconSrc: '/schoolcatering/assets/icons/menu.jpeg', href: '/menu' },
+    { label: 'gAIa', href: '/student/gaia', variant: 'text', textValue: 'gAIa', featureFlag: 'ai_future_enabled', disabledMessage: 'Furure Function' },
   ],
 };
 
@@ -42,6 +59,7 @@ export default function ModuleHub({
 }) {
   const [subtitle, setSubtitle] = useState('');
   const [assistanceMessage, setAssistanceMessage] = useState('For Assistance Please Whatsapp +6285211710217');
+  const [siteSettings, setSiteSettings] = useState<SiteSettings>({});
 
   useEffect(() => {
     let active = true;
@@ -77,8 +95,9 @@ export default function ModuleHub({
     let active = true;
     fetch('/schoolcatering/api/v1/public/site-settings', { credentials: 'include' })
       .then((res) => res.ok ? res.json() : null)
-      .then((data: { assistance_message?: string } | null) => {
+      .then((data: SiteSettings | null) => {
         if (!active) return;
+        setSiteSettings(data || {});
         if (data?.assistance_message?.trim()) setAssistanceMessage(data.assistance_message.trim());
       })
       .catch(() => undefined);
@@ -93,22 +112,33 @@ export default function ModuleHub({
         <h1>{title}</h1>
         {subtitle ? <p className="module-login-label">{subtitle}</p> : null}
         <div className="module-hub-grid">
-          {HUB_ITEMS[module].map((item) => (
-            <button
-              key={item.label}
-              type="button"
-              className="module-hub-card"
-              onClick={() => {
-                if (item.href) window.location.href = `${getAppBase()}${item.href}`;
-              }}
-              aria-label={item.label}
-            >
-              <span style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-hidden="true">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={item.iconSrc} alt="" style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }} />
-              </span>
-            </button>
-          ))}
+          {HUB_ITEMS[module].map((item) => {
+            const isFeatureEnabled = item.featureFlag ? Boolean(siteSettings[item.featureFlag]) : true;
+            return (
+              <button
+                key={item.label}
+                type="button"
+                className={`module-hub-card${!isFeatureEnabled ? ' module-hub-card-disabled' : ''}${item.variant === 'text' ? ' module-hub-card-text' : ''}`}
+                onClick={() => {
+                  if (!isFeatureEnabled) return;
+                  if (item.href) window.location.href = `${getAppBase()}${item.href}`;
+                }}
+                aria-label={item.label}
+                title={!isFeatureEnabled ? item.disabledMessage : item.label}
+                disabled={!isFeatureEnabled}
+              >
+                {item.variant === 'text' ? (
+                  <span className="module-hub-card-text-value" aria-hidden="true">{item.textValue || item.label}</span>
+                ) : (
+                  <span style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-hidden="true">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={item.iconSrc} alt="" style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }} />
+                  </span>
+                )}
+                {!isFeatureEnabled && item.disabledMessage ? <span className="module-hub-card-note">{item.disabledMessage}</span> : null}
+              </button>
+            );
+          })}
         </div>
         <div className="module-guide-card module-assistance-card">{assistanceMessage}</div>
         <LogoutButton showRecord={false} sticky={false} />
@@ -164,9 +194,38 @@ export default function ModuleHub({
           transition: transform 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
           box-shadow: 0 4px 14px rgba(122, 106, 88, 0.12);
         }
+        .module-hub-card:disabled {
+          cursor: not-allowed;
+        }
         .module-hub-card:hover {
           transform: translateY(-3px);
           box-shadow: 0 10px 24px rgba(122, 106, 88, 0.18);
+        }
+        .module-hub-card-disabled {
+          opacity: 0.65;
+          box-shadow: 0 2px 8px rgba(122, 106, 88, 0.12);
+        }
+        .module-hub-card-disabled:hover {
+          transform: none;
+          box-shadow: 0 2px 8px rgba(122, 106, 88, 0.12);
+        }
+        .module-hub-card-text {
+          background: linear-gradient(145deg, #efe4d1 0%, #dcc198 100%);
+          color: #493826;
+          justify-content: center;
+        }
+        .module-hub-card-text-value {
+          font-size: clamp(1.7rem, 4vw, 2.35rem);
+          font-weight: 900;
+          letter-spacing: 0.04em;
+          text-transform: none;
+        }
+        .module-hub-card-note {
+          display: block;
+          margin-top: 0.35rem;
+          font-size: 0.72rem;
+          line-height: 1.15;
+          text-align: center;
         }
       `}</style>
     </main>

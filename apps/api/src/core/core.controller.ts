@@ -37,6 +37,7 @@ import {
   CreateSchoolDto,
   MealPlanWizardDto,
   NoteDto,
+  QuickOrderDto,
   QuickReorderDto,
   RegisterYoungsterDto,
   ReplaceCartItemsDto,
@@ -103,9 +104,29 @@ export class CoreController {
   @Roles('ADMIN')
   updateAdminSiteSettings(
     @Req() req: AuthRequest,
-    @Body() body: { chef_message?: string; hero_image_url?: string; hero_image_caption?: string; ordering_cutoff_time?: string; assistance_message?: string },
+    @Body() body: {
+      chef_message?: string;
+      hero_image_url?: string;
+      hero_image_caption?: string;
+      ordering_cutoff_time?: string;
+      assistance_message?: string;
+      multiorder_future_enabled?: boolean;
+      ai_future_enabled?: boolean;
+    },
   ) {
     return this.coreService.updateSiteSettings(req.user, body);
+  }
+
+  @Post('ai/future/query')
+  @Roles('PARENT', 'YOUNGSTER')
+  queryGaia(@Req() req: AuthRequest, @Body() body: { question?: string }) {
+    return this.coreService.queryGaia(req.user, body);
+  }
+
+  @Post('order/quick')
+  @Roles('PARENT', 'YOUNGSTER')
+  quickOrder(@Req() req: AuthRequest, @Body() body: QuickOrderDto) {
+    return this.coreService.quickOrder(req.user, body);
   }
 
   @Post('admin/site-settings/hero-image-upload')

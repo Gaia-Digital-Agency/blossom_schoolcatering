@@ -21,7 +21,7 @@ type SiteSettings = {
   hero_image_caption?: string;
   ordering_cutoff_time?: string;
   assistance_message?: string;
-  multiorder_future_enabled?: boolean;
+  ai_future_enabled?: boolean;
 };
 
 export default function AdminSchoolsPage() {
@@ -215,8 +215,8 @@ export default function AdminSchoolsPage() {
     }
   };
 
-  const onToggleFutureFeature = async (isActive: boolean) => {
-    setSavingSession('FUTURE');
+  const onToggleGaiaFeature = async (isActive: boolean) => {
+    setSavingSession('GAIA');
     setMessage('');
     setError('');
     try {
@@ -224,10 +224,10 @@ export default function AdminSchoolsPage() {
         method: 'PATCH',
         body: JSON.stringify({
           ...siteSettings,
-          multiorder_future_enabled: isActive,
+          ai_future_enabled: isActive,
         }),
       }, { skipAutoReload: true });
-      setMessage(`Future feature ${isActive ? 'activated' : 'deactivated'}.`);
+      setMessage(`gAIa feature ${isActive ? 'activated' : 'deactivated'}.`);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed');
@@ -363,14 +363,14 @@ export default function AdminSchoolsPage() {
             </div>
           ))}
           <div className="session-card">
-            <span className="session-name">FUTURE</span>
-            <span className="session-status">{siteSettings.multiorder_future_enabled ? 'Active' : 'Inactive'}</span>
-            {siteSettings.multiorder_future_enabled ? (
+            <span className="session-name">gAIa</span>
+            <span className="session-status">{siteSettings.ai_future_enabled ? 'Active' : 'Inactive'}</span>
+            {siteSettings.ai_future_enabled ? (
               <button
                 className="btn btn-outline btn-sm"
                 type="button"
-                onClick={() => onToggleFutureFeature(false)}
-                disabled={savingSession === 'FUTURE'}
+                onClick={() => onToggleGaiaFeature(false)}
+                disabled={savingSession === 'GAIA'}
               >
                 Deactivate
               </button>
@@ -378,8 +378,8 @@ export default function AdminSchoolsPage() {
               <button
                 className="btn btn-outline btn-sm"
                 type="button"
-                onClick={() => onToggleFutureFeature(true)}
-                disabled={savingSession === 'FUTURE'}
+                onClick={() => onToggleGaiaFeature(true)}
+                disabled={savingSession === 'GAIA'}
               >
                 Activate
               </button>

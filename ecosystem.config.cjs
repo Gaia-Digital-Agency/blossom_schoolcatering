@@ -8,6 +8,11 @@ module.exports = {
       env: {
         PORT: 3000,
         NODE_ENV: 'production',
+        GCP_PROJECT_ID: 'gda-viceroy',
+        GCP_VERTEX_LOCATION: 'asia-southeast1',
+        GCP_VERTEX_MODEL: 'gemini-2.5-flash',
+        AI_FUTURE_MAX_PROMPT_CHARS: '2000',
+        AI_FUTURE_MAX_REQUESTS_PER_DAY: '100',
       },
       max_restarts: 10,
       restart_delay: 3000,
