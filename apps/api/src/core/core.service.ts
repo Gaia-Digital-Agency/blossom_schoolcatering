@@ -1530,7 +1530,7 @@ export class CoreService implements OnModuleInit {
       childId = out;
     }
 
-    // Fuzzy-match dishes to menu item IDs for the given date/session
+    // Fuzzy-match dishes by name + session — date-independent (dishes are global once published)
     const resolvedItems: { menuItemId: string; name: string }[] = [];
     const notFound: string[] = [];
 
@@ -1540,14 +1540,15 @@ export class CoreService implements OnModuleInit {
            SELECT mi.id, mi.name
            FROM menu_items mi
            JOIN menus m ON m.id = mi.menu_id
-           WHERE m.service_date = $1::date
-             AND m.session = $2::session_type
+           WHERE m.session = $1::session_type
+             AND m.deleted_at IS NULL
              AND mi.is_available = true
              AND mi.deleted_at IS NULL
-             AND lower(mi.name) ILIKE $3
+             AND lower(mi.name) ILIKE $2
+           ORDER BY m.service_date DESC
            LIMIT 1
          ) t;`,
-        [serviceDate, session, `%${dish.toLowerCase()}%`],
+        [session, `%${dish.toLowerCase()}%`],
       );
       if (rawOut) {
         const row = this.parseJsonLine<{ id: string; name: string }>(rawOut);
@@ -1559,7 +1560,7 @@ export class CoreService implements OnModuleInit {
     }
 
     if (notFound.length > 0) {
-      throw new BadRequestException(`Dishes not found on menu for ${serviceDate} ${session}: ${notFound.join(', ')}`);
+      throw new BadRequestException(`Dishes not found for session ${session}: ${notFound.join(', ')}`);
     }
 
     // Create cart (reuses existing open cart if present)
