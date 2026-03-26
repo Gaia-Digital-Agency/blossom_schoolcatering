@@ -23,6 +23,9 @@ type ParentRow = {
   youngsters: ParentYoungster[];
   teacher_guardians: ParentTeacherGuardian[];
   schools: string[];
+  parent2_first_name?: string | null;
+  parent2_phone?: string | null;
+  parent2_email?: string | null;
 };
 
 type ShowPassInfo = {
@@ -56,6 +59,7 @@ export default function AdminParentsPage() {
   const [showPassInfo, setShowPassInfo] = useState<ShowPassInfo | null>(null);
   const [showIdInfo, setShowIdInfo] = useState<ShowIdInfo | null>(null);
   const [showTeacherGuardianInfo, setShowTeacherGuardianInfo] = useState<ShowTeacherGuardianInfo | null>(null);
+  const [showParent2Info, setShowParent2Info] = useState<{ familyGroup: string; firstName: string; phone?: string | null; email?: string | null } | null>(null);
 
   const load = async () => {
     const p = await apiFetch('/admin/parent') as ParentRow[];
@@ -248,6 +252,15 @@ export default function AdminParentsPage() {
                       <button
                         className="btn btn-outline"
                         type="button"
+                        onClick={() => p.parent2_first_name && setShowParent2Info({ familyGroup: p.last_name, firstName: p.parent2_first_name, phone: p.parent2_phone, email: p.parent2_email })}
+                        disabled={!p.parent2_first_name}
+                        title={!p.parent2_first_name ? 'No second parent/guardian on record' : 'Show Parent #2'}
+                      >
+                        Show Parent #2
+                      </button>
+                      <button
+                        className="btn btn-outline"
+                        type="button"
                         onClick={() => onDeleteParent(p)}
                         disabled={deleteDisabled(p)}
                         title={deleteTitle(p)}
@@ -320,6 +333,39 @@ export default function AdminParentsPage() {
               type="button"
               onClick={() => setShowTeacherGuardianInfo(null)}
             >
+              Close
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {showParent2Info ? (
+        <div className="pass-modal-overlay" onClick={() => setShowParent2Info(null)}>
+          <div className="pass-modal-card" onClick={(e) => e.stopPropagation()}>
+            <h2 className="pass-modal-title">Parent / Guardian #2</h2>
+            <div className="reg-info-list">
+              <div className="reg-info-row">
+                <span className="reg-info-label">Family Group</span>
+                <span className="reg-info-val">{showParent2Info.familyGroup}</span>
+              </div>
+              <div className="reg-info-row">
+                <span className="reg-info-label">First Name</span>
+                <span className="reg-info-val">{showParent2Info.firstName}</span>
+              </div>
+              {showParent2Info.phone ? (
+                <div className="reg-info-row">
+                  <span className="reg-info-label">Phone</span>
+                  <span className="reg-info-val">{showParent2Info.phone}</span>
+                </div>
+              ) : null}
+              {showParent2Info.email ? (
+                <div className="reg-info-row">
+                  <span className="reg-info-label">Email</span>
+                  <span className="reg-info-val">{showParent2Info.email}</span>
+                </div>
+              ) : null}
+            </div>
+            <button className="btn btn-primary pass-modal-close" type="button" onClick={() => setShowParent2Info(null)}>
               Close
             </button>
           </div>

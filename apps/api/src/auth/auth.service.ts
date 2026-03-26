@@ -79,6 +79,9 @@ type RegisterYoungsterWithParentInput = {
   parentAddress?: string;
   parentAllergies?: string;
   password: string;
+  parent2FirstName?: string;
+  parent2Phone?: string;
+  parent2Email?: string;
 };
 
 type RegistrationSchoolRow = {
@@ -129,6 +132,7 @@ export class AuthService {
   private passwordResetTableReady = false;
   private adminVisiblePasswordsReady = false;
   private systemUsersReady = false;
+  private parent2ColsReady = false;
 
   private normalizeRole(role: string): Role {
     const normalized = role?.toUpperCase() as Role;
@@ -328,6 +332,12 @@ export class AuthService {
       ADD COLUMN IF NOT EXISTS registration_actor_teacher_phone varchar(30);
     `);
     this.childRegistrationSourceColumnsReady = true;
+  }
+
+  private async ensureParent2Columns() {
+    if (this.parent2ColsReady) return;
+    await runSql(`ALTER TABLE parents ADD COLUMN IF NOT EXISTS parent2_first_name varchar(100), ADD COLUMN IF NOT EXISTS parent2_phone varchar(30), ADD COLUMN IF NOT EXISTS parent2_email varchar(255);`);
+    this.parent2ColsReady = true;
   }
 
   private async ensureChildCurrentGradeColumn() {
@@ -1183,6 +1193,9 @@ export class AuthService {
     const parentAddress = (input.parentAddress || '').trim();
     const parentAllergies = this.normalizeAllergies(input.parentAllergies);
     const password = String(input.password || '').trim();
+    const parent2FirstName = (input.parent2FirstName || '').trim();
+    const parent2Phone = this.normalizePhone(input.parent2Phone);
+    const parent2Email = (input.parent2Email || '').trim().toLowerCase();
 
     if (
       !registrantType ||
@@ -1219,6 +1232,7 @@ export class AuthService {
     const parentLastName = parentLastNameInput;
     await this.ensureChildRegistrationSourceColumns();
     await this.ensureChildCurrentGradeColumn();
+    await this.ensureParent2Columns();
     const familyNameExists = await runSql(
       `
       SELECT EXISTS (
@@ -1379,11 +1393,18 @@ export class AuthService {
        ON CONFLICT (user_id) DO NOTHING;`,
       [parentUserId],
     );
-    await runSql(
-      `INSERT INTO parents (user_id, address)
-       VALUES ($1, $2);`,
-      [parentUserId, parentAddress || 'Address pending from youngster registration'],
-    );
+    {
+      const parentInsertCols = ['user_id', 'address'];
+      const parentInsertVals: unknown[] = [parentUserId, parentAddress || 'Address pending from youngster registration'];
+      if (parent2FirstName) { parentInsertCols.push('parent2_first_name'); parentInsertVals.push(parent2FirstName); }
+      if (parent2Phone) { parentInsertCols.push('parent2_phone'); parentInsertVals.push(parent2Phone); }
+      if (parent2Email) { parentInsertCols.push('parent2_email'); parentInsertVals.push(parent2Email); }
+      const parentInsertPh = parentInsertVals.map((_, i) => `$${i + 1}`).join(', ');
+      await runSql(
+        `INSERT INTO parents (${parentInsertCols.join(', ')}) VALUES (${parentInsertPh});`,
+        parentInsertVals,
+      );
+    }
     await this.setAdminVisiblePassword(parentUserId, parentGeneratedPassword, 'REGISTRATION');
 
     const parentId = await runSql(

@@ -83,6 +83,9 @@ export default function YoungsterRegisterPage() {
   const [parentMobileNumber, setParentMobileNumber] = useState('');
   const [parentEmail, setParentEmail] = useState('');
   const [parentAddress, setParentAddress] = useState('');
+  const [parent2FirstName, setParent2FirstName] = useState('');
+  const [parent2Phone, setParent2Phone] = useState('');
+  const [parent2Email, setParent2Email] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -375,6 +378,9 @@ export default function YoungsterRegisterPage() {
           parentEmail,
           parentAddress,
           password,
+          ...(parent2FirstName.trim() && { parent2FirstName: parent2FirstName.trim() }),
+          ...(parent2Phone.trim() && { parent2Phone: parent2Phone.trim() }),
+          ...(parent2Email.trim() && { parent2Email: parent2Email.trim() }),
           students: students.map((student) => ({
             youngsterFirstName: student.youngsterFirstName,
             youngsterGender: student.youngsterGender,
@@ -563,6 +569,21 @@ export default function YoungsterRegisterPage() {
               Parent/Guardian Address (Optional)
               <input value={parentAddress} onChange={(e) => setParentAddress(e.target.value)} />
             </label>
+            <div className="auth-form-section">
+              <h4>Parent / Guardian #2 <span className="auth-optional">(Optional)</span></h4>
+              <label>
+                First Name
+                <input type="text" value={parent2FirstName} onChange={e => setParent2FirstName(e.target.value)} placeholder="Second parent or guardian first name" />
+              </label>
+              <label>
+                Phone Number
+                <input type="text" value={parent2Phone} onChange={e => setParent2Phone(e.target.value)} placeholder="+628..." />
+              </label>
+              <label>
+                Email
+                <input type="email" value={parent2Email} onChange={e => setParent2Email(e.target.value)} placeholder="guardian2@email.com" />
+              </label>
+            </div>
             <label>
               Number Of Student
               <select value={studentCount} onChange={(e) => setStudentCount(Number(e.target.value))} disabled={isReadonlyRecord}>
@@ -681,6 +702,24 @@ export default function YoungsterRegisterPage() {
         </form>
       </section>
       <style jsx>{`
+        .auth-form-section {
+          display: grid;
+          gap: 0.45rem;
+          border: 1px solid #d9ccb8;
+          border-radius: 0.65rem;
+          padding: 0.45rem 0.55rem;
+          background: #fffdf9;
+        }
+        .auth-form-section h4 {
+          margin: 0;
+          font-size: 0.92rem;
+          font-weight: 700;
+        }
+        .auth-optional {
+          font-weight: 400;
+          color: var(--ink-soft, #888);
+          font-size: 0.82rem;
+        }
         .registrant-type-fieldset,
         .student-group-fieldset,
         .allergy-fieldset {

@@ -82,6 +82,7 @@ export class CoreService implements OnModuleInit {
   private childRegistrationSourceColumnsReady = false;
   private childCurrentGradeColumnReady = false;
   private menuItemTextDefaultsReady = false;
+  private parent2ColsReady = false;
   private readonly publicMenuCacheTtlMs = 60_000;
   private publicMenuCache = new Map<string, {
     data: {
@@ -2368,6 +2369,7 @@ export class CoreService implements OnModuleInit {
   }
 
   async getAdminParents() {
+    await this.ensureParent2Columns();
     const out = await runSql(`
       SELECT row_to_json(t)::text
       FROM (
@@ -2379,6 +2381,9 @@ export class CoreService implements OnModuleInit {
                u.email,
                u.phone_number,
                p.address,
+               p.parent2_first_name,
+               p.parent2_phone,
+               p.parent2_email,
                count(DISTINCT c.id)::int AS linked_children_count,
                count(DISTINCT br.id)::int AS billing_count,
                COALESCE(
@@ -2417,7 +2422,7 @@ export class CoreService implements OnModuleInit {
         LEFT JOIN billing_records br ON br.parent_id = p.id
         WHERE p.deleted_at IS NULL
           AND u.is_active = true
-        GROUP BY p.id, p.user_id, u.username, u.first_name, u.last_name, u.email, u.phone_number, p.address
+        GROUP BY p.id, p.user_id, u.username, u.first_name, u.last_name, u.email, u.phone_number, p.address, p.parent2_first_name, p.parent2_phone, p.parent2_email
         ORDER BY u.first_name, u.last_name
       ) t;
     `);
@@ -2433,6 +2438,12 @@ export class CoreService implements OnModuleInit {
       ADD COLUMN IF NOT EXISTS registration_actor_teacher_phone varchar(30);
     `);
     this.childRegistrationSourceColumnsReady = true;
+  }
+
+  private async ensureParent2Columns() {
+    if (this.parent2ColsReady) return;
+    await runSql(`ALTER TABLE parents ADD COLUMN IF NOT EXISTS parent2_first_name varchar(100), ADD COLUMN IF NOT EXISTS parent2_phone varchar(30), ADD COLUMN IF NOT EXISTS parent2_email varchar(255);`);
+    this.parent2ColsReady = true;
   }
 
   private async ensureChildCurrentGradeColumn() {
@@ -7975,9 +7986,10 @@ export class CoreService implements OnModuleInit {
 
   // ─── Parent CRUD ─────────────────────────────────────────────────────────
 
-  async updateParentProfile(actor: AccessUser, targetParentId: string, input: { firstName?: string; lastName?: string; phoneNumber?: string; email?: string; address?: string }) {
+  async updateParentProfile(actor: AccessUser, targetParentId: string, input: { firstName?: string; lastName?: string; phoneNumber?: string; email?: string; address?: string; parent2FirstName?: string; parent2Phone?: string; parent2Email?: string }) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     this.assertValidUuid(targetParentId, 'parentId');
+    await this.ensureParent2Columns();
     const out = await runSql(
       `SELECT row_to_json(t)::text FROM (
          SELECT p.id, p.user_id FROM parents p
@@ -8016,6 +8028,18 @@ export class CoreService implements OnModuleInit {
     }
     if (input.address) {
       await runSql(`UPDATE parents SET address = $1, updated_at = now() WHERE id = $2;`, [input.address.trim(), targetParentId]);
+    }
+    if (input.parent2FirstName !== undefined || input.parent2Phone !== undefined || input.parent2Email !== undefined) {
+      const p2Updates: string[] = [];
+      const p2Params: unknown[] = [];
+      if (input.parent2FirstName !== undefined) { p2Params.push(input.parent2FirstName.trim() || null); p2Updates.push(`parent2_first_name = $${p2Params.length}`); }
+      if (input.parent2Phone !== undefined) { p2Params.push(this.normalizePhone(input.parent2Phone) || null); p2Updates.push(`parent2_phone = $${p2Params.length}`); }
+      if (input.parent2Email !== undefined) { p2Params.push(input.parent2Email.trim().toLowerCase() || null); p2Updates.push(`parent2_email = $${p2Params.length}`); }
+      if (p2Updates.length > 0) {
+        p2Updates.push('updated_at = now()');
+        p2Params.push(targetParentId);
+        await runSql(`UPDATE parents SET ${p2Updates.join(', ')} WHERE id = $${p2Params.length};`, p2Params);
+      }
     }
     await this.recordAdminAudit(actor, 'PARENT_PROFILE_UPDATED', 'parent', targetParentId, {
       changedFields: Object.keys(input).filter((k) => Boolean((input as Record<string, unknown>)[k])),

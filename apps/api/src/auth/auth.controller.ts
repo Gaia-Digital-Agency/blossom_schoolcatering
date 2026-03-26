@@ -153,6 +153,9 @@ export class AuthController {
       parentEmail: body.parentEmail,
       parentAddress: body.parentAddress || '',
       password: body.password,
+      parent2FirstName: body.parent2FirstName,
+      parent2Phone: body.parent2Phone,
+      parent2Email: body.parent2Email,
     });
   }
 
