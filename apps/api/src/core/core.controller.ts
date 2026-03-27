@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -818,18 +819,21 @@ export class CoreController {
   }
 
   @Post('admin/whatsapp/order-notifications/run-daily')
+  @HttpCode(200)
   @Roles('ADMIN')
   getDailyWhatsappOrderNotifications(@Req() req: AuthRequest) {
     return this.coreService.getDailyWhatsappOrderNotifications(req.user);
   }
 
   @Post('admin/whatsapp/order-notifications/run')
+  @HttpCode(200)
   @Roles('ADMIN')
   runWhatsappOrderNotificationsForDate(@Req() req: AuthRequest, @Body() body: { date?: string }) {
     return this.coreService.getDailyWhatsappOrderNotifications(req.user, body?.date);
   }
 
   @Post('admin/whatsapp/order-notifications/:orderId/mark-sent')
+  @HttpCode(200)
   @Roles('ADMIN')
   markWhatsappOrderNotificationSent(
     @Req() req: AuthRequest,
@@ -848,6 +852,7 @@ export class CoreController {
   }
 
   @Post('admin/whatsapp/order-notifications/:orderId/mark-failed')
+  @HttpCode(200)
   @Roles('ADMIN')
   markWhatsappOrderNotificationFailed(
     @Req() req: AuthRequest,
