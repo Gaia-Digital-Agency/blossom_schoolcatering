@@ -122,3 +122,13 @@ docs/gda-viceroy-17373de6d690.json
 secure/
 *.json.key
 *service-account*.json
+# Local build and verification artifacts
+apps/web/tsconfig.tsbuildinfo
+ecosystem.config.cjs.bak
+scripts/run_tasks_ssh.sh
+scripts/ssh_write_skill.sh
+scripts/test_ssh.sh
+scripts/verify_full.sh
+scripts/verify_openclaw.sh
+sql_result.txt
+verify_result.txt
