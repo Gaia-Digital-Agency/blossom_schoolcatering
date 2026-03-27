@@ -2,5 +2,5 @@
 set -euo pipefail
 
 # Requires running API + DB environment with seeded role users.
-node docs/testting/consolidated_runner.mjs
-node docs/testting/extra_kitchen_billing_test.mjs
+NODE_NO_WARNINGS=1 node docs/testting/consolidated_runner.mjs
+NODE_NO_WARNINGS=1 node docs/testting/extra_kitchen_billing_test.mjs

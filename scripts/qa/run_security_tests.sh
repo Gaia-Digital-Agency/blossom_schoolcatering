@@ -2,4 +2,4 @@
 set -euo pipefail
 
 # Requires running API + DB environment.
-node docs/testting/security_test_suite.mjs
+NODE_NO_WARNINGS=1 node docs/testting/security_test_suite.mjs

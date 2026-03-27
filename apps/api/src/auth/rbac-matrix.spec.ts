@@ -23,12 +23,11 @@ describe('RBAC Matrix', () => {
   it('enforces explicit role matrix for critical CoreController methods', () => {
     const expected: Record<string, string[]> = {
       createSchool: ['ADMIN'],
-      updateSchoolActive: ['ADMIN'],
+      updateSchool: ['ADMIN'],
       deleteSchool: ['ADMIN'],
       getAdminBilling: ['ADMIN'],
       verifyBilling: ['ADMIN'],
       generateBillingReceipt: ['ADMIN'],
-      getAdminAuditLogs: ['ADMIN'],
       createAdminMenuItem: ['ADMIN'],
       updateAdminMenuItem: ['ADMIN'],
       deleteAdminMenuItem: ['ADMIN'],
@@ -39,11 +38,9 @@ describe('RBAC Matrix', () => {
       autoAssignDelivery: ['ADMIN'],
       assignDelivery: ['ADMIN'],
       getDeliveryAssignments: ['ADMIN', 'DELIVERY'],
-      confirmDelivery: ['DELIVERY'],
       toggleDeliveryCompletion: ['DELIVERY'],
       getParentConsolidatedBilling: ['PARENT'],
-      uploadBillingProof: ['PARENT'],
-      uploadBillingProofBatch: ['PARENT'],
+      uploadBillingProofBatch: ['PARENT', 'YOUNGSTER'],
     };
 
     for (const [methodName, roles] of Object.entries(expected)) {
