@@ -69,6 +69,7 @@ export class CoreService implements OnModuleInit {
   private parentDietaryRestrictionsReady = false;
   private deliverySchoolAssignmentsReady = false;
   private deliveryDailyNotesReady = false;
+  private orderNotificationLogsReady = false;
   private billingReviewColumnsReady = false;
   private schoolShortNameReady = false;
   private adminAuditTrailReady = false;
@@ -106,6 +107,7 @@ export class CoreService implements OnModuleInit {
     await this.ensureChildRegistrationSourceColumns();
     await this.ensureChildCurrentGradeColumn();
     await this.ensureDeliveryDailyNotesTable();
+    await this.ensureOrderNotificationLogsTable();
     await this.ensureBillingReviewColumns();
     await this.ensureSchoolShortNameColumn();
     await this.ensureAdminAuditTrailTable();
@@ -175,6 +177,44 @@ export class CoreService implements OnModuleInit {
       );
     `);
     this.deliveryDailyNotesReady = true;
+  }
+
+  private async ensureOrderNotificationLogsTable() {
+    if (this.orderNotificationLogsReady) return;
+    await runSql(`
+      CREATE TABLE IF NOT EXISTS order_notification_logs (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        order_id uuid NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+        channel varchar(30) NOT NULL,
+        notification_type varchar(50) NOT NULL,
+        target_phone varchar(30),
+        target_source varchar(20),
+        status varchar(20) NOT NULL,
+        attempted_at timestamptz NOT NULL DEFAULT now(),
+        sent_at timestamptz,
+        provider varchar(30),
+        provider_message_id varchar(100),
+        message_hash varchar(128),
+        failure_reason text,
+        metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      );
+    `);
+    await runSql(`
+      CREATE INDEX IF NOT EXISTS order_notification_logs_order_idx
+      ON order_notification_logs(order_id);
+    `);
+    await runSql(`
+      CREATE INDEX IF NOT EXISTS order_notification_logs_status_idx
+      ON order_notification_logs(status, attempted_at DESC);
+    `);
+    await runSql(`
+      CREATE UNIQUE INDEX IF NOT EXISTS order_notification_logs_sent_once_uq
+      ON order_notification_logs(order_id, channel, notification_type)
+      WHERE status = 'SENT';
+    `);
+    this.orderNotificationLogsReady = true;
   }
 
   private async setAdminVisiblePassword(userId: string, password: string, source: 'REGISTRATION' | 'RESET' | 'MANUAL_CREATE') {
@@ -6574,6 +6614,359 @@ export class CoreService implements OnModuleInit {
       [actor.uid, serviceDate, cleanNote],
     );
     return { ok: true, serviceDate, note: cleanNote };
+  }
+
+  async getDailyWhatsappOrderNotifications(actor: AccessUser, dateRaw?: string) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    await this.ensureOrderNotificationLogsTable();
+    const serviceDate = dateRaw ? this.validateServiceDate(dateRaw) : this.makassarTodayIsoDate();
+
+    const ordersRaw = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        WITH candidate_orders AS (
+          SELECT
+            o.id AS order_id,
+            o.order_number::text AS order_number,
+            o.service_date::text AS service_date,
+            o.session::text AS session,
+            o.status::text AS status,
+            c.id AS child_id,
+            uc.id AS student_user_id,
+            trim(coalesce(uc.first_name, '')) AS student_first_name,
+            trim(concat(coalesce(uc.first_name, ''), ' ', coalesce(uc.last_name, ''))) AS student_name,
+            NULLIF(trim(uc.phone_number), '') AS student_phone,
+            p.id AS parent_id,
+            trim(concat(coalesce(up.first_name, ''), ' ', coalesce(up.last_name, ''))) AS parent_name,
+            NULLIF(trim(up.phone_number), '') AS parent_phone,
+            CASE
+              WHEN NULLIF(trim(uc.phone_number), '') IS NOT NULL THEN NULLIF(trim(uc.phone_number), '')
+              WHEN NULLIF(trim(up.phone_number), '') IS NOT NULL THEN NULLIF(trim(up.phone_number), '')
+              ELSE NULL
+            END AS target_phone,
+            CASE
+              WHEN NULLIF(trim(uc.phone_number), '') IS NOT NULL THEN 'STUDENT'
+              WHEN NULLIF(trim(up.phone_number), '') IS NOT NULL THEN 'PARENT'
+              ELSE NULL
+            END AS target_source,
+            COALESCE(pc.created_at, o.created_at) AS parent_linked_at
+          FROM orders o
+          JOIN children c
+            ON c.id = o.child_id
+          JOIN users uc
+            ON uc.id = c.user_id
+          LEFT JOIN parent_children pc
+            ON pc.child_id = c.id
+          LEFT JOIN parents p
+            ON p.id = pc.parent_id
+          LEFT JOIN users up
+            ON up.id = p.user_id
+          WHERE o.service_date = $1::date
+            AND o.status IN ('PLACED', 'LOCKED')
+            AND o.deleted_at IS NULL
+            AND NOT EXISTS (
+              SELECT 1
+              FROM order_notification_logs onl
+              WHERE onl.order_id = o.id
+                AND onl.channel = 'WHATSAPP'
+                AND onl.notification_type = 'DAILY_ORDER_9AM'
+                AND onl.status = 'SENT'
+            )
+        ),
+        deduped_orders AS (
+          SELECT *
+          FROM (
+            SELECT
+              co.*,
+              row_number() OVER (
+                PARTITION BY co.order_id
+                ORDER BY co.parent_linked_at ASC, co.parent_id NULLS LAST
+              ) AS rn
+            FROM candidate_orders co
+          ) x
+          WHERE x.rn = 1
+        ),
+        order_items_agg AS (
+          SELECT
+            oi.order_id,
+            json_agg(oi.item_name_snapshot ORDER BY oi.created_at ASC) AS items
+          FROM order_items oi
+          JOIN deduped_orders d
+            ON d.order_id = oi.order_id
+          GROUP BY oi.order_id
+        )
+        SELECT
+          d.order_id AS "orderId",
+          d.order_number AS "orderNumber",
+          d.service_date AS "serviceDate",
+          d.session AS "session",
+          d.status AS "status",
+          json_build_object(
+            'id', d.child_id,
+            'userId', d.student_user_id,
+            'name', d.student_name,
+            'firstName', d.student_first_name,
+            'phone', d.student_phone
+          ) AS "student",
+          json_build_object(
+            'id', d.parent_id,
+            'name', d.parent_name,
+            'phone', d.parent_phone
+          ) AS "parentFallback",
+          json_build_object(
+            'phone', d.target_phone,
+            'source', d.target_source
+          ) AS "target",
+          COALESCE(i.items, '[]'::json) AS "items"
+        FROM deduped_orders d
+        LEFT JOIN order_items_agg i
+          ON i.order_id = d.order_id
+        WHERE d.target_phone IS NOT NULL
+        ORDER BY d.student_name ASC, d.service_date ASC, d.session ASC, d.order_number ASC
+      ) t;
+      `,
+      [serviceDate],
+    );
+
+    const skippedRaw = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        WITH candidate_orders AS (
+          SELECT
+            o.id AS order_id,
+            o.order_number::text AS order_number,
+            NULLIF(trim(uc.phone_number), '') AS student_phone,
+            NULLIF(trim(up.phone_number), '') AS parent_phone,
+            COALESCE(pc.created_at, o.created_at) AS parent_linked_at,
+            p.id AS parent_id
+          FROM orders o
+          JOIN children c
+            ON c.id = o.child_id
+          JOIN users uc
+            ON uc.id = c.user_id
+          LEFT JOIN parent_children pc
+            ON pc.child_id = c.id
+          LEFT JOIN parents p
+            ON p.id = pc.parent_id
+          LEFT JOIN users up
+            ON up.id = p.user_id
+          WHERE o.service_date = $1::date
+            AND o.status IN ('PLACED', 'LOCKED')
+            AND o.deleted_at IS NULL
+            AND NOT EXISTS (
+              SELECT 1
+              FROM order_notification_logs onl
+              WHERE onl.order_id = o.id
+                AND onl.channel = 'WHATSAPP'
+                AND onl.notification_type = 'DAILY_ORDER_9AM'
+                AND onl.status = 'SENT'
+            )
+        ),
+        deduped_orders AS (
+          SELECT *
+          FROM (
+            SELECT
+              co.*,
+              row_number() OVER (
+                PARTITION BY co.order_id
+                ORDER BY co.parent_linked_at ASC, co.parent_id NULLS LAST
+              ) AS rn
+            FROM candidate_orders co
+          ) x
+          WHERE x.rn = 1
+        )
+        SELECT
+          order_id AS "orderId",
+          order_number AS "orderNumber",
+          'NO_TARGET_PHONE' AS "reason"
+        FROM deduped_orders
+        WHERE student_phone IS NULL
+          AND parent_phone IS NULL
+        ORDER BY order_number ASC
+      ) t;
+      `,
+      [serviceDate],
+    );
+
+    const orders = this.parseJsonLines<{
+      orderId: string;
+      orderNumber: string;
+      serviceDate: string;
+      session: SessionType;
+      status: 'PLACED' | 'LOCKED';
+      student: {
+        id: string;
+        userId: string;
+        name: string;
+        firstName: string;
+        phone?: string | null;
+      };
+      parentFallback: {
+        id?: string | null;
+        name?: string | null;
+        phone?: string | null;
+      };
+      target: {
+        phone: string;
+        source: 'STUDENT' | 'PARENT';
+      };
+      items: string[];
+    }>(ordersRaw).map((row) => ({
+      ...row,
+      student: {
+        ...row.student,
+        phone: this.normalizePhone(row.student?.phone),
+      },
+      parentFallback: {
+        ...row.parentFallback,
+        phone: this.normalizePhone(row.parentFallback?.phone),
+      },
+      target: {
+        ...row.target,
+        phone: this.normalizePhone(row.target?.phone),
+      },
+    }));
+
+    const skipped = this.parseJsonLines<{
+      orderId: string;
+      orderNumber: string;
+      reason: 'NO_TARGET_PHONE';
+    }>(skippedRaw);
+
+    return {
+      ok: true,
+      date: serviceDate,
+      timezone: 'Asia/Makassar',
+      orders,
+      skipped,
+    };
+  }
+
+  async markDailyWhatsappOrderNotificationSent(
+    actor: AccessUser,
+    orderId: string,
+    body: {
+      sentTo?: string;
+      targetSource?: 'STUDENT' | 'PARENT';
+      sentVia?: string;
+      provider?: string;
+      providerMessageId?: string;
+      sentAt?: string;
+      messageHash?: string;
+    },
+  ) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    await this.ensureOrderNotificationLogsTable();
+    const sentTo = this.normalizePhone(body.sentTo);
+    const targetSource = body.targetSource === 'PARENT' ? 'PARENT' : 'STUDENT';
+    const provider = String(body.provider || body.sentVia || 'BRIAN').trim().slice(0, 30);
+    const providerMessageId = String(body.providerMessageId || '').trim().slice(0, 100) || null;
+    const messageHash = String(body.messageHash || '').trim().slice(0, 128) || null;
+    const sentAt = body.sentAt && !Number.isNaN(Date.parse(body.sentAt)) ? new Date(body.sentAt).toISOString() : new Date().toISOString();
+
+    await runSql(
+      `
+      INSERT INTO order_notification_logs (
+        order_id,
+        channel,
+        notification_type,
+        target_phone,
+        target_source,
+        status,
+        attempted_at,
+        sent_at,
+        provider,
+        provider_message_id,
+        message_hash,
+        metadata,
+        updated_at
+      )
+      VALUES (
+        $1::uuid,
+        'WHATSAPP',
+        'DAILY_ORDER_9AM',
+        $2,
+        $3,
+        'SENT',
+        now(),
+        $4::timestamptz,
+        $5,
+        $6,
+        $7,
+        '{}'::jsonb,
+        now()
+      )
+      ON CONFLICT (order_id, channel, notification_type) WHERE status = 'SENT'
+      DO UPDATE SET
+        target_phone = EXCLUDED.target_phone,
+        target_source = EXCLUDED.target_source,
+        sent_at = EXCLUDED.sent_at,
+        provider = EXCLUDED.provider,
+        provider_message_id = EXCLUDED.provider_message_id,
+        message_hash = EXCLUDED.message_hash,
+        updated_at = now();
+      `,
+      [orderId, sentTo || null, targetSource, sentAt, provider || null, providerMessageId, messageHash],
+    );
+
+    return { ok: true, orderId, status: 'SENT', sentAt, sentTo };
+  }
+
+  async markDailyWhatsappOrderNotificationFailed(
+    actor: AccessUser,
+    orderId: string,
+    body: {
+      failedAt?: string;
+      targetPhone?: string;
+      targetSource?: 'STUDENT' | 'PARENT';
+      sentVia?: string;
+      provider?: string;
+      reason?: string;
+    },
+  ) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    await this.ensureOrderNotificationLogsTable();
+    const targetPhone = this.normalizePhone(body.targetPhone);
+    const targetSource = body.targetSource === 'PARENT' ? 'PARENT' : 'STUDENT';
+    const provider = String(body.provider || body.sentVia || 'BRIAN').trim().slice(0, 30);
+    const failureReason = String(body.reason || 'WHATSAPP_SEND_FAILED').trim().slice(0, 500);
+    const failedAt = body.failedAt && !Number.isNaN(Date.parse(body.failedAt)) ? new Date(body.failedAt).toISOString() : new Date().toISOString();
+
+    await runSql(
+      `
+      INSERT INTO order_notification_logs (
+        order_id,
+        channel,
+        notification_type,
+        target_phone,
+        target_source,
+        status,
+        attempted_at,
+        provider,
+        failure_reason,
+        metadata,
+        updated_at
+      )
+      VALUES (
+        $1::uuid,
+        'WHATSAPP',
+        'DAILY_ORDER_9AM',
+        $2,
+        $3,
+        'FAILED',
+        $4::timestamptz,
+        $5,
+        $6,
+        '{}'::jsonb,
+        now()
+      );
+      `,
+      [orderId, targetPhone || null, targetSource, failedAt, provider || null, failureReason],
+    );
+
+    return { ok: true, orderId, status: 'FAILED', failedAt, reason: failureReason };
   }
 
   async sendDeliveryNotificationEmails(actor: AccessUser) {

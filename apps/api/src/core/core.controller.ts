@@ -817,6 +817,53 @@ export class CoreController {
     return this.coreService.updateDeliveryDailyNote(req.user, date, body.note);
   }
 
+  @Post('admin/whatsapp/order-notifications/run-daily')
+  @Roles('ADMIN')
+  getDailyWhatsappOrderNotifications(@Req() req: AuthRequest) {
+    return this.coreService.getDailyWhatsappOrderNotifications(req.user);
+  }
+
+  @Post('admin/whatsapp/order-notifications/run')
+  @Roles('ADMIN')
+  runWhatsappOrderNotificationsForDate(@Req() req: AuthRequest, @Body() body: { date?: string }) {
+    return this.coreService.getDailyWhatsappOrderNotifications(req.user, body?.date);
+  }
+
+  @Post('admin/whatsapp/order-notifications/:orderId/mark-sent')
+  @Roles('ADMIN')
+  markWhatsappOrderNotificationSent(
+    @Req() req: AuthRequest,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Body() body: {
+      sentTo?: string;
+      targetSource?: 'STUDENT' | 'PARENT';
+      sentVia?: string;
+      provider?: string;
+      providerMessageId?: string;
+      sentAt?: string;
+      messageHash?: string;
+    },
+  ) {
+    return this.coreService.markDailyWhatsappOrderNotificationSent(req.user, orderId, body);
+  }
+
+  @Post('admin/whatsapp/order-notifications/:orderId/mark-failed')
+  @Roles('ADMIN')
+  markWhatsappOrderNotificationFailed(
+    @Req() req: AuthRequest,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Body() body: {
+      failedAt?: string;
+      targetPhone?: string;
+      targetSource?: 'STUDENT' | 'PARENT';
+      sentVia?: string;
+      provider?: string;
+      reason?: string;
+    },
+  ) {
+    return this.coreService.markDailyWhatsappOrderNotificationFailed(req.user, orderId, body);
+  }
+
   @Get('delivery/summary')
   @Roles('ADMIN', 'DELIVERY')
   getDeliverySummary(@Req() req: AuthRequest, @Query('date') date?: string) {
