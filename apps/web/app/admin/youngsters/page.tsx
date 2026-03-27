@@ -640,7 +640,7 @@ export default function AdminYoungstersPage() {
               </tr>
             </thead>
             <tbody>
-              {children.map((c) => (
+              {[...children].sort((a, b) => a.last_name.localeCompare(b.last_name) || a.first_name.localeCompare(b.first_name)).map((c) => (
                 <tr key={c.id}>
                   <td>{c.last_name}</td>
                   <td>{c.first_name}</td>

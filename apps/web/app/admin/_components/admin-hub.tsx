@@ -4,19 +4,19 @@ import { getAppBase } from '../../../lib/auth';
 import LogoutButton from '../../_components/logout-button';
 
 const HUB_ITEMS = [
-  { label: 'Dashboard', iconSrc: '/schoolcatering/assets/icons/dashboard.jpeg', href: '/admin/dashboard' },
-  { label: 'Family', iconSrc: '/schoolcatering/assets/icons/family.jpeg', href: '/admin/family' },
-  { label: 'Student', iconSrc: '/schoolcatering/assets/icons/student.jpeg', href: '/admin/student' },
-  { label: 'Schools', iconSrc: '/schoolcatering/assets/icons/schools.jpeg', href: '/admin/schools' },
-  { label: 'Delivery', iconSrc: '/schoolcatering/assets/icons/delivery.jpeg', href: '/admin/delivery' },
-  { label: 'Menu', iconSrc: '/schoolcatering/assets/icons/menu.jpeg', href: '/admin/menu' },
-  { label: 'Orders', iconSrc: '/schoolcatering/assets/icons/order.jpeg', href: '/admin/orders' },
-  { label: 'Multi Orders', iconSrc: '/schoolcatering/assets/icons/multiorder.jpeg', href: '/admin/multiorders' },
-  { label: 'Billing', iconSrc: '/schoolcatering/assets/icons/billing.jpeg', href: '/admin/billing' },
-  { label: 'Blackout', iconSrc: '/schoolcatering/assets/icons/blackout.jpeg', href: '/admin/blackout-dates' },
-  { label: 'Kitchen', iconSrc: '/schoolcatering/assets/icons/kitchen.jpeg', href: '/admin/kitchen' },
-  { label: 'Rating', iconSrc: '/schoolcatering/assets/icons/rating.jpeg', href: '/admin/rating' },
-  { label: 'Reports', iconSrc: '/schoolcatering/assets/icons/report.jpeg', href: '/admin/reports' },
+  { label: 'Dashboard', iconSrc: '/schoolcatering/assets/icons/dashboard.png', href: '/admin/dashboard' },
+  { label: 'Family', iconSrc: '/schoolcatering/assets/icons/family.png', href: '/admin/family' },
+  { label: 'Student', iconSrc: '/schoolcatering/assets/icons/student.png', href: '/admin/student' },
+  { label: 'Schools', iconSrc: '/schoolcatering/assets/icons/schools.png', href: '/admin/schools' },
+  { label: 'Delivery', iconSrc: '/schoolcatering/assets/icons/delivery.png', href: '/admin/delivery' },
+  { label: 'Menu', iconSrc: '/schoolcatering/assets/icons/menu.png', href: '/admin/menu' },
+  { label: 'Orders', iconSrc: '/schoolcatering/assets/icons/order.png', href: '/admin/orders' },
+  { label: 'Multi Orders', iconSrc: '/schoolcatering/assets/icons/multiorder.png', href: '/admin/multiorders' },
+  { label: 'Billing', iconSrc: '/schoolcatering/assets/icons/billing.png', href: '/admin/billing' },
+  { label: 'Blackout', iconSrc: '/schoolcatering/assets/icons/blackout.png', href: '/admin/blackout-dates' },
+  { label: 'Kitchen', iconSrc: '/schoolcatering/assets/icons/kitchen.png', href: '/admin/kitchen' },
+  { label: 'Rating', iconSrc: '/schoolcatering/assets/icons/rating.png', href: '/admin/rating' },
+  { label: 'Reports', iconSrc: '/schoolcatering/assets/icons/report.png', href: '/admin/reports' },
 ];
 
 export default function AdminHub() {

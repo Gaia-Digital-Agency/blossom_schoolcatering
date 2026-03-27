@@ -18,6 +18,8 @@ type ParentRow = {
   first_name: string;
   last_name: string;
   email?: string | null;
+  phone_number?: string | null;
+  address?: string | null;
   linked_children_count: number;
   billing_count: number;
   youngsters: ParentYoungster[];
@@ -60,6 +62,19 @@ export default function AdminParentsPage() {
   const [showIdInfo, setShowIdInfo] = useState<ShowIdInfo | null>(null);
   const [showTeacherGuardianInfo, setShowTeacherGuardianInfo] = useState<ShowTeacherGuardianInfo | null>(null);
   const [showParent2Info, setShowParent2Info] = useState<{ familyGroup: string; firstName: string; phone?: string | null; email?: string | null } | null>(null);
+
+  // Edit modal state
+  const [editParent, setEditParent] = useState<ParentRow | null>(null);
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editLastName, setEditLastName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+  const [editP2FirstName, setEditP2FirstName] = useState('');
+  const [editP2Phone, setEditP2Phone] = useState('');
+  const [editP2Email, setEditP2Email] = useState('');
+  const [editBusy, setEditBusy] = useState(false);
+  const [editError, setEditError] = useState('');
 
   const load = async () => {
     const p = await apiFetch('/admin/parent') as ParentRow[];
@@ -176,6 +191,52 @@ export default function AdminParentsPage() {
     }
   };
 
+  const onOpenEdit = (p: ParentRow) => {
+    setEditParent(p);
+    setEditFirstName(p.first_name || '');
+    setEditLastName(p.last_name || '');
+    setEditPhone(p.phone_number || '');
+    setEditEmail(p.email || '');
+    setEditAddress(p.address || '');
+    setEditP2FirstName(p.parent2_first_name || '');
+    setEditP2Phone(p.parent2_phone || '');
+    setEditP2Email(p.parent2_email || '');
+    setEditError('');
+  };
+
+  const onEditSave = async () => {
+    if (!editParent) return;
+    if (!editFirstName.trim()) { setEditError('First Name is required.'); return; }
+    if (!editLastName.trim()) { setEditError('Family Group Name is required.'); return; }
+    if (!editPhone.trim()) { setEditError('Phone Number is required.'); return; }
+    if (!editEmail.trim()) { setEditError('Email is required.'); return; }
+    if (!editEmail.includes('@')) { setEditError('Email must be valid.'); return; }
+    setEditBusy(true);
+    setEditError('');
+    try {
+      await apiFetch(`/admin/parent/${editParent.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          firstName: editFirstName.trim(),
+          lastName: editLastName.trim(),
+          phoneNumber: editPhone.trim(),
+          email: editEmail.trim(),
+          address: editAddress.trim() || undefined,
+          parent2FirstName: editP2FirstName.trim() || undefined,
+          parent2Phone: editP2Phone.trim() || undefined,
+          parent2Email: editP2Email.trim() || undefined,
+        }),
+      });
+      setMessage(`Family "${editLastName.trim()}" updated successfully.`);
+      setEditParent(null);
+      await load();
+    } catch (e) {
+      setEditError(e instanceof Error ? e.message : 'Failed to save');
+    } finally {
+      setEditBusy(false);
+    }
+  };
+
   const teacherGuardianEntries = (p: ParentRow) => (p.teacher_guardians || [])
     .map((entry) => ({
       studentName: String(entry.student_name || '').trim(),
@@ -210,18 +271,43 @@ export default function AdminParentsPage() {
             <thead>
               <tr>
                 <th>Family Group</th>
-                <th>First Name</th>
-                <th>User Name</th>
+                <th>Parent #1</th>
+                <th>Parent #2 / Guardian</th>
+                <th>Username</th>
                 <th>Student</th>
                 <th>School</th>
                 <th>Action</th>
               </tr>
             </thead>
             <tbody>
-              {parents.map((p) => (
+              {parents.map((p) => {
+                const tgEntries = teacherGuardianEntries(p);
+                return (
                 <tr key={p.id}>
                   <td>{p.last_name}</td>
                   <td>{p.first_name}</td>
+                  <td>
+                    {p.parent2_first_name ? (
+                      <div className="guardian-info">
+                        <span className="guardian-badge">Parent #2</span>
+                        <span className="guardian-name">{p.parent2_first_name}</span>
+                        {p.parent2_phone ? <span className="guardian-detail">{p.parent2_phone}</span> : null}
+                        {p.parent2_email ? <span className="guardian-detail">{p.parent2_email}</span> : null}
+                      </div>
+                    ) : null}
+                    {tgEntries.length > 0 ? (
+                      <div className="guardian-info">
+                        <span className="guardian-badge guardian-badge-teacher">Teacher/Guardian</span>
+                        {tgEntries.map((entry, i) => (
+                          <span key={i} className="guardian-name">
+                            {entry.teacherName}{entry.teacherPhone ? ` · ${entry.teacherPhone}` : ''}
+                            {entry.studentName ? <span className="guardian-for"> for {entry.studentName}</span> : null}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    {!p.parent2_first_name && tgEntries.length === 0 ? <span className="text-muted">—</span> : null}
+                  </td>
                   <td>{p.username}</td>
                   <td>
                     {(p.youngsters || []).length === 0
@@ -231,6 +317,9 @@ export default function AdminParentsPage() {
                   <td>{(p.schools || []).join(', ') || '-'}</td>
                   <td>
                     <div className="action-row">
+                      <button className="btn btn-primary" type="button" onClick={() => onOpenEdit(p)}>
+                        Edit
+                      </button>
                       <button className="btn btn-outline" type="button" onClick={() => onShowId(p)}>
                         Show ID
                       </button>
@@ -239,24 +328,6 @@ export default function AdminParentsPage() {
                       </button>
                       <button className="btn btn-outline" type="button" onClick={() => onResetPassword(p)}>
                         Set new Password
-                      </button>
-                      <button
-                        className="btn btn-outline"
-                        type="button"
-                        onClick={() => onShowTeacherGuardian(p)}
-                        disabled={teacherGuardianEntries(p).length === 0}
-                        title={teacherGuardianEntries(p).length === 0 ? 'No Teacher/Guardian registration info' : 'Show Teacher/Guardian'}
-                      >
-                        Show Teacher/Guardian
-                      </button>
-                      <button
-                        className="btn btn-outline"
-                        type="button"
-                        onClick={() => p.parent2_first_name && setShowParent2Info({ familyGroup: p.last_name, firstName: p.parent2_first_name, phone: p.parent2_phone, email: p.parent2_email })}
-                        disabled={!p.parent2_first_name}
-                        title={!p.parent2_first_name ? 'No second parent/guardian on record' : 'Show Parent #2'}
-                      >
-                        Show Parent #2
                       </button>
                       <button
                         className="btn btn-outline"
@@ -270,9 +341,10 @@ export default function AdminParentsPage() {
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
               {parents.length === 0 ? (
-                <tr><td colSpan={6}>No family found.</td></tr>
+                <tr><td colSpan={7}>No family found.</td></tr>
               ) : null}
             </tbody>
           </table>
@@ -415,6 +487,66 @@ export default function AdminParentsPage() {
         </div>
       ) : null}
 
+      {/* ── Edit Family Modal ─────────────────────────────── */}
+      {editParent ? (
+        <div className="pass-modal-overlay" onClick={() => !editBusy && setEditParent(null)}>
+          <div className="pass-modal-card edit-modal-card" onClick={(e) => e.stopPropagation()}>
+            <h2 className="pass-modal-title">Edit Family — {editParent.last_name}</h2>
+
+            <div className="edit-section-label">Parent / Guardian #1</div>
+            <div className="edit-field-grid">
+              <label className="edit-label">
+                First Name <span className="edit-req">*</span>
+                <input className="edit-input" value={editFirstName} onChange={(e) => setEditFirstName(e.target.value)} disabled={editBusy} />
+              </label>
+              <label className="edit-label">
+                Family Group Name <span className="edit-req">*</span>
+                <input className="edit-input" value={editLastName} onChange={(e) => setEditLastName(e.target.value)} disabled={editBusy} />
+              </label>
+              <label className="edit-label">
+                Phone <span className="edit-req">*</span>
+                <input className="edit-input" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} placeholder="+628..." disabled={editBusy} />
+              </label>
+              <label className="edit-label">
+                Email <span className="edit-req">*</span>
+                <input className="edit-input" type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} disabled={editBusy} />
+              </label>
+              <label className="edit-label edit-full">
+                Address
+                <input className="edit-input" value={editAddress} onChange={(e) => setEditAddress(e.target.value)} disabled={editBusy} />
+              </label>
+            </div>
+
+            <div className="edit-section-label">Parent / Guardian #2 <span className="edit-optional">(Optional)</span></div>
+            <div className="edit-field-grid">
+              <label className="edit-label">
+                First Name
+                <input className="edit-input" value={editP2FirstName} onChange={(e) => setEditP2FirstName(e.target.value)} disabled={editBusy} />
+              </label>
+              <label className="edit-label">
+                Phone
+                <input className="edit-input" value={editP2Phone} onChange={(e) => setEditP2Phone(e.target.value)} placeholder="+628..." disabled={editBusy} />
+              </label>
+              <label className="edit-label edit-full">
+                Email
+                <input className="edit-input" type="email" value={editP2Email} onChange={(e) => setEditP2Email(e.target.value)} disabled={editBusy} />
+              </label>
+            </div>
+
+            {editError ? <p className="edit-error">{editError}</p> : null}
+
+            <div className="edit-actions">
+              <button className="btn btn-primary" type="button" onClick={() => void onEditSave()} disabled={editBusy}>
+                {editBusy ? 'Saving...' : 'Save Changes'}
+              </button>
+              <button className="btn btn-outline" type="button" onClick={() => setEditParent(null)} disabled={editBusy}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <style jsx>{`
         .kitchen-table-wrap {
           overflow-x: auto;
@@ -456,15 +588,55 @@ export default function AdminParentsPage() {
           flex-wrap: wrap;
           gap: 0.35rem;
         }
+        .guardian-info {
+          display: flex;
+          flex-direction: column;
+          gap: 0.18rem;
+          margin-bottom: 0.35rem;
+        }
+        .guardian-info:last-child { margin-bottom: 0; }
+        .guardian-badge {
+          display: inline-block;
+          font-size: 0.68rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          background: #e8f0fc;
+          color: #2a52be;
+          border-radius: 0.25rem;
+          padding: 0.08rem 0.35rem;
+          width: fit-content;
+        }
+        .guardian-badge-teacher {
+          background: #fef3e2;
+          color: #92400e;
+        }
+        .guardian-name {
+          font-size: 0.88rem;
+          font-weight: 600;
+          color: #1a1a1a;
+        }
+        .guardian-detail {
+          font-size: 0.8rem;
+          color: #555;
+        }
+        .guardian-for {
+          font-weight: 400;
+          color: #777;
+          font-size: 0.8rem;
+        }
+        .text-muted {
+          color: #aaa;
+        }
         /* Mobile */
         @media (max-width: 680px) {
           .kitchen-table-wrap {
             overflow-x: hidden;
           }
-          .admin-parents-table th:nth-child(4),
-          .admin-parents-table td:nth-child(4),
           .admin-parents-table th:nth-child(5),
-          .admin-parents-table td:nth-child(5) {
+          .admin-parents-table td:nth-child(5),
+          .admin-parents-table th:nth-child(6),
+          .admin-parents-table td:nth-child(6) {
             display: none;
           }
           .kitchen-table {
@@ -573,6 +745,72 @@ export default function AdminParentsPage() {
         .pass-modal-close {
           width: 100%;
           padding: 0.6rem 1.25rem;
+        }
+
+        /* ── Edit modal ── */
+        .edit-modal-card {
+          max-width: 560px;
+          max-height: 90vh;
+          overflow-y: auto;
+        }
+        .edit-section-label {
+          font-size: 0.78rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          color: #5a4a3a;
+          border-bottom: 1.5px solid #e2d6c2;
+          padding-bottom: 0.25rem;
+          margin: 1rem 0 0.55rem;
+        }
+        .edit-section-label:first-of-type { margin-top: 0.25rem; }
+        .edit-optional {
+          font-weight: 400;
+          color: #999;
+          text-transform: none;
+          letter-spacing: 0;
+          font-size: 0.78rem;
+        }
+        .edit-field-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 0.55rem 0.7rem;
+        }
+        .edit-label {
+          display: flex;
+          flex-direction: column;
+          gap: 0.2rem;
+          font-size: 0.82rem;
+          font-weight: 500;
+          color: #444;
+        }
+        .edit-full { grid-column: 1 / -1; }
+        .edit-req { color: #c0392b; }
+        .edit-input {
+          padding: 0.38rem 0.55rem;
+          border: 1px solid #d0c4b0;
+          border-radius: 0.4rem;
+          font-size: 0.9rem;
+          background: #fff;
+          width: 100%;
+          box-sizing: border-box;
+        }
+        .edit-input:focus { outline: 2px solid #c3a96a; border-color: transparent; }
+        .edit-input:disabled { background: #f5f0e8; color: #999; }
+        .edit-error {
+          color: #c0392b;
+          font-size: 0.84rem;
+          margin: 0.5rem 0 0;
+        }
+        .edit-actions {
+          display: flex;
+          gap: 0.55rem;
+          margin-top: 1.1rem;
+        }
+        .edit-actions .btn { flex: 1; }
+        @media (max-width: 480px) {
+          .edit-field-grid { grid-template-columns: 1fr; }
+          .edit-full { grid-column: 1; }
         }
       `}</style>
     </main>

@@ -124,7 +124,7 @@ export class CoreController {
   }
 
   @Post('order/quick')
-  @Roles('PARENT', 'YOUNGSTER')
+  @Roles('PARENT', 'YOUNGSTER', 'ADMIN')
   quickOrder(@Req() req: AuthRequest, @Body() body: QuickOrderDto) {
     return this.coreService.quickOrder(req.user, body);
   }

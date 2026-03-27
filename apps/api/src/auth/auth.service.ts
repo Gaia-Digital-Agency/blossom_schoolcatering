@@ -121,7 +121,7 @@ const DELIVERY_USERNAME = 'delivery';
 const DELIVERY_PASSWORD = 'teameditor123';
 const PARENT_USERNAME = 'parent';
 const YOUNGSTER_USERNAME = 'youngster';
-const ACCESS_TTL = '15m';
+const ACCESS_TTL = '2h';
 const REFRESH_TTL = '7d';
 
 @Injectable()
@@ -1437,7 +1437,7 @@ export class AuthService {
       const youngsterSchoolId = String(student.youngsterSchoolId || '').trim();
       const youngsterGrade = String(student.youngsterGrade || '').trim();
       const youngsterPhone = this.normalizePhone(student.youngsterPhone) || parentMobileNumber;
-      const youngsterEmail = String(student.youngsterEmail || '').trim().toLowerCase();
+      const youngsterEmail = String(student.youngsterEmail || '').trim().toLowerCase() || null;
       const youngsterAllergies = this.normalizeAllergies(student.youngsterAllergies);
       if (!['MALE', 'FEMALE'].includes(youngsterGender)) {
         throw new BadRequestException(`Student gender must be Male or Female for ${youngsterFirstName || 'this student'}.`);
@@ -1445,7 +1445,7 @@ export class AuthService {
       const youngsterLastName = parentLastName;
       const youngsterUsernameBase = this.sanitizeUsernamePart(`${youngsterLastName}_${youngsterFirstName}`);
       const youngsterUsername = await runSql(`SELECT generate_unique_username($1);`, [youngsterUsernameBase]);
-      const youngsterGeneratedPassword = this.generateRegistrationPassword();
+      const youngsterGeneratedPassword = password;
       const youngsterPasswordHash = this.hashPassword(youngsterGeneratedPassword);
       let youngsterOut = '';
       try {

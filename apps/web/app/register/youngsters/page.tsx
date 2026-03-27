@@ -29,6 +29,8 @@ type RegisterResponse = {
     generatedPassword: string;
     firstName: string;
     lastName: string;
+    mobileNumber?: string;
+    email?: string;
   };
   students: Array<{
     username: string;
@@ -268,7 +270,7 @@ export default function YoungsterRegisterPage() {
       return;
     }
     if (!password.trim()) {
-      setError('Parent Password is required.');
+      setError('Family Password is required.');
       return;
     }
     if (password.length < 6) {
@@ -288,7 +290,7 @@ export default function YoungsterRegisterPage() {
       return;
     }
     if (password !== confirmPassword) {
-      setError('Parent Password and Confirm Password must match.');
+      setError('Family Password and Confirm Password must match.');
       return;
     }
 
@@ -410,6 +412,7 @@ export default function YoungsterRegisterPage() {
   };
 
   if (success) {
+    const hasParent2 = Boolean(parent2FirstName.trim() || parent2Phone.trim() || parent2Email.trim());
     return (
       <main className="page-auth">
         <section className="auth-panel">
@@ -421,17 +424,51 @@ export default function YoungsterRegisterPage() {
               <span className="reg-info-value">{parentLastName}</span>
             </div>
             <div className="reg-info-row">
-              <span className="reg-info-label">Parent First Name</span>
-              <span className="reg-info-value">{success.parent.firstName}</span>
-            </div>
-            <div className="reg-info-row">
-              <span className="reg-info-label">Family Username</span>
-              <code className="reg-info-code">{success.parent.username}</code>
-            </div>
-            <div className="reg-info-row">
               <span className="reg-info-label">Family Password</span>
               <code className="reg-info-code">{success.parent.generatedPassword}</code>
             </div>
+            <div className="reg-parent-block">
+              <div className="reg-parent-heading">Parent / Guardian #1</div>
+              <div className="reg-info-row">
+                <span className="reg-info-label">First Name</span>
+                <span className="reg-info-value">{success.parent.firstName}</span>
+              </div>
+              <div className="reg-info-row">
+                <span className="reg-info-label">Phone</span>
+                <span className="reg-info-value">{success.parent.mobileNumber || parentMobileNumber}</span>
+              </div>
+              <div className="reg-info-row">
+                <span className="reg-info-label">Email</span>
+                <span className="reg-info-value">{success.parent.email || parentEmail}</span>
+              </div>
+              <div className="reg-info-row">
+                <span className="reg-info-label">Username</span>
+                <code className="reg-info-code">{success.parent.username}</code>
+              </div>
+            </div>
+            {hasParent2 ? (
+              <div className="reg-parent-block">
+                <div className="reg-parent-heading">Parent / Guardian #2</div>
+                {parent2FirstName.trim() ? (
+                  <div className="reg-info-row">
+                    <span className="reg-info-label">First Name</span>
+                    <span className="reg-info-value">{parent2FirstName.trim()}</span>
+                  </div>
+                ) : null}
+                {parent2Phone.trim() ? (
+                  <div className="reg-info-row">
+                    <span className="reg-info-label">Phone</span>
+                    <span className="reg-info-value">{parent2Phone.trim()}</span>
+                  </div>
+                ) : null}
+                {parent2Email.trim() ? (
+                  <div className="reg-info-row">
+                    <span className="reg-info-label">Email</span>
+                    <span className="reg-info-value">{parent2Email.trim()}</span>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             {success.students.map((student, index) => (
               <div key={`${student.username}-${index}`} className="reg-student-block">
                 <div className="reg-info-row">
@@ -445,10 +482,6 @@ export default function YoungsterRegisterPage() {
                 <div className="reg-info-row">
                   <span className="reg-info-label">Student {index + 1} Username</span>
                   <code className="reg-info-code">{student.username}</code>
-                </div>
-                <div className="reg-info-row">
-                  <span className="reg-info-label">Student {index + 1} Password</span>
-                  <code className="reg-info-code">{student.generatedPassword}</code>
                 </div>
               </div>
             ))}
@@ -475,6 +508,19 @@ export default function YoungsterRegisterPage() {
               border-radius: 0.65rem;
               padding: 1rem 1.1rem;
               margin: 1rem 0;
+            }
+            .reg-parent-block {
+              display: grid;
+              gap: 0.45rem;
+              padding-top: 0.7rem;
+              border-top: 1px solid var(--border, #e5e5e5);
+            }
+            .reg-parent-heading {
+              font-size: 0.8rem;
+              font-weight: 700;
+              color: var(--ink-soft, #666);
+              text-transform: uppercase;
+              letter-spacing: 0.04em;
             }
             .reg-student-block {
               display: grid;
@@ -683,12 +729,12 @@ export default function YoungsterRegisterPage() {
             ))}
 
             <label>
-              Parent Password
+              Family Password
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-              <small className="field-hint">Minimum 6 characters, 1 uppercase, 1 number, 1 symbol.</small>
+              <small className="field-hint">Shared by all family members. Min 6 characters, 1 uppercase, 1 number, 1 symbol.</small>
             </label>
             <label>
-              Confirm Parent Password
+              Confirm Family Password
               <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
             </label>
           </fieldset>

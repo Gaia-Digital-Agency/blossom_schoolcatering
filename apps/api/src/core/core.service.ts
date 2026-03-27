@@ -1483,7 +1483,7 @@ export class CoreService implements OnModuleInit {
   }
 
   async quickOrder(actor: AccessUser, input: { childUsername?: string; date?: string; session?: string; dishes?: string[] }) {
-    if (!['PARENT', 'YOUNGSTER'].includes(actor.role)) {
+    if (!['PARENT', 'YOUNGSTER', 'ADMIN'].includes(actor.role)) {
       throw new ForbiddenException('Role not allowed');
     }
 
@@ -1510,6 +1510,20 @@ export class CoreService implements OnModuleInit {
         [actor.uid],
       );
       if (!out) throw new NotFoundException('Youngster profile not found');
+      childId = out;
+    } else if (actor.role === 'ADMIN') {
+      // Admin can place orders for any registered student by username
+      const out = await runSql(
+        `SELECT c.id
+         FROM children c
+         JOIN users u ON u.id = c.user_id
+         WHERE lower(u.username) = $1
+           AND c.is_active = true
+           AND c.deleted_at IS NULL
+         LIMIT 1;`,
+        [childUsername],
+      );
+      if (!out) throw new NotFoundException(`Student with username "${input.childUsername}" not found`);
       childId = out;
     } else {
       const parentId = await this.getParentIdByUserId(actor.uid);
@@ -1564,9 +1578,9 @@ export class CoreService implements OnModuleInit {
       throw new BadRequestException(`Dishes not found for session ${session}: ${notFound.join(', ')}`);
     }
 
-    // Fetch student name for confirmation response
+    // Fetch student first name for confirmation response
     const nameOut = await runSql(
-      `SELECT (u.first_name || ' ' || u.last_name) AS full_name
+      `SELECT u.first_name
        FROM children c
        JOIN users u ON u.id = c.user_id
        WHERE c.id = $1
@@ -8190,7 +8204,9 @@ export class CoreService implements OnModuleInit {
       `UPDATE users
        SET is_active = false,
            deleted_at = now(),
-           updated_at = now()
+           updated_at = now(),
+           email = NULL,
+           phone_number = NULL
        WHERE id = $1;`,
       [userId],
     );
@@ -8260,7 +8276,9 @@ export class CoreService implements OnModuleInit {
       `UPDATE users
        SET is_active = false,
            deleted_at = now(),
-           updated_at = now()
+           updated_at = now(),
+           email = NULL,
+           phone_number = NULL
        WHERE id = $1;`,
       [userId],
     );

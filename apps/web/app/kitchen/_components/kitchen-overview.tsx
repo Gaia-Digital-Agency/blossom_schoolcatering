@@ -4,10 +4,10 @@ import { getAppBase } from '../../../lib/auth';
 import LogoutButton from '../../_components/logout-button';
 
 const KITCHEN_ITEMS = [
-  { label: 'Yesterday', iconSrc: '/schoolcatering/assets/icons/yesterday.jpeg', href: '/kitchen/yesterday' },
-  { label: 'Today', iconSrc: '/schoolcatering/assets/icons/today.jpeg', href: '/kitchen/today', active: true },
-  { label: 'Tomorrow', iconSrc: '/schoolcatering/assets/icons/tomorrow.jpeg', href: '/kitchen/tomorrow' },
-  { label: 'Select Date', iconSrc: '/schoolcatering/assets/icons/date.jpeg', href: '/kitchen/select-date' },
+  { label: 'Yesterday', iconSrc: '/schoolcatering/assets/icons/yesterday.png', href: '/kitchen/yesterday' },
+  { label: 'Today', iconSrc: '/schoolcatering/assets/icons/today.png', href: '/kitchen/today', active: true },
+  { label: 'Tomorrow', iconSrc: '/schoolcatering/assets/icons/tomorrow.png', href: '/kitchen/tomorrow' },
+  { label: 'Select Date', iconSrc: '/schoolcatering/assets/icons/date.png', href: '/kitchen/select-date' },
 ];
 
 export default function KitchenOverview() {
