@@ -459,6 +459,58 @@ export class CoreService implements OnModuleInit {
     return out ? this.parseJsonLine<{ id: string; role: string; username: string }>(out) : null;
   }
 
+  async lookupNameByPhone(phoneNumber?: string | null) {
+    const normalizedPhone = this.normalizePhone(phoneNumber);
+    const phoneKey = this.phoneCompareKey(phoneNumber);
+    if (!phoneKey) throw new BadRequestException('phone is required');
+
+    const out = await runSql(
+      `SELECT row_to_json(t)::text
+       FROM (
+         SELECT
+           trim(concat(coalesce(u.first_name, ''), ' ', coalesce(u.last_name, ''))) AS name,
+           u.username,
+           u.role::text AS role,
+           u.phone_number AS phone
+         FROM users u
+         WHERE u.deleted_at IS NULL
+           AND u.is_active = true
+           AND regexp_replace(coalesce(u.phone_number, ''), '[^0-9]', '', 'g') = $1
+         ORDER BY
+           CASE u.role::text
+             WHEN 'CHILD' THEN 1
+             WHEN 'PARENT' THEN 2
+             WHEN 'ADMIN' THEN 3
+             WHEN 'KITCHEN' THEN 4
+             WHEN 'DELIVERY' THEN 5
+             ELSE 99
+           END,
+           u.created_at ASC
+         LIMIT 1
+       ) t;`,
+      [phoneKey],
+    );
+
+    if (!out) {
+      return {
+        ok: true,
+        found: false,
+        phone: normalizedPhone,
+        name: null,
+      };
+    }
+
+    const row = this.parseJsonLine<{ name?: string; username?: string; role?: string; phone?: string | null }>(out);
+    return {
+      ok: true,
+      found: true,
+      phone: this.normalizePhone(row.phone) || normalizedPhone,
+      name: String(row.name || '').trim() || row.username || null,
+      username: row.username || null,
+      role: row.role || null,
+    };
+  }
+
   private buildTwoColumnDeliveryPdfLines(input: {
     title: string;
     serviceDate: string;
@@ -1522,7 +1574,7 @@ export class CoreService implements OnModuleInit {
     return answer;
   }
 
-  async quickOrder(actor: AccessUser, input: { childUsername?: string; date?: string; session?: string; dishes?: string[] }) {
+  async quickOrder(actor: AccessUser, input: { childUsername?: string; senderPhone?: string; date?: string; session?: string; dishes?: string[] }) {
     if (!['PARENT', 'YOUNGSTER', 'ADMIN'].includes(actor.role)) {
       throw new ForbiddenException('Role not allowed');
     }
@@ -6841,6 +6893,28 @@ export class CoreService implements OnModuleInit {
       timezone: 'Asia/Makassar',
       orders,
       skipped,
+    };
+  }
+
+  async getDailyOrdersByPhone(actor: AccessUser, input: { date?: string; phone?: string }) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    const phone = this.normalizePhone(input.phone);
+    const phoneKey = this.phoneCompareKey(input.phone);
+    if (!phoneKey) throw new BadRequestException('phone is required');
+
+    const payload = await this.getDailyWhatsappOrderNotifications(actor, input.date);
+    const orders = payload.orders.filter((row) => (
+      this.phoneCompareKey(row.target?.phone) === phoneKey
+      || this.phoneCompareKey(row.student?.phone) === phoneKey
+      || this.phoneCompareKey(row.parentFallback?.phone) === phoneKey
+    ));
+
+    return {
+      ok: true,
+      date: payload.date,
+      timezone: payload.timezone,
+      phone,
+      orders,
     };
   }
 

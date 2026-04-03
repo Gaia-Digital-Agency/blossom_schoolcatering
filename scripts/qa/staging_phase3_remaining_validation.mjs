@@ -2,13 +2,13 @@ import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
 const BASE = process.env.BASE_URL || 'http://34.158.47.112/schoolcatering/api/v1';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'teameditor123';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Teameditor@123';
 const SEEDED_PASSWORD = process.env.SEEDED_PASSWORD || 'Teameditor@123';
 const FAMILY_USERNAME = process.env.FAMILY_USERNAME || 'family01_parent01';
 const STUDENT_USERNAME = process.env.STUDENT_USERNAME || 'family01_student01a';
 const KITCHEN_USERNAME = process.env.KITCHEN_USERNAME || 'kitchen';
 const DELIVERY_USERNAME = process.env.DELIVERY_USERNAME || 'delivery';
-const OPS_PASSWORD = process.env.OPS_PASSWORD || 'teameditor123';
+const OPS_PASSWORD = process.env.OPS_PASSWORD || 'Teameditor@123';
 
 const out = [];
 const PROOF_IMAGE = 'data:image/webp;base64,UklGRjgAAABXRUJQVlA4ICwAAACQAQCdASoCAAIAAgA0JQBOgCHEgmAA+EQpUapV94M5NPm3kbfRz1ZaiFyAAA==';

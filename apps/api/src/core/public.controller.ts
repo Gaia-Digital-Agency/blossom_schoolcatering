@@ -14,4 +14,9 @@ export class PublicController {
   getPublicSiteSettings() {
     return this.coreService.getSiteSettings();
   }
+
+  @Get('lookup-name')
+  getPublicLookupName(@Query('phone') phone?: string) {
+    return this.coreService.lookupNameByPhone(phone);
+  }
 }

@@ -453,8 +453,7 @@ export class AuthService {
           `INSERT INTO users (role, username, password_hash, first_name, last_name, phone_number, email)
            VALUES ($1, $2, $3, $4, $5, $6, $7)
            ON CONFLICT (username) DO UPDATE
-           SET password_hash = EXCLUDED.password_hash,
-               role = EXCLUDED.role,
+           SET role = EXCLUDED.role,
                first_name = EXCLUDED.first_name,
                last_name = EXCLUDED.last_name,
                phone_number = EXCLUDED.phone_number,

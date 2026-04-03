@@ -130,6 +130,12 @@ export class CoreController {
     return this.coreService.quickOrder(req.user, body);
   }
 
+  @Get('orders/daily')
+  @Roles('ADMIN')
+  getDailyOrders(@Req() req: AuthRequest, @Query('date') date?: string, @Query('phone') phone?: string) {
+    return this.coreService.getDailyOrdersByPhone(req.user, { date, phone });
+  }
+
   @Post('admin/site-settings/hero-image-upload')
   @Roles('ADMIN')
   @UseInterceptors(FileInterceptor('image', { limits: { fileSize: 5 * 1024 * 1024 } }))
