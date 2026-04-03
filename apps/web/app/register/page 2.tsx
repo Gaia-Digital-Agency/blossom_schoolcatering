@@ -10,15 +10,6 @@ export default function RegisterPage() {
           <Link href="/register/youngsters">Register Student (Includes Family)</Link>
           <Link href="/login">Back to Login</Link>
         </div>
-        <div className="quick-credentials" style={{ marginTop: '0.8rem' }}>
-          <p><strong>For Testing Note</strong></p>
-          <p>Student Register: url: /register/youngsters (view only)</p>
-          <p>Student Login: url: /login | user: youngster | pw: Teameditor@123</p>
-          <p>Family Login: url: /login | user: parent | pw: Teameditor@123</p>
-          <p>Delivery Login: url: /delivery/login | user: delivery | pw: Teameditor@123</p>
-          <p>Kitchen Login: url: /kitchen/login | user: kitchen | pw: Teameditor@123</p>
-          <p>Admin Login: url: /admin/login | user: admin | pw: Teameditor@123</p>
-        </div>
       </section>
     </main>
   );

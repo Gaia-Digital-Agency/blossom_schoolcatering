@@ -43,13 +43,6 @@ export default function LoginPage() {
         <div className="module-guide-card">
           Use this single sign-on page to access the Family, Student, Delivery, Kitchen, and Admin modules.
         </div>
-        <div className="auth-form" style={{ marginBottom: '0.75rem' }}>
-          <small><strong>Admin</strong>: <code>admin</code> / <code>teameditor123</code></small>
-          <small><strong>Kitchen</strong>: <code>kitchen</code> / <code>teameditor123</code></small>
-          <small><strong>Delivery</strong>: <code>delivery_username</code> / <code>teameditor123</code></small>
-          <small><strong>Family</strong>: <code>familyname_parentname</code> / <code>Teameditor@123</code></small>
-          <small><strong>Student</strong>: <code>familyname_studentname</code> / <code>Teameditor@123</code></small>
-        </div>
         <form onSubmit={onSubmit} className="auth-form" autoComplete="off">
           <label>
             Username
