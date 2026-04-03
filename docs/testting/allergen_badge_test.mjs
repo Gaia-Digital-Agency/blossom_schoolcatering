@@ -133,7 +133,7 @@ function ensureOrderForChild(childId, placedByUserId, serviceDate, session = 'LU
 
 (async () => {
   try {
-    const admin = await login('admin', 'admin123', 'ADMIN');
+    const admin = await login('admin', 'Teameditor@123', 'ADMIN');
     const adminToken = admin.accessToken;
 
     // Allergen test: 1 parent + 1 youngster
@@ -170,7 +170,7 @@ function ensureOrderForChild(childId, placedByUserId, serviceDate, session = 'LU
       return api(`/carts/${cart.id}/submit`, { method: 'POST', token: pToken });
     })();
 
-    const kitchen = await login('kitchen', 'kitchen123', 'KITCHEN');
+    const kitchen = await login('kitchen', 'Teameditor@123', 'KITCHEN');
     const ksum = await api(`/kitchen/daily-summary?date=${allergenDate}`, { token: kitchen.accessToken });
     const kRow = (ksum.orders || []).find((o) => o.id === order.id);
     ok('A1', !!kRow && kRow.has_allergen === true, 'Kitchen sees allergen order for the youngster');

@@ -8,7 +8,7 @@ function nextWeekday(offset){const d=new Date();d.setUTCDate(d.getUTCDate()+offs
 (async()=>{
  const stamp=Date.now().toString().slice(-6);
  const d=nextWeekday(16);
- const admin=await req('/auth/login',{method:'POST',body:{username:'admin',password:'admin123',role:'ADMIN'}});
+ const admin=await req('/auth/login',{method:'POST',body:{username:'admin',password:'Teameditor@123',role:'ADMIN'}});
  const at=admin.body.accessToken;
  const schools=await req('/schools?active=true',{token:at});
  const schoolId=(schools.body||[])[0]?.id;
@@ -26,7 +26,7 @@ function nextWeekday(offset){const d=new Date();d.setUTCDate(d.getUTCDate()+offs
  const order=await req(`/carts/${cart.body.id}/submit`,{method:'POST',token:pt});
  const orderId=order.body.id;
 
- const kitchen=await req('/auth/login',{method:'POST',body:{username:'kitchen',password:'kitchen123',role:'KITCHEN'}});
+ const kitchen=await req('/auth/login',{method:'POST',body:{username:'kitchen',password:'Teameditor@123',role:'KITCHEN'}});
  const kt=kitchen.body.accessToken;
  const ksum=await req(`/kitchen/daily-summary?date=${d}`,{token:kt});
  const krow=(ksum.body.orders||[]).find(x=>x.id===orderId);

@@ -9,7 +9,7 @@ try{
   const stamp=Date.now().toString().slice(-6);
   const testDate=nextWeekday(18);
 
-  const admin=await req('/auth/login',{method:'POST',body:{username:'admin',password:'admin123',role:'ADMIN'},expect:[200,201]});
+  const admin=await req('/auth/login',{method:'POST',body:{username:'admin',password:'Teameditor@123',role:'ADMIN'},expect:[200,201]});
   const at=admin.body.accessToken; add('Admin','Admin login',true,'201 login success');
 
   const dashboard=await req('/admin/dashboard',{token:at,expect:[200]});
@@ -92,7 +92,7 @@ try{
   const yins=await req(`/youngsters/me/insights?date=${testDate}`,{token:yt,expect:[200]});
   add('Youngster','Youngster insights',!!yins.body?.badge,`badge=${yins.body?.badge?.level||'-'}`);
 
-  const kitchen=await req('/auth/login',{method:'POST',body:{username:'kitchen',password:'kitchen123',role:'KITCHEN'},expect:[200,201]});
+  const kitchen=await req('/auth/login',{method:'POST',body:{username:'kitchen',password:'Teameditor@123',role:'KITCHEN'},expect:[200,201]});
   const kt=kitchen.body.accessToken;
   add('Kitchen','Kitchen login',!!kt,'login success');
 
@@ -107,7 +107,7 @@ try{
     await req('/delivery/assign',{method:'POST',token:at,body:{orderIds:[orderId],deliveryUserId:defaultDelivery.id},expect:[200]});
   }
 
-  const delivery=await req('/auth/login',{method:'POST',body:{username:'delivery',password:'delivery123',role:'DELIVERY'},expect:[200,201]});
+  const delivery=await req('/auth/login',{method:'POST',body:{username:'delivery',password:'Teameditor@123',role:'DELIVERY'},expect:[200,201]});
   const dt=delivery.body.accessToken;
   add('Delivery','Delivery login',!!dt,'login success');
 

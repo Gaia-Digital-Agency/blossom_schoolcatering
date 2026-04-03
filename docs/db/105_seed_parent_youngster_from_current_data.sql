@@ -2,11 +2,11 @@ BEGIN;
 
 -- Canonical parent + youngster seed baseline (future use).
 -- Keep only 3 parent + 6 youngster accounts and hard-delete non-target rows when unreferenced.
--- Backdoor password: teameditor123
+-- Backdoor password: Teameditor@123
 
 DO $$
 DECLARE
-  v_password_hash text := crypt('teameditor123', gen_salt('bf'));
+  v_password_hash text := crypt('Teameditor@123', gen_salt('bf'));
   rec record;
   v_school_id uuid;
   v_parent_user_id uuid;

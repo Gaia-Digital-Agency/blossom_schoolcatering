@@ -22,6 +22,13 @@ type OrderRow = {
   dishes: Array<{ item_name: string; quantity: number }>;
 };
 
+type MenuItem = {
+  id: string;
+  name: string;
+  description?: string;
+  price: number;
+};
+
 type AdminOrdersResponse = {
   filters: {
     schools: Array<{ id: string; name: string }>;
@@ -42,6 +49,7 @@ function formatMoney(value: number) {
 
 export default function AdminOrdersPage() {
   const [date, setDate] = useState(todayIsoLocal());
+  const [allDates, setAllDates] = useState(false);
   const [schoolId, setSchoolId] = useState('ALL');
   const [deliveryUserId, setDeliveryUserId] = useState('ALL');
   const [session, setSession] = useState<'ALL' | 'BREAKFAST' | 'SNACK' | 'LUNCH'>('ALL');
@@ -49,13 +57,18 @@ export default function AdminOrdersPage() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<OrderRow | null>(null);
+  const [editingOrder, setEditingOrder] = useState<OrderRow | null>(null);
+  const [editMenuItems, setEditMenuItems] = useState<MenuItem[]>([]);
+  const [editQuantities, setEditQuantities] = useState<Record<string, number>>({});
+  const [editLoading, setEditLoading] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [deletingOrderId, setDeletingOrderId] = useState('');
 
   const load = async () => {
     setError('');
     try {
       const query = new URLSearchParams();
-      query.set('date', date);
+      if (!allDates && date) query.set('date', date);
       if (schoolId !== 'ALL') query.set('school_id', schoolId);
       if (deliveryUserId !== 'ALL') query.set('delivery_user_id', deliveryUserId);
       if (session !== 'ALL') query.set('session', session);
@@ -85,7 +98,93 @@ export default function AdminOrdersPage() {
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [date, schoolId, deliveryUserId, session]);
+  const onOpenEditOrder = async (order: OrderRow) => {
+    setEditingOrder(order);
+    setEditLoading(true);
+    setSavingEdit(false);
+    setError('');
+    setMessage('');
+    try {
+      const query = new URLSearchParams({
+        service_date: order.service_date,
+        session: order.session,
+      });
+      const menuData = await apiFetch(`/menus?${query.toString()}`) as { items?: MenuItem[] };
+      const nextMenuItems = menuData.items || [];
+      const quantities = (order.dishes || []).reduce<Record<string, number>>((acc, dish) => {
+        const match = nextMenuItems.find((item) => item.name === dish.item_name);
+        if (match) acc[match.id] = Number(dish.quantity || 0);
+        return acc;
+      }, {});
+      setEditMenuItems(nextMenuItems);
+      setEditQuantities(quantities);
+    } catch (e) {
+      setEditingOrder(null);
+      setError(e instanceof Error ? e.message : 'Failed loading order editor');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const onChangeEditQuantity = (menuItemId: string, value: string) => {
+    const next = Number(value);
+    setEditQuantities((prev) => ({
+      ...prev,
+      [menuItemId]: Number.isFinite(next) && next > 0 ? Math.floor(next) : 0,
+    }));
+  };
+
+  const onSaveEditOrder = async () => {
+    if (!editingOrder) return;
+    const items = Object.entries(editQuantities)
+      .filter(([, quantity]) => Number(quantity) > 0)
+      .map(([menuItemId, quantity]) => ({ menuItemId, quantity: Number(quantity) }));
+    if (items.length === 0) {
+      setError('Select at least one menu item.');
+      return;
+    }
+    if (items.length > 5) {
+      setError('Maximum 5 items per order.');
+      return;
+    }
+    setSavingEdit(true);
+    setError('');
+    setMessage('');
+    try {
+      await apiFetch(`/orders/${editingOrder.order_id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ items }),
+      }, { skipAutoReload: true });
+      setMessage(`Updated order ${editingOrder.order_id}.`);
+      setEditingOrder(null);
+      setEditMenuItems([]);
+      setEditQuantities({});
+      await load();
+      if (selectedOrder?.order_id === editingOrder.order_id) {
+        const updatedDishes = items.map(({ menuItemId, quantity }) => {
+          const menuItem = editMenuItems.find((item) => item.id === menuItemId);
+          return {
+            item_name: menuItem?.name || menuItemId,
+            quantity,
+          };
+        });
+        setSelectedOrder({
+          ...selectedOrder,
+          dishes: updatedDishes,
+          total_price: updatedDishes.reduce((sum, dish) => {
+            const menuItem = editMenuItems.find((item) => item.name === dish.item_name);
+            return sum + Number(menuItem?.price || 0) * dish.quantity;
+          }, 0),
+        });
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed updating order');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [allDates, date, schoolId, deliveryUserId, session]);
 
   const outstandingTotal = useMemo(
     () => (data?.outstanding || []).reduce((sum, row) => sum + Number(row.total_price || 0), 0),
@@ -108,7 +207,14 @@ export default function AdminOrdersPage() {
           <div className="orders-filter-grid">
             <label>
               <span>Service Date</span>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={allDates} />
+            </label>
+            <label>
+              <span>Date Scope</span>
+              <select value={allDates ? 'ALL' : 'ONE'} onChange={(e) => setAllDates(e.target.value === 'ALL')}>
+                <option value="ONE">Specific date</option>
+                <option value="ALL">All dates</option>
+              </select>
             </label>
             <label>
               <span>School</span>
@@ -166,6 +272,7 @@ export default function AdminOrdersPage() {
                   <small>Dishes: {(row.dishes || []).map((dish) => `${dish.item_name} x${dish.quantity}`).join(', ') || '-'}</small>
                   <div className="orders-card-actions">
                     <button className="btn btn-outline btn-sm" type="button" onClick={() => setSelectedOrder(row)}>Read</button>
+                    <button className="btn btn-outline btn-sm" type="button" onClick={() => void onOpenEditOrder(row)}>Edit</button>
                     <button
                       className="btn btn-outline btn-sm"
                       type="button"
@@ -249,6 +356,55 @@ export default function AdminOrdersPage() {
                 disabled={deletingOrderId === selectedOrder.order_id}
               >
                 {deletingOrderId === selectedOrder.order_id ? 'Deleting...' : 'Delete Order'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {editingOrder ? (
+        <div className="orders-modal-overlay" onClick={() => !savingEdit && setEditingOrder(null)}>
+          <div className="orders-modal-card" onClick={(e) => e.stopPropagation()}>
+            <h2>Edit Order</h2>
+            <div className="orders-modal-grid">
+              <label><strong>Student</strong><small>{editingOrder.child_name}</small></label>
+              <label><strong>Date / Session</strong><small>{editingOrder.service_date} · {getSessionLabel(editingOrder.session)}</small></label>
+              <label className="orders-modal-wide">
+                <strong>Menu Items</strong>
+                <small>Adjust quantities and save the order.</small>
+              </label>
+            </div>
+            {editLoading ? (
+              <p className="auth-help">Loading menu options...</p>
+            ) : (
+              <div className="orders-edit-list">
+                {editMenuItems.map((item) => (
+                  <label key={item.id} className="orders-edit-row">
+                    <span>
+                      <strong>{item.name}</strong>
+                      <small>{formatMoney(item.price)}</small>
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={editQuantities[item.id] || 0}
+                      onChange={(e) => onChangeEditQuantity(item.id, e.target.value)}
+                      disabled={savingEdit}
+                    />
+                  </label>
+                ))}
+                {editMenuItems.length === 0 ? <p className="auth-help">No menu items available for this date and session.</p> : null}
+              </div>
+            )}
+            <div className="orders-modal-actions">
+              <button className="btn btn-outline" type="button" onClick={() => setEditingOrder(null)} disabled={savingEdit}>Cancel</button>
+              <button
+                className="btn btn-outline"
+                type="button"
+                onClick={() => void onSaveEditOrder()}
+                disabled={editLoading || savingEdit || editMenuItems.length === 0}
+              >
+                {savingEdit ? 'Saving...' : 'Save Order'}
               </button>
             </div>
           </div>
@@ -371,9 +527,43 @@ export default function AdminOrdersPage() {
           gap: 0.55rem;
           justify-content: flex-end;
         }
+        .orders-edit-list {
+          display: grid;
+          gap: 0.65rem;
+        }
+        .orders-edit-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 0.75rem;
+          padding: 0.7rem 0.8rem;
+          border: 1px solid #ddcfb8;
+          border-radius: 0.75rem;
+          background: #fffaf2;
+        }
+        .orders-edit-row span {
+          display: grid;
+          gap: 0.15rem;
+        }
+        .orders-edit-row small {
+          color: #5f5244;
+        }
+        .orders-edit-row input {
+          width: 88px;
+          padding: 0.45rem 0.55rem;
+          border: 1px solid #c9b89e;
+          border-radius: 0.55rem;
+        }
         @media (max-width: 680px) {
           .orders-modal-grid {
             grid-template-columns: 1fr;
+          }
+          .orders-edit-row {
+            align-items: stretch;
+            flex-direction: column;
+          }
+          .orders-edit-row input {
+            width: 100%;
           }
           .orders-card-actions :global(.btn),
           .orders-modal-actions :global(.btn) {

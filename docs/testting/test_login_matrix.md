@@ -7,9 +7,9 @@ Base URL: `http://34.158.47.112/schoolcatering`
 
 | Role | Username | Password | Login Path | Landing Path |
 |---|---|---|---|---|
-| Admin | `admin` | `admin123` | `/admin/login` | `/admin` |
-| Kitchen | `kitchen` | `kitchen123` | `/kitchen/login` | `/kitchen` |
-| Delivery | `delivery` | `delivery123` | `/delivery/login` | `/delivery` |
+| Admin | `admin` | `Teameditor@123` | `/admin/login` | `/admin` |
+| Kitchen | `kitchen` | `Teameditor@123` | `/kitchen/login` | `/kitchen` |
+| Delivery | `delivery` | `Teameditor@123` | `/delivery/login` | `/delivery` |
 | Parent | `parent` | `parent123` | `/parent/login` | `/parents` |
 | Youngster | `youngster` | `youngster123` | `/youngster/login` | `/youngsters` |
 

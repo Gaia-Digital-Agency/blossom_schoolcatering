@@ -22,7 +22,7 @@ async function req(path, { method = 'GET', token, body, headers = {} } = {}) {
 (async () => {
   try {
     const stamp = Date.now().toString().slice(-6);
-    const admin = await req('/auth/login', { method: 'POST', body: { username: 'admin', password: 'admin123', role: 'ADMIN' } });
+    const admin = await req('/auth/login', { method: 'POST', body: { username: 'admin', password: 'Teameditor@123', role: 'ADMIN' } });
     if (admin.status < 200 || admin.status >= 300) throw new Error(`admin login failed ${admin.status}`);
     const at = admin.body.accessToken;
 

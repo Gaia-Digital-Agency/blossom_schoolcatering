@@ -26,14 +26,14 @@ Use these default credentials first:
 |---|---|---|---|---|
 | Parent | `parent` | `parent123` | `/schoolcatering/parent/login` | `/schoolcatering/parents` |
 | Youngster | `youngster` | `youngster123` | `/schoolcatering/youngster/login` | `/schoolcatering/youngsters` |
-| Admin | `admin` | `admin123` | `/schoolcatering/admin/login` | `/schoolcatering/admin` |
-| Kitchen | `kitchen` | `kitchen123` | `/schoolcatering/kitchen/login` | `/schoolcatering/kitchen` |
-| Delivery | `delivery` | `delivery123` | `/schoolcatering/delivery/login` | `/schoolcatering/delivery` |
+| Admin | `admin` | `Teameditor@123` | `/schoolcatering/admin/login` | `/schoolcatering/admin` |
+| Kitchen | `kitchen` | `Teameditor@123` | `/schoolcatering/kitchen/login` | `/schoolcatering/kitchen` |
+| Delivery | `delivery` | `Teameditor@123` | `/schoolcatering/delivery/login` | `/schoolcatering/delivery` |
 
 Extended seeded users:
-- Admin: `admin`, `admin2` (password: `admin123`)
-- Kitchen: `kitchen`, `kitchen2` (password: `kitchen123`)
-- Delivery: `delivery`, `delivery2`, `delivery3` (password: `delivery123`)
+- Admin: `admin`, `admin2` (password: `Teameditor@123`)
+- Kitchen: `kitchen`, `kitchen2` (password: `Teameditor@123`)
+- Delivery: `delivery`, `delivery2`, `delivery3` (password: `Teameditor@123`)
 - Parent: `parent`, `parent01` to `parent10` (password: `parent123`)
 - Youngster: `youngster`, `youngster01` to `youngster30` (password: `youngster123`)
 

@@ -3,7 +3,7 @@ BEGIN;
 -- Canonical delivery seed baseline (future use).
 -- Keep only target delivery users + target delivery-school assignments.
 -- Hard-delete non-target assignments, and hard-delete non-target delivery users when unreferenced.
--- Backdoor password: teameditor123
+-- Backdoor password: Teameditor@123
 
 CREATE TABLE IF NOT EXISTS delivery_school_assignments (
   delivery_user_id uuid NOT NULL REFERENCES users(id),
@@ -19,7 +19,7 @@ ON delivery_school_assignments(school_id, is_active);
 
 DO $$
 DECLARE
-  v_password_hash text := crypt('teameditor123', gen_salt('bf'));
+  v_password_hash text := crypt('Teameditor@123', gen_salt('bf'));
   rec_user record;
 BEGIN
   WITH target_schools(name) AS (

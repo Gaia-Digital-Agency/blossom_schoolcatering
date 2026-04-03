@@ -53,7 +53,7 @@ function nextWeekday(offset = 1) {
 (async () => {
   const adminLogin = await req('/auth/login', {
     method: 'POST',
-    body: { username: 'admin', password: 'admin123', role: 'ADMIN' },
+    body: { username: 'admin', password: 'Teameditor@123', role: 'ADMIN' },
   });
 
   if (adminLogin.status < 200 || adminLogin.status >= 300) {
@@ -419,7 +419,7 @@ function nextWeekday(offset = 1) {
       body: {
         role: 'DELIVERY',
         username,
-        password: 'Delivery123',
+        password: 'Teameditor@123',
         firstName: 'Crud',
         lastName: 'Delivery',
         phoneNumber: `62866${stamp}03`,

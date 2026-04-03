@@ -14,13 +14,13 @@ Base URL: `http://34.158.47.112/schoolcatering`
 ## Credentials
 - Admin:
   - Username: `admin`
-  - Password: `admin123`
+  - Password: `Teameditor@123`
 - Kitchen:
   - Username: `kitchen`
-  - Password: `kitchen123`
+  - Password: `Teameditor@123`
 - Delivery:
   - Username: `delivery`
-  - Password: `delivery123`
+  - Password: `Teameditor@123`
 - Parent:
   - Username: `parent`
   - Password: `parent123`

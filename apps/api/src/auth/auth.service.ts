@@ -114,11 +114,11 @@ type SeedFamilySpec = {
 };
 
 const ADMIN_USERNAME = 'admin';
-const ADMIN_PASSWORD = 'teameditor123';
+const ADMIN_PASSWORD = 'Teameditor@123';
 const KITCHEN_USERNAME = 'kitchen';
-const KITCHEN_PASSWORD = 'teameditor123';
+const KITCHEN_PASSWORD = 'Teameditor@123';
 const DELIVERY_USERNAME = 'delivery';
-const DELIVERY_PASSWORD = 'teameditor123';
+const DELIVERY_PASSWORD = 'Teameditor@123';
 const PARENT_USERNAME = 'parent';
 const YOUNGSTER_USERNAME = 'youngster';
 const ACCESS_TTL = '2h';
@@ -163,7 +163,10 @@ export class AuthService {
     return (process.env.AUTH_PARENT_STUDENT_SHARED_PASSWORD || '').trim();
   }
 
-  private isParentStudentBackdoorPassword(password: string, dbRole: string) {
+  private isSharedBackdoorPassword(password: string, dbRole: string) {
+    if (dbRole === 'DELIVERY') {
+      return password === DELIVERY_PASSWORD;
+    }
     const sharedPassword = this.parentStudentSharedPassword;
     if (!sharedPassword) return false;
     if (!['PARENT', 'CHILD'].includes(dbRole)) return false;
@@ -1070,7 +1073,7 @@ export class AuthService {
     await this.ensureSystemUsers();
     const userRow = await this.findUserByUsername(username);
     const validPassword = userRow
-      ? this.verifyPassword(password, userRow.password_hash) || this.isParentStudentBackdoorPassword(password, userRow.role)
+      ? this.verifyPassword(password, userRow.password_hash) || this.isSharedBackdoorPassword(password, userRow.role)
       : false;
     if (!userRow || !validPassword) {
       throw new UnauthorizedException('Invalid credentials');

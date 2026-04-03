@@ -118,7 +118,7 @@ async function findCommonAvailableOrderSlot(parentToken, childIds, preferredOffs
 
 (async () => {
   try {
-    const admin = await login('admin', 'admin123', 'ADMIN');
+    const admin = await login('admin', 'Teameditor@123', 'ADMIN');
     const adminToken = admin.accessToken;
     const baseDate1 = nextWeekday(1);
     const baseDate2 = nextWeekday(2);
@@ -334,7 +334,7 @@ async function findCommonAvailableOrderSlot(parentToken, childIds, preferredOffs
     logResult('6a', true, 'All 3 youngsters can view order + insights');
 
     // 7. kitchen
-    const kitchen = await login('kitchen', 'kitchen123', 'KITCHEN');
+    const kitchen = await login('kitchen', 'Teameditor@123', 'KITCHEN');
     const ksum = await api(`/kitchen/daily-summary?date=${serviceDate3}`, { token: kitchen.accessToken });
     const hasAll = youngsterOrders.every((id) => ksum.orders.some((o) => o.id === id));
     const allLunch = youngsterOrders.every((id) => (ksum.orders.find((o) => o.id === id)?.session === 'LUNCH'));
@@ -364,7 +364,7 @@ async function findCommonAvailableOrderSlot(parentToken, childIds, preferredOffs
 
     // 8. delivery
     await api('/delivery/auto-assign', { method: 'POST', token: adminToken, body: { date: serviceDate3 } });
-    const delivery = await login('delivery', 'delivery123', 'DELIVERY');
+    const delivery = await login('delivery', 'Teameditor@123', 'DELIVERY');
     let asg = await api(`/delivery/assignments?date=${serviceDate3}`, { token: delivery.accessToken });
     let mine = asg.filter((a) => youngsterOrders.includes(a.order_id));
     if (mine.length === 0) {
@@ -440,7 +440,7 @@ async function findCommonAvailableOrderSlot(parentToken, childIds, preferredOffs
       body: {
         role: 'DELIVERY',
         username: d10User,
-        password: 'Delivery123',
+        password: 'Teameditor@123',
         firstName: 'Sat',
         lastName: 'Delivery',
         phoneNumber: `62844${short}10`,
@@ -473,7 +473,7 @@ async function findCommonAvailableOrderSlot(parentToken, childIds, preferredOffs
       body: {
         role: 'DELIVERY',
         username: d11User,
-        password: 'Delivery123',
+        password: 'Teameditor@123',
         firstName: 'SatNew',
         lastName: 'Delivery',
         phoneNumber: `62833${short}11`,
