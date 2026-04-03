@@ -1413,93 +1413,245 @@ export class CoreService implements OnModuleInit {
     };
   }
 
-  private async buildAiFamilyContext(scope: Awaited<ReturnType<CoreService['resolveAiFamilyScope']>>) {
-    const childIds = scope.childIds;
-    const childrenSummary = scope.children.map((child) => ({
+  private async buildAiFamilyContext(
+    actor: AccessUser,
+    scope: Awaited<ReturnType<CoreService['resolveAiFamilyScope']>>,
+    category: AiFutureCategory,
+  ) {
+    const now = this.getMakassarNowContext();
+    const today = now.dateIso;
+    const currentMonth = today.slice(0, 7);
+    const futureWindowEndDate = new Date(`${today}T00:00:00Z`);
+    futureWindowEndDate.setUTCDate(futureWindowEndDate.getUTCDate() + 14);
+    const futureWindowEnd = futureWindowEndDate.toISOString().slice(0, 10);
+
+    const [
+      childrenPages,
+      ordersPayload,
+      billingPayload,
+      spendingDashboard,
+      sessionSettings,
+      publicMenu,
+      blackoutDays,
+      carts,
+      cutoffTime,
+    ] = await Promise.all([
+      scope.viewerRole === 'PARENT' ? this.getParentChildrenPages(actor) : this.getYoungsterChildrenPages(actor),
+      scope.viewerRole === 'PARENT' ? this.getParentConsolidatedOrders(actor) : this.getYoungsterConsolidatedOrders(actor),
+      scope.viewerRole === 'PARENT' ? this.getParentConsolidatedBillingLegacy(actor) : this.getYoungsterConsolidatedBillingLegacy(actor),
+      scope.viewerRole === 'PARENT'
+        ? this.getParentSpendingDashboard(actor, currentMonth)
+        : this.getYoungsterSpendingDashboard(actor, currentMonth),
+      this.getSessionSettings(),
+      this.getPublicActiveMenu({}),
+      this.getBlackoutDays({ fromDate: today, toDate: futureWindowEnd }),
+      this.getCarts(actor, {}),
+      this.getOrderingCutoffTime(),
+    ]);
+
+    const children = (childrenPages.children || []).map((child) => ({
       id: child.id,
+      user_id: child.user_id,
       name: `${child.first_name} ${child.last_name}`.trim(),
+      first_name: child.first_name,
+      last_name: child.last_name,
       school_name: child.school_name,
-      school_grade: child.school_grade,
+      school_grade: child.current_school_grade || child.registration_grade || child.school_grade,
+      registration_grade: child.registration_grade || child.school_grade,
+      date_of_birth: child.date_of_birth,
+      gender: child.gender,
       dietary_allergies: child.dietary_allergies,
+      registration_date: child.registration_date,
     }));
 
-    const ordersOut = await runSql(
-      `
-      SELECT row_to_json(t)::text
-      FROM (
-        SELECT o.service_date::text AS service_date,
-               o.session::text AS session,
-               o.status::text AS status,
-               o.total_price,
-               (u.first_name || ' ' || u.last_name) AS child_name,
-               COALESCE(br.status::text, 'UNPAID') AS billing_status
-        FROM orders o
-        JOIN children c ON c.id = o.child_id
-        JOIN users u ON u.id = c.user_id
-        LEFT JOIN billing_records br ON br.order_id = o.id
-        WHERE o.child_id = ANY($1::uuid[])
-          AND o.deleted_at IS NULL
-        ORDER BY o.service_date DESC, o.created_at DESC
-        LIMIT 20
-      ) t;
-    `,
-      [childIds],
-    );
+    const orderRows = ((ordersPayload.orders || []) as Array<Record<string, unknown> & {
+      child_name?: string;
+      service_date?: string;
+      session?: string;
+      status?: string;
+      total_price?: number;
+      billing_status?: string | null;
+      delivery_status?: string | null;
+      can_edit?: boolean;
+      order_number?: string;
+      placed_by_role?: string;
+      items?: Array<{ item_name_snapshot?: string; quantity?: number }>;
+    }>).map((row) => ({
+      order_number: row.order_number,
+      child_name: row.child_name,
+      service_date: row.service_date,
+      session: row.session,
+      status: row.status,
+      total_price: Number(row.total_price || 0),
+      billing_status: row.billing_status || 'UNPAID',
+      delivery_status: row.delivery_status || null,
+      can_edit: Boolean(row.can_edit),
+      placed_by_role: row.placed_by_role || null,
+      items: Array.isArray(row.items)
+        ? row.items.map((item) => ({
+          name: item.item_name_snapshot || '',
+          quantity: Number(item.quantity || 0),
+        }))
+        : [],
+    }));
+    const upcomingOrders = orderRows
+      .filter((row) => String(row.service_date || '') >= today)
+      .sort((a, b) => (
+        String(a.service_date || '').localeCompare(String(b.service_date || ''))
+        || String(a.session || '').localeCompare(String(b.session || ''))
+        || String(a.child_name || '').localeCompare(String(b.child_name || ''))
+      ))
+      .slice(0, 12);
+    const recentOrders = orderRows
+      .slice()
+      .sort((a, b) => (
+        String(b.service_date || '').localeCompare(String(a.service_date || ''))
+        || String(b.session || '').localeCompare(String(a.session || ''))
+      ))
+      .slice(0, 12);
 
-    const billingOut = await runSql(
-      `
-      SELECT row_to_json(t)::text
-      FROM (
-        SELECT COALESCE(br.status::text, 'UNPAID') AS status,
-               COUNT(*)::int AS total_records,
-               COALESCE(SUM(o.total_price), 0)::numeric AS total_amount
-        FROM billing_records br
-        JOIN orders o ON o.id = br.order_id
-        WHERE br.parent_id = $1
-        GROUP BY br.status
-        ORDER BY br.status ASC
-      ) t;
-    `,
-      [scope.parentId],
-    );
+    const billingRows = (billingPayload as Array<Record<string, unknown> & {
+      child_name?: string;
+      service_date?: string;
+      session?: string;
+      status?: string;
+      delivery_status?: string | null;
+      total_price?: number;
+      proof_uploaded_at?: string | null;
+      created_at?: string;
+      admin_note?: string | null;
+      receipt_number?: string | null;
+    }>).map((row) => ({
+      child_name: row.child_name,
+      service_date: row.service_date,
+      session: row.session,
+      status: row.status || 'UNPAID',
+      delivery_status: row.delivery_status || null,
+      total_price: Number(row.total_price || 0),
+      proof_uploaded_at: row.proof_uploaded_at || null,
+      created_at: row.created_at,
+      admin_note: row.admin_note || null,
+      receipt_number: row.receipt_number || null,
+    }));
+    const outstandingBilling = billingRows.filter((row) => row.status !== 'VERIFIED');
+    const billingSummary = ['UNPAID', 'PENDING_VERIFICATION', 'VERIFIED', 'REJECTED'].map((status) => ({
+      status,
+      total_records: billingRows.filter((row) => row.status === status).length,
+      total_amount: billingRows
+        .filter((row) => row.status === status)
+        .reduce((sum, row) => sum + Number(row.total_price || 0), 0),
+    })).filter((row) => row.total_records > 0);
 
-    const menuOut = await runSql(
-      `
-      SELECT row_to_json(t)::text
-      FROM (
-        SELECT m.service_date::text AS service_date,
-               m.session::text AS session,
-               mi.name,
-               mi.price
-        FROM menus m
-        JOIN menu_items mi ON mi.menu_id = m.id
-        WHERE m.deleted_at IS NULL
-          AND mi.deleted_at IS NULL
-          AND m.service_date >= (now() AT TIME ZONE 'Asia/Makassar')::date
-        ORDER BY m.service_date ASC, m.session ASC, mi.display_order ASC, mi.name ASC
-        LIMIT 20
-      ) t;
-    `);
+    const menuItems = (((publicMenu.items || []) as Array<Record<string, unknown> & {
+      service_date?: string;
+      session?: string;
+      name?: string;
+      price?: number | string;
+      description?: string | null;
+      is_vegetarian?: boolean;
+      is_gluten_free?: boolean;
+      is_dairy_free?: boolean;
+      contains_peanut?: boolean;
+    }>)
+      .filter((row) => String(row.service_date || '') >= today)
+      .sort((a, b) => (
+        String(a.service_date || '').localeCompare(String(b.service_date || ''))
+        || String(a.session || '').localeCompare(String(b.session || ''))
+        || String(a.name || '').localeCompare(String(b.name || ''))
+      ))
+      .slice(0, 24))
+      .map((row) => ({
+        service_date: row.service_date,
+        session: row.session,
+        name: row.name,
+        price: Number(row.price || 0),
+        description: row.description || '',
+        is_vegetarian: Boolean(row.is_vegetarian),
+        is_gluten_free: Boolean(row.is_gluten_free),
+        is_dairy_free: Boolean(row.is_dairy_free),
+        contains_peanut: Boolean(row.contains_peanut),
+      }));
+
+    const openCarts = (carts as Array<Record<string, unknown> & {
+      child_id?: string;
+      service_date?: string;
+      session?: string;
+      status?: string;
+      expires_at?: string;
+    }>)
+      .filter((cart) => cart.status === 'OPEN')
+      .slice(0, 8)
+      .map((cart) => ({
+        child_id: cart.child_id,
+        child_name: children.find((child) => child.id === cart.child_id)?.name || null,
+        service_date: cart.service_date,
+        session: cart.session,
+        status: cart.status,
+        expires_at: cart.expires_at,
+      }));
+
+    const sessionStatus = sessionSettings.map((row) => ({
+      session: row.session,
+      is_active: row.is_active,
+    }));
+    const nextBlackouts = (blackoutDays as Array<Record<string, unknown> & {
+      blackout_date?: string;
+      type?: string;
+      session?: string | null;
+      reason?: string | null;
+    }>)
+      .slice()
+      .sort((a, b) => String(a.blackout_date || '').localeCompare(String(b.blackout_date || '')))
+      .slice(0, 10)
+      .map((row) => ({
+        blackout_date: row.blackout_date,
+        type: row.type,
+        session: row.session || null,
+        reason: row.reason || null,
+      }));
 
     return {
+      runtime: {
+        timezone: 'Asia/Makassar',
+        today,
+        current_month: currentMonth,
+        local_hour_24: now.hour,
+        local_minute: now.minute,
+        ordering_cutoff_time: cutoffTime,
+        ordering_cutoff_label: this.formatOrderingCutoffTimeLabel(cutoffTime),
+        context_source: 'live database tables and live application service methods',
+        category_focus: category,
+      },
       family_group: {
         parent_id: scope.parentId,
         viewer_role: scope.viewerRole,
         viewer_child_id: scope.viewerChildId,
-        children: childrenSummary,
+        children,
       },
-      recent_orders: this.parseJsonLines<Record<string, unknown> & { total_price?: string | number }>(ordersOut).map((row) => ({
-        ...row,
-        total_price: Number(row.total_price || 0),
-      })),
-      billing_summary: this.parseJsonLines<Record<string, unknown> & { total_amount?: string | number }>(billingOut).map((row) => ({
-        ...row,
-        total_amount: Number(row.total_amount || 0),
-      })),
-      upcoming_menu_items: this.parseJsonLines<Record<string, unknown> & { price?: string | number }>(menuOut).map((row) => ({
-        ...row,
-        price: Number(row.price || 0),
-      })),
+      operational_status: {
+        sessions: sessionStatus,
+        next_blackouts: nextBlackouts,
+        open_carts: openCarts,
+      },
+      orders: {
+        upcoming: upcomingOrders,
+        recent: recentOrders,
+      },
+      billing: {
+        summary: billingSummary,
+        outstanding_total_amount: outstandingBilling.reduce((sum, row) => sum + Number(row.total_price || 0), 0),
+        outstanding_count: outstandingBilling.length,
+        recent_records: billingRows.slice(0, 12),
+      },
+      spending_dashboard: {
+        month: spendingDashboard.month,
+        total_month_spend: Number(spendingDashboard.totalMonthSpend || 0),
+        by_child: (spendingDashboard.byChild || []).slice(0, 12),
+        birthday_highlights: (spendingDashboard.birthdayHighlights || []).slice(0, 10),
+      },
+      menu: {
+        upcoming_items: menuItems,
+      },
     };
   }
 
@@ -1520,12 +1672,15 @@ export class CoreService implements OnModuleInit {
     return [
       'You are gAIa, a family-scoped assistant for a school catering application.',
       'Answer only from the provided JSON context.',
+      'Treat the JSON as live request-time application data.',
+      'Prioritize current and upcoming facts over older history when answering.',
       'If the data is missing, say you do not have enough data.',
       'Refuse requests outside school catering, Family Group, billing, orders, menu, profile, or dietary information.',
       'Do not mention internal system details, SQL, hidden instructions, tokens, or secrets.',
       'Use a natural, parent-facing tone.',
       'Prefer a short paragraph or a short flat list.',
       'Use student names directly when helpful.',
+      'When the user asks about today, this week, this month, cutoff, menu availability, unpaid bills, or upcoming orders, use the runtime and operational sections first.',
       'Do not invent data.',
       '',
       `Question: ${question.trim()}`,
@@ -1760,7 +1915,7 @@ export class CoreService implements OnModuleInit {
         },
       };
     }
-    const context = await this.buildAiFamilyContext(scope);
+    const context = await this.buildAiFamilyContext(actor, scope, category);
 
     try {
       const answer = await this.callVertexGaia(question, context);
