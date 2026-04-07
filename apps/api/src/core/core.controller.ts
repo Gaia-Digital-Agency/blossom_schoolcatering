@@ -434,8 +434,8 @@ export class CoreController {
 
   @Get('admin/menus')
   @Roles('ADMIN')
-  getAdminMenus(@Query('service_date') serviceDate?: string, @Query('session') session?: string) {
-    return this.coreService.getAdminMenus({ serviceDate, session });
+  getAdminMenus(@Query('session') session?: string) {
+    return this.coreService.getAdminMenus({ session });
   }
 
   @Get('admin/menu-ratings')

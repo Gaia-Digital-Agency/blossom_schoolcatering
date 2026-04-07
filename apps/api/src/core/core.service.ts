@@ -3731,20 +3731,12 @@ export class CoreService implements OnModuleInit {
     return this.parseJsonLines(out);
   }
 
-  async getAdminMenus(query: { serviceDate?: string; session?: string }) {
-    const serviceDate = query.serviceDate ? this.validateServiceDate(query.serviceDate) : null;
+  async getAdminMenus(query: { session?: string }) {
     const session = query.session ? this.normalizeSession(query.session) : null;
-    const filters: string[] = [];
     const params: unknown[] = [];
-    if (serviceDate) {
-      params.push(serviceDate);
-      filters.push(`m.service_date = $${params.length}::date`);
-    }
-    if (session) {
-      params.push(session);
-      filters.push(`m.session = $${params.length}::session_type`);
-    }
-    const filterSql = filters.length > 0 ? `AND ${filters.join('\n          AND ')}` : '';
+    const filterSql = session
+      ? (() => { params.push(session); return `AND m.session = $${params.length}::session_type`; })()
+      : '';
     const out = await runSql(
       `
       SELECT row_to_json(t)::text
@@ -3778,6 +3770,7 @@ export class CoreService implements OnModuleInit {
           ${filterSql}
           AND m.deleted_at IS NULL
           AND mi.deleted_at IS NULL
+          AND mi.is_available = true
         GROUP BY mi.id, m.service_date, m.session
         ORDER BY m.service_date DESC, m.session ASC, lower(mi.name) ASC
       ) t;
@@ -3785,7 +3778,6 @@ export class CoreService implements OnModuleInit {
       params,
     );
     return {
-      serviceDate: serviceDate || 'ALL_DATES',
       session: session || 'ALL',
       items: this.parseJsonLines(out),
     };
@@ -6857,12 +6849,16 @@ export class CoreService implements OnModuleInit {
               WHEN NULLIF(trim(up.phone_number), '') IS NOT NULL THEN 'PARENT'
               ELSE NULL
             END AS target_source,
+            COALESCE(c.current_school_grade, c.school_grade, '') AS student_grade,
+            COALESCE(s.name, '') AS school_name,
             COALESCE(pc.created_at, o.created_at) AS parent_linked_at
           FROM orders o
           JOIN children c
             ON c.id = o.child_id
           JOIN users uc
             ON uc.id = c.user_id
+          LEFT JOIN schools s
+            ON s.id = c.school_id
           LEFT JOIN parent_children pc
             ON pc.child_id = c.id
           LEFT JOIN parents p
@@ -6914,7 +6910,9 @@ export class CoreService implements OnModuleInit {
             'userId', d.student_user_id,
             'name', d.student_name,
             'firstName', d.student_first_name,
-            'phone', d.student_phone
+            'phone', d.student_phone,
+            'grade', d.student_grade,
+            'schoolName', d.school_name
           ) AS "student",
           json_build_object(
             'id', d.parent_id,
@@ -7009,6 +7007,8 @@ export class CoreService implements OnModuleInit {
         name: string;
         firstName: string;
         phone?: string | null;
+        grade: string;
+        schoolName: string;
       };
       parentFallback: {
         id?: string | null;

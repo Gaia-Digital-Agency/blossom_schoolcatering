@@ -28,6 +28,15 @@ export default function AdminHub() {
             <h1>Admin Module</h1>
             <p>Choose a module.</p>
           </div>
+          <button
+            type="button"
+            className="admin-create-order-button"
+            onClick={() => {
+              window.location.href = `${getAppBase()}/admin/create-order`;
+            }}
+          >
+            Create Order
+          </button>
         </div>
         <div className="admin-hub-grid">
           {HUB_ITEMS.map((item) => (
@@ -70,6 +79,21 @@ export default function AdminHub() {
           color: #7a6a58;
           font-size: 0.9rem;
         }
+        .admin-create-order-button {
+          border: 1px solid #c8a96e;
+          border-radius: 999px;
+          background: linear-gradient(180deg, #fff5db 0%, #f2dfad 100%);
+          color: #4f3a16;
+          font-weight: 700;
+          padding: 0.75rem 1rem;
+          cursor: pointer;
+          box-shadow: 0 4px 14px rgba(122, 106, 88, 0.12);
+          transition: transform 0.14s ease, box-shadow 0.14s ease;
+        }
+        .admin-create-order-button:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 10px 24px rgba(122, 106, 88, 0.18);
+        }
         .admin-hub-grid {
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -93,6 +117,12 @@ export default function AdminHub() {
         .admin-hub-card:hover {
           transform: translateY(-3px);
           box-shadow: 0 10px 24px rgba(122, 106, 88, 0.18);
+        }
+        @media (max-width: 640px) {
+          .admin-hub-top {
+            flex-direction: column;
+            align-items: stretch;
+          }
         }
       `}</style>
     </main>
