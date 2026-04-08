@@ -3,14 +3,13 @@
 ## Delivery Order (Required)
 Always follow this order for changes:
 1. Server first (`/var/www/schoolcatering`)
-2. Push to GitHub (`main` via PR)
+2. Push to GitHub (`main`)
 3. Pull to local workspace
 
 ## Branch and PR Workflow
-- Do not push directly to `main`.
-- Create a feature branch: `feature/<short-topic>`
-- Open PR to `main` with testing notes and deploy impact.
-- Merge only after checks pass.
+- The repository is currently maintained directly on `main`.
+- Use a feature branch only when the work benefits from a review branch or PR.
+- If you use a feature branch, open the PR to `main` with testing notes and deploy impact.
 
 ## Commit Message Convention
 Use:
@@ -27,20 +26,25 @@ Example:
 
 ## Deploy (Server)
 ```bash
+ssh 34.158.47.112
 cd /var/www/schoolcatering
-git fetch origin main
-git pull --rebase origin main
-rm -rf public/*
-cp -r apps/web/* public/
+git pull --ff-only origin main
+npm -C apps/api run build
+npm -C apps/web run build
+pm2 restart schoolcatering-api
+pm2 restart schoolcatering-web
 ```
 
 ## Rollback (Server)
 ```bash
+ssh 34.158.47.112
 cd /var/www/schoolcatering
 git log --oneline -n 10
 git checkout <good_commit_hash>
-rm -rf public/*
-cp -r apps/web/* public/
+npm -C apps/api run build
+npm -C apps/web run build
+pm2 restart schoolcatering-api
+pm2 restart schoolcatering-web
 ```
 
 ## Release Tag Convention

@@ -13,7 +13,7 @@
 ```bash
 curl -s -X POST http://34.158.47.112/schoolcatering/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"teameditor123"}'
+  -d '{"username":"admin","password":"Teameditor@123"}'
 ```
 
 Extract `accessToken`.
