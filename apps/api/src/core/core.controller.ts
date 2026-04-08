@@ -136,6 +136,18 @@ export class CoreController {
     return this.coreService.getDailyOrdersByPhone(req.user, { date, phone });
   }
 
+  @Get('admin/family-context')
+  @Roles('ADMIN')
+  getAdminFamilyContext(@Req() req: AuthRequest, @Query('phone') phone?: string) {
+    return this.coreService.getAdminFamilyContextByPhone(req.user, { phone });
+  }
+
+  @Get('admin/family-orders')
+  @Roles('ADMIN')
+  getAdminFamilyOrders(@Req() req: AuthRequest, @Query('phone') phone?: string, @Query('date') date?: string) {
+    return this.coreService.getAdminFamilyOrdersByPhone(req.user, { phone, date });
+  }
+
   @Post('admin/site-settings/hero-image-upload')
   @Roles('ADMIN')
   @UseInterceptors(FileInterceptor('image', { limits: { fileSize: 5 * 1024 * 1024 } }))

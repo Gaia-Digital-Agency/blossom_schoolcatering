@@ -84,6 +84,7 @@ export class CoreService implements OnModuleInit {
   private childCurrentGradeColumnReady = false;
   private menuItemTextDefaultsReady = false;
   private parent2ColsReady = false;
+  private familyIdsReady = false;
   private readonly publicMenuCacheTtlMs = 60_000;
   private publicMenuCache = new Map<string, {
     data: {
@@ -113,6 +114,7 @@ export class CoreService implements OnModuleInit {
     await this.ensureAdminAuditTrailTable();
     await this.ensureMultiOrderSchema();
     await this.ensureMenuItemTextDefaults();
+    await this.ensureFamilyIdColumns();
   }
 
   private async ensureBlackoutDaysSessionColumn() {
@@ -508,6 +510,183 @@ export class CoreService implements OnModuleInit {
       name: String(row.name || '').trim() || row.username || null,
       username: row.username || null,
       role: row.role || null,
+    };
+  }
+
+  private async resolveFamilyScopeByPhone(phoneNumber?: string | null) {
+    await this.ensureFamilyIdColumns();
+    await this.ensureParent2Columns();
+    const normalizedPhone = this.normalizePhone(phoneNumber);
+    const phoneKey = this.phoneCompareKey(phoneNumber);
+    if (!phoneKey) throw new BadRequestException('phone is required');
+
+    const senderOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT *
+        FROM (
+          SELECT trim(concat(coalesce(u.first_name, ''), ' ', coalesce(u.last_name, ''))) AS name,
+                 u.username,
+                 'PARENT'::text AS role,
+                 u.phone_number AS phone,
+                 p.family_id::text AS family_id,
+                 p.id AS parent_id,
+                 NULL::uuid AS child_id,
+                 'PRIMARY_PARENT'::text AS source,
+                 1 AS priority
+          FROM parents p
+          JOIN users u ON u.id = p.user_id
+          WHERE p.deleted_at IS NULL
+            AND u.deleted_at IS NULL
+            AND u.is_active = true
+            AND regexp_replace(coalesce(u.phone_number, ''), '[^0-9]', '', 'g') = $1
+
+          UNION ALL
+
+          SELECT trim(concat(coalesce(u.first_name, ''), ' ', coalesce(u.last_name, ''))) AS name,
+                 u.username,
+                 'YOUNGSTER'::text AS role,
+                 u.phone_number AS phone,
+                 c.family_id::text AS family_id,
+                 NULL::uuid AS parent_id,
+                 c.id AS child_id,
+                 'YOUNGSTER'::text AS source,
+                 2 AS priority
+          FROM children c
+          JOIN users u ON u.id = c.user_id
+          WHERE c.deleted_at IS NULL
+            AND c.is_active = true
+            AND u.deleted_at IS NULL
+            AND u.is_active = true
+            AND regexp_replace(coalesce(u.phone_number, ''), '[^0-9]', '', 'g') = $1
+
+          UNION ALL
+
+          SELECT COALESCE(NULLIF(BTRIM(p.parent2_first_name), ''), trim(concat(coalesce(u.first_name, ''), ' ', coalesce(u.last_name, '')))) AS name,
+                 NULL::text AS username,
+                 'PARENT'::text AS role,
+                 p.parent2_phone AS phone,
+                 p.family_id::text AS family_id,
+                 p.id AS parent_id,
+                 NULL::uuid AS child_id,
+                 'SECONDARY_PARENT'::text AS source,
+                 3 AS priority
+          FROM parents p
+          JOIN users u ON u.id = p.user_id
+          WHERE p.deleted_at IS NULL
+            AND u.deleted_at IS NULL
+            AND u.is_active = true
+            AND regexp_replace(coalesce(p.parent2_phone, ''), '[^0-9]', '', 'g') = $1
+        ) candidates
+        ORDER BY priority ASC
+        LIMIT 1
+      ) t;
+    `,
+      [phoneKey],
+    );
+
+    if (!senderOut) {
+      return {
+        ok: true,
+        found: false,
+        phone: normalizedPhone,
+      };
+    }
+
+    const sender = this.parseJsonLine<{
+      name: string;
+      username?: string | null;
+      role: string;
+      phone?: string | null;
+      family_id?: string | null;
+      parent_id?: string | null;
+      child_id?: string | null;
+      source: string;
+    }>(senderOut);
+
+    if (!sender.family_id) {
+      return {
+        ok: true,
+        found: false,
+        phone: normalizedPhone,
+      };
+    }
+
+    const parents = this.parseJsonLines<Record<string, unknown>>(await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT p.id,
+               u.id AS user_id,
+               p.family_id::text AS family_id,
+               u.username,
+               u.first_name,
+               u.last_name,
+               trim(concat(coalesce(u.first_name, ''), ' ', coalesce(u.last_name, ''))) AS name,
+               u.phone_number,
+               u.email,
+               p.parent2_first_name,
+               p.parent2_phone,
+               p.parent2_email
+        FROM parents p
+        JOIN users u ON u.id = p.user_id
+        WHERE p.deleted_at IS NULL
+          AND u.deleted_at IS NULL
+          AND u.is_active = true
+          AND p.family_id = $1::uuid
+        ORDER BY u.first_name, u.last_name
+      ) t;
+    `,
+      [sender.family_id],
+    ));
+
+    const children = this.parseJsonLines<Record<string, unknown>>(await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT c.id,
+               c.user_id,
+               c.family_id::text AS family_id,
+               u.username,
+               u.first_name,
+               u.last_name,
+               trim(concat(coalesce(u.first_name, ''), ' ', coalesce(u.last_name, ''))) AS name,
+               u.phone_number,
+               u.email,
+               COALESCE(c.current_school_grade, c.school_grade) AS school_grade,
+               s.name AS school_name
+        FROM children c
+        JOIN users u ON u.id = c.user_id
+        JOIN schools s ON s.id = c.school_id
+        WHERE c.deleted_at IS NULL
+          AND c.is_active = true
+          AND u.deleted_at IS NULL
+          AND u.is_active = true
+          AND c.family_id = $1::uuid
+        ORDER BY u.first_name, u.last_name
+      ) t;
+    `,
+      [sender.family_id],
+    )).map((row) => this.withEffectiveGrade(row));
+
+    return {
+      ok: true,
+      found: true,
+      phone: this.normalizePhone(sender.phone) || normalizedPhone,
+      sender: {
+        name: sender.name,
+        username: sender.username || null,
+        role: sender.role,
+        source: sender.source,
+        parent_id: sender.parent_id || null,
+        child_id: sender.child_id || null,
+      },
+      family: {
+        family_id: sender.family_id,
+        parents,
+        children,
+      },
     };
   }
 
@@ -1143,6 +1322,7 @@ export class CoreService implements OnModuleInit {
   }
 
   private async getParentIdByUserId(userId: string) {
+    await this.ensureFamilyIdColumns();
     const out = await runSql(
       `SELECT id
        FROM parents
@@ -1154,29 +1334,51 @@ export class CoreService implements OnModuleInit {
     return out || null;
   }
 
-  private async syncParentChildrenByLastName(parentId: string) {
-    const normalizedLastName = await runSql(
-      `SELECT trim(lower(u.last_name))
-       FROM parents p
-       JOIN users u ON u.id = p.user_id
-       WHERE p.id = $1
-         AND p.deleted_at IS NULL
-         AND u.deleted_at IS NULL
+  private async getParentFamilyId(parentId: string) {
+    await this.ensureFamilyIdColumns();
+    return await runSql(
+      `SELECT family_id::text
+       FROM parents
+       WHERE id = $1
+         AND deleted_at IS NULL
        LIMIT 1;`,
       [parentId],
-    );
-    if (!normalizedLastName) return 0;
+    ) || null;
+  }
 
+  private async getChildFamilyId(childId: string) {
+    await this.ensureFamilyIdColumns();
+    return await runSql(
+      `SELECT family_id::text
+       FROM children
+       WHERE id = $1
+         AND deleted_at IS NULL
+         AND is_active = true
+       LIMIT 1;`,
+      [childId],
+    ) || null;
+  }
+
+  private async getFamilyIdByUserId(userId: string, role: 'PARENT' | 'YOUNGSTER') {
+    if (role === 'PARENT') {
+      const parentId = await this.getParentIdByUserId(userId);
+      return parentId ? await this.getParentFamilyId(parentId) : null;
+    }
+    const childId = await this.getChildIdByUserId(userId);
+    return childId ? await this.getChildFamilyId(childId) : null;
+  }
+
+  private async syncParentChildrenByLastName(parentId: string) {
+    await this.ensureFamilyIdColumns();
+    const familyId = await this.getParentFamilyId(parentId);
+    if (!familyId) return 0;
     const linkedCount = Number(await runSql(
       `WITH target_children AS (
-         SELECT c.id
-         FROM children c
-         JOIN users u ON u.id = c.user_id
-         WHERE c.deleted_at IS NULL
-           AND c.is_active = true
-           AND u.deleted_at IS NULL
-           AND u.is_active = true
-           AND trim(lower(u.last_name)) = $1
+         SELECT id
+         FROM children
+         WHERE family_id = $1::uuid
+           AND deleted_at IS NULL
+           AND is_active = true
        ),
        inserted AS (
          INSERT INTO parent_children (parent_id, child_id)
@@ -1186,12 +1388,13 @@ export class CoreService implements OnModuleInit {
          RETURNING 1
        )
        SELECT count(*)::int FROM inserted;`,
-      [normalizedLastName, parentId],
+      [familyId, parentId],
     ) || 0);
     return linkedCount;
   }
 
   private async getChildIdByUserId(userId: string) {
+    await this.ensureFamilyIdColumns();
     const out = await runSql(
       `SELECT id
        FROM children
@@ -1205,15 +1408,10 @@ export class CoreService implements OnModuleInit {
   }
 
   private async ensureParentOwnsChild(parentId: string, childId: string) {
-    const allowed = await runSql(
-      `SELECT EXISTS (
-         SELECT 1
-         FROM parent_children
-         WHERE parent_id = $1
-           AND child_id = $2
-       );`,
-      [parentId, childId],
-    );
+    await this.ensureFamilyIdColumns();
+    const parentFamilyId = await this.getParentFamilyId(parentId);
+    const childFamilyId = await this.getChildFamilyId(childId);
+    const allowed = parentFamilyId && childFamilyId && parentFamilyId === childFamilyId ? 't' : 'f';
     if (allowed !== 't') {
       throw new ForbiddenException('ORDER_OWNERSHIP_FORBIDDEN');
     }
@@ -1347,18 +1545,22 @@ export class CoreService implements OnModuleInit {
       throw new ForbiddenException('Role not allowed');
     }
 
+    await this.ensureFamilyIdColumns();
     let parentId: string | null = null;
     let viewerChildId: string | null = null;
+    let familyId: string | null = null;
 
     if (actor.role === 'PARENT') {
       parentId = await this.getParentIdByUserId(actor.uid);
       if (!parentId) throw new BadRequestException('Parent profile not found');
+      familyId = await this.getParentFamilyId(parentId);
     } else {
       viewerChildId = await this.getChildIdByUserId(actor.uid);
       if (!viewerChildId) throw new NotFoundException('Youngster profile not found');
+      familyId = await this.getChildFamilyId(viewerChildId);
       parentId = await this.getParentIdByChildId(viewerChildId);
-      if (!parentId) throw new BadRequestException('Family Group not found');
     }
+    if (!familyId) throw new BadRequestException('Family Group not found');
 
     const childrenOut = await runSql(
       `
@@ -1380,18 +1582,17 @@ export class CoreService implements OnModuleInit {
                  ORDER BY cdr.updated_at DESC NULLS LAST, cdr.created_at DESC
                  LIMIT 1
                ), 'No Allergies') AS dietary_allergies
-        FROM parent_children pc
-        JOIN children c ON c.id = pc.child_id
+        FROM children c
         JOIN users u ON u.id = c.user_id
         JOIN schools s ON s.id = c.school_id
-        WHERE pc.parent_id = $1
+        WHERE c.family_id = $1::uuid
           AND c.is_active = true
           AND c.deleted_at IS NULL
           AND u.deleted_at IS NULL
         ORDER BY u.first_name ASC, u.last_name ASC
       ) t;
     `,
-      [parentId],
+      [familyId],
     );
     const children = this.parseJsonLines<{
       id: string;
@@ -1406,6 +1607,7 @@ export class CoreService implements OnModuleInit {
 
     return {
       viewerRole: actor.role as 'PARENT' | 'YOUNGSTER',
+      familyId,
       parentId,
       viewerChildId,
       childIds: children.map((child) => child.id),
@@ -1623,6 +1825,7 @@ export class CoreService implements OnModuleInit {
         category_focus: category,
       },
       family_group: {
+        family_id: scope.familyId,
         parent_id: scope.parentId,
         viewer_role: scope.viewerRole,
         viewer_child_id: scope.viewerChildId,
@@ -1775,18 +1978,18 @@ export class CoreService implements OnModuleInit {
     } else {
       const parentId = await this.getParentIdByUserId(actor.uid);
       if (!parentId) throw new BadRequestException('Parent profile not found');
-      await this.syncParentChildrenByLastName(parentId);
+      const familyId = await this.getParentFamilyId(parentId);
+      if (!familyId) throw new BadRequestException('Family Group not found');
       const out = await runSql(
         `SELECT c.id
          FROM children c
          JOIN users u ON u.id = c.user_id
-         JOIN parent_children pc ON pc.child_id = c.id
-         WHERE pc.parent_id = $1
+         WHERE c.family_id = $1::uuid
            AND lower(u.username) = $2
            AND c.is_active = true
            AND c.deleted_at IS NULL
          LIMIT 1;`,
-        [parentId, childUsername],
+        [familyId, childUsername],
       );
       if (!out) throw new NotFoundException(`Child with username "${input.childUsername}" not found or not linked to your account`);
       childId = out;
@@ -2561,6 +2764,9 @@ export class CoreService implements OnModuleInit {
     if (await this.findActiveUserByEmail(email)) throw new ConflictException('That email is already taken');
     if (await this.findActiveUserByPhone(phoneNumber)) throw new ConflictException('That phone number is already taken');
     await this.ensureChildCurrentGradeColumn();
+    await this.ensureFamilyIdColumns();
+    let familyId: string | null = parentId ? await this.getParentFamilyId(parentId) : null;
+    familyId ||= randomUUID();
 
     const usernameBase = this.sanitizeUsernamePart(`${parentLastNameForUsername}_${firstName}`);
     const username = await runSql(`SELECT generate_unique_username($1);`, [usernameBase]);
@@ -2588,13 +2794,13 @@ export class CoreService implements OnModuleInit {
 
     const childOut = await runSql(
       `WITH inserted AS (
-         INSERT INTO children (user_id, school_id, date_of_birth, gender, school_grade, current_school_grade, photo_url)
-         VALUES ($1, $2, $3::date, $4::gender_type, $5, $6, NULL)
+         INSERT INTO children (user_id, school_id, date_of_birth, gender, school_grade, current_school_grade, photo_url, family_id)
+         VALUES ($1, $2, $3::date, $4::gender_type, $5, $6, NULL, $7::uuid)
          RETURNING id, user_id
        )
        SELECT row_to_json(inserted)::text
        FROM inserted;`,
-      [created.id, schoolId, dateOfBirth, gender, schoolGrade, currentGrade || null],
+      [created.id, schoolId, dateOfBirth, gender, schoolGrade, currentGrade || null, familyId],
     );
     const child = this.parseJsonLine<{ id: string; user_id: string }>(childOut);
 
@@ -2636,6 +2842,7 @@ export class CoreService implements OnModuleInit {
       FROM (
         SELECT p.id,
                p.user_id,
+               p.family_id::text AS family_id,
                u.username,
                u.first_name,
                u.last_name,
@@ -2705,6 +2912,149 @@ export class CoreService implements OnModuleInit {
     if (this.parent2ColsReady) return;
     await runSql(`ALTER TABLE parents ADD COLUMN IF NOT EXISTS parent2_first_name varchar(100), ADD COLUMN IF NOT EXISTS parent2_phone varchar(30), ADD COLUMN IF NOT EXISTS parent2_email varchar(255);`);
     this.parent2ColsReady = true;
+  }
+
+  private async ensureFamilyIdColumns() {
+    if (this.familyIdsReady) return;
+    await runSql(`
+      ALTER TABLE parents
+      ADD COLUMN IF NOT EXISTS family_id uuid;
+
+      ALTER TABLE children
+      ADD COLUMN IF NOT EXISTS family_id uuid;
+    `);
+    await runSql(`
+      CREATE INDEX IF NOT EXISTS idx_parents_family_id
+      ON parents (family_id)
+      WHERE deleted_at IS NULL;
+
+      CREATE INDEX IF NOT EXISTS idx_children_family_id
+      ON children (family_id)
+      WHERE deleted_at IS NULL AND is_active = true;
+    `);
+    await this.backfillFamilyIds();
+    this.familyIdsReady = true;
+  }
+
+  private async assignFamilyIdToParents(parentIds: string[], familyId: string) {
+    if (parentIds.length === 0) return;
+    await runSql(
+      `UPDATE parents
+       SET family_id = $2::uuid
+       WHERE id = ANY($1::uuid[]);`,
+      [parentIds, familyId],
+    );
+  }
+
+  private async assignFamilyIdToChildren(childIds: string[], familyId: string) {
+    if (childIds.length === 0) return;
+    await runSql(
+      `UPDATE children
+       SET family_id = $2::uuid
+       WHERE id = ANY($1::uuid[]);`,
+      [childIds, familyId],
+    );
+  }
+
+  private async backfillFamilyIds() {
+    const linksOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT p.id AS parent_id,
+               c.id AS child_id,
+               p.family_id::text AS parent_family_id,
+               c.family_id::text AS child_family_id
+        FROM parent_children pc
+        JOIN parents p ON p.id = pc.parent_id
+        JOIN children c ON c.id = pc.child_id
+        WHERE p.deleted_at IS NULL
+          AND c.deleted_at IS NULL
+          AND c.is_active = true
+      ) t;
+    `,
+    );
+    const links = this.parseJsonLines<{
+      parent_id: string;
+      child_id: string;
+      parent_family_id?: string | null;
+      child_family_id?: string | null;
+    }>(linksOut);
+
+    const adjacency = new Map<string, Set<string>>();
+    const nodeFamilyIds = new Map<string, string>();
+    const ensureNode = (node: string) => {
+      if (!adjacency.has(node)) adjacency.set(node, new Set());
+    };
+    const connect = (left: string, right: string) => {
+      ensureNode(left);
+      ensureNode(right);
+      adjacency.get(left)?.add(right);
+      adjacency.get(right)?.add(left);
+    };
+
+    for (const link of links) {
+      const parentNode = `parent:${link.parent_id}`;
+      const childNode = `child:${link.child_id}`;
+      connect(parentNode, childNode);
+      if (link.parent_family_id) nodeFamilyIds.set(parentNode, link.parent_family_id);
+      if (link.child_family_id) nodeFamilyIds.set(childNode, link.child_family_id);
+    }
+
+    const visited = new Set<string>();
+    for (const start of adjacency.keys()) {
+      if (visited.has(start)) continue;
+      const queue = [start];
+      const parentIds: string[] = [];
+      const childIds: string[] = [];
+      let familyId = '';
+      while (queue.length > 0) {
+        const current = queue.shift()!;
+        if (visited.has(current)) continue;
+        visited.add(current);
+        familyId ||= nodeFamilyIds.get(current) || '';
+        const [kind, id] = current.split(':');
+        if (kind === 'parent') parentIds.push(id);
+        if (kind === 'child') childIds.push(id);
+        for (const next of adjacency.get(current) || []) {
+          if (!visited.has(next)) queue.push(next);
+        }
+      }
+      const resolvedFamilyId = familyId || randomUUID();
+      await this.assignFamilyIdToParents(parentIds, resolvedFamilyId);
+      await this.assignFamilyIdToChildren(childIds, resolvedFamilyId);
+    }
+
+    const orphanParents = this.parseJsonLines<{ id: string }>(await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT id
+        FROM parents
+        WHERE deleted_at IS NULL
+          AND family_id IS NULL
+      ) t;
+    `,
+    ));
+    for (const parent of orphanParents) {
+      await this.assignFamilyIdToParents([parent.id], randomUUID());
+    }
+
+    const orphanChildren = this.parseJsonLines<{ id: string }>(await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT id
+        FROM children
+        WHERE deleted_at IS NULL
+          AND is_active = true
+          AND family_id IS NULL
+      ) t;
+    `,
+    ));
+    for (const child of orphanChildren) {
+      await this.assignFamilyIdToChildren([child.id], randomUUID());
+    }
   }
 
   private async ensureChildCurrentGradeColumn() {
@@ -2797,6 +3147,7 @@ export class CoreService implements OnModuleInit {
       FROM (
         SELECT c.id,
                c.user_id,
+               c.family_id::text AS family_id,
                u.username,
                u.first_name,
                u.last_name,
@@ -3405,7 +3756,8 @@ export class CoreService implements OnModuleInit {
     if (actor.role !== 'PARENT') throw new ForbiddenException('Role not allowed');
     const parentId = await this.getParentIdByUserId(actor.uid);
     if (!parentId) throw new BadRequestException('Parent profile not found');
-    await this.syncParentChildrenByLastName(parentId);
+    const familyId = await this.getParentFamilyId(parentId);
+    if (!familyId) throw new BadRequestException('Family Group not found');
 
     const out = await runSql(
       `
@@ -3426,21 +3778,21 @@ export class CoreService implements OnModuleInit {
                  ORDER BY cdr.updated_at DESC NULLS LAST, cdr.created_at DESC
                  LIMIT 1
                ), 'No Allergies') AS dietary_allergies
-        FROM parent_children pc
-        JOIN children c ON c.id = pc.child_id
+        FROM children c
         JOIN users u ON u.id = c.user_id
         JOIN schools s ON s.id = c.school_id
-        WHERE pc.parent_id = $1
+        WHERE c.family_id = $1::uuid
           AND c.is_active = true
           AND c.deleted_at IS NULL
         ORDER BY u.first_name, u.last_name
       ) t;
     `,
-      [parentId],
+      [familyId],
     );
 
     return {
       parentId,
+      familyId,
       children: this.parseJsonLines<ChildRow>(out).map((row) => this.withEffectiveGrade(row)),
     };
   }
@@ -3452,6 +3804,39 @@ export class CoreService implements OnModuleInit {
       parentId: null,
       children: [me],
     };
+  }
+
+  private async mergeFamilyIds(targetFamilyId: string, sourceFamilyId: string) {
+    if (!targetFamilyId || !sourceFamilyId || targetFamilyId === sourceFamilyId) return;
+    await runSql(
+      `UPDATE parents
+       SET family_id = $1::uuid
+       WHERE family_id = $2::uuid;`,
+      [targetFamilyId, sourceFamilyId],
+    );
+    await runSql(
+      `UPDATE children
+       SET family_id = $1::uuid
+       WHERE family_id = $2::uuid;`,
+      [targetFamilyId, sourceFamilyId],
+    );
+  }
+
+  private async alignFamilyIdsForLink(actor: AccessUser, parentId: string, childId: string) {
+    await this.ensureFamilyIdColumns();
+    const parentFamilyId = await this.getParentFamilyId(parentId);
+    const childFamilyId = await this.getChildFamilyId(childId);
+    if (parentFamilyId && childFamilyId && parentFamilyId !== childFamilyId) {
+      if (actor.role !== 'ADMIN') {
+        throw new ForbiddenException('FAMILY_MERGE_REQUIRES_ADMIN');
+      }
+      await this.mergeFamilyIds(parentFamilyId, childFamilyId);
+      return parentFamilyId;
+    }
+    const resolvedFamilyId = parentFamilyId || childFamilyId || randomUUID();
+    await this.assignFamilyIdToParents([parentId], resolvedFamilyId);
+    await this.assignFamilyIdToChildren([childId], resolvedFamilyId);
+    return resolvedFamilyId;
   }
 
   async linkParentChild(actor: AccessUser, parentId: string, childId: string) {
@@ -3492,6 +3877,7 @@ export class CoreService implements OnModuleInit {
        ON CONFLICT (parent_id, child_id) DO NOTHING;`,
       [parentId, childId],
     );
+    await this.alignFamilyIdsForLink(actor, parentId, childId);
 
     return { ok: true };
   }
@@ -5203,6 +5589,8 @@ export class CoreService implements OnModuleInit {
     if (actor.role !== 'PARENT') throw new ForbiddenException('Role not allowed');
     const parentId = await this.getParentIdByUserId(actor.uid);
     if (!parentId) throw new BadRequestException('Parent profile not found');
+    const familyId = await this.getParentFamilyId(parentId);
+    if (!familyId) throw new BadRequestException('Family Group not found');
     await this.lockOrdersForServiceDateIfCutoffPassed(this.makassarTodayIsoDate());
 
     const out = await runSql(
@@ -5225,15 +5613,14 @@ export class CoreService implements OnModuleInit {
         FROM orders o
         JOIN children c ON c.id = o.child_id
         JOIN users u ON u.id = c.user_id
-        JOIN parent_children pc ON pc.child_id = c.id
         LEFT JOIN billing_records br ON br.order_id = o.id
-        WHERE pc.parent_id = $1
+        WHERE c.family_id = $1::uuid
           AND o.deleted_at IS NULL
         ORDER BY o.service_date DESC, o.created_at DESC
         LIMIT 200
       ) t;
     `,
-      [parentId],
+      [familyId],
     );
 
     const orders = this.parseJsonLines<{
@@ -5296,6 +5683,7 @@ export class CoreService implements OnModuleInit {
 
     return {
       parentId,
+      familyId,
       orders: result,
     };
   }
@@ -7070,6 +7458,84 @@ export class CoreService implements OnModuleInit {
       timezone: payload.timezone,
       phone,
       orders,
+    };
+  }
+
+  async getAdminFamilyContextByPhone(actor: AccessUser, input: { phone?: string }) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    return this.resolveFamilyScopeByPhone(input.phone);
+  }
+
+  async getAdminFamilyOrdersByPhone(actor: AccessUser, input: { phone?: string; date?: string }) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    const familyContext = await this.resolveFamilyScopeByPhone(input.phone);
+    if (!familyContext.found) return familyContext;
+
+    const serviceDate = input.date ? this.validateServiceDate(input.date) : this.makassarTodayIsoDate();
+    const familyId = String((familyContext.family as { family_id: string }).family_id || '');
+    const ordersOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT o.id,
+               o.order_number::text AS order_number,
+               o.service_date::text AS service_date,
+               o.session::text AS session,
+               o.status::text AS status,
+               o.total_price,
+               trim(concat(coalesce(u.first_name, ''), ' ', coalesce(u.last_name, ''))) AS child_name,
+               u.username AS child_username,
+               br.status::text AS billing_status,
+               br.delivery_status::text AS delivery_status
+        FROM orders o
+        JOIN children c ON c.id = o.child_id
+        JOIN users u ON u.id = c.user_id
+        LEFT JOIN billing_records br ON br.order_id = o.id
+        WHERE c.family_id = $1::uuid
+          AND o.service_date = $2::date
+          AND o.deleted_at IS NULL
+        ORDER BY u.first_name ASC, u.last_name ASC, o.session ASC, o.created_at DESC
+      ) t;
+    `,
+      [familyId, serviceDate],
+    );
+    const orders = this.parseJsonLines<Record<string, unknown> & {
+      id: string;
+      total_price?: string | number;
+    }>(ordersOut);
+
+    const orderIds = orders.map((order) => order.id);
+    const itemsByOrder = new Map<string, string[]>();
+    if (orderIds.length > 0) {
+      const itemsOut = await runSql(
+        `
+        SELECT row_to_json(t)::text
+        FROM (
+          SELECT oi.order_id::text AS order_id,
+                 oi.item_name_snapshot
+          FROM order_items oi
+          WHERE oi.order_id = ANY($1::uuid[])
+          ORDER BY oi.order_id ASC, oi.created_at ASC
+        ) t;
+      `,
+        [orderIds],
+      );
+      const items = this.parseJsonLines<{ order_id: string; item_name_snapshot: string }>(itemsOut);
+      for (const item of items) {
+        const list = itemsByOrder.get(item.order_id) || [];
+        list.push(item.item_name_snapshot);
+        itemsByOrder.set(item.order_id, list);
+      }
+    }
+
+    return {
+      ...familyContext,
+      date: serviceDate,
+      orders: orders.map((order) => ({
+        ...order,
+        total_price: Number(order.total_price || 0),
+        items: itemsByOrder.get(order.id) || [],
+      })),
     };
   }
 
@@ -11212,8 +11678,10 @@ export class CoreService implements OnModuleInit {
     await this.ensureMultiOrderSchema();
     const parentId = await this.getParentIdByUserId(actor.uid);
     if (!parentId) throw new BadRequestException('Parent profile not found');
+    const familyId = await this.getParentFamilyId(parentId);
+    if (!familyId) throw new BadRequestException('Family Group not found');
     const session = sessionFilter ? this.normalizeSession(sessionFilter) : null;
-    const params: unknown[] = [parentId];
+    const params: unknown[] = [familyId];
     const sessionClause = session ? `AND o.session = $${params.push(session)}::session_type` : '';
     const out = await runSql(`
       SELECT row_to_json(t)::text
@@ -11242,7 +11710,7 @@ export class CoreService implements OnModuleInit {
         JOIN children c ON c.id = o.child_id
         JOIN users u ON u.id = c.user_id
         LEFT JOIN digital_receipts dr ON dr.billing_record_id = br.id
-        WHERE br.parent_id = $1
+        WHERE c.family_id = $1::uuid
           AND COALESCE(o.source_type, 'SINGLE') = 'SINGLE'
         ${sessionClause}
         UNION ALL
@@ -11270,7 +11738,7 @@ export class CoreService implements OnModuleInit {
         JOIN children c ON c.id = mog.child_id
         JOIN users u ON u.id = c.user_id
         LEFT JOIN multi_order_receipts mor ON mor.id = mob.receipt_id AND mor.status = 'ACTIVE'
-        WHERE mob.parent_id = $1
+        WHERE c.family_id = $1::uuid
           ${session ? `AND mog.session = $${params.length}::session_type` : ''}
         ORDER BY created_at DESC
       ) t;

@@ -133,6 +133,7 @@ export class AuthService {
   private adminVisiblePasswordsReady = false;
   private systemUsersReady = false;
   private parent2ColsReady = false;
+  private familyIdsReady = false;
 
   private normalizeRole(role: string): Role {
     const normalized = role?.toUpperCase() as Role;
@@ -341,6 +342,149 @@ export class AuthService {
     if (this.parent2ColsReady) return;
     await runSql(`ALTER TABLE parents ADD COLUMN IF NOT EXISTS parent2_first_name varchar(100), ADD COLUMN IF NOT EXISTS parent2_phone varchar(30), ADD COLUMN IF NOT EXISTS parent2_email varchar(255);`);
     this.parent2ColsReady = true;
+  }
+
+  private async ensureFamilyIdColumns() {
+    if (this.familyIdsReady) return;
+    await runSql(`
+      ALTER TABLE parents
+      ADD COLUMN IF NOT EXISTS family_id uuid;
+
+      ALTER TABLE children
+      ADD COLUMN IF NOT EXISTS family_id uuid;
+    `);
+    await runSql(`
+      CREATE INDEX IF NOT EXISTS idx_parents_family_id
+      ON parents (family_id)
+      WHERE deleted_at IS NULL;
+
+      CREATE INDEX IF NOT EXISTS idx_children_family_id
+      ON children (family_id)
+      WHERE deleted_at IS NULL AND is_active = true;
+    `);
+    await this.backfillFamilyIds();
+    this.familyIdsReady = true;
+  }
+
+  private async assignFamilyIdToParents(parentIds: string[], familyId: string) {
+    if (parentIds.length === 0) return;
+    await runSql(
+      `UPDATE parents
+       SET family_id = $2::uuid
+       WHERE id = ANY($1::uuid[]);`,
+      [parentIds, familyId],
+    );
+  }
+
+  private async assignFamilyIdToChildren(childIds: string[], familyId: string) {
+    if (childIds.length === 0) return;
+    await runSql(
+      `UPDATE children
+       SET family_id = $2::uuid
+       WHERE id = ANY($1::uuid[]);`,
+      [childIds, familyId],
+    );
+  }
+
+  private async backfillFamilyIds() {
+    const linksOut = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT p.id AS parent_id,
+               c.id AS child_id,
+               p.family_id::text AS parent_family_id,
+               c.family_id::text AS child_family_id
+        FROM parent_children pc
+        JOIN parents p ON p.id = pc.parent_id
+        JOIN children c ON c.id = pc.child_id
+        WHERE p.deleted_at IS NULL
+          AND c.deleted_at IS NULL
+          AND c.is_active = true
+      ) t;
+    `,
+    );
+    const links = this.parseJsonLines<{
+      parent_id: string;
+      child_id: string;
+      parent_family_id?: string | null;
+      child_family_id?: string | null;
+    }>(linksOut);
+
+    const adjacency = new Map<string, Set<string>>();
+    const nodeFamilyIds = new Map<string, string>();
+    const visitNode = (node: string) => {
+      if (!adjacency.has(node)) adjacency.set(node, new Set());
+    };
+    const connect = (left: string, right: string) => {
+      visitNode(left);
+      visitNode(right);
+      adjacency.get(left)?.add(right);
+      adjacency.get(right)?.add(left);
+    };
+
+    for (const link of links) {
+      const parentNode = `parent:${link.parent_id}`;
+      const childNode = `child:${link.child_id}`;
+      connect(parentNode, childNode);
+      if (link.parent_family_id) nodeFamilyIds.set(parentNode, link.parent_family_id);
+      if (link.child_family_id) nodeFamilyIds.set(childNode, link.child_family_id);
+    }
+
+    const visited = new Set<string>();
+    for (const start of adjacency.keys()) {
+      if (visited.has(start)) continue;
+      const queue = [start];
+      const parentIds: string[] = [];
+      const childIds: string[] = [];
+      let familyId = '';
+      while (queue.length > 0) {
+        const current = queue.shift()!;
+        if (visited.has(current)) continue;
+        visited.add(current);
+        familyId ||= nodeFamilyIds.get(current) || '';
+        const [kind, id] = current.split(':');
+        if (kind === 'parent') parentIds.push(id);
+        if (kind === 'child') childIds.push(id);
+        for (const next of adjacency.get(current) || []) {
+          if (!visited.has(next)) queue.push(next);
+        }
+      }
+      const resolvedFamilyId = familyId || randomUUID();
+      await this.assignFamilyIdToParents(parentIds, resolvedFamilyId);
+      await this.assignFamilyIdToChildren(childIds, resolvedFamilyId);
+    }
+
+    const orphanParents = this.parseJsonLines<{ id: string }>(await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT id
+        FROM parents
+        WHERE deleted_at IS NULL
+          AND family_id IS NULL
+      ) t;
+    `,
+    ));
+    for (const parent of orphanParents) {
+      await this.assignFamilyIdToParents([parent.id], randomUUID());
+    }
+
+    const orphanChildren = this.parseJsonLines<{ id: string }>(await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT id
+        FROM children
+        WHERE deleted_at IS NULL
+          AND is_active = true
+          AND family_id IS NULL
+      ) t;
+    `,
+    ));
+    for (const child of orphanChildren) {
+      await this.assignFamilyIdToChildren([child.id], randomUUID());
+    }
   }
 
   private async ensureChildCurrentGradeColumn() {
@@ -1235,22 +1379,7 @@ export class AuthService {
     await this.ensureChildRegistrationSourceColumns();
     await this.ensureChildCurrentGradeColumn();
     await this.ensureParent2Columns();
-    const familyNameExists = await runSql(
-      `
-      SELECT EXISTS (
-        SELECT 1
-        FROM users u
-        JOIN parents p ON p.user_id = u.id
-        WHERE u.deleted_at IS NULL
-          AND p.deleted_at IS NULL
-          AND LOWER(TRIM(u.last_name)) = LOWER(TRIM($1))
-      );
-      `,
-      [parentLastName],
-    );
-    if (familyNameExists === 't') {
-      throw new BadRequestException('Family Group Name already exists. Please contact Admin.');
-    }
+    await this.ensureFamilyIdColumns();
     const parentPhoneKey = this.phoneCompareKey(parentMobileNumber);
     const seenEmails = new Set<string>([parentEmail]);
     const seenPhones = new Set<string>();
@@ -1364,6 +1493,7 @@ export class AuthService {
     const parentUsername = await runSql(`SELECT generate_unique_username($1);`, [parentUsernameBase]);
     const parentGeneratedPassword = password;
     const parentPasswordHash = this.hashPassword(parentGeneratedPassword);
+    const familyId = randomUUID();
     let parentOut = '';
     try {
       parentOut = await runSql(
@@ -1396,8 +1526,8 @@ export class AuthService {
       [parentUserId],
     );
     {
-      const parentInsertCols = ['user_id', 'address'];
-      const parentInsertVals: unknown[] = [parentUserId, parentAddress || 'Address pending from youngster registration'];
+      const parentInsertCols = ['user_id', 'address', 'family_id'];
+      const parentInsertVals: unknown[] = [parentUserId, parentAddress || 'Address pending from youngster registration', familyId];
       if (parent2FirstName) { parentInsertCols.push('parent2_first_name'); parentInsertVals.push(parent2FirstName); }
       if (parent2Phone) { parentInsertCols.push('parent2_phone'); parentInsertVals.push(parent2Phone); }
       if (parent2Email) { parentInsertCols.push('parent2_email'); parentInsertVals.push(parent2Email); }
@@ -1490,12 +1620,13 @@ export class AuthService {
              gender,
              school_grade,
              photo_url,
-             registration_actor_type,
-             registration_actor_teacher_name,
-             registration_actor_teacher_phone
-           )
-           VALUES ($1, $2, $3::date, $4::gender_type, $5, NULL, $6, $7, $8)
-           RETURNING id
+           registration_actor_type,
+            registration_actor_teacher_name,
+            registration_actor_teacher_phone,
+            family_id
+          )
+          VALUES ($1, $2, $3::date, $4::gender_type, $5, NULL, $6, $7, $8, $9::uuid)
+          RETURNING id
          )
          SELECT row_to_json(inserted)::text
          FROM inserted;`,
@@ -1508,6 +1639,7 @@ export class AuthService {
           registrantType,
           registrantType === 'TEACHER' ? teacherName : null,
           registrantType === 'TEACHER' ? teacherPhone : null,
+          familyId,
         ],
       );
       const youngsterChild = this.parseJsonLine<{ id: string }>(youngsterChildOut);
