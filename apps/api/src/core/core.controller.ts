@@ -148,6 +148,15 @@ export class CoreController {
     return this.coreService.getAdminFamilyOrdersByPhone(req.user, { phone, date });
   }
 
+  @Post('admin/families/merge')
+  @Roles('ADMIN')
+  mergeAdminFamilies(
+    @Req() req: AuthRequest,
+    @Body() body: { sourceFamilyId?: string; targetFamilyId?: string },
+  ) {
+    return this.coreService.mergeFamily(req.user, body);
+  }
+
   @Post('admin/site-settings/hero-image-upload')
   @Roles('ADMIN')
   @UseInterceptors(FileInterceptor('image', { limits: { fileSize: 5 * 1024 * 1024 } }))

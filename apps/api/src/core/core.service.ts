@@ -1418,7 +1418,22 @@ export class CoreService implements OnModuleInit {
   }
 
   private async getParentIdByChildId(childId: string) {
-    const out = await runSql(
+    await this.ensureFamilyIdColumns();
+    const familyId = await this.getChildFamilyId(childId);
+    if (familyId) {
+      const familyParentId = await runSql(
+        `SELECT p.id
+         FROM parents p
+         WHERE p.family_id = $1::uuid
+           AND p.deleted_at IS NULL
+         ORDER BY p.created_at ASC
+         LIMIT 1;`,
+        [familyId],
+      );
+      if (familyParentId) return familyParentId;
+    }
+
+    const linkedParentId = await runSql(
       `SELECT parent_id
        FROM parent_children
        WHERE child_id = $1
@@ -1426,7 +1441,38 @@ export class CoreService implements OnModuleInit {
        LIMIT 1;`,
       [childId],
     );
-    return out || null;
+    return linkedParentId || null;
+  }
+
+  private async syncFamilyParentChildren(familyId: string) {
+    await this.ensureFamilyIdColumns();
+    if (!familyId) return 0;
+    const insertedCount = Number(await runSql(
+      `WITH family_parents AS (
+         SELECT id
+         FROM parents
+         WHERE family_id = $1::uuid
+           AND deleted_at IS NULL
+       ),
+       family_children AS (
+         SELECT id
+         FROM children
+         WHERE family_id = $1::uuid
+           AND deleted_at IS NULL
+           AND is_active = true
+       ),
+       inserted AS (
+         INSERT INTO parent_children (parent_id, child_id)
+         SELECT fp.id, fc.id
+         FROM family_parents fp
+         CROSS JOIN family_children fc
+         ON CONFLICT (parent_id, child_id) DO NOTHING
+         RETURNING 1
+       )
+       SELECT count(*)::int FROM inserted;`,
+      [familyId],
+    ) || 0);
+    return insertedCount;
   }
 
   private async ensureAiUsageLogsTable() {
@@ -3820,6 +3866,7 @@ export class CoreService implements OnModuleInit {
        WHERE family_id = $2::uuid;`,
       [targetFamilyId, sourceFamilyId],
     );
+    await this.syncFamilyParentChildren(targetFamilyId);
   }
 
   private async alignFamilyIdsForLink(actor: AccessUser, parentId: string, childId: string) {
@@ -5253,8 +5300,17 @@ export class CoreService implements OnModuleInit {
     if (actor.role === 'PARENT') {
       const parentId = await this.getParentIdByUserId(actor.uid);
       if (!parentId) return [];
-      params.push(parentId);
-      conditions.push(`EXISTS (SELECT 1 FROM parent_children pc WHERE pc.parent_id = $${params.length} AND pc.child_id = oc.child_id)`);
+      const familyId = await this.getParentFamilyId(parentId);
+      if (!familyId) return [];
+      params.push(familyId);
+      conditions.push(`EXISTS (
+        SELECT 1
+        FROM children c
+        WHERE c.id = oc.child_id
+          AND c.family_id = $${params.length}::uuid
+          AND c.deleted_at IS NULL
+          AND c.is_active = true
+      )`);
     }
 
     const whereSql = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -5411,15 +5467,7 @@ export class CoreService implements OnModuleInit {
     if (actor.role === 'PARENT') {
       billingParentId = await this.getParentIdByUserId(actor.uid);
     } else {
-      const parentOut = await runSql(
-        `SELECT pc.parent_id
-         FROM parent_children pc
-         WHERE pc.child_id = $1
-         ORDER BY pc.created_at ASC
-         LIMIT 1;`,
-        [cart.child_id],
-      );
-      billingParentId = parentOut || null;
+      billingParentId = await this.getParentIdByChildId(cart.child_id);
     }
 
     if (!billingParentId) {
@@ -6160,8 +6208,10 @@ export class CoreService implements OnModuleInit {
     await this.ensureBillingReviewColumns();
     const parentId = await this.getParentIdByUserId(actor.uid);
     if (!parentId) throw new BadRequestException('Parent profile not found');
+    const familyId = await this.getParentFamilyId(parentId);
+    if (!familyId) throw new BadRequestException('Family Group not found');
     const session = sessionFilter ? this.normalizeSession(sessionFilter) : null;
-    const params: unknown[] = [parentId];
+    const params: unknown[] = [familyId];
     const sessionClause = session ? `AND o.session = $${params.push(session)}::session_type` : '';
     const out = await runSql(`
       SELECT row_to_json(t)::text
@@ -6189,7 +6239,7 @@ export class CoreService implements OnModuleInit {
         JOIN children c ON c.id = o.child_id
         JOIN users u ON u.id = c.user_id
         LEFT JOIN digital_receipts dr ON dr.billing_record_id = br.id
-        WHERE br.parent_id = $1
+        WHERE c.family_id = $1::uuid
         ${sessionClause}
         ORDER BY br.created_at DESC
       ) t;
@@ -8485,6 +8535,8 @@ export class CoreService implements OnModuleInit {
     if (actor.role !== 'PARENT') throw new ForbiddenException('Role not allowed');
     const parentId = await this.getParentIdByUserId(actor.uid);
     if (!parentId) throw new BadRequestException('Parent profile not found');
+    const familyId = await this.getParentFamilyId(parentId);
+    if (!familyId) throw new BadRequestException('Family Group not found');
     const month = monthRaw && /^\d{4}-\d{2}$/.test(monthRaw) ? monthRaw : await runSql(`SELECT to_char((now() AT TIME ZONE 'Asia/Makassar')::date, 'YYYY-MM');`);
     const monthStart = `${month}-01`;
     const monthEnd = await runSql(`SELECT ($1::date + INTERVAL '1 month - 1 day')::date::text;`, [monthStart]);
@@ -8501,8 +8553,7 @@ export class CoreService implements OnModuleInit {
         FROM orders o
         JOIN children c ON c.id = o.child_id
         JOIN users u ON u.id = c.user_id
-        JOIN parent_children pc ON pc.child_id = c.id
-        WHERE pc.parent_id = $1
+        WHERE c.family_id = $1::uuid
           AND o.service_date BETWEEN $2::date AND $3::date
           AND o.status <> 'CANCELLED'
           AND o.deleted_at IS NULL
@@ -8515,19 +8566,19 @@ export class CoreService implements OnModuleInit {
                  END ASC
       ) t;
     `,
-      [parentId, monthStart, monthEnd],
+      [familyId, monthStart, monthEnd],
     );
     const totalMonthSpend = Number(await runSql(
       `
       SELECT COALESCE(SUM(o.total_price), 0)::numeric
       FROM orders o
-      JOIN parent_children pc ON pc.child_id = o.child_id
-      WHERE pc.parent_id = $1
+      JOIN children c ON c.id = o.child_id
+      WHERE c.family_id = $1::uuid
         AND o.service_date BETWEEN $2::date AND $3::date
         AND o.status <> 'CANCELLED'
         AND o.deleted_at IS NULL;
     `,
-      [parentId, monthStart, monthEnd],
+      [familyId, monthStart, monthEnd],
     ) || 0);
 
     const birthdayOut = await runSql(
@@ -8539,14 +8590,13 @@ export class CoreService implements OnModuleInit {
                c.date_of_birth::text AS date_of_birth
         FROM children c
         JOIN users u ON u.id = c.user_id
-        JOIN parent_children pc ON pc.child_id = c.id
-        WHERE pc.parent_id = $1
+        WHERE c.family_id = $1::uuid
           AND c.is_active = true
           AND c.deleted_at IS NULL
         ORDER BY u.first_name, u.last_name
       ) t;
     `,
-      [parentId],
+      [familyId],
     );
     const today = new Date();
     const birthdayHighlights = this.parseJsonLines<{ child_id: string; child_name: string; date_of_birth: string }>(birthdayOut).map((row) => {
@@ -10500,15 +10550,73 @@ export class CoreService implements OnModuleInit {
       await this.ensureParentOwnsChild(parentId, childId);
       return parentId;
     }
-    const out = await runSql(
-      `SELECT parent_id
-       FROM parent_children
-       WHERE child_id = $1
-       ORDER BY created_at ASC
-       LIMIT 1;`,
-      [childId],
+    return this.getParentIdByChildId(childId);
+  }
+
+  async mergeFamily(actor: AccessUser, input: { sourceFamilyId?: string; targetFamilyId?: string }) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
+    await this.ensureFamilyIdColumns();
+
+    const sourceFamilyId = String(input.sourceFamilyId || '').trim();
+    const targetFamilyId = String(input.targetFamilyId || '').trim();
+    this.assertValidUuid(sourceFamilyId, 'sourceFamilyId');
+    this.assertValidUuid(targetFamilyId, 'targetFamilyId');
+    if (sourceFamilyId === targetFamilyId) {
+      throw new BadRequestException('Source and target family must be different');
+    }
+
+    const sourceExists = await runSql(
+      `SELECT EXISTS (
+         SELECT 1 FROM parents WHERE family_id = $1::uuid AND deleted_at IS NULL
+         UNION
+         SELECT 1 FROM children WHERE family_id = $1::uuid AND deleted_at IS NULL
+       );`,
+      [sourceFamilyId],
     );
-    return out || null;
+    if (sourceExists !== 't') throw new NotFoundException('Source family not found');
+
+    const targetExists = await runSql(
+      `SELECT EXISTS (
+         SELECT 1 FROM parents WHERE family_id = $1::uuid AND deleted_at IS NULL
+         UNION
+         SELECT 1 FROM children WHERE family_id = $1::uuid AND deleted_at IS NULL
+       );`,
+      [targetFamilyId],
+    );
+    if (targetExists !== 't') throw new NotFoundException('Target family not found');
+
+    await this.mergeFamilyIds(targetFamilyId, sourceFamilyId);
+
+    const parentCount = Number(await runSql(
+      `SELECT COUNT(*)::int
+       FROM parents
+       WHERE family_id = $1::uuid
+         AND deleted_at IS NULL;`,
+      [targetFamilyId],
+    ) || 0);
+    const childCount = Number(await runSql(
+      `SELECT COUNT(*)::int
+       FROM children
+       WHERE family_id = $1::uuid
+         AND deleted_at IS NULL
+         AND is_active = true;`,
+      [targetFamilyId],
+    ) || 0);
+
+    await this.recordAdminAudit(actor, 'FAMILY_MERGED', 'family', targetFamilyId, {
+      sourceFamilyId,
+      targetFamilyId,
+      parentCount,
+      childCount,
+    });
+
+    return {
+      ok: true,
+      targetFamilyId,
+      sourceFamilyId,
+      parentCount,
+      childCount,
+    };
   }
 
   private async getMultiOrderOwnerChildId(actor: AccessUser, childIdRaw: string) {
