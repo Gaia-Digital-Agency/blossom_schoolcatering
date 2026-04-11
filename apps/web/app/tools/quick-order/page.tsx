@@ -133,7 +133,7 @@ export default function QuickOrderPage() {
 
       <div style={{ marginTop: 40, padding: 14, background: '#f8f8f8', borderRadius: 6, fontSize: 13, color: '#555' }}>
         <b>API equivalent (for Casey):</b>
-        <pre style={{ marginTop: 8, whiteSpace: 'pre-wrap', fontSize: 12 }}>{`POST /schoolcatering/api/v1/order/quick
+        <pre style={{ marginTop: 8, whiteSpace: 'pre-wrap', fontSize: 12 }}>{`POST /api/v1/order/quick
 Authorization: Bearer <token>
 Content-Type: application/json
 

@@ -102,7 +102,7 @@ export default function AdminPage() {
 
   // State for the chef's personal message editor.
   const [chefMessage, setChefMessage] = useState('');
-  const [heroImageUrl, setHeroImageUrl] = useState('/schoolcatering/assets/hero-meal.jpg');
+  const [heroImageUrl, setHeroImageUrl] = useState('/assets/hero-meal.jpg');
   const [heroImageCaption, setHeroImageCaption] = useState('Enchanting Nourished Zesty Original Meals');
   const [heroImageFileName, setHeroImageFileName] = useState('');
   const [heroImagePreviewUrl, setHeroImagePreviewUrl] = useState('');
@@ -139,7 +139,7 @@ export default function AdminPage() {
         assistance_message?: string;
       };
       setChefMessage(result.chef_message ?? '');
-      setHeroImageUrl(result.hero_image_url ?? '/schoolcatering/assets/hero-meal.jpg');
+      setHeroImageUrl(result.hero_image_url ?? '/assets/hero-meal.jpg');
       setHeroImageCaption(result.hero_image_caption ?? 'Enchanting Nourished Zesty Original Meals');
       setAssistanceMessage(result.assistance_message ?? 'For Assistance Please Whatsapp +6285211710217');
       setHeroImageFileName('');

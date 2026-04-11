@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
 
 const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'http://34.158.47.112').replace(/\/+$/, '');
-const base = `${siteUrl}/schoolcatering`;
+const base = siteUrl;
 
 /**
  * Generates the sitemap.xml file for the website.

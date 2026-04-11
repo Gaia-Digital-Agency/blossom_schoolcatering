@@ -15,15 +15,15 @@ export const metadata: Metadata = {
   description: 'School meal ordering platform for families, students, kitchen, delivery, and admin operations.',
   metadataBase: new URL(siteUrl),
   alternates: {
-    canonical: '/schoolcatering',
+    canonical: '/',
   },
   robots: {
     index: true,
     follow: true,
   },
   icons: {
-    icon: '/schoolcatering/assets/logo.svg',
-    apple: '/schoolcatering/assets/logo.svg'
+    icon: '/assets/logo.svg',
+    apple: '/assets/logo.svg'
   }
 };
 

@@ -27,7 +27,7 @@ type PublicMenuItem = {
 type SessionOption = 'LUNCH' | 'SNACK' | 'BREAKFAST';
 type PublicSessionSetting = { session: SessionOption; is_active: boolean };
 
-const FALLBACK_DISH_IMAGE = '/schoolcatering/assets/hero-meal.jpg';
+const FALLBACK_DISH_IMAGE = '/assets/hero-meal.jpg';
 
 function withCacheBust(src: string, updatedAt?: string) {
   if (!updatedAt?.trim()) return src;

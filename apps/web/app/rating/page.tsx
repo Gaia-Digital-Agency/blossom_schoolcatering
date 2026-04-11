@@ -24,7 +24,7 @@ type PublicMenuItem = {
   service_date: string;
 };
 
-const FALLBACK_DISH_IMAGE = '/schoolcatering/assets/hero-meal.jpg';
+const FALLBACK_DISH_IMAGE = '/assets/hero-meal.jpg';
 
 function withCacheBust(src: string, updatedAt?: string) {
   if (!updatedAt?.trim()) return src;

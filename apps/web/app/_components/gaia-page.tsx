@@ -33,7 +33,7 @@ export default function GaiaPage({ module }: { module: GaiaModule }) {
 
   useEffect(() => {
     let active = true;
-    fetch('/schoolcatering/api/v1/public/site-settings', { credentials: 'include', cache: 'no-cache' })
+    fetch('/api/v1/public/site-settings', { credentials: 'include', cache: 'no-cache' })
       .then((res) => res.ok ? res.json() : null)
       .then((data: SiteSettings | null) => {
         if (!active) return;

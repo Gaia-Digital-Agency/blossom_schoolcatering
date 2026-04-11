@@ -14,9 +14,9 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: '*',
       allow: '/',
-      disallow: ['/schoolcatering/api/'],
+      disallow: ['/api/'],
     },
-    sitemap: `${siteUrl}/schoolcatering/sitemap.xml`,
+    sitemap: `${siteUrl}/sitemap.xml`,
     host: siteUrl,
   };
 }

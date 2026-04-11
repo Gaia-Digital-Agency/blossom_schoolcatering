@@ -29,23 +29,23 @@ type HubItem = {
 
 const HUB_ITEMS: Record<ModuleType, HubItem[]> = {
   family: [
-    { label: 'Overview', iconSrc: '/schoolcatering/assets/icons/overview.png', href: '/family/overview' },
-    { label: 'Order', iconSrc: '/schoolcatering/assets/icons/order.png', href: '/family/order' },
-    { label: 'Multi Order', iconSrc: '/schoolcatering/assets/icons/multiorder.png', href: '/family/multiorder' },
-    { label: 'Billing', iconSrc: '/schoolcatering/assets/icons/billing.png', href: '/family/billing' },
-    { label: 'Record', iconSrc: '/schoolcatering/assets/icons/report.png', href: '/family/consolorder' },
-    { label: 'Rating', iconSrc: '/schoolcatering/assets/icons/rating.png', href: '/rating' },
-    { label: 'Menu', iconSrc: '/schoolcatering/assets/icons/menu.png', href: '/menu' },
+    { label: 'Overview', iconSrc: '/assets/icons/overview.png', href: '/family/overview' },
+    { label: 'Order', iconSrc: '/assets/icons/order.png', href: '/family/order' },
+    { label: 'Multi Order', iconSrc: '/assets/icons/multiorder.png', href: '/family/multiorder' },
+    { label: 'Billing', iconSrc: '/assets/icons/billing.png', href: '/family/billing' },
+    { label: 'Record', iconSrc: '/assets/icons/report.png', href: '/family/consolorder' },
+    { label: 'Rating', iconSrc: '/assets/icons/rating.png', href: '/rating' },
+    { label: 'Menu', iconSrc: '/assets/icons/menu.png', href: '/menu' },
     { label: 'gAIa', href: '/family/gaia', variant: 'text', textValue: 'gAIa', featureFlag: 'ai_future_enabled', disabledMessage: 'Furure Function' },
   ],
   student: [
-    { label: 'Overview', iconSrc: '/schoolcatering/assets/icons/overview.png', href: '/student/overview' },
-    { label: 'Order', iconSrc: '/schoolcatering/assets/icons/order.png', href: '/student/order' },
-    { label: 'Multi Order', iconSrc: '/schoolcatering/assets/icons/multiorder.png', href: '/student/multiorder' },
-    { label: 'Billing', iconSrc: '/schoolcatering/assets/icons/billing.png', href: '/student/billing' },
-    { label: 'Record', iconSrc: '/schoolcatering/assets/icons/report.png', href: '/student/consolorder' },
-    { label: 'Rating', iconSrc: '/schoolcatering/assets/icons/rating.png', href: '/rating' },
-    { label: 'Menu', iconSrc: '/schoolcatering/assets/icons/menu.png', href: '/menu' },
+    { label: 'Overview', iconSrc: '/assets/icons/overview.png', href: '/student/overview' },
+    { label: 'Order', iconSrc: '/assets/icons/order.png', href: '/student/order' },
+    { label: 'Multi Order', iconSrc: '/assets/icons/multiorder.png', href: '/student/multiorder' },
+    { label: 'Billing', iconSrc: '/assets/icons/billing.png', href: '/student/billing' },
+    { label: 'Record', iconSrc: '/assets/icons/report.png', href: '/student/consolorder' },
+    { label: 'Rating', iconSrc: '/assets/icons/rating.png', href: '/rating' },
+    { label: 'Menu', iconSrc: '/assets/icons/menu.png', href: '/menu' },
     { label: 'gAIa', href: '/student/gaia', variant: 'text', textValue: 'gAIa', featureFlag: 'ai_future_enabled', disabledMessage: 'Furure Function' },
   ],
 };
@@ -93,7 +93,7 @@ export default function ModuleHub({
 
   useEffect(() => {
     let active = true;
-    fetch('/schoolcatering/api/v1/public/site-settings', { credentials: 'include' })
+    fetch('/api/v1/public/site-settings', { credentials: 'include' })
       .then((res) => res.ok ? res.json() : null)
       .then((data: SiteSettings | null) => {
         if (!active) return;

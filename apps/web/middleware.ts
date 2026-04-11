@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AUTH_COOKIE, ROLE_COOKIE, Role } from './lib/auth';
 
-const BASE_PATH = '/schoolcatering';
+const BASE_PATH = '';
 const LEGACY_LOGIN_PATHS = new Set([
   '/admin/login',
   '/kitchen/login',
@@ -89,18 +89,18 @@ export function middleware(request: NextRequest) {
     normalizedPath.startsWith('/register/');
 
   if (LEGACY_LOGIN_PATHS.has(normalizedPath)) {
-    return NextResponse.redirect(new URL(`${BASE_PATH}/login`, request.url));
+    return NextResponse.redirect(new URL(`/login`, request.url));
   }
 
   if (normalizedPath === '/dashboard' || normalizedPath.startsWith('/dashboard/')) {
     const destination = role ? roleHomePath(role) : '/login';
-    return NextResponse.redirect(new URL(`${BASE_PATH}${destination}`, request.url));
+    return NextResponse.redirect(new URL(`${destination}`, request.url));
   }
 
   // Special handling for rating paths.
   if (isRatingPath) {
     if (!hasToken) {
-      return NextResponse.redirect(new URL(`${BASE_PATH}/login`, request.url));
+      return NextResponse.redirect(new URL(`/login`, request.url));
     }
     // Only PARENT and YOUNGSTER roles can access rating paths.
     if (role !== 'PARENT' && role !== 'YOUNGSTER') {
@@ -115,7 +115,7 @@ export function middleware(request: NextRequest) {
               : role === 'YOUNGSTER'
                 ? '/student'
                 : '/login';
-      return NextResponse.redirect(new URL(`${BASE_PATH}${destination}`, request.url));
+      return NextResponse.redirect(new URL(`${destination}`, request.url));
     }
     return NextResponse.next();
   }
@@ -125,7 +125,7 @@ export function middleware(request: NextRequest) {
     // If user is already logged in with the correct role, redirect them to their dashboard.
     if (hasToken && role === requiredRole) {
       const destination = roleHomePath(requiredRole);
-      return NextResponse.redirect(new URL(`${BASE_PATH}${destination}`, request.url));
+      return NextResponse.redirect(new URL(`${destination}`, request.url));
     }
     return NextResponse.next();
   }
@@ -134,20 +134,20 @@ export function middleware(request: NextRequest) {
   if (requiredRole) {
     if (!hasToken || role !== requiredRole) {
       // If not authenticated or wrong role, redirect to the correct login page.
-      return NextResponse.redirect(new URL(`${BASE_PATH}${roleLoginPath(requiredRole)}`, request.url));
+      return NextResponse.redirect(new URL(`${roleLoginPath(requiredRole)}`, request.url));
     }
     return NextResponse.next();
   }
 
   // For any other non-public path, require a token.
   if (!hasToken && !isPublic) {
-    return NextResponse.redirect(new URL(`${BASE_PATH}/login`, request.url));
+    return NextResponse.redirect(new URL(`/login`, request.url));
   }
 
   // If a logged-in user tries to access the main login page, redirect them to their dashboard.
   if (hasToken && normalizedPath === '/login') {
     if (role) {
-      return NextResponse.redirect(new URL(`${BASE_PATH}${roleHomePath(role)}`, request.url));
+      return NextResponse.redirect(new URL(`${roleHomePath(role)}`, request.url));
     }
     return NextResponse.next();
   }

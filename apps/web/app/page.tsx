@@ -33,15 +33,15 @@ export default function HomePage() {
    * If the fetch is successful, it updates the chefMessage state.
    */
   useEffect(() => {
-    fetch('/schoolcatering/api/v1/public/site-settings', { credentials: 'include' })
+    fetch('/api/v1/public/site-settings', { credentials: 'include' })
       .then((res) => res.ok ? res.json() : null)
       .then((json: { chef_message?: string; hero_image_url?: string; hero_image_caption?: string } | null) => {
         if (json?.chef_message) setChefMessage(json.chef_message);
         if (json?.hero_image_url) setHeroImageUrl(json.hero_image_url);
-        else setHeroImageUrl('/schoolcatering/assets/hero-meal.jpg');
+        else setHeroImageUrl('/assets/hero-meal.jpg');
         if (json?.hero_image_caption) setHeroImageCaption(json.hero_image_caption);
       })
-      .catch(() => { setHeroImageUrl('/schoolcatering/assets/hero-meal.jpg'); });
+      .catch(() => { setHeroImageUrl('/assets/hero-meal.jpg'); });
   }, []);
 
   /**
@@ -54,7 +54,7 @@ export default function HomePage() {
   useEffect(() => {
     let alive = true;
     // Increment the page visit counter.
-    fetch('/schoolcatering/api/v1/public/page-visits/hit', {
+    fetch('/api/v1/public/page-visits/hit', {
       method: 'POST',
       credentials: 'include',
     })
@@ -105,7 +105,7 @@ export default function HomePage() {
         {/* Header section with branding, navigation, and menu toggle */}
         <header className="topbar">
           <Link className="brand" href="/">
-            <img className="brand-logo" src="/schoolcatering/assets/logo.svg" alt="Bali Catering logo" />
+            <img className="brand-logo" src="/assets/logo.svg" alt="Bali Catering logo" />
             <span>Bali Catering</span>
           </Link>
           <button className="menu-btn" aria-label="Toggle menu" onClick={() => setOpen(!open)}>

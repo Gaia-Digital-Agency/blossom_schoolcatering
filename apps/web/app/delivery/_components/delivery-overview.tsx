@@ -4,10 +4,10 @@ import { getAppBase } from '../../../lib/auth';
 import LogoutButton from '../../_components/logout-button';
 
 const DELIVERY_ITEMS = [
-  { label: 'Yesterday', iconSrc: '/schoolcatering/assets/icons/yesterday.png', href: '/delivery/yesterday' },
-  { label: 'Today', iconSrc: '/schoolcatering/assets/icons/today.png', href: '/delivery/today', active: true },
-  { label: 'Tomorrow', iconSrc: '/schoolcatering/assets/icons/tomorrow.png', href: '/delivery/tomorrow' },
-  { label: 'Select Date', iconSrc: '/schoolcatering/assets/icons/date.png', href: '/delivery/select-date' },
+  { label: 'Yesterday', iconSrc: '/assets/icons/yesterday.png', href: '/delivery/yesterday' },
+  { label: 'Today', iconSrc: '/assets/icons/today.png', href: '/delivery/today', active: true },
+  { label: 'Tomorrow', iconSrc: '/assets/icons/tomorrow.png', href: '/delivery/tomorrow' },
+  { label: 'Select Date', iconSrc: '/assets/icons/date.png', href: '/delivery/select-date' },
 ];
 
 export default function DeliveryOverview() {

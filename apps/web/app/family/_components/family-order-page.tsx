@@ -289,7 +289,7 @@ export default function FamilyOrderPage({
   };
 
   const loadPublicSiteSettings = async () => {
-    const res = await fetch('/schoolcatering/api/v1/public/site-settings', { credentials: 'include', cache: 'no-cache' });
+    const res = await fetch('/api/v1/public/site-settings', { credentials: 'include', cache: 'no-cache' });
     if (!res.ok) return;
     const data = await res.json() as { ordering_cutoff_time?: string };
     setOrderingCutoffTime(data.ordering_cutoff_time || '08:00');
@@ -725,7 +725,7 @@ export default function FamilyOrderPage({
                             orderId: order.id,
                             serviceDate: order.service_date,
                           });
-                          window.location.href = `/schoolcatering/family/order?${params.toString()}`;
+                          window.location.href = `/family/order?${params.toString()}`;
                         }}
                         disabled={!order.can_edit || submitting}>Edit Before Cutoff</button>
                       <button className="btn btn-outline" type="button"

@@ -38,7 +38,7 @@ type MasterIngredientFile = {
 };
 
 type MasterDishFile = Record<string, string[]>;
-const DEFAULT_DISH_IMAGE = '/schoolcatering/assets/hero-meal.jpg';
+const DEFAULT_DISH_IMAGE = '/assets/hero-meal.jpg';
 
 function toLabel(raw: string) {
   return raw
@@ -454,7 +454,7 @@ export default function AdminMenuPage() {
         nutritionFactsText: 'TBA',
         caloriesKcal: null,
         price: Number(itemPrice || 0),
-        imageUrl: itemImageUrl || '/schoolcatering/assets/hero-meal.jpg',
+        imageUrl: itemImageUrl || '/assets/hero-meal.jpg',
         ingredientIds: itemIngredientIds,
         isAvailable: true,
         cutleryRequired: itemCutleryRequired,

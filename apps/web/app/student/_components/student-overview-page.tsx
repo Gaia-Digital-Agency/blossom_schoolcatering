@@ -40,13 +40,13 @@ type StudentInsights = {
 function getBadgeDisplay(level: StudentInsights['badge']['level']) {
   switch (level) {
     case 'BRONZE':
-      return { imageSrc: '/schoolcatering/assets/trophies/bronze.jpeg', tone: '#b7791f', label: 'Bronze Trophy' };
+      return { imageSrc: '/assets/trophies/bronze.jpeg', tone: '#b7791f', label: 'Bronze Trophy' };
     case 'SILVER':
-      return { imageSrc: '/schoolcatering/assets/trophies/silver.jpeg', tone: '#718096', label: 'Silver Trophy' };
+      return { imageSrc: '/assets/trophies/silver.jpeg', tone: '#718096', label: 'Silver Trophy' };
     case 'GOLD':
-      return { imageSrc: '/schoolcatering/assets/trophies/gold.jpeg', tone: '#d69e2e', label: 'Gold Trophy' };
+      return { imageSrc: '/assets/trophies/gold.jpeg', tone: '#d69e2e', label: 'Gold Trophy' };
     case 'PLATINUM':
-      return { imageSrc: '/schoolcatering/assets/trophies/platinum.jpeg', tone: '#4a5568', label: 'Platinum Trophy' };
+      return { imageSrc: '/assets/trophies/platinum.jpeg', tone: '#4a5568', label: 'Platinum Trophy' };
     default:
       return { icon: '✨', tone: '#dd6b20', label: 'Multi Star' };
   }

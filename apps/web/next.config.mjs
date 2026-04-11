@@ -1,8 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  basePath: '/schoolcatering',
-  assetPrefix: '/schoolcatering',
-
   // Compress responses with gzip — reduces payload size for JS/HTML/JSON
   compress: true,
 
@@ -11,6 +8,8 @@ const nextConfig = {
     remotePatterns: [
       { protocol: 'http',  hostname: '34.158.47.112' },
       { protocol: 'https', hostname: '34.158.47.112' },
+      { protocol: 'https', hostname: 'schoolcatering.gaiada1.online' },
+      { protocol: 'https', hostname: 'blossomcatering.online' },
       { protocol: 'http',  hostname: 'localhost' },
     ],
     // Cache optimised images for 7 days on the client

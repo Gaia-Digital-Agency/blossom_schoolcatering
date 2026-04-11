@@ -252,7 +252,7 @@ export default function FamilyMultiOrderPage() {
     const [settings, groupsData, siteSettings] = await Promise.all([
       apiFetch('/session-settings') as Promise<SessionSetting[]>,
       apiFetch('/multi-orders') as Promise<MultiOrderGroup[]>,
-      fetch('/schoolcatering/api/v1/public/site-settings', { credentials: 'include', cache: 'no-cache' })
+      fetch('/api/v1/public/site-settings', { credentials: 'include', cache: 'no-cache' })
         .then(async (res) => (res.ok ? res.json() : null))
         .catch(() => null) as Promise<SiteSettings | null>,
     ]);

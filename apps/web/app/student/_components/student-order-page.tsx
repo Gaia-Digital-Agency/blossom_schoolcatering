@@ -250,7 +250,7 @@ export default function StudentOrderPage({
         if (Array.isArray(settings) && settings.length > 0) setSessionSettings(settings);
       })
       .catch(() => undefined);
-    fetch('/schoolcatering/api/v1/public/site-settings', { credentials: 'include', cache: 'no-cache' })
+    fetch('/api/v1/public/site-settings', { credentials: 'include', cache: 'no-cache' })
       .then((res) => res.ok ? res.json() : null)
       .then((data: { ordering_cutoff_time?: string } | null) => {
         if (data?.ordering_cutoff_time) setOrderingCutoffTime(data.ordering_cutoff_time);

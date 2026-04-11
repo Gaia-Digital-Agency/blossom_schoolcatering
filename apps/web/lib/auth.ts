@@ -11,7 +11,7 @@ let pendingRequests = 0;
 let _refreshPromise: Promise<string | null> | null = null;
 
 export function getApiBase() {
-  return process.env.NEXT_PUBLIC_API_BASE ?? '/schoolcatering/api/v1';
+  return process.env.NEXT_PUBLIC_API_BASE ?? '/api/v1';
 }
 
 export function getAppBase() {
@@ -45,7 +45,7 @@ function expireCookie(name: string, path: string) {
 }
 
 function clearLegacyAuthCookies() {
-  const paths = new Set(['/', getCookiePath(), '/schoolcatering', '/cateringschool']);
+  const paths = new Set(['/', getCookiePath()]);
   for (const path of paths) {
     expireCookie(AUTH_COOKIE, path);
     expireCookie(ROLE_COOKIE, path);
