@@ -1,5 +1,6 @@
 # NODE.JS / NEXT.JS
 node_modules/
+.turbo/
 dist/
 apps/api/dist/
 apps/web/.next/

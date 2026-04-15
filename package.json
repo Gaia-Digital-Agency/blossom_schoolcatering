@@ -3,22 +3,18 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "packageManager": "pnpm@9.15.4",
   "directories": {
     "doc": "docs"
   },
-  "workspaces": [
-    "apps/api",
-    "apps/web",
-    "packages/*"
-  ],
   "scripts": {
-    "dev": "npm run dev:web",
-    "dev:web": "npm --prefix apps/web run dev",
-    "dev:api": "npm --prefix apps/api run start:dev",
-    "build": "npm run build:web && npm run build:api",
-    "build:web": "npm --prefix apps/web run build",
-    "build:api": "npm --prefix apps/api run build",
-    "preview": "npm --prefix apps/web run start",
+    "dev": "turbo run dev",
+    "dev:web": "pnpm --filter @blossom/web dev",
+    "dev:api": "pnpm --filter api start:dev",
+    "build": "turbo run build",
+    "build:web": "pnpm --filter @blossom/web build",
+    "build:api": "pnpm --filter api build",
+    "preview": "pnpm --filter @blossom/web start",
     "test": "npm run test:unit",
     "test:unit": "./scripts/qa/run_unit_tests.sh",
     "test:integration": "./scripts/qa/run_integration_tests.sh",
@@ -27,8 +23,8 @@
     "test:security": "./scripts/qa/run_security_tests.sh",
     "test:performance": "./scripts/qa/run_performance_tests.sh",
     "test:qa": "npm run test:unit && npm run test:integration && npm run test:e2e && npm run test:regression && npm run test:security && npm run test:performance",
-    "build:types": "npm --prefix packages/types run build",
-    "check:config": "npm --prefix packages/config run validate"
+    "build:types": "pnpm --filter @blossom/types build",
+    "check:config": "pnpm --filter @blossom/config validate"
   },
   "repository": {
     "type": "git",
@@ -37,5 +33,8 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs"
+  "type": "commonjs",
+  "devDependencies": {
+    "turbo": "^2.3.0"
+  }
 }
