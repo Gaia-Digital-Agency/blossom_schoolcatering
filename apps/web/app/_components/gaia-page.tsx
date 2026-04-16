@@ -18,6 +18,7 @@ type GaiaResponse = {
   scope?: {
     viewerRole?: string;
     childIds?: string[];
+    familyName?: string;
   };
 };
 
@@ -119,8 +120,8 @@ export default function GaiaPage({ module }: { module: GaiaModule }) {
               <h2>Output</h2>
               {error ? <p className="auth-error">{error}</p> : null}
               {answer ? <p className="gaia-answer">{answer}</p> : null}
-              {meta?.category ? <p className="auth-help">Category: {meta.category}</p> : null}
-              {scope?.childIds?.length ? <p className="auth-help">Family Group students in scope: {scope.childIds.length}</p> : null}
+              {meta?.category ? <p className="auth-help">Answer Category Is About: {meta.category.charAt(0).toUpperCase() + meta.category.slice(1)}</p> : null}
+              {scope?.familyName ? <p className="auth-help">Family Group: {scope.familyName}</p> : null}
             </div>
           </>
         ) : null}

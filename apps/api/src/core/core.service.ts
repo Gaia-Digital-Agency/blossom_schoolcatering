@@ -2157,6 +2157,7 @@ export class CoreService implements OnModuleInit {
           viewerRole: scope.viewerRole,
           parentId: scope.parentId,
           childIds: scope.childIds,
+          familyName: this.deriveFamilyName(scope.children),
         },
         meta: {
           supported: false,
@@ -2184,6 +2185,7 @@ export class CoreService implements OnModuleInit {
           viewerRole: scope.viewerRole,
           parentId: scope.parentId,
           childIds: scope.childIds,
+          familyName: this.deriveFamilyName(scope.children),
         },
         meta: {
           supported: true,
@@ -2205,6 +2207,11 @@ export class CoreService implements OnModuleInit {
       });
       throw error;
     }
+  }
+
+  private deriveFamilyName(children: { first_name: string; last_name: string }[]): string {
+    const lastNames = [...new Set(children.map((c) => c.last_name).filter(Boolean))];
+    return lastNames.length > 0 ? lastNames.join(' / ') : 'Unknown';
   }
 
   private assertValidUuid(value: string | undefined, label: string) {
