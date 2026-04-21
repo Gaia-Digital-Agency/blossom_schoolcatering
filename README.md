@@ -1,7 +1,7 @@
 # Blossom School Catering
 
 Creation date: 2026-02-24  
-Last updated: 2026-04-08  
+Last updated: 2026-04-21  
 Developed by Gaiada.com (C) 2026  
 Repository: `git@github.com-net1io:Gaia-Digital-Agency/blossom_schoolcatering.git`
 
@@ -13,21 +13,30 @@ Blossom School Catering is a role-based school meal ordering platform for Bali o
 - Runtime stack: Next.js + NestJS + PostgreSQL + PM2 + Nginx + GCS
 
 ## Current Runtime
-- Staging URL: `http://34.158.47.112/schoolcatering`
-- Frontend process: `schoolcatering-web`
-- API process: `schoolcatering-api`
-- API base: `/schoolcatering/api/v1`
+- Public URL: `https://blossomcatering.online/` (→ `https://schoolcatering.gaiada1.online`)
+- API base: `https://schoolcatering.gaiada1.online/api/v1`
+- Server: `gda-ce01` (34.158.47.112)
+- Path: `/var/www/schoolcatering`
+- Frontend process: `schoolcatering-web` (pm2)
+- API process: `schoolcatering-api` (pm2)
 - Active branch: `main`
-- Current deployed commit on staging: `578e11b`
 
 ## Current State
-- Family membership is now modeled with `family_id` on `parents` and `children`.
+- Family membership is modeled with `family_id` on `parents` and `children`.
 - Parent, secondary parent, and youngster family support flows resolve against server-side `family_id`, not surname matching.
-- Brian/OpenClaw support now uses:
+- Brian/OpenClaw support uses:
   - `GET /admin/family-context?phone=PHONE`
   - `GET /admin/family-orders?phone=PHONE&date=YYYY-MM-DD`
-- Admin family repair now supports:
+- Admin family repair supports:
   - `POST /admin/families/merge`
+- **WhatsApp registration (via Brian)** — parents can register their family entirely through WhatsApp without the web UI:
+  - `POST /auth/register/youngsters` — called by Brian on user confirmation
+  - `GET /auth/register/schools` — live school list (no hardcoded IDs in Brian)
+  - See `docs/short_guide.md` for the welcome message Brian sends on registration intent
+  - Seed schools: only `Bali Island School` and `Sanur Independent School` are active
+- **Dev-only test endpoints** (ADMIN role required):
+  - `POST /auth/dev/test-registration` — creates a synthetic registration with phone `+620000099991`, email `regtest@blossom.invalid`
+  - `DELETE /auth/dev/test-registration` — hard-deletes that synthetic data
 
 ## Repository Structure
 - `apps/web`: Next.js frontend
