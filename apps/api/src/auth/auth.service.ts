@@ -1934,4 +1934,128 @@ export class AuthService {
     );
     return { ok: true };
   }
+
+  // ── DEV: registration test helpers (called only by admin test endpoints) ──
+
+  private readonly DEV_TEST_PHONE = '+620000099991';
+  private readonly DEV_TEST_EMAIL = 'regtest@blossom.invalid';
+
+  async runRegistrationTest() {
+    // Always clean up stale test data first so the test is idempotent
+    await this.purgeRegistrationTestData();
+
+    const result = await this.registerYoungsterWithParent({
+      registrantType: 'PARENT',
+      parentFirstName: 'RegTest',
+      parentLastName: 'BlossomDev',
+      parentMobileNumber: this.DEV_TEST_PHONE,
+      parentEmail: this.DEV_TEST_EMAIL,
+      password: 'Blossom#TestDev99',
+      students: [
+        {
+          youngsterFirstName: 'TestChild',
+          youngsterGender: 'FEMALE',
+          youngsterDateOfBirth: '2016-06-15',
+          youngsterSchoolId: '8b56ba1d-c3ba-409c-91e3-1cfd95237b3f',
+          youngsterGrade: 'G4',
+          youngsterPhone: '',
+          youngsterAllergies: 'none',
+        },
+      ],
+    });
+
+    return {
+      ok: true,
+      note: 'Test registration succeeded. Call DELETE /api/v1/auth/dev/test-registration to clean up.',
+      result,
+    };
+  }
+
+  async purgeRegistrationTestData() {
+    // Find parent user by test phone
+    const parentUserId = await runSql(
+      `SELECT id FROM users
+       WHERE regexp_replace(COALESCE(phone_number, ''), '[^0-9]', '', 'g')
+           = regexp_replace($1, '[^0-9]', '', 'g')
+         AND role = 'PARENT'
+       LIMIT 1;`,
+      [this.DEV_TEST_PHONE],
+    );
+
+    // Also find by test email (belt-and-suspenders)
+    const parentUserIdByEmail = await runSql(
+      `SELECT id FROM users WHERE lower(email) = lower($1) AND role = 'PARENT' LIMIT 1;`,
+      [this.DEV_TEST_EMAIL],
+    );
+
+    const parentIds = [...new Set([parentUserId, parentUserIdByEmail].filter(Boolean))];
+
+    if (parentIds.length === 0) {
+      return { ok: true, note: 'No test data found — nothing to clean up.' };
+    }
+
+    const deleted: string[] = [];
+
+    for (const userId of parentIds) {
+      // Find parent record
+      const parentId = await runSql(
+        `SELECT id FROM parents WHERE user_id = $1 LIMIT 1;`,
+        [userId],
+      );
+
+      // Find all children in same family via parent_children
+      const childrenOut = await runSql(
+        `SELECT row_to_json(t)::text
+         FROM (
+           SELECT c.id as child_id, c.user_id as child_user_id
+           FROM children c
+           JOIN parent_children pc ON pc.child_id = c.id
+           WHERE pc.parent_id = $1
+         ) t;`,
+        [parentId || '00000000-0000-0000-0000-000000000000'],
+      );
+
+      const children = this.parseJsonLines<{ child_id: string; child_user_id: string }>(childrenOut);
+      const childIds = children.map((c) => c.child_id);
+      const childUserIds = children.map((c) => c.child_user_id);
+
+      // Delete child dependents
+      if (childIds.length > 0) {
+        const ph = childIds.map((_, i) => `$${i + 1}`).join(',');
+        await runSql(`DELETE FROM child_dietary_restrictions WHERE child_id IN (${ph});`, childIds);
+        await runSql(`DELETE FROM child_badges WHERE child_id IN (${ph});`, childIds);
+        await runSql(`DELETE FROM favourite_meals WHERE child_id IN (${ph});`, childIds);
+        await runSql(`DELETE FROM order_carts WHERE child_id IN (${ph});`, childIds);
+        await runSql(`DELETE FROM parent_children WHERE child_id IN (${ph});`, childIds);
+        await runSql(`DELETE FROM children WHERE id IN (${ph});`, childIds);
+      }
+
+      // Delete child users
+      if (childUserIds.length > 0) {
+        const ph = childUserIds.map((_, i) => `$${i + 1}`).join(',');
+        await runSql(`DELETE FROM admin_visible_passwords WHERE user_id IN (${ph});`, childUserIds);
+        await runSql(`DELETE FROM user_preferences WHERE user_id IN (${ph});`, childUserIds);
+        await runSql(`DELETE FROM users WHERE id IN (${ph});`, childUserIds);
+      }
+
+      // Delete parent dependents
+      if (parentId) {
+        await runSql(`DELETE FROM parent_children WHERE parent_id = $1;`, [parentId]);
+        await runSql(`DELETE FROM parents WHERE id = $1;`, [parentId]);
+      }
+      await runSql(`DELETE FROM admin_visible_passwords WHERE user_id = $1;`, [userId]);
+      await runSql(`DELETE FROM user_preferences WHERE user_id = $1;`, [userId]);
+      await runSql(`DELETE FROM auth_refresh_sessions WHERE user_id = $1;`, [userId]);
+      await runSql(`DELETE FROM users WHERE id = $1;`, [userId]);
+
+      deleted.push(userId);
+    }
+
+    return {
+      ok: true,
+      note: `Test data purged. Deleted ${deleted.length} parent user(s) and all linked children.`,
+    };
+  }
+  // ── end DEV ──────────────────────────────────────────────────────────────
+
 }

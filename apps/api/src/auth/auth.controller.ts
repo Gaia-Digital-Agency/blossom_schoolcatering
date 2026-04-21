@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Post, Req, Res, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, Post, Req, Res, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { ROLES, Role } from './auth.types';
@@ -295,4 +295,26 @@ export class AuthController {
     }
     return authorization.replace('Bearer ', '').trim();
   }
+
+  // ── DEV: registration test endpoints (ADMIN only) ──────────────────────────
+  // These endpoints exist solely for verifying the WhatsApp registration flow.
+  // They use a reserved test phone (+620000099991) and a .invalid email domain
+  // that can never belong to a real user. Safe to call at any time — will not
+  // interfere with live Brian / WhatsApp registrations.
+
+  @Post('dev/test-registration')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async devTestRegistration() {
+    return this.authService.runRegistrationTest();
+  }
+
+  @Delete('dev/test-registration')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async devCleanupRegistration() {
+    return this.authService.purgeRegistrationTestData();
+  }
+  // ── end DEV ────────────────────────────────────────────────────────────────
+
 }
