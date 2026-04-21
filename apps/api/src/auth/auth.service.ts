@@ -637,7 +637,7 @@ export class AuthService {
     return `${local}+${aliasTag}@${domain}`;
   }
 
-  private async ensureSeedSchools(requiredCount: number) {
+  private async ensureSeedSchools() {
     const existingOut = await runSql(
       `SELECT row_to_json(t)::text
        FROM (
@@ -648,36 +648,8 @@ export class AuthService {
          ORDER BY name ASC
        ) t;`,
     );
-    const schools = this.parseJsonLines<{ id: string; name: string }>(existingOut);
-    for (let index = schools.length; index < requiredCount; index += 1) {
-      const schoolNumber = index + 1;
-      const schoolName = `Seed School ${String(schoolNumber).padStart(2, '0')}`;
-      let schoolId = await runSql(
-        `INSERT INTO schools (name, address, city, contact_phone, is_active)
-         VALUES ($1, $2, $3, $4, true)
-         ON CONFLICT DO NOTHING
-         RETURNING id;`,
-        [
-          schoolName,
-          `Seed Address ${schoolNumber}`,
-          'Makassar',
-          `+620000000${String(schoolNumber).padStart(2, '0')}`,
-        ],
-      );
-      if (!schoolId) {
-        schoolId = await runSql(
-          `SELECT id
-           FROM schools
-           WHERE lower(name) = lower($1)
-           LIMIT 1;`,
-          [schoolName],
-        );
-      }
-      schools.push({ id: schoolId, name: schoolName });
-    }
-    return schools;
+    return this.parseJsonLines<{ id: string; name: string }>(existingOut);
   }
-
   private async retireLegacyFamilyStudentSeedUsers() {
     const legacyOut = await runSql(
       `SELECT row_to_json(t)::text
@@ -740,7 +712,7 @@ export class AuthService {
     await this.ensureAdminVisiblePasswordsTable();
     await this.retireLegacyFamilyStudentSeedUsers();
 
-    const schools = await this.ensureSeedSchools(7);
+    const schools = await this.ensureSeedSchools();
     const parentPhone = '+628172345678';
     const studentPhone = '+628171234567';
     const teacherPhone = '+628173456789';
@@ -789,7 +761,7 @@ export class AuthService {
             firstName: 'student02b',
             gender: 'FEMALE',
             familyGroup: 'family02',
-            schoolIndex: 2,
+            schoolIndex: 0,
             dateOfBirth: '2014-06-21',
             grade: '6',
             allergies: 'Shellfish Allergy',
@@ -809,7 +781,7 @@ export class AuthService {
             firstName: 'student03a',
             gender: 'MALE',
             familyGroup: 'family03',
-            schoolIndex: 3,
+            schoolIndex: 1,
             dateOfBirth: '2013-08-11',
             grade: '7',
             allergies: 'No Allergies',
@@ -829,7 +801,7 @@ export class AuthService {
             firstName: 'student04a',
             gender: 'FEMALE',
             familyGroup: 'family04',
-            schoolIndex: 4,
+            schoolIndex: 0,
             dateOfBirth: '2012-10-03',
             grade: '8',
             allergies: 'Dairy Allergy',
@@ -851,7 +823,7 @@ export class AuthService {
             firstName: 'student05a',
             gender: 'MALE',
             familyGroup: 'family05',
-            schoolIndex: 5,
+            schoolIndex: 1,
             dateOfBirth: '2011-12-18',
             grade: '9',
             allergies: 'Egg Allergy',
@@ -862,7 +834,7 @@ export class AuthService {
             firstName: 'student05b',
             gender: 'FEMALE',
             familyGroup: 'family05',
-            schoolIndex: 6,
+            schoolIndex: 0,
             dateOfBirth: '2014-01-26',
             grade: '6',
             allergies: 'No Allergies',
