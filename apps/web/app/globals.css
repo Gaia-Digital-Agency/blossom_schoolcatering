@@ -177,7 +177,8 @@ h1 {
 }
 
 .home-auth-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 10rem));
+  justify-content: center;
 }
 
 .google-oauth-wrap {
@@ -1187,7 +1188,8 @@ button:disabled,
   }
 
   .home-auth-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 10rem));
+    justify-content: center;
   }
 
   .page-auth-desktop .auth-form {
