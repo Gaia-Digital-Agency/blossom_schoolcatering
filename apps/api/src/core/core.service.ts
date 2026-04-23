@@ -1,3 +1,40 @@
+/**
+ * CoreService (facade)
+ * ====================
+ *
+ * Scope (end state, in progress):
+ *   - This file is being incrementally split into 15 sub-services
+ *     under ./services/ (see their Scope headers for owned methods).
+ *   - The facade keeps the public API contract stable: controllers
+ *     (core, public, archived) keep calling coreService.xxx(). Every
+ *     method listed in core.service.public-surface.json remains
+ *     callable on this class — the regression guard at
+ *     core.service.public-surface.spec.ts fails if any disappears.
+ *   - onModuleInit will eventually delegate all schema migrations to
+ *     SchemaService.runAll(). Until that extraction lands, the guards
+ *     live here so boot order is byte-identical.
+ *
+ * Scope (today, pre-extraction):
+ *   - 132 public methods owned here directly. Each one will move to
+ *     its sub-service in a separate commit, replaced by a one-line
+ *     delegation (e.g. `getMenus(...args) { return this.menu.getMenus(...args); }`).
+ *   - Private helpers (phone/date/hash/family/etc.) migrate to
+ *     HelpersService and are reached through `this.helpers.xxx`.
+ *
+ * Dependencies (via @Optional() so `new CoreService()` still works in
+ * unit tests that bypass Nest DI — production Nest provides real
+ * instances for all 15):
+ *   - AdminReportsService, AuditService, BillingService, DeliveryService,
+ *     GaiaService, HelpersService, KitchenService, MediaService,
+ *     MenuService, MultiOrderService, OrderService, SchemaService,
+ *     SchoolsService, SiteSettingsService, UsersService.
+ *
+ * Consumers:
+ *   - CoreController  (apps/api/src/core/core.controller.ts)
+ *   - PublicController (apps/api/src/core/public.controller.ts)
+ *   - ArchivedController (apps/api/src/core/archived.controller.ts — not
+ *     registered in CoreModule but kept source-live for future reactivation)
+ */
 import {
   BadRequestException,
   ConflictException,
@@ -5,6 +42,7 @@ import {
   Injectable,
   OnModuleInit,
   NotFoundException,
+  Optional,
   UnauthorizedException,
 } from '@nestjs/common';
 import { readFile } from 'fs/promises';
@@ -13,6 +51,21 @@ import { runSql } from '../auth/db.util';
 import { validatePasswordPolicy } from '../auth/password-policy';
 import { AccessUser, CartItemInput, SessionType } from './core.types';
 import { normalizeGradeLabel, resolveEffectiveGrade } from '../shared/grade.util';
+import { AdminReportsService } from './services/admin-reports.service';
+import { AuditService } from './services/audit.service';
+import { BillingService } from './services/billing.service';
+import { DeliveryService } from './services/delivery.service';
+import { GaiaService } from './services/gaia.service';
+import { HelpersService } from './services/helpers.service';
+import { KitchenService } from './services/kitchen.service';
+import { MediaService } from './services/media.service';
+import { MenuService } from './services/menu.service';
+import { MultiOrderService } from './services/multi-order.service';
+import { OrderService } from './services/order.service';
+import { SchemaService } from './services/schema.service';
+import { SchoolsService } from './services/schools.service';
+import { SiteSettingsService } from './services/site-settings.service';
+import { UsersService } from './services/users.service';
 
 type DbUserRow = {
   id: string;
@@ -95,6 +148,27 @@ export class CoreService implements OnModuleInit {
     };
     expiresAt: number;
   }>();
+
+  // Sub-services scaffolded for the incremental split of this file.
+  // @Optional() keeps `new CoreService()` valid in unit tests that
+  // bypass Nest DI; in production Nest injects real instances.
+  constructor(
+    @Optional() protected readonly adminReports?: AdminReportsService,
+    @Optional() protected readonly audit?: AuditService,
+    @Optional() protected readonly billing?: BillingService,
+    @Optional() protected readonly delivery?: DeliveryService,
+    @Optional() protected readonly gaia?: GaiaService,
+    @Optional() protected readonly helpers?: HelpersService,
+    @Optional() protected readonly kitchen?: KitchenService,
+    @Optional() protected readonly media?: MediaService,
+    @Optional() protected readonly menu?: MenuService,
+    @Optional() protected readonly multiOrder?: MultiOrderService,
+    @Optional() protected readonly order?: OrderService,
+    @Optional() protected readonly schema?: SchemaService,
+    @Optional() protected readonly schools?: SchoolsService,
+    @Optional() protected readonly siteSettings?: SiteSettingsService,
+    @Optional() protected readonly users?: UsersService,
+  ) {}
 
   async onModuleInit() {
     // Startup schema guards are run sequentially because the production DB helper is not
