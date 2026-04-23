@@ -129,6 +129,74 @@ export default function KitchenDashboard({
     }
   };
 
+  const onDownloadCsv = () => {
+    if (!data) return;
+    const allOrders = sessionFilteredOrders;
+    if (allOrders.length === 0) {
+      setMessage('No orders available to export.');
+      return;
+    }
+
+    const escapeCsv = (value: string | number | null | undefined) => {
+      const s = value == null ? '' : String(value);
+      if (/[",\r\n]/.test(s)) {
+        return `"${s.replace(/"/g, '""')}"`;
+      }
+      return s;
+    };
+
+    const headers = [
+      'Service Date', 'Session', 'Student', 'Grade', 'School',
+      'Phone Number', 'Family', 'Dish', 'Quantity',
+      'Dietary Allergies', 'Order Status', 'Delivery Status',
+    ];
+
+    const rows: string[] = [headers.join(',')];
+    for (const o of allOrders) {
+      const sessionLabel = getSessionLabel(o.session);
+      const baseCols = [
+        data.serviceDate,
+        sessionLabel,
+        o.child_name,
+        o.school_grade || '',
+        o.school_name || '',
+        o.youngster_mobile || '',
+        o.parent_name || '',
+      ];
+      if (o.dishes.length === 0) {
+        rows.push([
+          ...baseCols.map(escapeCsv),
+          escapeCsv(''), escapeCsv(0),
+          escapeCsv(o.allergen_items || ''),
+          escapeCsv(o.status),
+          escapeCsv(o.delivery_status),
+        ].join(','));
+      } else {
+        for (const d of o.dishes) {
+          rows.push([
+            ...baseCols.map(escapeCsv),
+            escapeCsv(d.item_name),
+            escapeCsv(d.quantity),
+            escapeCsv(o.allergen_items || ''),
+            escapeCsv(o.status),
+            escapeCsv(o.delivery_status),
+          ].join(','));
+        }
+      }
+    }
+
+    const csv = '\ufeff' + rows.join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `kitchen-orders-${data.serviceDate}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.setTimeout(() => URL.revokeObjectURL(url), 500);
+  };
+
   const onDownloadPdf = () => {
     if (!data) return;
     const allOrders = sessionFilteredOrders;
@@ -273,6 +341,7 @@ export default function KitchenDashboard({
           </label>
           <button className="btn btn-outline" type="button" onClick={load}>Refresh</button>
           <button className="btn btn-outline" type="button" onClick={onDownloadPdf}>Download PDF</button>
+          <button className="btn btn-outline" type="button" onClick={onDownloadCsv}>Download CSV</button>
         </div>
         {message ? <p className="auth-help">{message}</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
@@ -439,10 +508,15 @@ export default function KitchenDashboard({
         }
         .kitchen-date-picker-row {
           display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
+          grid-template-columns: repeat(5, minmax(0, 1fr));
           gap: 0.6rem;
           margin-bottom: 0.65rem;
           align-items: end;
+        }
+        @media (max-width: 720px) {
+          .kitchen-date-picker-row {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
         }
         .kitchen-control {
           margin: 0;
