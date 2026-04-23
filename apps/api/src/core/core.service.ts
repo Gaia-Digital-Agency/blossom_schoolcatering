@@ -8933,47 +8933,7 @@ export class CoreService implements OnModuleInit {
   // ─── Site settings (chef message, etc.) ───────────────────────────────────
 
   async getSiteSettings() {
-    await this.schema!.ensureSiteSettingsTable();
-    await runSql(`
-      INSERT INTO site_settings (setting_key, setting_value)
-      VALUES ('multiorder_future_enabled', 'false')
-      ON CONFLICT (setting_key) DO NOTHING;
-    `);
-    const out = await runSql(`
-      SELECT row_to_json(t)::text
-      FROM (
-        SELECT
-          COALESCE(MAX(CASE WHEN setting_key = 'chef_message' THEN setting_value END), '') AS chef_message,
-          COALESCE(MAX(CASE WHEN setting_key = 'hero_image_url' THEN setting_value END), '/schoolcatering/assets/hero-meal.jpg') AS hero_image_url,
-          COALESCE(MAX(CASE WHEN setting_key = 'hero_image_caption' THEN setting_value END), 'Enchanting Nourished Zesty Original Meals') AS hero_image_caption,
-          COALESCE(MAX(CASE WHEN setting_key = 'ordering_cutoff_time' THEN setting_value END), '08:00') AS ordering_cutoff_time,
-          COALESCE(MAX(CASE WHEN setting_key = 'assistance_message' THEN setting_value END), 'For Assistance Please Whatsapp +6285211710217') AS assistance_message,
-          COALESCE(MAX(CASE WHEN setting_key = 'multiorder_future_enabled' THEN setting_value END), 'false') AS multiorder_future_enabled,
-          COALESCE(MAX(CASE WHEN setting_key = 'ai_future_enabled' THEN setting_value END), 'false') AS ai_future_enabled
-        FROM site_settings
-      ) t;
-    `);
-    const lines = out.split('\n').map((x: string) => x.trim()).filter(Boolean);
-    const data = lines[0]
-      ? (JSON.parse(lines[0]) as {
-          chef_message?: string;
-          hero_image_url?: string;
-          hero_image_caption?: string;
-          ordering_cutoff_time?: string;
-          assistance_message?: string;
-          multiorder_future_enabled?: string;
-          ai_future_enabled?: string;
-        })
-      : {};
-    return {
-      chef_message: data.chef_message ?? '',
-      hero_image_url: data.hero_image_url ?? '/schoolcatering/assets/hero-meal.jpg',
-      hero_image_caption: data.hero_image_caption ?? 'Enchanting Nourished Zesty Original Meals',
-      ordering_cutoff_time: this.normalizeOrderingCutoffTime(data.ordering_cutoff_time ?? '08:00'),
-      assistance_message: data.assistance_message ?? 'For Assistance Please Whatsapp +6285211710217',
-      multiorder_future_enabled: String(data.multiorder_future_enabled || 'false').trim().toLowerCase() === 'true',
-      ai_future_enabled: String(data.ai_future_enabled || 'false').trim().toLowerCase() === 'true',
-    };
+    return this.siteSettings!.getSiteSettings();
   }
 
   async updateSiteSettings(actor: AccessUser, input: {
@@ -8985,57 +8945,7 @@ export class CoreService implements OnModuleInit {
     multiorder_future_enabled?: boolean;
     ai_future_enabled?: boolean;
   }) {
-    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
-    const current = await this.getSiteSettings();
-    const chefMessage = typeof input.chef_message === 'string' ? input.chef_message.trim() : current.chef_message;
-    const heroImageUrl = typeof input.hero_image_url === 'string' ? input.hero_image_url.trim() : current.hero_image_url;
-    const heroImageCaption = typeof input.hero_image_caption === 'string' ? input.hero_image_caption.trim() : current.hero_image_caption;
-    const orderingCutoffTime = this.normalizeOrderingCutoffTime(input.ordering_cutoff_time ?? current.ordering_cutoff_time);
-    const assistanceMessage = typeof input.assistance_message === 'string'
-      ? input.assistance_message.trim()
-      : current.assistance_message;
-    const multiorderFutureEnabled = typeof input.multiorder_future_enabled === 'boolean'
-      ? input.multiorder_future_enabled
-      : Boolean(current.multiorder_future_enabled);
-    const aiFutureEnabled = typeof input.ai_future_enabled === 'boolean'
-      ? input.ai_future_enabled
-      : Boolean(current.ai_future_enabled);
-    if (chefMessage.length > 500) throw new BadRequestException('chef_message must be 500 characters or fewer');
-    if (heroImageCaption.length > 200) throw new BadRequestException('hero_image_caption must be 200 characters or fewer');
-    if (heroImageUrl.length > 2000) throw new BadRequestException('hero_image_url must be 2000 characters or fewer');
-    if (assistanceMessage.length > 200) throw new BadRequestException('assistance_message must be 200 characters or fewer');
-    await this.schema!.ensureSiteSettingsTable();
-    await runSql(
-      `INSERT INTO site_settings (setting_key, setting_value, updated_at)
-       VALUES
-         ('chef_message', $1, now()),
-         ('hero_image_url', $2, now()),
-         ('hero_image_caption', $3, now()),
-         ('ordering_cutoff_time', $4, now()),
-         ('assistance_message', $5, now()),
-         ('multiorder_future_enabled', $6, now()),
-         ('ai_future_enabled', $7, now())
-       ON CONFLICT (setting_key)
-       DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = now();`,
-      [
-        chefMessage,
-        heroImageUrl || '/schoolcatering/assets/hero-meal.jpg',
-        heroImageCaption,
-        orderingCutoffTime,
-        assistanceMessage,
-        multiorderFutureEnabled ? 'true' : 'false',
-        aiFutureEnabled ? 'true' : 'false',
-      ],
-    );
-    return {
-      chef_message: chefMessage,
-      hero_image_url: heroImageUrl || '/schoolcatering/assets/hero-meal.jpg',
-      hero_image_caption: heroImageCaption,
-      ordering_cutoff_time: orderingCutoffTime,
-      assistance_message: assistanceMessage,
-      multiorder_future_enabled: multiorderFutureEnabled,
-      ai_future_enabled: aiFutureEnabled,
-    };
+    return this.siteSettings!.updateSiteSettings(actor, input);
   }
 
   private normalizeMultiOrderRepeatDays(repeatDaysRaw: string[]) {
