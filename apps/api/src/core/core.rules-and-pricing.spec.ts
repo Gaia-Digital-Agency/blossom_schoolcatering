@@ -2,6 +2,8 @@ import { BadRequestException } from '@nestjs/common';
 import { CoreService } from './core.service';
 import { HelpersService } from './services/helpers.service';
 import { SchemaService } from './services/schema.service';
+import { SchoolsService } from './services/schools.service';
+import { AuditService } from './services/audit.service';
 import { runSql } from '../auth/db.util';
 
 jest.mock('../auth/db.util', () => ({
@@ -12,19 +14,21 @@ jest.mock('../auth/db.util', () => ({
 const mockedRunSql = runSql as jest.MockedFunction<typeof runSql>;
 
 function attachSubServiceStubs(service: CoreService) {
-  // helpers + schema get real instances so sync helpers (calculateTotalPrice,
-  // etc.) and spied async helpers (getMakassarNowContext) behave correctly.
-  // The remaining sub-services are Proxy stubs whose methods resolve to
-  // undefined — enough for flow-control tests that don't exercise their
-  // real logic.
+  // helpers, schema, audit, schools get real instances so sync helpers
+  // (calculateTotalPrice, validateOrderDayRules) behave correctly and
+  // can be spied on directly. Remaining sub-services are Proxy stubs.
   const schema = new SchemaService();
   const helpers = new HelpersService(schema);
+  const audit = new AuditService();
+  const schools = new SchoolsService(schema, helpers, audit);
   (service as unknown as Record<string, unknown>).schema = schema;
   (service as unknown as Record<string, unknown>).helpers = helpers;
+  (service as unknown as Record<string, unknown>).audit = audit;
+  (service as unknown as Record<string, unknown>).schools = schools;
   const subServiceNames = [
-    'adminReports', 'audit', 'billing', 'delivery', 'gaia',
+    'adminReports', 'billing', 'delivery', 'gaia',
     'kitchen', 'media', 'menu', 'multiOrder', 'order',
-    'schools', 'siteSettings', 'users',
+    'siteSettings', 'users',
   ] as const;
   const stub: Record<string, unknown> = new Proxy({}, {
     get: () => jest.fn().mockResolvedValue(undefined),
