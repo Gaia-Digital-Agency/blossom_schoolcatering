@@ -125,7 +125,6 @@ export class CoreService implements OnModuleInit {
   private orderNotificationLogsReady = false;
   private billingReviewColumnsReady = false;
   private schoolShortNameReady = false;
-  private adminAuditTrailReady = false;
   private multiOrderSchemaReady = false;
   private adminVisiblePasswordsReady = false;
   private menuItemExtendedColumnsReady = false;
@@ -185,7 +184,7 @@ export class CoreService implements OnModuleInit {
     await this.ensureOrderNotificationLogsTable();
     await this.ensureBillingReviewColumns();
     await this.ensureSchoolShortNameColumn();
-    await this.ensureAdminAuditTrailTable();
+    await this.audit!.ensureAdminAuditTrailTable();
     await this.ensureMultiOrderSchema();
     await this.ensureMenuItemTextDefaults();
     await this.ensureFamilyIdColumns();
@@ -2538,40 +2537,6 @@ export class CoreService implements OnModuleInit {
     this.deliverySchoolAssignmentsReady = true;
   }
 
-  private async ensureAdminAuditTrailTable() {
-    if (this.adminAuditTrailReady) return;
-    await runSql(`
-      CREATE TABLE IF NOT EXISTS admin_audit_logs (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        actor_user_id uuid NOT NULL REFERENCES users(id),
-        action text NOT NULL,
-        target_type text NOT NULL,
-        target_id text NULL,
-        metadata_json text NULL,
-        created_at timestamptz NOT NULL DEFAULT now()
-      );
-      CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_actor ON admin_audit_logs(actor_user_id, created_at DESC);
-      CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_action ON admin_audit_logs(action, created_at DESC);
-      CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_target ON admin_audit_logs(target_type, created_at DESC);
-    `);
-    this.adminAuditTrailReady = true;
-  }
-
-  private async recordAdminAudit(
-    actor: AccessUser,
-    action: string,
-    targetType: string,
-    targetId?: string | null,
-    metadata?: Record<string, unknown>,
-  ) {
-    if (actor.role !== 'ADMIN') return;
-    await this.ensureAdminAuditTrailTable();
-    await runSql(
-      `INSERT INTO admin_audit_logs (actor_user_id, action, target_type, target_id, metadata_json)
-       VALUES ($1::uuid, $2, $3, $4, $5);`,
-      [actor.uid, action, targetType, targetId || null, metadata ? JSON.stringify(metadata) : null],
-    );
-  }
 
   private async ensureSessionSettingsTable() {
     if (this.sessionSettingsTableReady) return;
@@ -2748,7 +2713,7 @@ export class CoreService implements OnModuleInit {
     );
     if (!out) throw new NotFoundException('School not found');
     const updated = this.parseJsonLine<{ id: string; name: string; is_active: boolean }>(out);
-    await this.recordAdminAudit(actor, 'SCHOOL_UPDATED', 'school', updated.id, { name: updated.name, isActive: updated.is_active });
+    await this.audit!.recordAdminAudit(actor, 'SCHOOL_UPDATED', 'school', updated.id, { name: updated.name, isActive: updated.is_active });
     return updated;
   }
 
@@ -2786,7 +2751,7 @@ export class CoreService implements OnModuleInit {
     if (!out) throw new NotFoundException('Session setting not found');
     this.clearPublicMenuCache();
     const updated = this.parseJsonLine<{ session: SessionType; is_active: boolean }>(out);
-    await this.recordAdminAudit(actor, 'SESSION_SETTING_UPDATED', 'session-setting', updated.session, {
+    await this.audit!.recordAdminAudit(actor, 'SESSION_SETTING_UPDATED', 'session-setting', updated.session, {
       isActive: updated.is_active,
     });
     return updated;
@@ -3858,7 +3823,7 @@ export class CoreService implements OnModuleInit {
            SELECT row_to_json(upserted)::text FROM upserted;`;
     const out = await runSql(upsertSql, [blackoutDate, type, session, reason || null, actor.uid]);
     const entry = this.parseJsonLine<{ id: string; blackout_date: string; type: string; session?: SessionType | null }>(out);
-    await this.recordAdminAudit(actor, 'BLACKOUT_DAY_UPSERTED', 'blackout-day', entry.id, {
+    await this.audit!.recordAdminAudit(actor, 'BLACKOUT_DAY_UPSERTED', 'blackout-day', entry.id, {
       blackoutDate: entry.blackout_date,
       type: entry.type,
       session: entry.session || 'ALL',
@@ -3875,7 +3840,7 @@ export class CoreService implements OnModuleInit {
       [id],
     );
     if (!out) throw new NotFoundException('Blackout day not found');
-    await this.recordAdminAudit(actor, 'BLACKOUT_DAY_DELETED', 'blackout-day', id);
+    await this.audit!.recordAdminAudit(actor, 'BLACKOUT_DAY_DELETED', 'blackout-day', id);
     return { ok: true };
   }
 
@@ -4530,7 +4495,7 @@ export class CoreService implements OnModuleInit {
     }
 
     this.clearPublicMenuCache();
-    await this.recordAdminAudit(actor, 'MENU_ITEM_CREATED', 'menu-item', item.id, { itemName: item.name });
+    await this.audit!.recordAdminAudit(actor, 'MENU_ITEM_CREATED', 'menu-item', item.id, { itemName: item.name });
     return { ok: true, itemId: item.id, itemName: item.name };
   }
 
@@ -4719,7 +4684,7 @@ export class CoreService implements OnModuleInit {
       );
     }
     this.clearPublicMenuCache();
-    await this.recordAdminAudit(actor, 'MENU_ITEM_UPDATED', 'menu-item', itemId, {
+    await this.audit!.recordAdminAudit(actor, 'MENU_ITEM_UPDATED', 'menu-item', itemId, {
       serviceDate,
       session,
       name,
@@ -6712,7 +6677,7 @@ export class CoreService implements OnModuleInit {
     if (isReject) {
       await runSql('DELETE FROM digital_receipts WHERE billing_record_id = $1;', [billingId]);
     }
-    await this.recordAdminAudit(actor, 'BILLING_VERIFIED', 'billing-record', billingId, {
+    await this.audit!.recordAdminAudit(actor, 'BILLING_VERIFIED', 'billing-record', billingId, {
       decision: isReject ? 'REJECTED_TO_UNPAID' : decision,
       note: adminNote || null,
     });
@@ -6737,7 +6702,7 @@ export class CoreService implements OnModuleInit {
     if (!billingOut) throw new NotFoundException('Billing record not found');
     await runSql('DELETE FROM digital_receipts WHERE billing_record_id = $1;', [billingId]);
     await runSql('DELETE FROM billing_records WHERE id = $1;', [billingId]);
-    await this.recordAdminAudit(actor, 'BILLING_DELETED', 'billing-record', billingId);
+    await this.audit!.recordAdminAudit(actor, 'BILLING_DELETED', 'billing-record', billingId);
     return { ok: true };
   }
 
@@ -6838,7 +6803,7 @@ export class CoreService implements OnModuleInit {
        DO UPDATE SET receipt_number = EXCLUDED.receipt_number, pdf_url = EXCLUDED.pdf_url, generated_at = now(), generated_by_user_id = EXCLUDED.generated_by_user_id;`,
       [billing.id, receiptNumber, pdfUrl, actor.uid],
     );
-    await this.recordAdminAudit(actor, 'BILLING_RECEIPT_GENERATED', 'billing-record', billingId, {
+    await this.audit!.recordAdminAudit(actor, 'BILLING_RECEIPT_GENERATED', 'billing-record', billingId, {
       receiptNumber,
     });
     return { ok: true, receiptNumber, pdfUrl };
@@ -7019,7 +6984,7 @@ export class CoreService implements OnModuleInit {
                      updated_at = now();`,
       [deliveryUserId, schoolId, session, isActive],
     );
-    await this.recordAdminAudit(actor, 'DELIVERY_SCHOOL_ASSIGNMENT_UPSERTED', 'delivery-school-assignment', `${schoolId}:${session}`, {
+    await this.audit!.recordAdminAudit(actor, 'DELIVERY_SCHOOL_ASSIGNMENT_UPSERTED', 'delivery-school-assignment', `${schoolId}:${session}`, {
       deliveryUserId,
       schoolId,
       session,
@@ -7045,7 +7010,7 @@ export class CoreService implements OnModuleInit {
       [deliveryUserId, schoolId, session],
     );
     if (!out) throw new NotFoundException('Delivery-school assignment not found');
-    await this.recordAdminAudit(actor, 'DELIVERY_SCHOOL_ASSIGNMENT_DELETED', 'delivery-school-assignment', `${schoolId}:${session}`, {
+    await this.audit!.recordAdminAudit(actor, 'DELIVERY_SCHOOL_ASSIGNMENT_DELETED', 'delivery-school-assignment', `${schoolId}:${session}`, {
       deliveryUserId,
       schoolId,
       session,
@@ -9188,7 +9153,7 @@ export class CoreService implements OnModuleInit {
     );
     if (!out) throw new BadRequestException('Failed to create school');
     const school = this.parseJsonLine<{ id: string; name: string }>(out);
-    await this.recordAdminAudit(actor, 'SCHOOL_CREATED', 'school', school.id, { name: school.name });
+    await this.audit!.recordAdminAudit(actor, 'SCHOOL_CREATED', 'school', school.id, { name: school.name });
     return school;
   }
 
@@ -9213,7 +9178,7 @@ export class CoreService implements OnModuleInit {
       [schoolId],
     );
     if (!out) throw new NotFoundException('School not found');
-    await this.recordAdminAudit(actor, 'SCHOOL_DELETED', 'school', schoolId);
+    await this.audit!.recordAdminAudit(actor, 'SCHOOL_DELETED', 'school', schoolId);
     return { ok: true };
   }
 
@@ -9274,7 +9239,7 @@ export class CoreService implements OnModuleInit {
         await runSql(`UPDATE parents SET ${p2Updates.join(', ')} WHERE id = $${p2Params.length};`, p2Params);
       }
     }
-    await this.recordAdminAudit(actor, 'PARENT_PROFILE_UPDATED', 'parent', targetParentId, {
+    await this.audit!.recordAdminAudit(actor, 'PARENT_PROFILE_UPDATED', 'parent', targetParentId, {
       changedFields: Object.keys(input).filter((k) => Boolean((input as Record<string, unknown>)[k])),
     });
     return { ok: true };
@@ -9353,14 +9318,14 @@ export class CoreService implements OnModuleInit {
       blockingHistory.auditCount > 0
     ) {
       await this.softDeleteParent(targetParentId, parent.user_id);
-      await this.recordAdminAudit(actor, 'PARENT_DELETED', 'parent', targetParentId);
+      await this.audit!.recordAdminAudit(actor, 'PARENT_DELETED', 'parent', targetParentId);
       return { ok: true };
     }
     await runSql(`DELETE FROM parent_children WHERE parent_id = $1;`, [targetParentId]);
     await runSql(`DELETE FROM user_preferences WHERE user_id = $1;`, [parent.user_id]);
     await runSql(`DELETE FROM parents WHERE id = $1;`, [targetParentId]);
     await runSql(`DELETE FROM users WHERE id = $1;`, [parent.user_id]);
-    await this.recordAdminAudit(actor, 'PARENT_DELETED', 'parent', targetParentId);
+    await this.audit!.recordAdminAudit(actor, 'PARENT_DELETED', 'parent', targetParentId);
     return { ok: true };
   }
 
@@ -9715,7 +9680,7 @@ export class CoreService implements OnModuleInit {
         );
       }
     }
-    await this.recordAdminAudit(actor, 'YOUNGSTER_PROFILE_UPDATED', 'youngster', youngsterId, {
+    await this.audit!.recordAdminAudit(actor, 'YOUNGSTER_PROFILE_UPDATED', 'youngster', youngsterId, {
       changedFields: Object.keys(input).filter((k) => (input as Record<string, unknown>)[k] !== undefined),
     });
     return { ok: true };
@@ -9748,7 +9713,7 @@ export class CoreService implements OnModuleInit {
     } else {
       await this.hardDeleteYoungsterIfSafe(youngsterId, child.user_id);
     }
-    await this.recordAdminAudit(actor, 'YOUNGSTER_DELETED', 'youngster', youngsterId);
+    await this.audit!.recordAdminAudit(actor, 'YOUNGSTER_DELETED', 'youngster', youngsterId);
     return { ok: true };
   }
 
@@ -9792,7 +9757,7 @@ export class CoreService implements OnModuleInit {
       [userId],
     );
     await this.setAdminVisiblePassword(userId, newPassword, 'RESET');
-    await this.recordAdminAudit(actor, 'USER_PASSWORD_RESET', 'user', userId, {
+    await this.audit!.recordAdminAudit(actor, 'USER_PASSWORD_RESET', 'user', userId, {
       role: target.role,
       username: target.username,
       generated: !newPasswordRaw,
@@ -9922,7 +9887,7 @@ export class CoreService implements OnModuleInit {
       );
       if (!updateOut) throw new BadRequestException('Failed to update ingredient');
       const ingredient = this.parseJsonLine<{ id: string; name: string }>(updateOut);
-      await this.recordAdminAudit(actor, 'INGREDIENT_UPSERTED', 'ingredient', ingredient.id, {
+      await this.audit!.recordAdminAudit(actor, 'INGREDIENT_UPSERTED', 'ingredient', ingredient.id, {
         name: ingredient.name,
       });
       return ingredient;
@@ -9938,7 +9903,7 @@ export class CoreService implements OnModuleInit {
     );
     if (!insertOut) throw new BadRequestException('Failed to create ingredient');
     const ingredient = this.parseJsonLine<{ id: string; name: string }>(insertOut);
-    await this.recordAdminAudit(actor, 'INGREDIENT_CREATED', 'ingredient', ingredient.id, {
+    await this.audit!.recordAdminAudit(actor, 'INGREDIENT_CREATED', 'ingredient', ingredient.id, {
       name: ingredient.name,
     });
     return ingredient;
@@ -9966,7 +9931,7 @@ export class CoreService implements OnModuleInit {
     );
     if (!out) throw new NotFoundException('Ingredient not found');
     const ingredient = this.parseJsonLine<{ id: string; name: string }>(out);
-    await this.recordAdminAudit(actor, 'INGREDIENT_UPDATED', 'ingredient', ingredient.id, {
+    await this.audit!.recordAdminAudit(actor, 'INGREDIENT_UPDATED', 'ingredient', ingredient.id, {
       name: ingredient.name,
     });
     return ingredient;
@@ -9982,7 +9947,7 @@ export class CoreService implements OnModuleInit {
       [ingredientId],
     );
     if (!out) throw new NotFoundException('Ingredient not found');
-    await this.recordAdminAudit(actor, 'INGREDIENT_DELETED', 'ingredient', ingredientId);
+    await this.audit!.recordAdminAudit(actor, 'INGREDIENT_DELETED', 'ingredient', ingredientId);
     return { ok: true };
   }
 
@@ -10018,7 +9983,7 @@ export class CoreService implements OnModuleInit {
       [itemId],
     );
     this.clearPublicMenuCache();
-    await this.recordAdminAudit(actor, 'MENU_ITEM_DELETED', 'menu-item', itemId);
+    await this.audit!.recordAdminAudit(actor, 'MENU_ITEM_DELETED', 'menu-item', itemId);
     return { ok: true };
   }
 
@@ -10111,7 +10076,7 @@ export class CoreService implements OnModuleInit {
        ON CONFLICT (user_id) DO NOTHING;`,
       [user.id],
     );
-    await this.recordAdminAudit(actor, 'DELIVERY_USER_CREATED', 'user', user.id, { username: user.username });
+    await this.audit!.recordAdminAudit(actor, 'DELIVERY_USER_CREATED', 'user', user.id, { username: user.username });
     return user;
   }
 
@@ -10129,7 +10094,7 @@ export class CoreService implements OnModuleInit {
     );
     if (!out) throw new NotFoundException('Delivery user not found');
     const user = this.parseJsonLine<{ id: string; username: string }>(out);
-    await this.recordAdminAudit(actor, 'DELIVERY_USER_DEACTIVATED', 'user', user.id, { username: user.username });
+    await this.audit!.recordAdminAudit(actor, 'DELIVERY_USER_DEACTIVATED', 'user', user.id, { username: user.username });
     return { ok: true, user };
   }
 
@@ -10210,7 +10175,7 @@ export class CoreService implements OnModuleInit {
     }
     if (!out) throw new NotFoundException('Delivery user not found');
     const user = this.parseJsonLine<{ id: string; username: string }>(out);
-    await this.recordAdminAudit(actor, 'DELIVERY_USER_UPDATED', 'user', user.id, {
+    await this.audit!.recordAdminAudit(actor, 'DELIVERY_USER_UPDATED', 'user', user.id, {
       changedFields: Object.keys(input).filter((k) => (input as Record<string, unknown>)[k] !== undefined),
     });
     return { ok: true, user };
@@ -10259,7 +10224,7 @@ export class CoreService implements OnModuleInit {
     );
     if (!out) throw new NotFoundException('Delivery user not found');
     const user = this.parseJsonLine<{ id: string; username: string }>(out);
-    await this.recordAdminAudit(actor, 'DELIVERY_USER_DELETED', 'user', user.id, { username: user.username });
+    await this.audit!.recordAdminAudit(actor, 'DELIVERY_USER_DELETED', 'user', user.id, { username: user.username });
     return { ok: true, user };
   }
 
@@ -10272,55 +10237,7 @@ export class CoreService implements OnModuleInit {
   }
 
   async getAdminAuditLogs(actor: AccessUser, input: { limit?: string; action?: string; targetType?: string }) {
-    if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
-    await this.ensureAdminAuditTrailTable();
-    const limit = Math.min(Math.max(Number(input.limit || 100) || 100, 1), 500);
-    const action = (input.action || '').trim();
-    const targetType = (input.targetType || '').trim();
-    const params: unknown[] = [];
-    const conditions: string[] = [];
-
-    if (action) {
-      params.push(action);
-      conditions.push(`action = $${params.length}`);
-    }
-    if (targetType) {
-      params.push(targetType);
-      conditions.push(`target_type = $${params.length}`);
-    }
-    params.push(limit);
-
-    const whereSql = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-    const out = await runSql(
-      `SELECT row_to_json(t)::text
-       FROM (
-         SELECT id,
-                actor_user_id,
-                action,
-                target_type,
-                target_id,
-                metadata_json,
-                created_at::text AS created_at
-         FROM admin_audit_logs
-         ${whereSql}
-         ORDER BY created_at DESC
-         LIMIT $${params.length}
-       ) t;`,
-      params,
-    );
-
-    return this.parseJsonLines<{
-      id: string;
-      actor_user_id: string;
-      action: string;
-      target_type: string;
-      target_id?: string | null;
-      metadata_json?: string | null;
-      created_at: string;
-    }>(out).map((row) => ({
-      ...row,
-      metadata: row.metadata_json ? JSON.parse(row.metadata_json) : null,
-    }));
+    return this.audit!.getAdminAuditLogs(actor, input);
   }
 
   // ─── Site settings (chef message, etc.) ───────────────────────────────────
@@ -10684,7 +10601,7 @@ export class CoreService implements OnModuleInit {
       [targetFamilyId],
     ) || 0);
 
-    await this.recordAdminAudit(actor, 'FAMILY_MERGED', 'family', targetFamilyId, {
+    await this.audit!.recordAdminAudit(actor, 'FAMILY_MERGED', 'family', targetFamilyId, {
       sourceFamilyId,
       targetFamilyId,
       parentCount,
@@ -11154,7 +11071,7 @@ export class CoreService implements OnModuleInit {
        WHERE id = $1;`,
       [groupId, totalAmount],
     );
-    await this.recordAdminAudit(actor, 'MULTI_ORDER_CREATED', 'multi-order-group', groupId, {
+    await this.audit!.recordAdminAudit(actor, 'MULTI_ORDER_CREATED', 'multi-order-group', groupId, {
       createdCount: created.length,
       skippedCount: plan.skipped.length,
       session,
@@ -11254,7 +11171,7 @@ export class CoreService implements OnModuleInit {
       menuSnapshot: plan.menuSnapshot,
     });
     const totalAmount = await this.upsertMultiOrderBilling(groupId, String(group.parent_id || '').trim() || null);
-    await this.recordAdminAudit(actor, 'MULTI_ORDER_UPDATED', 'multi-order-group', groupId, {
+    await this.audit!.recordAdminAudit(actor, 'MULTI_ORDER_UPDATED', 'multi-order-group', groupId, {
       createdCount: created.length,
       skippedCount: plan.skipped.length,
     });
@@ -11282,7 +11199,7 @@ export class CoreService implements OnModuleInit {
     await runSql(`DELETE FROM multi_order_billings WHERE multi_order_group_id = $1;`, [groupId]);
     await runSql(`DELETE FROM multi_order_change_requests WHERE multi_order_group_id = $1;`, [groupId]);
     await runSql(`DELETE FROM multi_order_groups WHERE id = $1;`, [groupId]);
-    await this.recordAdminAudit(actor, 'MULTI_ORDER_DELETED', 'multi-order-group', groupId);
+    await this.audit!.recordAdminAudit(actor, 'MULTI_ORDER_DELETED', 'multi-order-group', groupId);
     return { ok: true };
   }
 
@@ -11556,7 +11473,7 @@ export class CoreService implements OnModuleInit {
     const group = await this.getMultiOrderGroupOwned(actor, groupId);
     const totalAmount = await this.upsertMultiOrderBilling(groupId, String(group.parent_id || '').trim() || null);
     const status = await this.recalculateMultiOrderGroupStatus(groupId);
-    await this.recordAdminAudit(actor, 'MULTI_ORDER_FUTURE_TRIMMED', 'multi-order-group', groupId, {
+    await this.audit!.recordAdminAudit(actor, 'MULTI_ORDER_FUTURE_TRIMMED', 'multi-order-group', groupId, {
       trimmedCount: futureMutable.length,
       status,
       totalAmount,
@@ -11589,7 +11506,7 @@ export class CoreService implements OnModuleInit {
        WHERE id = $1;`,
       [groupId],
     );
-    await this.recordAdminAudit(actor, 'MULTI_ORDER_REPLACEMENT_CREATED', 'multi-order-group', groupId, {
+    await this.audit!.recordAdminAudit(actor, 'MULTI_ORDER_REPLACEMENT_CREATED', 'multi-order-group', groupId, {
       replacementGroupId: replacement.groupId,
     });
     return replacement;
