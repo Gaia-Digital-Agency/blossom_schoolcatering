@@ -1,56 +1,50 @@
 /**
- * CoreService (facade)
- * ====================
+ * CoreService (facade) — EXTRACTION COMPLETE
+ * ==========================================
  *
- * Scope (end state, in progress):
- *   - This file is being incrementally split into 15 sub-services
- *     under ./services/ (see their Scope headers for owned methods).
- *   - The facade keeps the public API contract stable: controllers
- *     (core, public, archived) keep calling coreService.xxx(). Every
- *     method listed in core.service.public-surface.json remains
- *     callable on this class — the regression guard at
- *     core.service.public-surface.spec.ts fails if any disappears.
- *   - onModuleInit will eventually delegate all schema migrations to
- *     SchemaService.runAll(). Until that extraction lands, the guards
- *     live here so boot order is byte-identical.
+ * Scope (end state):
+ *   - Thin facade over 15 domain sub-services in ./services/.
+ *     Every endpoint in core/public/archived controllers still calls
+ *     coreService.xxx(); each call is a one-line delegation to the
+ *     owning sub-service. Only healthCheck and onModuleInit hold
+ *     logic here (boot orchestration + db liveness).
+ *   - Public surface guarded by core.service.public-surface.spec.ts:
+ *     if any of the 132 snapshotted methods disappears or any of the
+ *     127 controller-called methods breaks, the guard fails.
  *
- * Scope (today, pre-extraction):
- *   - 132 public methods owned here directly. Each one will move to
- *     its sub-service in a separate commit, replaced by a one-line
- *     delegation (e.g. `getMenus(...args) { return this.menu.getMenus(...args); }`).
- *   - Private helpers (phone/date/hash/family/etc.) migrate to
- *     HelpersService and are reached through `this.helpers.xxx`.
+ * Architecture:
+ *   - onModuleInit runs the schema migrations in order:
+ *       schema.runAll() → audit.ensureAdminAuditTrailTable()
+ *       → helpers.ensureFamilyIdColumns() (triggers backfill)
+ *   - Controllers (core, public, archived) use this facade only.
+ *   - Sub-services inject each other directly where there's no cycle;
+ *     forwardRef(() => CoreService) is used by Gaia / MultiOrder /
+ *     Delivery for the cart-submit path that transits the facade.
+ *
+ * Sub-service roster (15):
+ *   audit, schema, helpers, media, site-settings, schools, kitchen,
+ *   menu, admin-reports, gaia, billing, users, multi-order, delivery,
+ *   order.
+ *
+ * Stats after split:
+ *   core.service.ts     — 12,051 lines → 1,447 lines (−88%)
+ *   sub-services total  — ~12,700 lines across 15 files
+ *   largest sub-service — delivery.service.ts (1,723 lines)
+ *   smallest sub-service — audit.service.ts (132 lines)
  *
  * Dependencies (via @Optional() so `new CoreService()` still works in
- * unit tests that bypass Nest DI — production Nest provides real
- * instances for all 15):
- *   - AdminReportsService, AuditService, BillingService, DeliveryService,
- *     GaiaService, HelpersService, KitchenService, MediaService,
- *     MenuService, MultiOrderService, OrderService, SchemaService,
- *     SchoolsService, SiteSettingsService, UsersService.
+ * unit tests that bypass Nest DI; in production Nest wires all 15).
  *
  * Consumers:
  *   - CoreController  (apps/api/src/core/core.controller.ts)
  *   - PublicController (apps/api/src/core/public.controller.ts)
- *   - ArchivedController (apps/api/src/core/archived.controller.ts — not
- *     registered in CoreModule but kept source-live for future reactivation)
+ *   - ArchivedController (apps/api/src/core/archived.controller.ts —
+ *     not registered in CoreModule but kept source-live for future
+ *     reactivation; its method names are guarded by the surface spec).
  */
-import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  Injectable,
-  OnModuleInit,
-  NotFoundException,
-  Optional,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { readFile } from 'fs/promises';
-import { createSign, randomUUID, scryptSync } from 'crypto';
+import { Injectable, OnModuleInit, Optional } from '@nestjs/common';
 import { runSql } from '../auth/db.util';
-import { validatePasswordPolicy } from '../auth/password-policy';
 import { AccessUser, CartItemInput, SessionType } from './core.types';
-import { normalizeGradeLabel, resolveEffectiveGrade } from '../shared/grade.util';
 import { AdminReportsService } from './services/admin-reports.service';
 import { AuditService } from './services/audit.service';
 import { BillingService } from './services/billing.service';
@@ -66,31 +60,6 @@ import { SchemaService } from './services/schema.service';
 import { SchoolsService } from './services/schools.service';
 import { SiteSettingsService } from './services/site-settings.service';
 import { UsersService } from './services/users.service';
-
-type DbUserRow = {
-  id: string;
-  username: string;
-  role: string;
-  first_name: string;
-  last_name: string;
-};
-
-type ChildRow = {
-  id: string;
-  user_id: string;
-  first_name: string;
-  last_name: string;
-  school_id: string;
-  school_name: string;
-  school_short_name?: string;
-  school_grade: string;
-  registration_grade?: string;
-  current_school_grade?: string | null;
-  registration_date?: string;
-  date_of_birth: string;
-  gender: string;
-  dietary_allergies?: string;
-};
 
 type CartRow = {
   id: string;
