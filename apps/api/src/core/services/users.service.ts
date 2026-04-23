@@ -1,74 +1,80 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { runSql } from '../../auth/db.util';
+import { AccessUser } from '../core.types';
+import { HelpersService } from './helpers.service';
+import { SchemaService } from './schema.service';
+
+type ChildRow = {
+  id: string;
+  user_id: string;
+  first_name: string;
+  last_name: string;
+  school_id: string;
+  school_name: string;
+  school_short_name?: string;
+  school_grade: string;
+  registration_grade?: string;
+  current_school_grade?: string | null;
+  registration_date?: string;
+  date_of_birth: string;
+  gender: string;
+  dietary_allergies?: string;
+};
 
 /**
- * UsersService
+ * UsersService (in progress — see Step 14 for full extraction)
  * ============
  *
- * Scope:
- *   - Parents and youngsters read/write/delete lifecycle, including
- *     soft-delete rules, delete-blocker detection (active orders,
- *     pending billings), and hard-delete safety path.
- *   - Youngster registration flow invoked by parent-led signup and
- *     admin-led creation (used by WhatsApp onboarding).
- *   - Family model: family_id assignment, backfill, merge of two
- *     families, alignment on parent↔child link, and last-name-based
- *     parent-child sync.
- *   - Admin-visible passwords: generate/reset endpoints that also
- *     record the password for admin view (admin_visible_passwords
- *     table). Applies to both parent users and youngster users.
- *   - Record pages: the /record read endpoint used by parent and
- *     youngster record view.
+ * Scope (eventual): parents/youngsters CRUD, password admin, family
+ * linking/merging, youngster registration.
  *
- * Methods that will move here from CoreService:
- *   Registration:
- *     - registerYoungster
- *   Admin CRUD:
- *     - getAdminParents
- *     - getAdminChildren
- *     - updateParentProfile
- *     - deleteParent
- *     - updateYoungsterProfile
- *     - deleteYoungster
- *     - getYoungsterMe
- *   Passwords (admin):
- *     - adminResetUserPassword
- *     - adminGetUserPassword
- *     - adminResetYoungsterPassword
- *     - adminGetYoungsterPassword
- *     - setAdminVisiblePassword (private)
- *     - getAdminVisiblePasswordRow (private)
- *   Delete safety:
- *     - getParentDeleteBlockers (private)
- *     - softDeleteParent (private)
- *     - getYoungsterDeleteBlockers (private)
- *     - softDeleteYoungster (private)
- *     - hardDeleteYoungsterIfSafe (private)
- *   Family model:
- *     - linkParentChild
- *     - mergeFamily
- *     - mergeFamilyIds (private)
- *     - alignFamilyIdsForLink (private)
- *     - backfillFamilyIds (private)
- *     - assignFamilyIdToParents (private)
- *     - assignFamilyIdToChildren (private)
- *   Record pages:
- *     - getParentChildrenPages
- *     - getYoungsterChildrenPages
+ * Currently owned (bootstrapped so AdminReportsService can reference it
+ * without a circular dependency):
+ *   - getYoungsterMe (/youngsters/me/profile read)
  *
- * Dependencies:
- *   - runSql (db.util)
- *   - SchemaService (ensureChildRegistrationSourceColumns,
- *                    ensureFamilyIdColumns, ensureAdminVisiblePasswordsTable,
- *                    ensureChildCurrentGradeColumn, parent2 columns)
- *   - HelpersService (phone, hashPassword, username sanitize,
- *                     syncFamilyParentChildren, family lookups)
- *   - AuthService (via AuthModule) for password policy validation
- *   - AuditService (recordAdminAudit on writes)
- *
- * Consumers:
- *   - CoreService facade (~18 endpoints)
- *   - GaiaService (user context in prompts)
- *   - OrderService, MultiOrderService (ownership checks)
+ * Dependencies: runSql, SchemaService, HelpersService.
  */
 @Injectable()
-export class UsersService {}
+export class UsersService {
+  constructor(
+    private readonly schema: SchemaService,
+    private readonly helpers: HelpersService,
+  ) {}
+
+  async getYoungsterMe(actor: AccessUser) {
+    if (actor.role !== 'YOUNGSTER') throw new ForbiddenException('Role not allowed');
+    await this.schema.ensureSchoolShortNameColumn();
+    const out = await runSql(
+      `
+      SELECT row_to_json(t)::text
+      FROM (
+        SELECT c.id, c.user_id, u.first_name, u.last_name, c.school_id, s.name AS school_name, s.short_name AS school_short_name,
+               c.school_grade AS registration_grade,
+               c.current_school_grade,
+               c.created_at::text AS registration_date,
+               c.date_of_birth::text AS date_of_birth, c.gender::text AS gender,
+               COALESCE((
+                 SELECT cdr.restriction_details
+                 FROM child_dietary_restrictions cdr
+                 WHERE cdr.child_id = c.id
+                   AND cdr.is_active = true
+                   AND cdr.deleted_at IS NULL
+                   AND upper(cdr.restriction_label) = 'ALLERGIES'
+                 ORDER BY cdr.updated_at DESC NULLS LAST, cdr.created_at DESC
+                 LIMIT 1
+               ), 'No Allergies') AS dietary_allergies
+        FROM children c
+        JOIN users u ON u.id = c.user_id
+        JOIN schools s ON s.id = c.school_id
+        WHERE c.user_id = $1
+          AND c.is_active = true
+          AND c.deleted_at IS NULL
+        LIMIT 1
+      ) t;
+    `,
+      [actor.uid],
+    );
+    if (!out) throw new NotFoundException('Youngster profile not found');
+    return this.helpers.withEffectiveGrade(this.helpers.parseJsonLine<ChildRow>(out));
+  }
+}
