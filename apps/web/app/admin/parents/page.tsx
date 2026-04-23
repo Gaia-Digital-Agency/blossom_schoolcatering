@@ -207,7 +207,7 @@ export default function AdminParentsPage() {
   const onEditSave = async () => {
     if (!editParent) return;
     if (!editFirstName.trim()) { setEditError('First Name is required.'); return; }
-    if (!editLastName.trim()) { setEditError('Family Group Name is required.'); return; }
+    if (!editLastName.trim()) { setEditError('Parent Last Name is required.'); return; }
     if (!editPhone.trim()) { setEditError('Phone Number is required.'); return; }
     if (!editEmail.trim()) { setEditError('Email is required.'); return; }
     if (!editEmail.includes('@')) { setEditError('Email must be valid.'); return; }
@@ -500,7 +500,7 @@ export default function AdminParentsPage() {
                 <input className="edit-input" value={editFirstName} onChange={(e) => setEditFirstName(e.target.value)} disabled={editBusy} />
               </label>
               <label className="edit-label">
-                Family Group Name <span className="edit-req">*</span>
+                Parent Last Name <span className="edit-req">*</span>
                 <input className="edit-input" value={editLastName} onChange={(e) => setEditLastName(e.target.value)} disabled={editBusy} />
               </label>
               <label className="edit-label">

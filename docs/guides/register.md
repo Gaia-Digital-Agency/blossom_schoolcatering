@@ -12,7 +12,7 @@ Last updated: 2026-03-20
 - Supports registration by `Parent/Guardian`, `Student`, or `Staff`.
 
 ## Required Family Details
-- Family Group Name
+- Parent Last Name
 - Parent First Name
 - Parent Phone Number
 - Parent Email

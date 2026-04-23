@@ -257,7 +257,7 @@ export default function YoungsterRegisterPage() {
       return;
     }
     if (!parentLastName.trim()) {
-      setError('Family Group Name is required.');
+      setError('Parent Last Name is required.');
       return;
     }
     if (!parentMobileNumber.trim()) {
@@ -424,7 +424,7 @@ export default function YoungsterRegisterPage() {
           <p className="auth-help reg-save-warning">Please take this information down and keep it safely for login.</p>
           <div className="reg-success-info">
             <div className="reg-info-row">
-              <span className="reg-info-label">Family Group Name</span>
+              <span className="reg-info-label">Parent Last Name</span>
               <span className="reg-info-value">{parentLastName}</span>
             </div>
             <div className="reg-info-row">
@@ -599,7 +599,7 @@ export default function YoungsterRegisterPage() {
             ) : null}
 
             <label>
-              Family Group Name
+              Parent Last Name
               <input value={parentLastName} onChange={(e) => setParentLastName(e.target.value)} required />
             </label>
             <label>
