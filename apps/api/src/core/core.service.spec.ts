@@ -1,4 +1,6 @@
 import { CoreService } from './core.service';
+import { HelpersService } from './services/helpers.service';
+import { SchemaService } from './services/schema.service';
 import { runSql } from '../auth/db.util';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 
@@ -19,9 +21,13 @@ const mockedRunSql = runSql as jest.MockedFunction<typeof runSql>;
  * only about flow control.
  */
 function attachSubServiceStubs(service: CoreService) {
+  const schema = new SchemaService();
+  const helpers = new HelpersService(schema);
+  (service as unknown as Record<string, unknown>).schema = schema;
+  (service as unknown as Record<string, unknown>).helpers = helpers;
   const subServiceNames = [
-    'adminReports', 'audit', 'billing', 'delivery', 'gaia', 'helpers',
-    'kitchen', 'media', 'menu', 'multiOrder', 'order', 'schema',
+    'adminReports', 'audit', 'billing', 'delivery', 'gaia',
+    'kitchen', 'media', 'menu', 'multiOrder', 'order',
     'schools', 'siteSettings', 'users',
   ] as const;
   const stub: Record<string, unknown> = new Proxy({}, {
@@ -160,7 +166,9 @@ describe('CoreService ownership and cutoff rules', () => {
   });
 
   it('blocks parent cart creation before 08:00 Asia/Makassar', async () => {
-    jest.spyOn(service as any, 'getMakassarNowContext').mockReturnValue({ dateIso: '2026-03-01', hour: 7, minute: 0 });
+    // createCart → HelpersService.enforceParentYoungsterOrderingWindow →
+    // this.getMakassarNowContext (on HelpersService). Spy the helpers instance.
+    jest.spyOn((service as any).helpers, 'getMakassarNowContext').mockReturnValue({ dateIso: '2026-03-01', hour: 7, minute: 0 });
 
     await expect(
       service.createCart(
@@ -171,7 +179,7 @@ describe('CoreService ownership and cutoff rules', () => {
   });
 
   it('blocks youngster cart creation for same-day service date', async () => {
-    jest.spyOn(service as any, 'getMakassarNowContext').mockReturnValue({ dateIso: '2026-03-01', hour: 9, minute: 0 });
+    jest.spyOn((service as any).helpers, 'getMakassarNowContext').mockReturnValue({ dateIso: '2026-03-01', hour: 9, minute: 0 });
 
     await expect(
       service.createCart(
@@ -220,10 +228,10 @@ describe('CoreService ownership and cutoff rules', () => {
         dietary_snapshot: '',
       }),
     );
-    jest.spyOn(service as any, 'getParentIdByUserId').mockResolvedValue('parent-1');
-    jest.spyOn(service as any, 'ensureParentOwnsChild').mockResolvedValue(undefined);
-    jest.spyOn(service as any, 'isAfterOrAtMakassarCutoff').mockReturnValue(false);
-    jest.spyOn(service as any, 'getMakassarNowContext').mockReturnValue({ dateIso: '2099-01-01', hour: 9 });
+    jest.spyOn((service as any).helpers, 'getParentIdByUserId').mockResolvedValue('parent-1');
+    jest.spyOn((service as any).helpers, 'ensureParentOwnsChild').mockResolvedValue(undefined);
+    jest.spyOn((service as any).helpers, 'isAfterOrAtMakassarCutoff').mockReturnValue(false);
+    jest.spyOn((service as any).helpers, 'getMakassarNowContext').mockReturnValue({ dateIso: '2099-01-01', hour: 9 });
     jest
       .spyOn(service as any, 'validateOrderDayRules')
       .mockRejectedValue(new BadRequestException('ORDER_SERVICE_BLOCKED'));

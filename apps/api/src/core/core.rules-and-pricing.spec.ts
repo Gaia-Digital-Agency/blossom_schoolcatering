@@ -1,5 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { CoreService } from './core.service';
+import { HelpersService } from './services/helpers.service';
+import { SchemaService } from './services/schema.service';
 import { runSql } from '../auth/db.util';
 
 jest.mock('../auth/db.util', () => ({
@@ -10,9 +12,18 @@ jest.mock('../auth/db.util', () => ({
 const mockedRunSql = runSql as jest.MockedFunction<typeof runSql>;
 
 function attachSubServiceStubs(service: CoreService) {
+  // helpers + schema get real instances so sync helpers (calculateTotalPrice,
+  // etc.) and spied async helpers (getMakassarNowContext) behave correctly.
+  // The remaining sub-services are Proxy stubs whose methods resolve to
+  // undefined — enough for flow-control tests that don't exercise their
+  // real logic.
+  const schema = new SchemaService();
+  const helpers = new HelpersService(schema);
+  (service as unknown as Record<string, unknown>).schema = schema;
+  (service as unknown as Record<string, unknown>).helpers = helpers;
   const subServiceNames = [
-    'adminReports', 'audit', 'billing', 'delivery', 'gaia', 'helpers',
-    'kitchen', 'media', 'menu', 'multiOrder', 'order', 'schema',
+    'adminReports', 'audit', 'billing', 'delivery', 'gaia',
+    'kitchen', 'media', 'menu', 'multiOrder', 'order',
     'schools', 'siteSettings', 'users',
   ] as const;
   const stub: Record<string, unknown> = new Proxy({}, {
@@ -78,7 +89,10 @@ describe('CoreService rules, pricing, and badge logic', () => {
   });
 
   it('enforces parent/youngster ordering window', async () => {
-    jest.spyOn(service as any, 'getMakassarNowContext').mockReturnValue({ dateIso: '2026-03-02', hour: 7, minute: 0 });
+    // HelpersService.enforceParentYoungsterOrderingWindow calls its own
+    // this.getMakassarNowContext — spy on the helpers instance, not the
+    // CoreService delegation stub.
+    jest.spyOn((service as any).helpers, 'getMakassarNowContext').mockReturnValue({ dateIso: '2026-03-02', hour: 7, minute: 0 });
     await expect(
       (service as any).enforceParentYoungsterOrderingWindow(
         { uid: 'u', role: 'PARENT', sub: 'x' },
@@ -86,7 +100,7 @@ describe('CoreService rules, pricing, and badge logic', () => {
       ),
     ).rejects.toThrow('ORDERING_AVAILABLE_FROM_0800_WITA');
 
-    jest.spyOn(service as any, 'getMakassarNowContext').mockReturnValue({ dateIso: '2026-03-02', hour: 9, minute: 0 });
+    jest.spyOn((service as any).helpers, 'getMakassarNowContext').mockReturnValue({ dateIso: '2026-03-02', hour: 9, minute: 0 });
     await expect(
       (service as any).enforceParentYoungsterOrderingWindow(
         { uid: 'u', role: 'YOUNGSTER', sub: 'x' },
