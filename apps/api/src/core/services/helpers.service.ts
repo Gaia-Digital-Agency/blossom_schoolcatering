@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/com
 import { randomUUID, scryptSync } from "crypto";
 import { runSql } from '../../auth/db.util';
 import { AccessUser, SessionType } from '../core.types';
+import { normalizeGradeLabel, resolveEffectiveGrade } from '../../shared/grade.util';
 import { SchemaService } from './schema.service';
 
 const SESSIONS: SessionType[] = ['LUNCH', 'SNACK', 'BREAKFAST'];
@@ -693,6 +694,27 @@ export class HelpersService {
     await this.assignFamilyIdToParents([parentId], resolvedFamilyId);
     await this.assignFamilyIdToChildren([childId], resolvedFamilyId);
     return resolvedFamilyId;
+  }
+
+  withEffectiveGrade<T extends Record<string, unknown>>(row: T) {
+    const registrationGrade = normalizeGradeLabel(
+      (row.registration_grade as string | undefined) ?? (row.school_grade as string | undefined),
+    );
+    const currentSchoolGrade = normalizeGradeLabel(row.current_school_grade as string | null | undefined);
+    const registrationDate = (row.registration_date as string | null | undefined)
+      ?? (row.created_at as string | null | undefined)
+      ?? null;
+    return {
+      ...row,
+      school_grade: resolveEffectiveGrade({
+        registrationGrade,
+        currentGrade: currentSchoolGrade,
+        registrationDate,
+      }),
+      registration_grade: registrationGrade,
+      current_school_grade: currentSchoolGrade || null,
+      registration_date: registrationDate || undefined,
+    };
   }
 
   parseJsonLine<T>(line: string): T {
