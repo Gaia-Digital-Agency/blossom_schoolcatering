@@ -237,6 +237,9 @@ export default function KitchenDashboard({
     <main className="page-auth page-auth-desktop">
       <section className="auth-panel">
         <h1>{title}</h1>
+        {returnHref ? (
+          <a className="module-return-link" href={returnHref}>← Return to Kitchen</a>
+        ) : null}
         <div className="module-guide-card">
           💡 See Orders and Summary, Allergens, Mark ordered as prepared, print order tags. Press Refresh Button for latest updates.
         </div>
@@ -404,6 +407,22 @@ export default function KitchenDashboard({
         ) : null}
       </section>
       <style jsx>{`
+        .module-return-link {
+          display: inline-block;
+          margin: 0 0 0.65rem 0;
+          padding: 0.4rem 0.75rem;
+          border: 1px solid #ccbda2;
+          border-radius: 0.5rem;
+          background: rgba(255, 253, 248, 0.88);
+          color: #7a6a58;
+          font-size: 0.82rem;
+          text-decoration: none;
+        }
+        .module-return-link:hover {
+          background: #fff0e0;
+          border-color: #9e6b20;
+          color: #5a3a10;
+        }
         .module-guide-card {
           background: #fffbf4;
           border: 1px solid #e8d9c0;

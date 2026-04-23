@@ -268,6 +268,9 @@ export default function DeliveryDashboard({
       <main className="page-auth page-auth-mobile delivery-page">
         <section className="auth-panel">
           <h1>{title}</h1>
+          {returnHref ? (
+            <a className="module-return-link" href={returnHref}>← Return to Delivery</a>
+          ) : null}
           {deliveryFirstName ? <p className="module-login-label">Logged In as {deliveryFirstName}</p> : null}
           {message ? <p className="auth-help">{message}</p> : null}
           {error ? <p className="auth-error">{error}</p> : null}
@@ -395,6 +398,22 @@ export default function DeliveryDashboard({
           .auth-panel > h1 {
             margin: 0;
             line-height: 1.05;
+          }
+          .module-return-link {
+            display: inline-block;
+            margin: 0 0 0.65rem 0;
+            padding: 0.4rem 0.75rem;
+            border: 1px solid #ccbda2;
+            border-radius: 0.5rem;
+            background: rgba(255, 253, 248, 0.88);
+            color: #7a6a58;
+            font-size: 0.82rem;
+            text-decoration: none;
+          }
+          .module-return-link:hover {
+            background: #fff0e0;
+            border-color: #9e6b20;
+            color: #5a3a10;
           }
           .module-login-label {
             margin: -0.25rem 0 0.25rem;
