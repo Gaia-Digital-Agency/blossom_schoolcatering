@@ -12,6 +12,7 @@ type School = {
 };
 
 type StudentForm = {
+  youngsterLastName: string;
   youngsterFirstName: string;
   youngsterGender: '' | 'MALE' | 'FEMALE';
   youngsterDateOfBirth: string;
@@ -59,6 +60,7 @@ function normalizeNameKey(value: string) {
 
 function buildEmptyStudent(defaultSchoolId = ''): StudentForm {
   return {
+    youngsterLastName: '',
     youngsterFirstName: '',
     youngsterGender: '',
     youngsterDateOfBirth: '',
@@ -179,6 +181,7 @@ export default function YoungsterRegisterPage() {
           const allergies = (child.dietary_allergies || '').trim();
           const hasAllergies = allergies.length > 0 && allergies.toLowerCase() !== NO_ALLERGIES_LABEL.toLowerCase();
           return {
+            youngsterLastName: child.last_name || '',
             youngsterFirstName: child.first_name || '',
             youngsterGender: '',
             youngsterDateOfBirth: child.date_of_birth || '',
@@ -384,6 +387,7 @@ export default function YoungsterRegisterPage() {
           ...(parent2Phone.trim() && { parent2Phone: parent2Phone.trim() }),
           ...(parent2Email.trim() && { parent2Email: parent2Email.trim() }),
           students: students.map((student) => ({
+            youngsterLastName: student.youngsterLastName.trim(),
             youngsterFirstName: student.youngsterFirstName,
             youngsterGender: student.youngsterGender,
             youngsterDateOfBirth: student.youngsterDateOfBirth,
@@ -642,6 +646,15 @@ export default function YoungsterRegisterPage() {
             {students.map((student, index) => (
               <fieldset key={index} className="student-group-fieldset">
                 <legend>Student {index + 1}</legend>
+                <label>
+                  Student Last Name <span className="auth-optional">(Optional)</span>
+                  <input
+                    value={student.youngsterLastName}
+                    onChange={(e) => setStudentField(index, 'youngsterLastName', e.target.value.slice(0, 100))}
+                    maxLength={100}
+                    placeholder="Leave blank to use family last name"
+                  />
+                </label>
                 <label>
                   Student First Name
                   <input value={student.youngsterFirstName} onChange={(e) => setStudentField(index, 'youngsterFirstName', e.target.value)} required />

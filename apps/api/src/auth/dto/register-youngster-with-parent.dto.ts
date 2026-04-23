@@ -2,6 +2,11 @@ import { Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsEmail, IsIn, IsOptional, IsString, IsUUID, Matches, MaxLength, ValidateIf, ValidateNested } from 'class-validator';
 
 export class RegisterFamilyStudentDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  youngsterLastName?: string;
+
   @IsString()
   youngsterFirstName!: string;
 

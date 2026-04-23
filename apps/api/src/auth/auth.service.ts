@@ -63,6 +63,7 @@ type RegisterYoungsterWithParentInput = {
   teacherName?: string;
   teacherPhone?: string;
   students: Array<{
+    youngsterLastName?: string;
     youngsterFirstName: string;
     youngsterGender: 'MALE' | 'FEMALE';
     youngsterDateOfBirth: string;
@@ -1366,7 +1367,8 @@ export class AuthService {
       const youngsterPhoneInput = this.normalizePhone(student?.youngsterPhone);
       const youngsterPhone = youngsterPhoneInput || parentMobileNumber;
       const youngsterEmail = String(student?.youngsterEmail || '').trim().toLowerCase();
-      const youngsterNameKey = `${this.nameCompareKey(youngsterFirstName)}|${this.nameCompareKey(parentLastName)}`;
+      const youngsterLastNameEffective = String(student?.youngsterLastName || '').trim() || parentLastName;
+      const youngsterNameKey = `${this.nameCompareKey(youngsterFirstName)}|${this.nameCompareKey(youngsterLastNameEffective)}`;
       if (!youngsterFirstName || !youngsterGender || !youngsterDateOfBirth || !youngsterSchoolId || !youngsterGrade || !youngsterPhone) {
         throw new BadRequestException(`Student ${index + 1} is missing required information.`);
       }
@@ -1440,7 +1442,7 @@ export class AuthService {
             AND COALESCE(c.registration_actor_type::text, '') = $6
         );
         `,
-        [youngsterSchoolId, youngsterFirstName, parentLastName, parentFirstName, parentLastName, registrantType],
+        [youngsterSchoolId, youngsterFirstName, youngsterLastNameEffective, parentFirstName, parentLastName, registrantType],
       );
       if (duplicateOut === 't') {
         throw new BadRequestException(`Student ${index + 1} is already registered for this family. Please contact Admin.`);
@@ -1546,7 +1548,8 @@ export class AuthService {
       if (!['MALE', 'FEMALE'].includes(youngsterGender)) {
         throw new BadRequestException(`Student gender must be Male or Female for ${youngsterFirstName || 'this student'}.`);
       }
-      const youngsterLastName = parentLastName;
+      const youngsterLastNameInput = String(student.youngsterLastName || '').trim();
+      const youngsterLastName = youngsterLastNameInput || parentLastName;
       const youngsterUsernameBase = this.sanitizeUsernamePart(`${youngsterLastName}_${youngsterFirstName}`);
       const youngsterUsername = await runSql(`SELECT generate_unique_username($1);`, [youngsterUsernameBase]);
       const youngsterGeneratedPassword = password;
