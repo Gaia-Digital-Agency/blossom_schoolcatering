@@ -935,6 +935,23 @@ export class UsersService {
     }
     if (input.parentId) {
       this.helpers.assertValidUuid(input.parentId, 'parentId');
+      const currentLinkOut = await runSql(
+        `SELECT parent_id FROM parent_children WHERE child_id = $1 LIMIT 1;`,
+        [youngsterId],
+      );
+      const currentParentId = String(currentLinkOut || '').trim();
+      const isReassignment = currentParentId && currentParentId !== input.parentId;
+      if (isReassignment) {
+        const hasStudentLastName = typeof input.lastName === 'string' && input.lastName.trim().length > 0;
+        const existingLastNameOut = await runSql(
+          `SELECT last_name FROM users WHERE id = $1 LIMIT 1;`,
+          [child.user_id],
+        );
+        const existingLastName = String(existingLastNameOut || '').trim();
+        if (!hasStudentLastName && !existingLastName) {
+          throw new BadRequestException('Student last name is required when reassigning to a different parent.');
+        }
+      }
       const parentOut = await runSql(
         `SELECT row_to_json(t)::text FROM (
            SELECT u.phone_number, u.email

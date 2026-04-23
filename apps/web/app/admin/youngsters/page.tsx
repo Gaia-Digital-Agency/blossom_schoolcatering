@@ -70,6 +70,14 @@ type ShowIdInfo = {
   youngsterPassword: string;
 };
 
+type ReassignInfo = {
+  childId: string;
+  childFirstName: string;
+  childLastName: string;
+  currentParentLabel: string;
+  currentParentId: string;
+};
+
 const GRADES: string[] = [...GRADE_OPTIONS];
 
 export default function AdminYoungstersPage() {
@@ -83,6 +91,11 @@ export default function AdminYoungstersPage() {
   const [createResult, setCreateResult] = useState<CreateResult | null>(null);
   const [showPassInfo, setShowPassInfo] = useState<ShowPassInfo | null>(null);
   const [showIdInfo, setShowIdInfo] = useState<ShowIdInfo | null>(null);
+  const [reassignInfo, setReassignInfo] = useState<ReassignInfo | null>(null);
+  const [reassignParentId, setReassignParentId] = useState('');
+  const [reassignLastName, setReassignLastName] = useState('');
+  const [reassignBusy, setReassignBusy] = useState(false);
+  const [reassignError, setReassignError] = useState('');
 
   // Youngster fields
   const [selectedParentId, setSelectedParentId] = useState('');
@@ -415,6 +428,65 @@ export default function AdminYoungstersPage() {
     }
   };
 
+  const onOpenReassign = (child: ChildRow) => {
+    const currentParentId = (child.parent_ids || [])[0] || '';
+    const currentParent = parentById.get(currentParentId);
+    setReassignError('');
+    setReassignInfo({
+      childId: child.id,
+      childFirstName: child.first_name,
+      childLastName: child.last_name,
+      currentParentId,
+      currentParentLabel: currentParent
+        ? `${currentParent.first_name} ${currentParent.last_name} (${currentParent.username})`
+        : '—',
+    });
+    const firstOther = parents.find((p) => p.id !== currentParentId);
+    setReassignParentId(firstOther?.id || '');
+    setReassignLastName(child.last_name || '');
+  };
+
+  const onCloseReassign = () => {
+    setReassignInfo(null);
+    setReassignParentId('');
+    setReassignLastName('');
+    setReassignError('');
+    setReassignBusy(false);
+  };
+
+  const onConfirmReassign = async () => {
+    if (!reassignInfo) return;
+    setReassignError('');
+    if (!reassignParentId) { setReassignError('Select a new parent.'); return; }
+    if (reassignParentId === reassignInfo.currentParentId) {
+      setReassignError('Select a different parent to reassign.');
+      return;
+    }
+    const trimmedLastName = reassignLastName.trim();
+    if (!trimmedLastName) { setReassignError('Student last name is required.'); return; }
+    setReassignBusy(true);
+    try {
+      await apiFetch(`/admin/youngster/${reassignInfo.childId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          parentId: reassignParentId,
+          lastName: trimmedLastName,
+        }),
+      });
+      const newParent = parentById.get(reassignParentId);
+      const newParentLabel = newParent
+        ? `${newParent.first_name} ${newParent.last_name} (${newParent.username})`
+        : '—';
+      setMessage(`${reassignInfo.childFirstName} ${trimmedLastName} reassigned to ${newParentLabel}.`);
+      onCloseReassign();
+      await load();
+    } catch (e) {
+      setReassignError(e instanceof Error ? e.message : 'Reassignment failed');
+    } finally {
+      setReassignBusy(false);
+    }
+  };
+
   const createSchoolLabel = useMemo(() => {
     if (!createResult) return '';
     const school = schools.find((s) => s.id === createResult.schoolId);
@@ -630,8 +702,9 @@ export default function AdminYoungstersPage() {
           <table className="kitchen-table">
             <thead>
               <tr>
-                <th>Family Group</th>
+                <th>Student Last Name</th>
                 <th>First Name</th>
+                <th>Parent Family</th>
                 <th>User Name</th>
                 <th>School</th>
                 <th>Current Grade</th>
@@ -640,10 +713,16 @@ export default function AdminYoungstersPage() {
               </tr>
             </thead>
             <tbody>
-              {[...children].sort((a, b) => a.last_name.localeCompare(b.last_name) || a.first_name.localeCompare(b.first_name)).map((c) => (
+              {[...children].sort((a, b) => a.last_name.localeCompare(b.last_name) || a.first_name.localeCompare(b.first_name)).map((c) => {
+                const primaryParent = parentById.get((c.parent_ids || [])[0] || '');
+                const parentFamilyLabel = primaryParent
+                  ? `${primaryParent.first_name} ${primaryParent.last_name}`
+                  : '—';
+                return (
                 <tr key={c.id}>
                   <td>{c.last_name}</td>
                   <td>{c.first_name}</td>
+                  <td>{parentFamilyLabel}</td>
                   <td>{c.username}</td>
                   <td>{c.school_name}</td>
                   <td>{c.school_grade || '-'}</td>
@@ -655,6 +734,9 @@ export default function AdminYoungstersPage() {
                       </button>
                       <button className="btn btn-outline" type="button" onClick={() => onEdit(c)}>
                         Edit
+                      </button>
+                      <button className="btn btn-outline" type="button" onClick={() => onOpenReassign(c)}>
+                        Reassign Parent
                       </button>
                       <button className="btn btn-outline" type="button" onClick={() => onDelete(c.id)}>
                         Delete
@@ -668,10 +750,11 @@ export default function AdminYoungstersPage() {
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
               {children.length === 0 ? (
                 <tr>
-                  <td colSpan={7}>No youngsters found.</td>
+                  <td colSpan={8}>No youngsters found.</td>
                 </tr>
               ) : null}
             </tbody>
@@ -679,6 +762,76 @@ export default function AdminYoungstersPage() {
         </div>
         <AdminReturnButton />
       </section>
+
+      {reassignInfo ? (
+        <div className="pass-modal-overlay" onClick={onCloseReassign}>
+          <div className="pass-modal-card" onClick={(e) => e.stopPropagation()}>
+            <h2 className="pass-modal-title">Reassign Student to Another Parent</h2>
+            <p className="pass-modal-warning">
+              Moving {reassignInfo.childFirstName} {reassignInfo.childLastName} to a different parent group.
+              A student last name is required — it can differ from the parent last name.
+            </p>
+            <div className="reg-info-list">
+              <div className="reg-info-row">
+                <span className="reg-info-label">Student</span>
+                <span className="reg-info-val">
+                  {reassignInfo.childFirstName} {reassignInfo.childLastName}
+                </span>
+              </div>
+              <div className="reg-info-row">
+                <span className="reg-info-label">Current Parent</span>
+                <span className="reg-info-val">{reassignInfo.currentParentLabel}</span>
+              </div>
+            </div>
+            <label className="reassign-label">
+              New Parent (Required)
+              <select
+                value={reassignParentId}
+                onChange={(e) => setReassignParentId(e.target.value)}
+                disabled={reassignBusy}
+              >
+                <option value="">Select...</option>
+                {parents
+                  .filter((p) => p.id !== reassignInfo.currentParentId)
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.first_name} {p.last_name} ({p.username})
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <label className="reassign-label">
+              Student Last Name (Required)
+              <input
+                value={reassignLastName}
+                onChange={(e) => setReassignLastName(e.target.value)}
+                disabled={reassignBusy}
+                placeholder="Key the student last name"
+                required
+              />
+            </label>
+            {reassignError ? <p className="auth-error">{reassignError}</p> : null}
+            <div className="reassign-actions">
+              <button
+                className="btn btn-primary"
+                type="button"
+                onClick={onConfirmReassign}
+                disabled={reassignBusy}
+              >
+                {reassignBusy ? 'Reassigning...' : 'Confirm Reassign'}
+              </button>
+              <button
+                className="btn btn-outline"
+                type="button"
+                onClick={onCloseReassign}
+                disabled={reassignBusy}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {showIdInfo ? (
         <div className="pass-modal-overlay" onClick={() => setShowIdInfo(null)}>
@@ -968,6 +1121,32 @@ export default function AdminYoungstersPage() {
         .pass-modal-close {
           width: 100%;
           padding: 0.6rem 1.25rem;
+        }
+        .reassign-label {
+          display: flex;
+          flex-direction: column;
+          gap: 0.3rem;
+          margin-bottom: 0.75rem;
+          font-size: 0.88rem;
+          font-weight: 600;
+          color: #3b2e1f;
+        }
+        .reassign-label :global(select),
+        .reassign-label :global(input) {
+          font-weight: 400;
+          color: #2f2418;
+          padding: 0.5rem 0.6rem;
+          border: 1px solid #d8cab1;
+          border-radius: 0.45rem;
+          background: #fff;
+        }
+        .reassign-actions {
+          display: flex;
+          gap: 0.5rem;
+          margin-top: 0.4rem;
+        }
+        .reassign-actions :global(.btn) {
+          flex: 1;
         }
       `}</style>
     </main>
