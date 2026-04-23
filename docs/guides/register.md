@@ -9,7 +9,7 @@ Last updated: 2026-03-20
 - Creates one family account.
 - Creates one or more linked student accounts in the same registration.
 - Supports `1` to `5` students in one family registration.
-- Supports registration by `Parent`, `Student`, or `Guardian/Teacher`.
+- Supports registration by `Parent/Guardian`, `Student`, or `Staff`.
 
 ## Required Family Details
 - Family Group Name

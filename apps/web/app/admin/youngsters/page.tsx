@@ -197,7 +197,7 @@ export default function AdminYoungstersPage() {
     setAllergies(child.dietary_allergies || '');
     setRegistrationNote(
       child.registration_actor_teacher_name
-        ? `Registered by Guardian/Teacher: ${child.registration_actor_teacher_name}${child.registration_actor_teacher_phone ? ` (${child.registration_actor_teacher_phone})` : ''}`
+        ? `Registered by Staff: ${child.registration_actor_teacher_name}${child.registration_actor_teacher_phone ? ` (${child.registration_actor_teacher_phone})` : ''}`
         : '',
     );
     const primaryParentId = (child.parent_ids || [])[0] || '';

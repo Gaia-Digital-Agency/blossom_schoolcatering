@@ -15,9 +15,9 @@ Last updated: 2026-03-20
 - The Registration Successful card shows the family username/password and each student username/password.
 - Keep that information safely. A screenshot is recommended.
 
-## C. Registration by Parent, Student, or Guardian/Teacher
-- Registrant User can be `Parent`, `Student`, or `Guardian/Teacher`.
-- If `Guardian/Teacher` is selected, teacher or guardian contact details are required.
+## C. Registration by Parent/Guardian, Student, or Staff
+- Registrant User can be `Parent/Guardian`, `Student`, or `Staff`.
+- If `Staff` is selected, staff contact details are required.
 - All registered students are still linked under one family group.
 
 ## D. School Link and Delivery Link

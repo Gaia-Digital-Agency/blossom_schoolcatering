@@ -242,11 +242,11 @@ export default function YoungsterRegisterPage() {
       return;
     }
     if (registrantType === 'TEACHER' && !teacherName.trim()) {
-      setError('Guardian/Teacher name is required.');
+      setError('Staff name is required.');
       return;
     }
     if (registrantType === 'TEACHER' && !teacherPhone.trim()) {
-      setError('Guardian/Teacher phone number is required.');
+      setError('Staff phone number is required.');
       return;
     }
     if (!parentFirstName.trim()) {
@@ -569,7 +569,7 @@ export default function YoungsterRegisterPage() {
               <legend>Registrant User</legend>
               <label className="registrant-type-option">
                 <input type="radio" name="registrantType" value="PARENT" checked={registrantType === 'PARENT'} onChange={() => setRegistrantType('PARENT')} required />
-                Parent
+                Parent/Guardian
               </label>
               <label className="registrant-type-option">
                 <input type="radio" name="registrantType" value="YOUNGSTER" checked={registrantType === 'YOUNGSTER'} onChange={() => setRegistrantType('YOUNGSTER')} required />
@@ -577,18 +577,18 @@ export default function YoungsterRegisterPage() {
               </label>
               <label className="registrant-type-option">
                 <input type="radio" name="registrantType" value="TEACHER" checked={registrantType === 'TEACHER'} onChange={() => setRegistrantType('TEACHER')} required />
-                Guardian/Teacher
+                Staff
               </label>
             </fieldset>
 
             {registrantType === 'TEACHER' ? (
               <>
                 <label>
-                  Guardian/Teacher Name
+                  Staff Name
                   <input value={teacherName} onChange={(e) => setTeacherName(e.target.value.slice(0, 50))} maxLength={50} required />
                 </label>
                 <label>
-                  Guardian/Teacher Phone Number
+                  Staff Phone Number
                   <input value={teacherPhone} onChange={(e) => setTeacherPhone(e.target.value)} placeholder="+[country][area][number]" required />
                 </label>
               </>
