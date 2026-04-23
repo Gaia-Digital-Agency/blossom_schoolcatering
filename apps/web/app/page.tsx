@@ -132,7 +132,6 @@ export default function HomePage() {
             <div className="auth-grid home-auth-grid">
               <Link className="btn btn-primary" href="/login">Log In</Link>
               <Link className="btn btn-outline" href="/register">Register</Link>
-              <Link className="btn btn-outline" href="/userguide">Guide</Link>
             </div>
           </section>
         </main>
@@ -151,6 +150,9 @@ export default function HomePage() {
 
         {/* Footer section with copyright info and dynamic data like date, time, and visitor count */}
         <footer className="footer">
+          <p className="footer-guide">
+            <Link href="/userguide">📖 Guide</Link>
+          </p>
           <p>Copyright (C) 2026, Developed by Gaiada.com</p>
           <p>Today: {localToday}</p>
           <p>Visitors: <strong>{visitCount}</strong> | Timezone: {localTz} | Time: {localTime} {localTzAbbr}</p>
