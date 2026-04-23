@@ -3,6 +3,11 @@ import { HelpersService } from './services/helpers.service';
 import { SchemaService } from './services/schema.service';
 import { SchoolsService } from './services/schools.service';
 import { AuditService } from './services/audit.service';
+import { MediaService } from './services/media.service';
+import { MenuService } from './services/menu.service';
+import { DeliveryService } from './services/delivery.service';
+import { UsersService } from './services/users.service';
+import { OrderService } from './services/order.service';
 import { runSql } from '../auth/db.util';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 
@@ -27,14 +32,24 @@ function attachSubServiceStubs(service: CoreService) {
   const helpers = new HelpersService(schema);
   const audit = new AuditService();
   const schools = new SchoolsService(schema, helpers, audit);
+  const media = new MediaService(helpers);
+  const menu = new MenuService(schema, helpers, audit, media, schools);
+  const users = new UsersService(schema, helpers, audit, menu);
+  const delivery = new DeliveryService(service, schema, helpers, audit, media, users);
+  const order = new OrderService(schema, helpers, audit, schools, menu, delivery);
   (service as unknown as Record<string, unknown>).schema = schema;
   (service as unknown as Record<string, unknown>).helpers = helpers;
   (service as unknown as Record<string, unknown>).audit = audit;
   (service as unknown as Record<string, unknown>).schools = schools;
+  (service as unknown as Record<string, unknown>).media = media;
+  (service as unknown as Record<string, unknown>).menu = menu;
+  (service as unknown as Record<string, unknown>).users = users;
+  (service as unknown as Record<string, unknown>).delivery = delivery;
+  (service as unknown as Record<string, unknown>).order = order;
   const subServiceNames = [
-    'adminReports', 'billing', 'delivery', 'gaia',
-    'kitchen', 'media', 'menu', 'multiOrder', 'order',
-    'siteSettings', 'users',
+    'adminReports', 'billing', 'gaia',
+    'kitchen', 'multiOrder',
+    'siteSettings',
   ] as const;
   const stub: Record<string, unknown> = new Proxy({}, {
     get: () => jest.fn().mockResolvedValue(undefined),
@@ -65,9 +80,9 @@ describe('CoreService ownership and cutoff rules', () => {
         dietary_snapshot: '',
       }),
     );
-    jest.spyOn(service as any, 'getParentIdByUserId').mockResolvedValue('parent-1');
+    jest.spyOn((service as any).helpers, 'getParentIdByUserId').mockResolvedValue('parent-1');
     jest
-      .spyOn(service as any, 'ensureParentOwnsChild')
+      .spyOn((service as any).helpers, 'ensureParentOwnsChild')
       .mockRejectedValue(new ForbiddenException('ORDER_OWNERSHIP_FORBIDDEN'));
 
     await expect(
@@ -92,9 +107,9 @@ describe('CoreService ownership and cutoff rules', () => {
         status: 'PLACED',
       }),
     );
-    jest.spyOn(service as any, 'getParentIdByUserId').mockResolvedValue('parent-1');
-    jest.spyOn(service as any, 'ensureParentOwnsChild').mockResolvedValue(undefined);
-    jest.spyOn(service as any, 'isAfterOrAtMakassarCutoff').mockResolvedValue(true);
+    jest.spyOn((service as any).helpers, 'getParentIdByUserId').mockResolvedValue('parent-1');
+    jest.spyOn((service as any).helpers, 'ensureParentOwnsChild').mockResolvedValue(undefined);
+    jest.spyOn((service as any).helpers, 'isAfterOrAtMakassarCutoff').mockResolvedValue(true);
 
     await expect(
       service.deleteOrder({ uid: 'user-parent', role: 'PARENT', sub: 'parent_user' }, 'order-2'),
@@ -160,7 +175,7 @@ describe('CoreService ownership and cutoff rules', () => {
 
   it('uses blackout guard in createCart flow', async () => {
     jest
-      .spyOn(service as any, 'validateOrderDayRules')
+      .spyOn((service as any).schools, 'validateOrderDayRules')
       .mockRejectedValue(new BadRequestException('ORDER_SERVICE_BLOCKED'));
 
     await expect(
@@ -196,7 +211,7 @@ describe('CoreService ownership and cutoff rules', () => {
   });
 
   it('uses blackout guard in submitCart flow', async () => {
-    jest.spyOn(service as any, 'ensureCartIsOpenAndOwned').mockResolvedValue({
+    jest.spyOn((service as any).order, 'ensureCartIsOpenAndOwned').mockResolvedValue({
       id: 'cart-1',
       child_id: 'child-1',
       created_by_user_id: 'admin-1',
@@ -214,7 +229,7 @@ describe('CoreService ownership and cutoff rules', () => {
       }),
     );
     jest
-      .spyOn(service as any, 'validateOrderDayRules')
+      .spyOn((service as any).schools, 'validateOrderDayRules')
       .mockRejectedValue(new BadRequestException('ORDER_SERVICE_BLOCKED'));
 
     await expect(
@@ -239,7 +254,7 @@ describe('CoreService ownership and cutoff rules', () => {
     jest.spyOn((service as any).helpers, 'isAfterOrAtMakassarCutoff').mockReturnValue(false);
     jest.spyOn((service as any).helpers, 'getMakassarNowContext').mockReturnValue({ dateIso: '2099-01-01', hour: 9 });
     jest
-      .spyOn(service as any, 'validateOrderDayRules')
+      .spyOn((service as any).schools, 'validateOrderDayRules')
       .mockRejectedValue(new BadRequestException('ORDER_SERVICE_BLOCKED'));
 
     await expect(
@@ -264,9 +279,9 @@ describe('CoreService ownership and cutoff rules', () => {
         status: 'PLACED',
       }),
     );
-    jest.spyOn(service as any, 'getChildIdByUserId').mockResolvedValue('child-5');
+    jest.spyOn((service as any).helpers, 'getChildIdByUserId').mockResolvedValue('child-5');
     jest
-      .spyOn(service as any, 'createCart')
+      .spyOn((service as any).order, 'createCart')
       .mockRejectedValue(new BadRequestException('ORDER_SERVICE_BLOCKED'));
 
     await expect(
