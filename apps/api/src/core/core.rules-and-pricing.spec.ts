@@ -9,11 +9,26 @@ jest.mock('../auth/db.util', () => ({
 
 const mockedRunSql = runSql as jest.MockedFunction<typeof runSql>;
 
+function attachSubServiceStubs(service: CoreService) {
+  const subServiceNames = [
+    'adminReports', 'audit', 'billing', 'delivery', 'gaia', 'helpers',
+    'kitchen', 'media', 'menu', 'multiOrder', 'order', 'schema',
+    'schools', 'siteSettings', 'users',
+  ] as const;
+  const stub: Record<string, unknown> = new Proxy({}, {
+    get: () => jest.fn().mockResolvedValue(undefined),
+  });
+  for (const name of subServiceNames) {
+    (service as unknown as Record<string, unknown>)[name] = stub;
+  }
+}
+
 describe('CoreService rules, pricing, and badge logic', () => {
   let service: CoreService;
 
   beforeEach(() => {
     service = new CoreService();
+    attachSubServiceStubs(service);
     mockedRunSql.mockReset();
   });
 

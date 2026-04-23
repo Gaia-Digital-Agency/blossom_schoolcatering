@@ -118,24 +118,6 @@ type AiFutureCategory = 'orders' | 'billing' | 'menu' | 'profile' | 'dietary' | 
 
 @Injectable()
 export class CoreService implements OnModuleInit {
-  private blackoutDaysSessionReady = false;
-  private parentDietaryRestrictionsReady = false;
-  private deliverySchoolAssignmentsReady = false;
-  private deliveryDailyNotesReady = false;
-  private orderNotificationLogsReady = false;
-  private billingReviewColumnsReady = false;
-  private schoolShortNameReady = false;
-  private multiOrderSchemaReady = false;
-  private adminVisiblePasswordsReady = false;
-  private menuItemExtendedColumnsReady = false;
-  private menuItemNameUniquenessReady = false;
-  private menuRatingsTableReady = false;
-  private sessionSettingsTableReady = false;
-  private aiUsageLogsReady = false;
-  private childRegistrationSourceColumnsReady = false;
-  private childCurrentGradeColumnReady = false;
-  private menuItemTextDefaultsReady = false;
-  private parent2ColsReady = false;
   private familyIdsReady = false;
   private readonly publicMenuCacheTtlMs = 60_000;
   private publicMenuCache = new Map<string, {
@@ -172,128 +154,16 @@ export class CoreService implements OnModuleInit {
   async onModuleInit() {
     // Startup schema guards are run sequentially because the production DB helper is not
     // safe under parallel initialization and can tear down the shared pool mid-boot.
-    await this.ensureBlackoutDaysSessionColumn();
-    await this.ensureMenuItemExtendedColumns();
-    await this.ensureMenuItemNameUniquenessScope();
-    await this.ensureSessionSettingsTable();
-    await this.ensureMenuRatingsTable();
-    await this.ensureDeliverySchoolAssignmentsTable();
-    await this.ensureChildRegistrationSourceColumns();
-    await this.ensureChildCurrentGradeColumn();
-    await this.ensureDeliveryDailyNotesTable();
-    await this.ensureOrderNotificationLogsTable();
-    await this.ensureBillingReviewColumns();
-    await this.ensureSchoolShortNameColumn();
+    // SchemaService.runAll() preserves the exact boot order; the audit trail (owned by
+    // AuditService) and family_id columns (still on CoreService pending HelpersService
+    // extraction) are invoked separately to keep their existing position in the sequence.
+    await this.schema!.runAll();
     await this.audit!.ensureAdminAuditTrailTable();
-    await this.ensureMultiOrderSchema();
-    await this.ensureMenuItemTextDefaults();
     await this.ensureFamilyIdColumns();
   }
 
-  private async ensureBlackoutDaysSessionColumn() {
-    if (this.blackoutDaysSessionReady) return;
-    await runSql(`
-      ALTER TABLE blackout_days
-      ADD COLUMN IF NOT EXISTS session session_type NULL;
-    `);
-    await runSql(`
-      ALTER TABLE blackout_days
-      DROP CONSTRAINT IF EXISTS blackout_days_blackout_date_key;
-    `);
-    await runSql(`
-      CREATE UNIQUE INDEX IF NOT EXISTS uq_blackout_days_date_all_sessions
-      ON blackout_days(blackout_date)
-      WHERE session IS NULL;
-    `);
-    await runSql(`
-      CREATE UNIQUE INDEX IF NOT EXISTS uq_blackout_days_date_session
-      ON blackout_days(blackout_date, session)
-      WHERE session IS NOT NULL;
-    `);
-    await runSql(`
-      CREATE INDEX IF NOT EXISTS idx_blackout_days_date_session
-      ON blackout_days(blackout_date, session);
-    `);
-    this.blackoutDaysSessionReady = true;
-  }
-
-  private async ensureSchoolShortNameColumn() {
-    if (this.schoolShortNameReady) return;
-    await runSql(`
-      ALTER TABLE schools
-      ADD COLUMN IF NOT EXISTS short_name varchar(30);
-    `);
-    this.schoolShortNameReady = true;
-  }
-
-  private async ensureAdminVisiblePasswordsTable() {
-    if (this.adminVisiblePasswordsReady) return;
-    await runSql(`
-      CREATE TABLE IF NOT EXISTS admin_visible_passwords (
-        user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-        password_plaintext text NOT NULL,
-        source text NOT NULL DEFAULT 'REGISTRATION',
-        updated_at timestamptz NOT NULL DEFAULT now()
-      );
-    `);
-    this.adminVisiblePasswordsReady = true;
-  }
-
-  private async ensureDeliveryDailyNotesTable() {
-    if (this.deliveryDailyNotesReady) return;
-    await runSql(`
-      CREATE TABLE IF NOT EXISTS delivery_daily_notes (
-        delivery_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        service_date date NOT NULL,
-        note text NOT NULL DEFAULT '',
-        created_at timestamptz NOT NULL DEFAULT now(),
-        updated_at timestamptz NOT NULL DEFAULT now(),
-        PRIMARY KEY (delivery_user_id, service_date)
-      );
-    `);
-    this.deliveryDailyNotesReady = true;
-  }
-
-  private async ensureOrderNotificationLogsTable() {
-    if (this.orderNotificationLogsReady) return;
-    await runSql(`
-      CREATE TABLE IF NOT EXISTS order_notification_logs (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        order_id uuid NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-        channel varchar(30) NOT NULL,
-        notification_type varchar(50) NOT NULL,
-        target_phone varchar(30),
-        target_source varchar(20),
-        status varchar(20) NOT NULL,
-        attempted_at timestamptz NOT NULL DEFAULT now(),
-        sent_at timestamptz,
-        provider varchar(30),
-        provider_message_id varchar(100),
-        message_hash varchar(128),
-        failure_reason text,
-        metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
-        created_at timestamptz NOT NULL DEFAULT now(),
-        updated_at timestamptz NOT NULL DEFAULT now()
-      );
-    `);
-    await runSql(`
-      CREATE INDEX IF NOT EXISTS order_notification_logs_order_idx
-      ON order_notification_logs(order_id);
-    `);
-    await runSql(`
-      CREATE INDEX IF NOT EXISTS order_notification_logs_status_idx
-      ON order_notification_logs(status, attempted_at DESC);
-    `);
-    await runSql(`
-      CREATE UNIQUE INDEX IF NOT EXISTS order_notification_logs_sent_once_uq
-      ON order_notification_logs(order_id, channel, notification_type)
-      WHERE status = 'SENT';
-    `);
-    this.orderNotificationLogsReady = true;
-  }
-
   private async setAdminVisiblePassword(userId: string, password: string, source: 'REGISTRATION' | 'RESET' | 'MANUAL_CREATE') {
-    await this.ensureAdminVisiblePasswordsTable();
+    await this.schema!.ensureAdminVisiblePasswordsTable();
     await runSql(
       `INSERT INTO admin_visible_passwords (user_id, password_plaintext, source, updated_at)
        VALUES ($1, $2, $3, now())
@@ -306,7 +176,7 @@ export class CoreService implements OnModuleInit {
   }
 
   private async getAdminVisiblePasswordRow(userId: string) {
-    await this.ensureAdminVisiblePasswordsTable();
+    await this.schema!.ensureAdminVisiblePasswordsTable();
     const out = await runSql(
       `
       SELECT row_to_json(t)::text
@@ -322,20 +192,6 @@ export class CoreService implements OnModuleInit {
     return out
       ? this.parseJsonLine<{ password_plaintext: string; source: string; updated_at: string }>(out)
       : null;
-  }
-
-  private async ensureMenuItemNameUniquenessScope() {
-    if (this.menuItemNameUniquenessReady) return;
-    // Historical schema used a global unique index on lower(name), which blocks
-    // valid renames across different menus/dates/sessions.
-    // Current behavior expects uniqueness within a menu context only.
-    await runSql(`DROP INDEX IF EXISTS menu_items_name_ci_uq;`);
-    await runSql(`
-      CREATE UNIQUE INDEX IF NOT EXISTS menu_items_menu_name_ci_active_uq
-      ON menu_items (menu_id, lower(name))
-      WHERE deleted_at IS NULL;
-    `);
-    this.menuItemNameUniquenessReady = true;
   }
 
   private parseJsonLine<T>(line: string): T {
@@ -588,7 +444,7 @@ export class CoreService implements OnModuleInit {
 
   private async resolveFamilyScopeByPhone(phoneNumber?: string | null) {
     await this.ensureFamilyIdColumns();
-    await this.ensureParent2Columns();
+    await this.schema!.ensureParent2Columns();
     const normalizedPhone = this.normalizePhone(phoneNumber);
     const phoneKey = this.phoneCompareKey(phoneNumber);
     if (!phoneKey) throw new BadRequestException('phone is required');
@@ -1259,7 +1115,7 @@ export class CoreService implements OnModuleInit {
   }
 
   private async getOrderingCutoffTime() {
-    await this.ensureSiteSettingsTable();
+    await this.schema!.ensureSiteSettingsTable();
     const raw = await runSql(
       `
       SELECT setting_value
@@ -1548,30 +1404,6 @@ export class CoreService implements OnModuleInit {
     return insertedCount;
   }
 
-  private async ensureAiUsageLogsTable() {
-    if (this.aiUsageLogsReady) return;
-    await runSql(`
-      CREATE TABLE IF NOT EXISTS ai_usage_logs (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        actor_user_id uuid NOT NULL REFERENCES users(id),
-        actor_role text NOT NULL,
-        parent_id uuid NULL REFERENCES parents(id) ON DELETE SET NULL,
-        viewer_child_id uuid NULL REFERENCES children(id) ON DELETE SET NULL,
-        child_ids_json text NOT NULL DEFAULT '[]',
-        category text NOT NULL DEFAULT 'unknown',
-        prompt_chars int NOT NULL DEFAULT 0,
-        response_chars int NOT NULL DEFAULT 0,
-        success boolean NOT NULL DEFAULT false,
-        error_code text NULL,
-        created_at timestamptz NOT NULL DEFAULT now()
-      );
-      CREATE INDEX IF NOT EXISTS idx_ai_usage_logs_created_at ON ai_usage_logs(created_at DESC);
-      CREATE INDEX IF NOT EXISTS idx_ai_usage_logs_actor ON ai_usage_logs(actor_user_id, created_at DESC);
-      CREATE INDEX IF NOT EXISTS idx_ai_usage_logs_parent ON ai_usage_logs(parent_id, created_at DESC);
-    `);
-    this.aiUsageLogsReady = true;
-  }
-
   private async recordAiUsage(input: {
     actor: AccessUser;
     parentId?: string | null;
@@ -1583,7 +1415,7 @@ export class CoreService implements OnModuleInit {
     success: boolean;
     errorCode?: string | null;
   }) {
-    await this.ensureAiUsageLogsTable();
+    await this.schema!.ensureAiUsageLogsTable();
     await runSql(
       `INSERT INTO ai_usage_logs (
         actor_user_id,
@@ -2193,7 +2025,7 @@ export class CoreService implements OnModuleInit {
       throw new BadRequestException(`question must be ${config.maxPromptChars} characters or fewer`);
     }
 
-    await this.ensureAiUsageLogsTable();
+    await this.schema!.ensureAiUsageLogsTable();
     await this.enforceAiDailyLimit(actor, config.maxRequestsPerDay);
 
     const scope = await this.resolveAiFamilyScope(actor);
@@ -2377,187 +2209,6 @@ export class CoreService implements OnModuleInit {
     return this.parseJsonLine<BlackoutRule>(out);
   }
 
-  private async ensureMenuItemExtendedColumns() {
-    if (this.menuItemExtendedColumnsReady) return;
-    await runSql(`
-      ALTER TABLE menu_items
-      ADD COLUMN IF NOT EXISTS cutlery_required boolean NOT NULL DEFAULT false;
-    `);
-    await runSql(`
-      ALTER TABLE menu_items
-      ADD COLUMN IF NOT EXISTS packing_requirement text;
-    `);
-    await runSql(`
-      ALTER TABLE menu_items
-      ADD COLUMN IF NOT EXISTS calories_kcal integer;
-    `);
-    await runSql(`
-      ALTER TABLE menu_items
-      ADD COLUMN IF NOT EXISTS is_vegetarian boolean NOT NULL DEFAULT false;
-    `);
-    await runSql(`
-      ALTER TABLE menu_items
-      ADD COLUMN IF NOT EXISTS is_gluten_free boolean NOT NULL DEFAULT false;
-    `);
-    await runSql(`
-      ALTER TABLE menu_items
-      ADD COLUMN IF NOT EXISTS is_dairy_free boolean NOT NULL DEFAULT false;
-    `);
-    await runSql(`
-      ALTER TABLE menu_items
-      ADD COLUMN IF NOT EXISTS contains_peanut boolean NOT NULL DEFAULT false;
-    `);
-    await runSql(`
-      ALTER TABLE menu_items
-      ADD COLUMN IF NOT EXISTS dish_category text NOT NULL DEFAULT 'MAIN';
-    `);
-    this.menuItemExtendedColumnsReady = true;
-  }
-
-  private async ensureMenuRatingsTable() {
-    if (this.menuRatingsTableReady) return;
-    await runSql(`
-      CREATE TABLE IF NOT EXISTS menu_item_ratings (
-        menu_item_id uuid NOT NULL REFERENCES menu_items(id) ON DELETE CASCADE,
-        user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        session session_type NOT NULL DEFAULT 'LUNCH',
-        user_role text NOT NULL,
-        stars smallint NOT NULL CHECK (stars BETWEEN 1 AND 5),
-        created_at timestamptz NOT NULL DEFAULT now(),
-        updated_at timestamptz NOT NULL DEFAULT now(),
-        PRIMARY KEY (menu_item_id, user_id, session)
-      );
-    `);
-    await runSql(`
-      ALTER TABLE menu_item_ratings
-      ADD COLUMN IF NOT EXISTS session session_type NOT NULL DEFAULT 'LUNCH';
-    `);
-    await runSql(`
-      UPDATE menu_item_ratings mir
-      SET session = m.session
-      FROM menu_items mi
-      JOIN menus m ON m.id = mi.menu_id
-      WHERE mir.menu_item_id = mi.id
-        AND mir.session IS DISTINCT FROM m.session;
-    `);
-    await runSql(`
-      ALTER TABLE menu_item_ratings
-      ALTER COLUMN session SET NOT NULL;
-    `);
-    await runSql(`
-      ALTER TABLE menu_item_ratings
-      DROP CONSTRAINT IF EXISTS menu_item_ratings_pkey;
-    `);
-    const ratingsPkExists = await runSql(`
-      SELECT EXISTS (
-        SELECT 1
-        FROM pg_constraint
-        WHERE conrelid = 'menu_item_ratings'::regclass
-          AND conname = 'menu_item_ratings_pkey'
-      );
-    `);
-    if (ratingsPkExists !== 't') {
-      await runSql(`
-        ALTER TABLE menu_item_ratings
-        ADD CONSTRAINT menu_item_ratings_pkey PRIMARY KEY (menu_item_id, user_id, session);
-      `);
-    }
-    await runSql(`
-      CREATE INDEX IF NOT EXISTS idx_menu_item_ratings_item_stars
-      ON menu_item_ratings(menu_item_id, session, stars);
-    `);
-    this.menuRatingsTableReady = true;
-  }
-
-  private async ensureDeliverySchoolAssignmentsTable() {
-    if (this.deliverySchoolAssignmentsReady) return;
-    await runSql(`
-      CREATE TABLE IF NOT EXISTS delivery_school_assignments (
-        delivery_user_id uuid NOT NULL REFERENCES users(id),
-        school_id uuid NOT NULL REFERENCES schools(id),
-        session session_type NOT NULL DEFAULT 'LUNCH',
-        is_active boolean NOT NULL DEFAULT true,
-        created_at timestamptz NOT NULL DEFAULT now(),
-        updated_at timestamptz NOT NULL DEFAULT now(),
-        PRIMARY KEY (school_id, session)
-      );
-    `);
-    await runSql(`
-      ALTER TABLE delivery_school_assignments
-      ADD COLUMN IF NOT EXISTS session session_type NOT NULL DEFAULT 'LUNCH';
-    `);
-    await runSql(`
-      UPDATE delivery_school_assignments
-      SET session = 'LUNCH'
-      WHERE session IS NULL;
-    `);
-    await runSql(`
-      WITH ranked AS (
-        SELECT ctid,
-               ROW_NUMBER() OVER (
-                 PARTITION BY school_id, session
-                 ORDER BY is_active DESC, updated_at DESC, created_at DESC, delivery_user_id
-               ) AS rn
-        FROM delivery_school_assignments
-      )
-      DELETE FROM delivery_school_assignments dsa
-      USING ranked
-      WHERE dsa.ctid = ranked.ctid
-        AND ranked.rn > 1;
-    `);
-    await runSql(`
-      ALTER TABLE delivery_school_assignments
-      DROP CONSTRAINT IF EXISTS delivery_school_assignments_pkey;
-    `);
-    const assignmentPkExists = await runSql(`
-      SELECT EXISTS (
-        SELECT 1
-        FROM pg_constraint
-        WHERE conrelid = 'delivery_school_assignments'::regclass
-          AND conname = 'delivery_school_assignments_pkey'
-      );
-    `);
-    if (assignmentPkExists !== 't') {
-      await runSql(`
-        ALTER TABLE delivery_school_assignments
-        ADD CONSTRAINT delivery_school_assignments_pkey PRIMARY KEY (school_id, session);
-      `);
-    }
-    // Drop-and-recreate so the index always includes the session column
-    // even if an older version was created without it.
-    await runSql(`DROP INDEX IF EXISTS idx_delivery_school_assignments_school;`);
-    await runSql(`
-      CREATE INDEX idx_delivery_school_assignments_school
-      ON delivery_school_assignments(school_id, session, is_active);
-    `);
-    await runSql(`
-      CREATE INDEX IF NOT EXISTS idx_delivery_school_assignments_delivery_user
-      ON delivery_school_assignments(delivery_user_id, session, is_active);
-    `);
-    this.deliverySchoolAssignmentsReady = true;
-  }
-
-
-  private async ensureSessionSettingsTable() {
-    if (this.sessionSettingsTableReady) return;
-    await runSql(`
-      CREATE TABLE IF NOT EXISTS session_settings (
-        session session_type PRIMARY KEY,
-        is_active boolean NOT NULL DEFAULT true,
-        created_at timestamptz NOT NULL DEFAULT now(),
-        updated_at timestamptz NOT NULL DEFAULT now()
-      );
-    `);
-    // Single batch INSERT for all sessions instead of one query per session.
-    await runSql(`
-      INSERT INTO session_settings (session, is_active)
-      VALUES ('LUNCH'::session_type, true),
-             ('SNACK'::session_type, true),
-             ('BREAKFAST'::session_type, true)
-      ON CONFLICT (session) DO NOTHING;
-    `);
-    this.sessionSettingsTableReady = true;
-  }
 
   private async isSessionActive(session: SessionType) {
     const out = await runSql(
@@ -2600,24 +2251,8 @@ export class CoreService implements OnModuleInit {
     return cleaned;
   }
 
-  private async ensureParentDietaryRestrictionsTable() {
-    if (this.parentDietaryRestrictionsReady) return;
-    await runSql(`
-      CREATE TABLE IF NOT EXISTS parent_dietary_restrictions (
-        parent_id uuid PRIMARY KEY REFERENCES parents(id) ON DELETE CASCADE,
-        restriction_label text NOT NULL DEFAULT 'ALLERGIES',
-        restriction_details text NOT NULL,
-        is_active boolean NOT NULL DEFAULT true,
-        created_at timestamptz NOT NULL DEFAULT now(),
-        updated_at timestamptz NOT NULL DEFAULT now(),
-        deleted_at timestamptz NULL
-      );
-    `);
-    this.parentDietaryRestrictionsReady = true;
-  }
-
   private async getOrderDietarySnapshot(childId: string) {
-    await this.ensureParentDietaryRestrictionsTable();
+    await this.schema!.ensureParentDietaryRestrictionsTable();
     const childAllergiesRaw = await runSql(
       `SELECT cdr.restriction_details
        FROM child_dietary_restrictions cdr
@@ -2669,7 +2304,7 @@ export class CoreService implements OnModuleInit {
   }
 
   async getSchools(active = true) {
-    await this.ensureSchoolShortNameColumn();
+    await this.schema!.ensureSchoolShortNameColumn();
     const out = await runSql(
       `
       SELECT row_to_json(t)::text
@@ -2686,7 +2321,7 @@ export class CoreService implements OnModuleInit {
 
   async updateSchool(actor: AccessUser, schoolId: string, input: { isActive?: boolean; name?: string; shortName?: string; city?: string; address?: string; contactPhone?: string }) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
-    await this.ensureSchoolShortNameColumn();
+    await this.schema!.ensureSchoolShortNameColumn();
     const id = schoolId.trim();
     const sets: string[] = ['updated_at = now()'];
     const params: unknown[] = [];
@@ -2855,7 +2490,7 @@ export class CoreService implements OnModuleInit {
     }
     if (await this.findActiveUserByEmail(email)) throw new ConflictException('That email is already taken');
     if (await this.findActiveUserByPhone(phoneNumber)) throw new ConflictException('That phone number is already taken');
-    await this.ensureChildCurrentGradeColumn();
+    await this.schema!.ensureChildCurrentGradeColumn();
     await this.ensureFamilyIdColumns();
     let familyId: string | null = parentId ? await this.getParentFamilyId(parentId) : null;
     familyId ||= randomUUID();
@@ -2928,7 +2563,7 @@ export class CoreService implements OnModuleInit {
   }
 
   async getAdminParents() {
-    await this.ensureParent2Columns();
+    await this.schema!.ensureParent2Columns();
     const out = await runSql(`
       SELECT row_to_json(t)::text
       FROM (
@@ -2987,23 +2622,6 @@ export class CoreService implements OnModuleInit {
       ) t;
     `);
     return this.parseJsonLines(out);
-  }
-
-  private async ensureChildRegistrationSourceColumns() {
-    if (this.childRegistrationSourceColumnsReady) return;
-    await runSql(`
-      ALTER TABLE children
-      ADD COLUMN IF NOT EXISTS registration_actor_type varchar(20) NOT NULL DEFAULT 'PARENT',
-      ADD COLUMN IF NOT EXISTS registration_actor_teacher_name varchar(50),
-      ADD COLUMN IF NOT EXISTS registration_actor_teacher_phone varchar(30);
-    `);
-    this.childRegistrationSourceColumnsReady = true;
-  }
-
-  private async ensureParent2Columns() {
-    if (this.parent2ColsReady) return;
-    await runSql(`ALTER TABLE parents ADD COLUMN IF NOT EXISTS parent2_first_name varchar(100), ADD COLUMN IF NOT EXISTS parent2_phone varchar(30), ADD COLUMN IF NOT EXISTS parent2_email varchar(255);`);
-    this.parent2ColsReady = true;
   }
 
   private async ensureFamilyIdColumns() {
@@ -3149,15 +2767,6 @@ export class CoreService implements OnModuleInit {
     }
   }
 
-  private async ensureChildCurrentGradeColumn() {
-    if (this.childCurrentGradeColumnReady) return;
-    await runSql(`
-      ALTER TABLE children
-      ADD COLUMN IF NOT EXISTS current_school_grade varchar(30);
-    `);
-    this.childCurrentGradeColumnReady = true;
-  }
-
   private withEffectiveGrade<T extends Record<string, unknown>>(row: T) {
     const registrationGrade = normalizeGradeLabel(
       (row.registration_grade as string | undefined) ?? (row.school_grade as string | undefined),
@@ -3177,35 +2786,6 @@ export class CoreService implements OnModuleInit {
       current_school_grade: currentSchoolGrade || null,
       registration_date: registrationDate || undefined,
     };
-  }
-
-  private async ensureBillingReviewColumns() {
-    if (this.billingReviewColumnsReady) return;
-    await runSql(`
-      ALTER TABLE billing_records
-      ADD COLUMN IF NOT EXISTS admin_note text;
-    `);
-    this.billingReviewColumnsReady = true;
-  }
-
-  private async ensureMenuItemTextDefaults() {
-    if (this.menuItemTextDefaultsReady) return;
-    await runSql(`
-      UPDATE menu_items
-      SET description = 'TBA',
-          updated_at = now()
-      WHERE deleted_at IS NULL
-        AND is_available = true
-        AND COALESCE(NULLIF(BTRIM(description), ''), '') = '';
-
-      UPDATE menu_items
-      SET nutrition_facts_text = 'TBA',
-          updated_at = now()
-      WHERE deleted_at IS NULL
-        AND is_available = true
-        AND COALESCE(NULLIF(BTRIM(nutrition_facts_text), ''), '') = '';
-    `);
-    this.menuItemTextDefaultsReady = true;
   }
 
   private normalizeMenuText(raw?: string | null) {
@@ -3745,7 +3325,7 @@ export class CoreService implements OnModuleInit {
   }
 
   async getBlackoutDays(query: { fromDate?: string; toDate?: string; session?: string }) {
-    await this.ensureBlackoutDaysSessionColumn();
+    await this.schema!.ensureBlackoutDaysSessionColumn();
     const params: string[] = [];
     const conditions: string[] = [];
     if (query.fromDate) {
@@ -3788,7 +3368,7 @@ export class CoreService implements OnModuleInit {
 
   async createBlackoutDay(actor: AccessUser, input: { blackoutDate?: string; type?: string; reason?: string; session?: string }) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
-    await this.ensureBlackoutDaysSessionColumn();
+    await this.schema!.ensureBlackoutDaysSessionColumn();
     const blackoutDate = this.validateServiceDate(input.blackoutDate);
     const type = (input.type || '').toUpperCase();
     const reason = (input.reason || '').trim().slice(0, 500);
@@ -5226,7 +4806,7 @@ export class CoreService implements OnModuleInit {
 
   async getYoungsterMe(actor: AccessUser) {
     if (actor.role !== 'YOUNGSTER') throw new ForbiddenException('Role not allowed');
-    await this.ensureSchoolShortNameColumn();
+    await this.schema!.ensureSchoolShortNameColumn();
     const out = await runSql(
       `
       SELECT row_to_json(t)::text
@@ -6251,7 +5831,7 @@ export class CoreService implements OnModuleInit {
 
   async getParentConsolidatedBillingLegacy(actor: AccessUser, sessionFilter?: string) {
     if (actor.role !== 'PARENT') throw new ForbiddenException('Role not allowed');
-    await this.ensureBillingReviewColumns();
+    await this.schema!.ensureBillingReviewColumns();
     const parentId = await this.getParentIdByUserId(actor.uid);
     if (!parentId) throw new BadRequestException('Parent profile not found');
     const familyId = await this.getParentFamilyId(parentId);
@@ -6300,7 +5880,7 @@ export class CoreService implements OnModuleInit {
 
   async getYoungsterConsolidatedBillingLegacy(actor: AccessUser, sessionFilter?: string) {
     if (actor.role !== 'YOUNGSTER') throw new ForbiddenException('Role not allowed');
-    await this.ensureBillingReviewColumns();
+    await this.schema!.ensureBillingReviewColumns();
     const childId = await this.getChildIdByUserId(actor.uid);
     if (!childId) throw new NotFoundException('Youngster profile not found');
     const session = sessionFilter ? this.normalizeSession(sessionFilter) : null;
@@ -6566,7 +6146,7 @@ export class CoreService implements OnModuleInit {
   }
 
   async getAdminBillingLegacy(status?: string, sessionRaw?: string) {
-    await this.ensureBillingReviewColumns();
+    await this.schema!.ensureBillingReviewColumns();
     const statusFilter = (status || '').toUpperCase();
     const session = sessionRaw && sessionRaw !== 'ALL' ? this.normalizeSession(sessionRaw) : null;
     const params: unknown[] = [];
@@ -6624,7 +6204,7 @@ export class CoreService implements OnModuleInit {
 
   async verifyBilling(actor: AccessUser, billingId: string, decision: 'VERIFIED' | 'REJECTED', note?: string) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
-    await this.ensureBillingReviewColumns();
+    await this.schema!.ensureBillingReviewColumns();
     const billingOut = await runSql(
       `
       SELECT row_to_json(t)::text
@@ -6921,7 +6501,7 @@ export class CoreService implements OnModuleInit {
   }
 
   async getDeliverySchoolAssignments() {
-    await this.ensureDeliverySchoolAssignmentsTable();
+    await this.schema!.ensureDeliverySchoolAssignmentsTable();
     const out = await runSql(`
       SELECT row_to_json(t)::text
       FROM (
@@ -6946,7 +6526,7 @@ export class CoreService implements OnModuleInit {
 
   async upsertDeliverySchoolAssignment(actor: AccessUser, input: { deliveryUserId?: string; schoolId?: string; session?: string; isActive?: boolean }) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
-    await this.ensureDeliverySchoolAssignmentsTable();
+    await this.schema!.ensureDeliverySchoolAssignmentsTable();
     const deliveryUserId = (input.deliveryUserId || '').trim();
     const schoolId = (input.schoolId || '').trim();
     const session = this.normalizeSession(input.session);
@@ -6998,7 +6578,7 @@ export class CoreService implements OnModuleInit {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     this.assertValidUuid(deliveryUserId, 'deliveryUserId');
     this.assertValidUuid(schoolId, 'schoolId');
-    await this.ensureDeliverySchoolAssignmentsTable();
+    await this.schema!.ensureDeliverySchoolAssignmentsTable();
     const session = this.normalizeSession(sessionRaw);
 
     const out = await runSql(
@@ -7020,7 +6600,7 @@ export class CoreService implements OnModuleInit {
   }
 
   private async autoAssignDeliveriesForDate(serviceDate: string) {
-    await this.ensureDeliverySchoolAssignmentsTable();
+    await this.schema!.ensureDeliverySchoolAssignmentsTable();
     const ordersOut = await runSql(
       `
       SELECT row_to_json(t)::text
@@ -7149,7 +6729,7 @@ export class CoreService implements OnModuleInit {
 
   async getDeliveryAssignments(actor: AccessUser, dateRaw?: string) {
     if (!['DELIVERY', 'ADMIN'].includes(actor.role)) throw new ForbiddenException('Role not allowed');
-    await this.ensureDeliveryDailyNotesTable();
+    await this.schema!.ensureDeliveryDailyNotesTable();
     const serviceDate = dateRaw ? this.validateServiceDate(dateRaw) : null;
     await this.autoAssignDeliveriesForDate(serviceDate || this.makassarTodayIsoDate());
     const params: unknown[] = [];
@@ -7236,7 +6816,7 @@ export class CoreService implements OnModuleInit {
   }
 
   async getDeliveryDailyNote(actor: AccessUser, dateRaw?: string) {
-    await this.ensureDeliveryDailyNotesTable();
+    await this.schema!.ensureDeliveryDailyNotesTable();
     const serviceDate = dateRaw ? this.validateServiceDate(dateRaw) : this.makassarTodayIsoDate();
     if (actor.role === 'DELIVERY') {
       const out = await runSql(
@@ -7284,7 +6864,7 @@ export class CoreService implements OnModuleInit {
 
   async updateDeliveryDailyNote(actor: AccessUser, dateRaw: string, note?: string) {
     if (actor.role !== 'DELIVERY') throw new ForbiddenException('Role not allowed');
-    await this.ensureDeliveryDailyNotesTable();
+    await this.schema!.ensureDeliveryDailyNotesTable();
     const serviceDate = this.validateServiceDate(dateRaw);
     const cleanNote = (note || '').trim().slice(0, 500);
     await runSql(
@@ -7301,7 +6881,7 @@ export class CoreService implements OnModuleInit {
 
   async getDailyWhatsappOrderNotifications(actor: AccessUser, dateRaw?: string) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
-    await this.ensureOrderNotificationLogsTable();
+    await this.schema!.ensureOrderNotificationLogsTable();
     const serviceDate = dateRaw ? this.validateServiceDate(dateRaw) : this.makassarTodayIsoDate();
 
     const ordersRaw = await runSql(
@@ -7649,7 +7229,7 @@ export class CoreService implements OnModuleInit {
     },
   ) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
-    await this.ensureOrderNotificationLogsTable();
+    await this.schema!.ensureOrderNotificationLogsTable();
     const sentTo = this.normalizePhone(body.sentTo);
     const targetSource = body.targetSource === 'PARENT' ? 'PARENT' : 'STUDENT';
     const provider = String(body.provider || body.sentVia || 'BRIAN').trim().slice(0, 30);
@@ -7718,7 +7298,7 @@ export class CoreService implements OnModuleInit {
     },
   ) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
-    await this.ensureOrderNotificationLogsTable();
+    await this.schema!.ensureOrderNotificationLogsTable();
     const targetPhone = this.normalizePhone(body.targetPhone);
     const targetSource = body.targetSource === 'PARENT' ? 'PARENT' : 'STUDENT';
     const provider = String(body.provider || body.sentVia || 'BRIAN').trim().slice(0, 30);
@@ -9129,7 +8709,7 @@ export class CoreService implements OnModuleInit {
 
   async createSchool(actor: AccessUser, input: { name?: string; shortName?: string; address?: string; city?: string; contactPhone?: string }) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
-    await this.ensureSchoolShortNameColumn();
+    await this.schema!.ensureSchoolShortNameColumn();
     const name = (input.name || '').trim();
     const shortName = (input.shortName || '').trim();
     const address = (input.address || '').trim();
@@ -9187,7 +8767,7 @@ export class CoreService implements OnModuleInit {
   async updateParentProfile(actor: AccessUser, targetParentId: string, input: { firstName?: string; lastName?: string; phoneNumber?: string; email?: string; address?: string; parent2FirstName?: string; parent2Phone?: string; parent2Email?: string }) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
     this.assertValidUuid(targetParentId, 'parentId');
-    await this.ensureParent2Columns();
+    await this.schema!.ensureParent2Columns();
     const out = await runSql(
       `SELECT row_to_json(t)::text FROM (
          SELECT p.id, p.user_id FROM parents p
@@ -9599,7 +9179,7 @@ export class CoreService implements OnModuleInit {
       userParams.push(child.user_id);
       await runSql(`UPDATE users SET ${userUpdates.join(', ')} WHERE id = $${userParams.length};`, userParams);
     }
-    await this.ensureChildCurrentGradeColumn();
+    await this.schema!.ensureChildCurrentGradeColumn();
     const childUpdates: string[] = [];
     const childParams: unknown[] = [];
     if (input.schoolGrade !== undefined) {
@@ -10200,7 +9780,7 @@ export class CoreService implements OnModuleInit {
       throw new BadRequestException('Cannot delete delivery user with active assignments');
     }
 
-    await this.ensureDeliverySchoolAssignmentsTable();
+    await this.schema!.ensureDeliverySchoolAssignmentsTable();
     await runSql(
       `UPDATE delivery_school_assignments
        SET is_active = false, updated_at = now()
@@ -10242,48 +9822,8 @@ export class CoreService implements OnModuleInit {
 
   // ─── Site settings (chef message, etc.) ───────────────────────────────────
 
-  private async ensureSiteSettingsTable() {
-    await runSql(`
-      CREATE TABLE IF NOT EXISTS site_settings (
-        setting_key   text PRIMARY KEY,
-        setting_value text NOT NULL DEFAULT '',
-        updated_at    timestamptz NOT NULL DEFAULT now()
-      );
-    `);
-    await runSql(`
-      INSERT INTO site_settings (setting_key, setting_value)
-      VALUES ('chef_message', 'Every dish is prepared for school-day energy and balanced nutrition. We keep every meal fresh, consistent, and safe for all youngsters.')
-      ON CONFLICT (setting_key) DO NOTHING;
-    `);
-    await runSql(`
-      INSERT INTO site_settings (setting_key, setting_value)
-      VALUES ('hero_image_url', '/schoolcatering/assets/hero-meal.jpg')
-      ON CONFLICT (setting_key) DO NOTHING;
-    `);
-    await runSql(`
-      INSERT INTO site_settings (setting_key, setting_value)
-      VALUES ('hero_image_caption', 'Enchanting Nourished Zesty Original Meals')
-      ON CONFLICT (setting_key) DO NOTHING;
-    `);
-    await runSql(`
-      INSERT INTO site_settings (setting_key, setting_value)
-      VALUES ('ordering_cutoff_time', '08:00')
-      ON CONFLICT (setting_key) DO NOTHING;
-    `);
-    await runSql(`
-      INSERT INTO site_settings (setting_key, setting_value)
-      VALUES ('assistance_message', 'For Assistance Please Whatsapp +6285211710217')
-      ON CONFLICT (setting_key) DO NOTHING;
-    `);
-    await runSql(`
-      INSERT INTO site_settings (setting_key, setting_value)
-      VALUES ('ai_future_enabled', 'false')
-      ON CONFLICT (setting_key) DO NOTHING;
-    `);
-  }
-
   async getSiteSettings() {
-    await this.ensureSiteSettingsTable();
+    await this.schema!.ensureSiteSettingsTable();
     await runSql(`
       INSERT INTO site_settings (setting_key, setting_value)
       VALUES ('multiorder_future_enabled', 'false')
@@ -10354,7 +9894,7 @@ export class CoreService implements OnModuleInit {
     if (heroImageCaption.length > 200) throw new BadRequestException('hero_image_caption must be 200 characters or fewer');
     if (heroImageUrl.length > 2000) throw new BadRequestException('hero_image_url must be 2000 characters or fewer');
     if (assistanceMessage.length > 200) throw new BadRequestException('assistance_message must be 200 characters or fewer');
-    await this.ensureSiteSettingsTable();
+    await this.schema!.ensureSiteSettingsTable();
     await runSql(
       `INSERT INTO site_settings (setting_key, setting_value, updated_at)
        VALUES
@@ -10386,142 +9926,6 @@ export class CoreService implements OnModuleInit {
       multiorder_future_enabled: multiorderFutureEnabled,
       ai_future_enabled: aiFutureEnabled,
     };
-  }
-
-  private async ensureMultiOrderSchema() {
-    if (this.multiOrderSchemaReady) return;
-    await runSql(`
-      ALTER TABLE orders
-      ADD COLUMN IF NOT EXISTS source_type text NOT NULL DEFAULT 'SINGLE';
-    `);
-    await runSql(`
-      ALTER TABLE orders
-      ADD COLUMN IF NOT EXISTS multi_order_group_id uuid NULL;
-    `);
-    await runSql(`
-      CREATE TABLE IF NOT EXISTS multi_order_groups (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        child_id uuid NOT NULL REFERENCES children(id) ON DELETE CASCADE,
-        parent_id uuid NULL REFERENCES parents(id) ON DELETE SET NULL,
-        created_by_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        source_role text NOT NULL,
-        session session_type NOT NULL,
-        start_date date NOT NULL,
-        end_date date NOT NULL,
-        repeat_days_json jsonb NOT NULL DEFAULT '[]'::jsonb,
-        dish_selection_json jsonb NOT NULL DEFAULT '[]'::jsonb,
-        status text NOT NULL DEFAULT 'ACTIVE',
-        original_total_amount numeric(12,2) NOT NULL DEFAULT 0,
-        current_total_amount numeric(12,2) NOT NULL DEFAULT 0,
-        started_at timestamptz NULL,
-        completed_at timestamptz NULL,
-        created_at timestamptz NOT NULL DEFAULT now(),
-        updated_at timestamptz NOT NULL DEFAULT now()
-      );
-    `);
-    await runSql(`
-      CREATE TABLE IF NOT EXISTS multi_order_occurrences (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        multi_order_group_id uuid NOT NULL REFERENCES multi_order_groups(id) ON DELETE CASCADE,
-        service_date date NOT NULL,
-        session session_type NOT NULL,
-        order_id uuid NULL REFERENCES orders(id) ON DELETE SET NULL,
-        status text NOT NULL DEFAULT 'PLACED',
-        price_snapshot_total numeric(12,2) NOT NULL DEFAULT 0,
-        items_snapshot_json jsonb NOT NULL DEFAULT '[]'::jsonb,
-        created_at timestamptz NOT NULL DEFAULT now(),
-        updated_at timestamptz NOT NULL DEFAULT now()
-      );
-    `);
-    await runSql(`
-      CREATE TABLE IF NOT EXISTS multi_order_billings (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        multi_order_group_id uuid NOT NULL UNIQUE REFERENCES multi_order_groups(id) ON DELETE CASCADE,
-        parent_id uuid NULL REFERENCES parents(id) ON DELETE SET NULL,
-        status text NOT NULL DEFAULT 'UNPAID',
-        total_amount numeric(12,2) NOT NULL DEFAULT 0,
-        proof_image_url text NULL,
-        proof_uploaded_at timestamptz NULL,
-        verified_at timestamptz NULL,
-        verified_by uuid NULL REFERENCES users(id) ON DELETE SET NULL,
-        admin_note text NULL,
-        receipt_id uuid NULL,
-        receipt_version integer NOT NULL DEFAULT 0,
-        created_at timestamptz NOT NULL DEFAULT now(),
-        updated_at timestamptz NOT NULL DEFAULT now()
-      );
-    `);
-    await runSql(`
-      CREATE TABLE IF NOT EXISTS multi_order_receipts (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        multi_order_billing_id uuid NOT NULL REFERENCES multi_order_billings(id) ON DELETE CASCADE,
-        receipt_number text NOT NULL,
-        status text NOT NULL DEFAULT 'ACTIVE',
-        version integer NOT NULL DEFAULT 1,
-        pdf_path text NULL,
-        breakdown_json jsonb NOT NULL DEFAULT '{}'::jsonb,
-        voided_at timestamptz NULL,
-        created_at timestamptz NOT NULL DEFAULT now()
-      );
-    `);
-    await runSql(`
-      CREATE TABLE IF NOT EXISTS multi_order_change_requests (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        multi_order_group_id uuid NOT NULL REFERENCES multi_order_groups(id) ON DELETE CASCADE,
-        requested_by_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        request_type text NOT NULL,
-        reason text NOT NULL,
-        payload_json jsonb NULL,
-        status text NOT NULL DEFAULT 'OPEN',
-        resolved_by_user_id uuid NULL REFERENCES users(id) ON DELETE SET NULL,
-        resolved_at timestamptz NULL,
-        resolution_note text NULL,
-        created_at timestamptz NOT NULL DEFAULT now(),
-        updated_at timestamptz NOT NULL DEFAULT now()
-      );
-    `);
-    await runSql(`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (
-          SELECT 1
-          FROM pg_constraint
-          WHERE conname = 'fk_orders_multi_order_group'
-        ) THEN
-          ALTER TABLE orders
-          ADD CONSTRAINT fk_orders_multi_order_group
-          FOREIGN KEY (multi_order_group_id) REFERENCES multi_order_groups(id) ON DELETE SET NULL;
-        END IF;
-      END $$;
-    `);
-    await runSql(`
-      CREATE INDEX IF NOT EXISTS idx_orders_multi_order_group_id
-      ON orders(multi_order_group_id);
-      CREATE INDEX IF NOT EXISTS idx_orders_source_type
-      ON orders(source_type, service_date DESC);
-      CREATE INDEX IF NOT EXISTS idx_multi_order_groups_child
-      ON multi_order_groups(child_id, created_at DESC);
-      CREATE INDEX IF NOT EXISTS idx_multi_order_groups_parent
-      ON multi_order_groups(parent_id, created_at DESC);
-      CREATE INDEX IF NOT EXISTS idx_multi_order_groups_session_status
-      ON multi_order_groups(session, status, start_date, end_date);
-      CREATE INDEX IF NOT EXISTS idx_multi_order_occurrences_group_date
-      ON multi_order_occurrences(multi_order_group_id, service_date);
-      CREATE INDEX IF NOT EXISTS idx_multi_order_occurrences_order
-      ON multi_order_occurrences(order_id);
-      CREATE INDEX IF NOT EXISTS idx_multi_order_billings_parent
-      ON multi_order_billings(parent_id, status, created_at DESC);
-      CREATE INDEX IF NOT EXISTS idx_multi_order_receipts_billing
-      ON multi_order_receipts(multi_order_billing_id, created_at DESC);
-      CREATE INDEX IF NOT EXISTS idx_multi_order_change_requests_group
-      ON multi_order_change_requests(multi_order_group_id, status, created_at DESC);
-    `);
-    await runSql(`
-      CREATE UNIQUE INDEX IF NOT EXISTS orders_child_session_date_active_uq
-      ON orders(child_id, service_date, session)
-      WHERE deleted_at IS NULL AND status <> 'CANCELLED';
-    `);
-    this.multiOrderSchemaReady = true;
   }
 
   private normalizeMultiOrderRepeatDays(repeatDaysRaw: string[]) {
@@ -10721,7 +10125,7 @@ export class CoreService implements OnModuleInit {
   }
 
   private async getMultiOrderGroupOwned(actor: AccessUser, groupId: string) {
-    await this.ensureMultiOrderSchema();
+    await this.schema!.ensureMultiOrderSchema();
     this.assertValidUuid(groupId, 'groupId');
     const out = await runSql(
       `
@@ -10927,7 +10331,7 @@ export class CoreService implements OnModuleInit {
   }
 
   async getMultiOrders(actor: AccessUser) {
-    await this.ensureMultiOrderSchema();
+    await this.schema!.ensureMultiOrderSchema();
     const clauses: string[] = [];
     const params: unknown[] = [];
     if (actor.role === 'PARENT') {
@@ -11003,7 +10407,7 @@ export class CoreService implements OnModuleInit {
     items?: CartItemInput[];
   }) {
     if (!['PARENT', 'YOUNGSTER', 'ADMIN'].includes(actor.role)) throw new ForbiddenException('Role not allowed');
-    await this.ensureMultiOrderSchema();
+    await this.schema!.ensureMultiOrderSchema();
     const childId = await this.getMultiOrderOwnerChildId(actor, String(input.childId || ''));
     const session = this.normalizeSession(input.session);
     const startDate = this.validateServiceDate(input.startDate);
@@ -11369,7 +10773,7 @@ export class CoreService implements OnModuleInit {
     toDate?: string;
   }) {
     if (actor.role !== 'ADMIN') throw new ForbiddenException('Role not allowed');
-    await this.ensureMultiOrderSchema();
+    await this.schema!.ensureMultiOrderSchema();
     const clauses: string[] = [];
     const params: unknown[] = [];
     if (input.session) {
@@ -11780,8 +11184,8 @@ export class CoreService implements OnModuleInit {
 
   async getParentConsolidatedBilling(actor: AccessUser, sessionFilter?: string) {
     if (actor.role !== 'PARENT') throw new ForbiddenException('Role not allowed');
-    await this.ensureBillingReviewColumns();
-    await this.ensureMultiOrderSchema();
+    await this.schema!.ensureBillingReviewColumns();
+    await this.schema!.ensureMultiOrderSchema();
     const parentId = await this.getParentIdByUserId(actor.uid);
     if (!parentId) throw new BadRequestException('Parent profile not found');
     const familyId = await this.getParentFamilyId(parentId);
@@ -11859,8 +11263,8 @@ export class CoreService implements OnModuleInit {
 
   async getYoungsterConsolidatedBilling(actor: AccessUser, sessionFilter?: string) {
     if (actor.role !== 'YOUNGSTER') throw new ForbiddenException('Role not allowed');
-    await this.ensureBillingReviewColumns();
-    await this.ensureMultiOrderSchema();
+    await this.schema!.ensureBillingReviewColumns();
+    await this.schema!.ensureMultiOrderSchema();
     const childId = await this.getChildIdByUserId(actor.uid);
     if (!childId) throw new NotFoundException('Youngster profile not found');
     const session = sessionFilter ? this.normalizeSession(sessionFilter) : null;
@@ -11935,8 +11339,8 @@ export class CoreService implements OnModuleInit {
   }
 
   async getAdminBilling(status?: string, sessionRaw?: string) {
-    await this.ensureBillingReviewColumns();
-    await this.ensureMultiOrderSchema();
+    await this.schema!.ensureBillingReviewColumns();
+    await this.schema!.ensureMultiOrderSchema();
     const statusFilter = (status || '').toUpperCase();
     const session = sessionRaw && sessionRaw !== 'ALL' ? this.normalizeSession(sessionRaw) : null;
     const params: unknown[] = [];

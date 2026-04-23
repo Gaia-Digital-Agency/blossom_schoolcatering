@@ -9,11 +9,35 @@ jest.mock('../auth/db.util', () => ({
 
 const mockedRunSql = runSql as jest.MockedFunction<typeof runSql>;
 
+/**
+ * CoreService's constructor takes 15 @Optional() sub-services. In these
+ * unit tests we bypass Nest DI (`new CoreService()`), so every sub-service
+ * reference would be undefined and any delegation would throw "Cannot
+ * read property of undefined". This helper attaches a Proxy that makes
+ * every `this.xxx.yyy(...)` call resolve to a jest.fn() returning
+ * undefined — good enough for tests that spy on domain helpers and care
+ * only about flow control.
+ */
+function attachSubServiceStubs(service: CoreService) {
+  const subServiceNames = [
+    'adminReports', 'audit', 'billing', 'delivery', 'gaia', 'helpers',
+    'kitchen', 'media', 'menu', 'multiOrder', 'order', 'schema',
+    'schools', 'siteSettings', 'users',
+  ] as const;
+  const stub: Record<string, unknown> = new Proxy({}, {
+    get: () => jest.fn().mockResolvedValue(undefined),
+  });
+  for (const name of subServiceNames) {
+    (service as unknown as Record<string, unknown>)[name] = stub;
+  }
+}
+
 describe('CoreService ownership and cutoff rules', () => {
   let service: CoreService;
 
   beforeEach(() => {
     service = new CoreService();
+    attachSubServiceStubs(service);
     mockedRunSql.mockReset();
   });
 
