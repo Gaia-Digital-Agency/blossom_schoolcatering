@@ -1,0 +1,765 @@
+[
+  {
+    "name": "adminGetUserPassword",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "adminGetYoungsterPassword",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "adminResetUserPassword",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "adminResetYoungsterPassword",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "applyFavouriteToCart",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "assignDelivery",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "autoAssignDeliveries",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "confirmDelivery",
+    "controllers": [
+      "archived.controller.ts"
+    ]
+  },
+  {
+    "name": "createAdminMenuItem",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "createBlackoutDay",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "createCart",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "createDeliveryUser",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "createFavourite",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "createIngredient",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "createMultiOrder",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "createMultiOrderReplacement",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "createMultiOrderRequest",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "createOrUpdateMenuRating",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "createSchool",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "deactivateDeliveryUser",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "deleteBilling",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "deleteBlackoutDay",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "deleteDeliverySchoolAssignment",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "deleteDeliveryUser",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "deleteFavourite",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "deleteIngredient",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "deleteMenuItem",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "deleteMultiOrder",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "deleteMultiOrderOccurrence",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "deleteOrder",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "deleteParent",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "deleteSchool",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "deleteYoungster",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "discardCart",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "generateMultiOrderReceipt",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "generateReceipt",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getAdminAuditLogs",
+    "controllers": [
+      "archived.controller.ts"
+    ]
+  },
+  {
+    "name": "getAdminBilling",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getAdminChildren",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getAdminDashboard",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getAdminFamilyContextByPhone",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getAdminFamilyOrdersByPhone",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getAdminIngredients",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getAdminMenuRatings",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getAdminMenus",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getAdminMultiOrders",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getAdminOrders",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getAdminParents",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getAdminPrintReport",
+    "controllers": [
+      "archived.controller.ts"
+    ]
+  },
+  {
+    "name": "getAdminRevenueDashboard",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getBillingProofImage",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getBillingReceipt",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getBillingReceiptFile",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getBlackoutDays",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getCartById",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getCarts",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getDailyOrdersByPhone",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getDailyWhatsappOrderNotifications",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getDeliveryAssignments",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getDeliveryDailyNote",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getDeliverySchoolAssignments",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getDeliverySummary",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getDeliveryUsers",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getFavourites",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getKitchenDailySummary",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getMenus",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getMultiOrderBilling",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getMultiOrderDetail",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getMultiOrderProofImage",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getMultiOrderReceipt",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getMultiOrderReceiptFile",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getMultiOrders",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getOrderDetail",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getParentChildrenPages",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getParentConsolidatedBilling",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getParentConsolidatedOrders",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getParentSpendingDashboard",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getPublicActiveMenu",
+    "controllers": [
+      "public.controller.ts"
+    ]
+  },
+  {
+    "name": "getSchools",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getSessionSettings",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getSiteSettings",
+    "controllers": [
+      "core.controller.ts",
+      "public.controller.ts"
+    ]
+  },
+  {
+    "name": "getYoungsterChildrenPages",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getYoungsterConsolidatedBilling",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getYoungsterConsolidatedOrders",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getYoungsterInsights",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getYoungsterMe",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "getYoungsterSpendingDashboard",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "linkParentChild",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "lookupNameByPhone",
+    "controllers": [
+      "public.controller.ts"
+    ]
+  },
+  {
+    "name": "markDailyWhatsappOrderNotificationFailed",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "markDailyWhatsappOrderNotificationSent",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "markKitchenOrderComplete",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "mealPlanWizard",
+    "controllers": [
+      "archived.controller.ts"
+    ]
+  },
+  {
+    "name": "mergeFamily",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "queryGaia",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "quickOrder",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "quickReorder",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "registerYoungster",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "replaceCartItems",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "resolveMultiOrderRequest",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "revertBillingProof",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "revertMultiOrderBillingProof",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "seedAdminMenuSample",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "seedAdminOrdersSample",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "sendDeliveryNotificationEmails",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "submitCart",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "toggleDeliveryCompletion",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "trimMultiOrderFuture",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "updateAdminMenuItem",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "updateDeliveryDailyNote",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "updateDeliveryUser",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "updateIngredient",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "updateMultiOrder",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "updateOrder",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "updateParentProfile",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "updateSchool",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "updateSessionSetting",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "updateSiteSettings",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "updateYoungsterProfile",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "uploadBillingProof",
+    "controllers": [
+      "archived.controller.ts"
+    ]
+  },
+  {
+    "name": "uploadBillingProofBatch",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "uploadMenuImage",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "uploadMultiOrderBillingProof",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "uploadSiteHeroImage",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "upsertDeliverySchoolAssignment",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "verifyBilling",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  },
+  {
+    "name": "verifyMultiOrderBilling",
+    "controllers": [
+      "core.controller.ts"
+    ]
+  }
+]

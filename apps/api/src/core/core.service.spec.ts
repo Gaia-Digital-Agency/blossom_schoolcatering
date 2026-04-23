@@ -1,6 +1,6 @@
 import { CoreService } from './core.service';
 import { runSql } from '../auth/db.util';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 
 jest.mock('../auth/db.util', () => ({
   runSql: jest.fn(),
@@ -18,20 +18,21 @@ describe('CoreService ownership and cutoff rules', () => {
   });
 
   it('blocks parent order update when parent-child ownership is missing', async () => {
-    mockedRunSql
-      .mockResolvedValueOnce(
-        JSON.stringify({
-          id: 'order-1',
-          child_id: 'child-1',
-          service_date: '2099-01-10',
-          session: 'LUNCH',
-          status: 'PLACED',
-          total_price: '10000',
-          dietary_snapshot: '',
-        }),
-      )
-      .mockResolvedValueOnce('parent-1')
-      .mockResolvedValueOnce('f');
+    mockedRunSql.mockResolvedValueOnce(
+      JSON.stringify({
+        id: 'order-1',
+        child_id: 'child-1',
+        service_date: '2099-01-10',
+        session: 'LUNCH',
+        status: 'PLACED',
+        total_price: '10000',
+        dietary_snapshot: '',
+      }),
+    );
+    jest.spyOn(service as any, 'getParentIdByUserId').mockResolvedValue('parent-1');
+    jest
+      .spyOn(service as any, 'ensureParentOwnsChild')
+      .mockRejectedValue(new ForbiddenException('ORDER_OWNERSHIP_FORBIDDEN'));
 
     await expect(
       service.updateOrder(
@@ -47,17 +48,17 @@ describe('CoreService ownership and cutoff rules', () => {
   });
 
   it('blocks parent delete after cutoff', async () => {
-    mockedRunSql
-      .mockResolvedValueOnce(
-        JSON.stringify({
-          id: 'order-2',
-          child_id: 'child-2',
-          service_date: '2020-01-10',
-          status: 'PLACED',
-        }),
-      )
-      .mockResolvedValueOnce('parent-1')
-      .mockResolvedValueOnce('t');
+    mockedRunSql.mockResolvedValueOnce(
+      JSON.stringify({
+        id: 'order-2',
+        child_id: 'child-2',
+        service_date: '2020-01-10',
+        status: 'PLACED',
+      }),
+    );
+    jest.spyOn(service as any, 'getParentIdByUserId').mockResolvedValue('parent-1');
+    jest.spyOn(service as any, 'ensureParentOwnsChild').mockResolvedValue(undefined);
+    jest.spyOn(service as any, 'isAfterOrAtMakassarCutoff').mockResolvedValue(true);
 
     await expect(
       service.deleteOrder({ uid: 'user-parent', role: 'PARENT', sub: 'parent_user' }, 'order-2'),
