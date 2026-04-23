@@ -4,6 +4,9 @@ import { HelpersService } from './services/helpers.service';
 import { SchemaService } from './services/schema.service';
 import { SchoolsService } from './services/schools.service';
 import { AuditService } from './services/audit.service';
+import { MultiOrderService } from './services/multi-order.service';
+import { MediaService } from './services/media.service';
+import { MenuService } from './services/menu.service';
 import { runSql } from '../auth/db.util';
 
 jest.mock('../auth/db.util', () => ({
@@ -21,13 +24,19 @@ function attachSubServiceStubs(service: CoreService) {
   const helpers = new HelpersService(schema);
   const audit = new AuditService();
   const schools = new SchoolsService(schema, helpers, audit);
+  const media = new MediaService(helpers);
+  const menu = new MenuService(schema, helpers, audit, media, schools);
+  const multiOrder = new MultiOrderService(service, schema, helpers, audit, media, menu, schools);
   (service as unknown as Record<string, unknown>).schema = schema;
   (service as unknown as Record<string, unknown>).helpers = helpers;
   (service as unknown as Record<string, unknown>).audit = audit;
   (service as unknown as Record<string, unknown>).schools = schools;
+  (service as unknown as Record<string, unknown>).media = media;
+  (service as unknown as Record<string, unknown>).menu = menu;
+  (service as unknown as Record<string, unknown>).multiOrder = multiOrder;
   const subServiceNames = [
     'adminReports', 'billing', 'delivery', 'gaia',
-    'kitchen', 'media', 'menu', 'multiOrder', 'order',
+    'kitchen', 'order',
     'siteSettings', 'users',
   ] as const;
   const stub: Record<string, unknown> = new Proxy({}, {
