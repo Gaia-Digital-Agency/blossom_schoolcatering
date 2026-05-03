@@ -132,6 +132,23 @@ Production DB execution runbook:
 
 ## Operational Toggles
 
+### Quick reference
+| | |
+|---|---|
+| **Host** | `gda-ce01` |
+| **Run as** | any sudoer |
+
+```bash
+sudo sc-login off       # block all login attempts (HTTP 503)
+sudo sc-login on        # restore normal login
+sudo sc-login status    # show current state
+```
+
+One-liner from a workstation:
+```bash
+ssh gda-ce01 "sudo sc-login on"
+```
+
 ### Login disable (maintenance mode)
 For temporarily blocking all login attempts while keeping the site up. No code change, no PM2 restart, zero downtime — the toggle reloads nginx with a different include snippet.
 
