@@ -129,3 +129,28 @@ Fresh-install consolidated path:
 
 Production DB execution runbook:
 - `docs/db/production-runbook.md`
+
+## Operational Toggles
+
+### Login disable (maintenance mode)
+For temporarily blocking all login attempts while keeping the site up. No code change, no PM2 restart, zero downtime — the toggle reloads nginx with a different include snippet.
+
+```bash
+sudo sc-login off       # block all auth-login endpoints (return HTTP 503)
+sudo sc-login on        # restore normal login
+sudo sc-login status    # show current state
+```
+
+When OFF, the following endpoints return `503 {"statusCode":503,"message":"Login temporarily disabled for maintenance"}`:
+- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/refresh` — existing JWTs cannot be extended
+- `POST /api/v1/auth/google/verify`
+- `POST /api/v1/auth/google/dev`
+
+Already-issued JWTs remain valid until their natural expiry; new logins and refresh attempts are rejected. All other web and API routes (admin pages, listings, registration via `/auth/register/*`, etc.) are unaffected.
+
+Source files live under `scripts/ops/login-toggle/`. To install (or reinstall) on a server:
+```bash
+sudo bash scripts/ops/login-toggle/install.sh
+```
+The installer copies the snippets to `/etc/nginx/snippets/`, installs the `sc-login` script to `/usr/local/bin/`, and inserts a single `include` line into the schoolcatering server block in `/etc/nginx/sites-available/gaiada1-subdomains` (idempotent, with backup).

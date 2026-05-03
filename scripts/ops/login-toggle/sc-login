@@ -1,0 +1,38 @@
+#!/bin/bash
+# schoolcatering login toggle.
+# Usage: sudo sc-login {off|on|status}
+#   off    — block all auth-login endpoints (503), site otherwise up
+#   on     — restore normal auth routing
+#   status — show current state
+set -e
+SNIPDIR=/etc/nginx/snippets
+STATE="$SNIPDIR/sc-login-state.conf"
+BLOCK="$SNIPDIR/sc-login-block.conf"
+EMPTY="$SNIPDIR/sc-login-empty.conf"
+
+reload() { sudo nginx -t && sudo systemctl reload nginx; }
+
+case "${1:-status}" in
+    off)
+        sudo ln -sf "$BLOCK" "$STATE"
+        reload
+        echo "schoolcatering login: OFF (auth endpoints return 503)"
+        ;;
+    on)
+        sudo ln -sf "$EMPTY" "$STATE"
+        reload
+        echo "schoolcatering login: ON"
+        ;;
+    status)
+        target=$(readlink "$STATE" 2>/dev/null || echo "?")
+        case "$target" in
+            *block*) echo "schoolcatering login: OFF" ;;
+            *empty*) echo "schoolcatering login: ON" ;;
+            *)       echo "schoolcatering login: UNKNOWN ($target)" ;;
+        esac
+        ;;
+    *)
+        echo "Usage: sudo sc-login {off|on|status}" >&2
+        exit 1
+        ;;
+esac
