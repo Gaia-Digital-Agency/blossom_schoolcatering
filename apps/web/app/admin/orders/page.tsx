@@ -15,6 +15,8 @@ type OrderRow = {
   total_price: number;
   school_name: string;
   school_grade?: string;
+  registration_grade?: string;
+  current_school_grade?: string | null;
   child_name: string;
   account_name: string;
   delivery_name: string;
@@ -45,6 +47,15 @@ function todayIsoLocal() {
 
 function formatMoney(value: number) {
   return `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
+}
+
+function displayGrade(row: { school_grade?: string; registration_grade?: string; current_school_grade?: string | null }) {
+  return (
+    (row.school_grade && row.school_grade.trim()) ||
+    (row.current_school_grade && String(row.current_school_grade).trim()) ||
+    (row.registration_grade && row.registration_grade.trim()) ||
+    '-'
+  );
 }
 
 export default function AdminOrdersPage() {
@@ -261,7 +272,7 @@ export default function AdminOrdersPage() {
               {(data?.outstanding || []).map((row) => (
                 <article key={row.order_id} className="orders-card">
                   <strong>{row.child_name}</strong>
-                  <small>Grade: {row.school_grade || '-'}</small>
+                  <small><strong>Grade: {displayGrade(row)}</strong></small>
                   <small>{row.school_name}</small>
                   <small>{row.service_date} · {getSessionLabel(row.session)}</small>
                   <small>Family/Student: {row.account_name}</small>
@@ -297,7 +308,7 @@ export default function AdminOrdersPage() {
               {(data?.completed || []).map((row) => (
                 <article key={row.order_id} className="orders-card orders-card-complete">
                   <strong>{row.child_name}</strong>
-                  <small>Grade: {row.school_grade || '-'}</small>
+                  <small><strong>Grade: {displayGrade(row)}</strong></small>
                   <small>{row.school_name}</small>
                   <small>{row.service_date} · {getSessionLabel(row.session)}</small>
                   <small>Family/Student: {row.account_name}</small>
@@ -333,7 +344,7 @@ export default function AdminOrdersPage() {
             <div className="orders-modal-grid">
               <label><strong>Order ID</strong><small>{selectedOrder.order_id}</small></label>
               <label><strong>Student</strong><small>{selectedOrder.child_name}</small></label>
-              <label><strong>Grade</strong><small>{selectedOrder.school_grade || '-'}</small></label>
+              <label><strong>Grade</strong><small>{displayGrade(selectedOrder)}</small></label>
               <label><strong>School</strong><small>{selectedOrder.school_name}</small></label>
               <label><strong>Date / Session</strong><small>{selectedOrder.service_date} · {getSessionLabel(selectedOrder.session)}</small></label>
               <label><strong>Family / Student Login</strong><small>{selectedOrder.account_name}</small></label>
@@ -367,6 +378,7 @@ export default function AdminOrdersPage() {
             <h2>Edit Order</h2>
             <div className="orders-modal-grid">
               <label><strong>Student</strong><small>{editingOrder.child_name}</small></label>
+              <label><strong>Grade</strong><small>{displayGrade(editingOrder)}</small></label>
               <label><strong>Date / Session</strong><small>{editingOrder.service_date} · {getSessionLabel(editingOrder.session)}</small></label>
               <label className="orders-modal-wide">
                 <strong>Menu Items</strong>
