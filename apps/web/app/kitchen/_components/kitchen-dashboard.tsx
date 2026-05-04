@@ -19,6 +19,8 @@ type KitchenOrder = {
   delivery_status: string;
   school_name?: string;
   school_grade?: string;
+  registration_grade?: string;
+  current_school_grade?: string | null;
   child_name: string;
   youngster_mobile?: string | null;
   parent_name: string;
@@ -42,6 +44,15 @@ type KitchenData = {
   allergenAlerts: KitchenOrder[];
   orders: KitchenOrder[];
 };
+
+function displayGrade(o: KitchenOrder) {
+  return (
+    (o.school_grade && o.school_grade.trim()) ||
+    (o.current_school_grade && String(o.current_school_grade).trim()) ||
+    (o.registration_grade && o.registration_grade.trim()) ||
+    '-'
+  );
+}
 
 function dateInMakassar(offsetDays = 0) {
   const now = new Date();
@@ -158,7 +169,7 @@ export default function KitchenDashboard({
         data.serviceDate,
         sessionLabel,
         o.child_name,
-        o.school_grade || '',
+        displayGrade(o) === '-' ? '' : displayGrade(o),
         o.school_name || '',
         o.youngster_mobile || '',
         o.parent_name || '',
@@ -227,7 +238,7 @@ export default function KitchenDashboard({
       <article class=\"order-card\">
         <div><strong>Session:</strong> ${escapeHtml(getSessionLabel(o.session))}</div>
         <div><strong>Student:</strong> ${escapeHtml(o.child_name)}</div>
-        <div><strong>Grade:</strong> ${escapeHtml(o.school_grade || '-')}</div>
+        <div><strong>Grade:</strong> ${escapeHtml(displayGrade(o))}</div>
         <div><strong>School:</strong> ${escapeHtml(o.school_name || '-')}</div>
         <div><strong>Phone Number:</strong> ${escapeHtml(o.youngster_mobile || '-')}</div>
         <div><strong>Dietary Allergies:</strong> ${escapeHtml(o.allergen_items || '-')}</div>
@@ -407,7 +418,7 @@ export default function KitchenDashboard({
                   {filteredAlerts.map((o) => (
                     <article className="kitchen-alert-card" key={o.id}>
                       <strong>{getSessionLabel(o.session)} - {o.child_name}</strong>
-                      <small>Grade: {o.school_grade || '-'}</small>
+                      <small><strong>Grade: {displayGrade(o)}</strong></small>
                       <small>Family: {o.parent_name}</small>
                       <small>Dietary Allergies: {o.allergen_items || '-'}</small>
                       <small>Dishes: {o.dish_count}</small>
@@ -429,7 +440,7 @@ export default function KitchenDashboard({
                           <button className="kitchen-order-card" key={o.id} type="button" onClick={() => onMarkKitchenComplete(o.id)}>
                             <small>Session: {getSessionLabel(o.session)}</small>
                             <small>Student: {o.child_name}</small>
-                            <small>Grade: {o.school_grade || '-'}</small>
+                            <small><strong>Grade: {displayGrade(o)}</strong></small>
                             <small>School: {o.school_name || '-'}</small>
                             <small>Phone Number: {o.youngster_mobile || '-'}</small>
                             <small>Dietary Allergies: {o.allergen_items || '-'}</small>
@@ -453,7 +464,7 @@ export default function KitchenDashboard({
                           <button className="kitchen-order-card kitchen-order-card-complete" key={o.id} type="button" onClick={() => onMarkKitchenComplete(o.id)}>
                             <small>Session: {getSessionLabel(o.session)}</small>
                             <small>Student: {o.child_name}</small>
-                            <small>Grade: {o.school_grade || '-'}</small>
+                            <small><strong>Grade: {displayGrade(o)}</strong></small>
                             <small>School: {o.school_name || '-'}</small>
                             <small>Phone Number: {o.youngster_mobile || '-'}</small>
                             <small>Dietary Allergies: {o.allergen_items || '-'}</small>

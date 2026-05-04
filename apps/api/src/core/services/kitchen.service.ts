@@ -88,6 +88,9 @@ export class KitchenService {
                o.status::text AS status,
                o.delivery_status::text AS delivery_status,
                s.name AS school_name,
+               c.school_grade AS registration_grade,
+               c.current_school_grade,
+               c.created_at::text AS registration_date,
                (uc.first_name || ' ' || uc.last_name) AS child_name,
                COALESCE(NULLIF(TRIM(uc.phone_number), ''), NULLIF(TRIM(up.phone_number), '')) AS youngster_mobile,
                COALESCE((up.first_name || ' ' || up.last_name), '-') AS parent_name,
@@ -147,7 +150,7 @@ export class KitchenService {
         LEFT JOIN users up ON up.id = p.user_id
         WHERE o.service_date = $1::date
           AND o.status IN ('PLACED', 'LOCKED')
-        GROUP BY o.id, s.name, uc.first_name, uc.last_name, uc.phone_number, up.first_name, up.last_name, up.phone_number, item_counts.dish_count, reg_allergy.restriction_details
+        GROUP BY o.id, s.name, c.school_grade, c.current_school_grade, c.created_at, uc.first_name, uc.last_name, uc.phone_number, up.first_name, up.last_name, up.phone_number, item_counts.dish_count, reg_allergy.restriction_details
         ORDER BY s.name ASC, child_name ASC, o.session ASC
       ) t;
     `,
@@ -160,6 +163,9 @@ export class KitchenService {
       status: string;
       delivery_status: string;
       school_name: string;
+      registration_grade?: string | null;
+      current_school_grade?: string | null;
+      registration_date?: string | null;
       child_name: string;
       youngster_mobile?: string | null;
       parent_name: string;
