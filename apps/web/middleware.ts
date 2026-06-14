@@ -80,6 +80,7 @@ export function middleware(request: NextRequest) {
     normalizedPath === '/' ||
     normalizedPath === '/menu' ||
     normalizedPath.startsWith('/menu/') ||
+    normalizedPath === '/info' ||
     normalizedPath === '/guide' ||
     normalizedPath.startsWith('/guide/') ||
     normalizedPath === '/userguide' ||
